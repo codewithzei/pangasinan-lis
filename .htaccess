@@ -1,0 +1,20 @@
+RewriteEngine On
+
+# Base directory
+RewriteBase /pangasinan-lis/
+
+# Protect environment and configuration files
+<FilesMatch "^(\.env|composer\.json|composer\.lock)$">
+    Require all denied
+</FilesMatch>
+
+# Don't rewrite existing files or folders
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Send all other requests to index.php
+RewriteRule ^ index.php [QSA,L]
+
+# Disable directory listing
+Options -Indexes

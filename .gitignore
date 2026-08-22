@@ -1,0 +1,18 @@
+# Environment
+.env
+.env.*
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# Generated files
+/public/assets/css/output.css
+
+# Logs
+/storage/logs/*
+/storage/cache/*
+/storage/sessions/*
+
+# Uploaded documents
+/storage/documents/*

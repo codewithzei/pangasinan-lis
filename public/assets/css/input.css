@@ -1,0 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+    --font-poppins: "Poppins", sans-serif;
+
+    --color-primary: #1d4ed8;
+    --color-primary-dark: #1e40af;
+    --color-secondary: #64748b;
+}
+
+@layer components {
+
+    .sidebar-link {
+        @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 transition;
+    }
+
+    .sidebar-link:hover {
+        @apply bg-gray-50 text-primary;
+    }
+
+}
