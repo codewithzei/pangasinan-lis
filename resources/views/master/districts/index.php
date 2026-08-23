@@ -54,12 +54,12 @@ $accent = $accent ?? 'primary';
                         <p class="text-sm text-gray-500">Total Districts</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalDistricts) ?></p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-icon lucide-map"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-600">All districts</span>
+                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-600">All districts</span>
                 </div>
             </div>
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
@@ -68,7 +68,7 @@ $accent = $accent ?? 'primary';
                         <p class="text-sm text-gray-500">Active Districts</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($activeDistricts) ?></p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                   d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
@@ -76,7 +76,7 @@ $accent = $accent ?? 'primary';
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-600">Available in dropdowns</span>
+                    <span class="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-600">Available in dropdowns</span>
                 </div>
             </div>
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
@@ -150,15 +150,12 @@ $accent = $accent ?? 'primary';
                         <tr>
                             <td colspan="5" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
-                                    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                              d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                    </svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-icon lucide-map"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>
                                 </div>
                                 <p class="mt-4 text-sm font-medium text-gray-700">No districts found.</p>
                                 <p class="mt-1 text-xs text-gray-500">Create your first district to populate dropdowns.</p>
                                 <button type="button" onclick="openDistrictModal()"
-                                    class="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition">
+                                    class="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                     </svg>
@@ -213,7 +210,7 @@ $accent = $accent ?? 'primary';
                                 <div class="flex items-center justify-end gap-1">
                                     <button type="button" onclick="editDistrict(<?= $d['id'] ?>)"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition"
-                                        title="Edit District">
+                                        title="Edit">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -236,7 +233,7 @@ $accent = $accent ?? 'primary';
                                     </button>
                                     <button type="button" onclick="deleteDistrict(<?= $d['id'] ?>, '<?= htmlspecialchars($d['name']) ?>')"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-red-400 hover:bg-red-50 hover:text-red-600 transition"
-                                        title="Delete District">
+                                        title="Delete">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -371,7 +368,7 @@ $accent = $accent ?? 'primary';
                     <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                     </svg>
-                    Save District
+                    Save
                 </button>
             </div>
         </form>
@@ -538,7 +535,7 @@ function resetDistrictForm() {
         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
         </svg>
-        Save District
+        Save
     `;
     ['districtName', 'districtNumber', 'sortOrder'].forEach(clearFieldError);
     attachDistrictValidation();
@@ -602,7 +599,7 @@ async function editDistrict(id) {
             <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
             </svg>
-            Update District
+            Update
         `;
         districtModalOpen = true;
         const m = document.getElementById('districtModal');

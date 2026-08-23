@@ -8,6 +8,8 @@ class DatabaseSeeder
         RoleSeeder::class,
         PositionSeeder::class,
         DistrictSeeder::class,
+        DocumentTypeSeeder::class,
+        DocumentStatusSeeder::class,
         MasterSeeder::class,
         TermSeeder::class,
     ];

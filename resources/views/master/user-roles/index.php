@@ -54,12 +54,12 @@ $accent = $accent ?? 'primary';
                         <p class="text-sm text-gray-500">Total Roles</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalRoles) ?></p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-icon lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-600">All roles</span>
+                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-600">All roles</span>
                 </div>
             </div>
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
@@ -68,7 +68,7 @@ $accent = $accent ?? 'primary';
                         <p class="text-sm text-gray-500">Active Roles</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($activeRoles) ?></p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                   d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
@@ -76,7 +76,7 @@ $accent = $accent ?? 'primary';
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-600">Available in dropdowns</span>
+                    <span class="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-600">Available in dropdowns</span>
                 </div>
             </div>
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
@@ -198,7 +198,7 @@ $accent = $accent ?? 'primary';
                                 <div class="flex items-center justify-end gap-1">
                                     <button type="button" onclick="editRole(<?= $r['id'] ?>)"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition"
-                                        title="Edit Role">
+                                        title="Edit">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -221,7 +221,7 @@ $accent = $accent ?? 'primary';
                                     </button>
                                     <button type="button" onclick="deleteRole(<?= $r['id'] ?>, '<?= htmlspecialchars($r['name']) ?>')"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-red-400 hover:bg-red-50 hover:text-red-600 transition"
-                                        title="Delete Role">
+                                        title="Delete">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -346,7 +346,7 @@ $accent = $accent ?? 'primary';
                     <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                     </svg>
-                    Save Role
+                    Save
                 </button>
             </div>
         </form>
@@ -505,7 +505,7 @@ function resetRoleForm() {
         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
         </svg>
-        Save Role
+        Save
     `;
     ['roleName', 'roleNumber', 'sortOrder'].forEach(clearFieldError);
     attachRoleValidation();
@@ -568,7 +568,7 @@ async function editRole(id) {
             <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
             </svg>
-            Update Role
+            Update
         `;
         userRoleModalOpen = true;
         const m = document.getElementById('userRoleModal');

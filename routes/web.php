@@ -289,6 +289,94 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'master/document-types' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/DocumentTypeController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/document-types/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/DocumentTypeController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/document-types/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/DocumentTypeController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/document-types/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/DocumentTypeController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/document-types/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/DocumentTypeController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/document-types/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/DocumentTypeController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/document-statuses' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/DocumentStatusController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/document-statuses/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/DocumentStatusController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/document-statuses/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/DocumentStatusController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/document-statuses/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/DocumentStatusController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/document-statuses/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/DocumentStatusController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/document-statuses/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/DocumentStatusController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'master/system-logs' => [
         'method' => 'GET',
         'controller' => 'Master/SystemLogController',
