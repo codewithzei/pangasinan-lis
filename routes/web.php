@@ -289,6 +289,50 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'master/municipalities' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/MuniCityController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/municipalities/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/MuniCityController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/municipalities/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/MuniCityController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/municipalities/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/MuniCityController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/municipalities/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/MuniCityController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/municipalities/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/MuniCityController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'master/document-types' => [
         [
             'method' => 'GET',
@@ -373,6 +417,182 @@ return [
     'master/document-statuses/toggle-status' => [
         'method' => 'POST',
         'controller' => 'Master/DocumentStatusController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/source-types' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/SourceTypeController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/source-types/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/SourceTypeController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/source-types/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/SourceTypeController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/source-types/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/SourceTypeController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/source-types/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/SourceTypeController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/source-types/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/SourceTypeController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/external-offices' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/ExternalOfficeController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/external-offices/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/ExternalOfficeController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/external-offices/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/ExternalOfficeController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/external-offices/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/ExternalOfficeController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/external-offices/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/ExternalOfficeController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/external-offices/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/ExternalOfficeController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/routing-options' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/RoutingOptionController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/routing-options/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/RoutingOptionController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/routing-options/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/RoutingOptionController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/routing-options/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/RoutingOptionController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/routing-options/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/RoutingOptionController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/routing-options/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/RoutingOptionController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/hospitals' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/HospitalController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/hospitals/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/HospitalController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/hospitals/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/HospitalController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/hospitals/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/HospitalController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/hospitals/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/HospitalController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/hospitals/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/HospitalController',
         'action' => 'toggleStatus',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],

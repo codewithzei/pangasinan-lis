@@ -3,15 +3,15 @@ ob_start();
 
 $success = $success ?? null;
 $error = $error ?? null;
-$pageTitle = $pageTitle ?? 'Document Statuses Management';
+$pageTitle = $pageTitle ?? 'Source Types Management';
 $pageSubtitle = $pageSubtitle ?? '';
-$totalDocumentStatuses = $totalDocumentStatuses ?? 0;
-$activeDocumentStatuses = $activeDocumentStatuses ?? 0;
-$inactiveDocumentStatuses = $inactiveDocumentStatuses ?? 0;
+$totalSourceTypes = $totalSourceTypes ?? 0;
+$activeSourceTypes = $activeSourceTypes ?? 0;
+$inactiveSourceTypes = $inactiveSourceTypes ?? 0;
 $totalRows = $totalRows ?? 0;
 $search = $search ?? '';
 $filterStatus = $filterStatus ?? '';
-$documentStatuses = $documentStatuses ?? [];
+$sourceTypes = $sourceTypes ?? [];
 $totalPages = $totalPages ?? 1;
 $page = $page ?? 1;
 $accent = $accent ?? 'primary';
@@ -23,7 +23,7 @@ $accent = $accent ?? 'primary';
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
-                    <p class="text-sm font-medium text-blue-100">DOCUMENT STATUS MASTER DATA</p>
+                    <p class="text-sm font-medium text-blue-100">SOURCE TYPE MASTER DATA</p>
                     <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                         <?= htmlspecialchars($pageTitle) ?>
                     </h1>
@@ -32,12 +32,12 @@ $accent = $accent ?? 'primary';
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <button type="button" onclick="openDocumentStatusModal()"
+                    <button type="button" onclick="openSourceTypeModal()"
                         class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary shadow-sm hover:bg-blue-50 transition">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
-                        New Status
+                        New Source Type
                     </button>
                 </div>
             </div>
@@ -51,26 +51,26 @@ $accent = $accent ?? 'primary';
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Total Document Statuses</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalDocumentStatuses) ?></p>
+                        <p class="text-sm text-gray-500">Total Source Types</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalSourceTypes) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+                        </svg>
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-primary">All classifications</span>
+                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-primary">All source types</span>
                 </div>
             </div>
 
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Active Document Statuses</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($activeDocumentStatuses) ?></p>
+                        <p class="text-sm text-gray-500">Active Source Types</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($activeSourceTypes) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -79,15 +79,15 @@ $accent = $accent ?? 'primary';
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-600">Available in selection</span>
+                    <span class="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-600">Available in workflow</span>
                 </div>
             </div>
 
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Inactive Document Statuses</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($inactiveDocumentStatuses) ?></p>
+                        <p class="text-sm text-gray-500">Inactive Source Types</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($inactiveSourceTypes) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,17 +105,17 @@ $accent = $accent ?? 'primary';
     <section class="rounded-2xl border border-gray-200 bg-white">
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <h2 class="font-semibold text-gray-900">Document Statuses List</h2>
+                <h2 class="font-semibold text-gray-900">Source Types List</h2>
                 <p class="mt-1 text-xs text-gray-500">
                     <?= $totalRows ?> record<?= $totalRows !== 1 ? 's' : '' ?> found
                 </p>
             </div>
-            <form method="GET" action="<?= BASE_URL ?>/master/document-statuses" class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <form method="GET" action="<?= BASE_URL ?>/master/source-types" class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search status..."
+                    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search source types..."
                         class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-64">
                 </div>
                 <select name="status" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
@@ -127,7 +127,7 @@ $accent = $accent ?? 'primary';
                     Filter
                 </button>
                 <?php if ($search !== '' || $filterStatus !== ''): ?>
-                    <a href="<?= BASE_URL ?>/master/document-statuses"
+                    <a href="<?= BASE_URL ?>/master/source-types"
                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition text-center">
                         Clear
                     </a>
@@ -139,59 +139,51 @@ $accent = $accent ?? 'primary';
             <table class="w-full text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="px-6 py-3 font-medium">Document Status</th>
-                        <th class="px-6 py-3 font-medium">Badge</th>
+                        <th class="px-6 py-3 font-medium">Source Type</th>
                         <th class="px-6 py-3 font-medium">Sort</th>
                         <th class="px-6 py-3 font-medium">Status</th>
                         <th class="px-6 py-3 font-medium text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    <?php if (empty($documentStatuses)): ?>
+                    <?php if (empty($sourceTypes)): ?>
                         <tr>
-                            <td colspan="5" class="px-6 py-16 text-center">
+                            <td colspan="4" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
                                     </svg>
                                 </div>
-                                <p class="mt-4 text-sm font-medium text-gray-700">No document statuses found.</p>
-                                <p class="mt-1 text-xs text-gray-500">Create a category and assign a color badge to label it.</p>
-                                <button type="button" onclick="openDocumentStatusModal()"
+                                <p class="mt-4 text-sm font-medium text-gray-700">No source types found.</p>
+                                <p class="mt-1 text-xs text-gray-500">Create a new source type to organize your data.</p>
+                                <button type="button" onclick="openSourceTypeModal()"
                                     class="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                     </svg>
-                                    Create Document Status
+                                    Create Source Type
                                 </button>
                             </td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($documentStatuses as $documentStatus): ?>
-                            <?php $badgeColor = !empty($documentStatus['badge_color']) ? $documentStatus['badge_color'] : '#2563EB'; ?>
+                        <?php foreach ($sourceTypes as $sourceType): ?>
                             <tr class="hover:bg-gray-50/50 transition">
                                 <td class="px-6 py-4">
                                     <div>
-                                        <div class="font-medium text-gray-900"><?= htmlspecialchars($documentStatus['name']) ?></div>
-                                        <?php if (!empty($documentStatus['description'])): ?>
-                                            <div class="mt-0.5 text-xs text-gray-500 line-clamp-1 max-w-lg"><?= htmlspecialchars($documentStatus['description']) ?></div>
+                                        <div class="font-medium text-gray-900"><?= htmlspecialchars($sourceType['name']) ?></div>
+                                        <?php if (!empty($sourceType['description'])): ?>
+                                            <div class="mt-0.5 text-xs text-gray-500 line-clamp-1 max-w-xl"><?= htmlspecialchars($sourceType['description']) ?></div>
                                         <?php endif; ?>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span class="inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold shadow-sm" style="background-color: <?= htmlspecialchars($badgeColor) ?>; border-color: <?= htmlspecialchars($badgeColor) ?>; color: white;">
-                                        <span class="h-2.5 w-2.5 rounded-full bg-white/80"></span>
-                                        <?= htmlspecialchars($badgeColor) ?>
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4">
                                     <span class="inline-flex items-center rounded-lg bg-gray-50 border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600">
-                                        #<?= (int)$documentStatus['sort_order'] ?>
+                                        #<?= (int)$sourceType['sort_order'] ?>
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <?php if ($documentStatus['is_active']): ?>
+                                    <?php if ($sourceType['is_active']): ?>
                                         <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                                             <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span> Active
                                         </span>
@@ -203,17 +195,17 @@ $accent = $accent ?? 'primary';
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-1">
-                                        <button type="button" onclick="editDocumentStatus(<?= $documentStatus['id'] ?>)"
+                                        <button type="button" onclick="editSourceType(<?= $sourceType['id'] ?>)"
                                             class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-primary hover:bg-blue-50 hover:text-primary transition"
                                             title="Edit">
                                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                             </svg>
                                         </button>
-                                        <button type="button" onclick="toggleStatus(<?= $documentStatus['id'] ?>, '<?= htmlspecialchars($documentStatus['name']) ?>')"
+                                        <button type="button" onclick="toggleStatus(<?= $sourceType['id'] ?>, '<?= htmlspecialchars($sourceType['name']) ?>')"
                                             class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 transition"
-                                            title="<?= $documentStatus['is_active'] ? 'Set Inactive' : 'Set Active' ?>">
-                                            <?php if ($documentStatus['is_active']): ?>
+                                            title="<?= $sourceType['is_active'] ? 'Set Inactive' : 'Set Active' ?>">
+                                            <?php if ($sourceType['is_active']): ?>
                                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
                                             </svg>
@@ -223,7 +215,7 @@ $accent = $accent ?? 'primary';
                                             </svg>
                                             <?php endif; ?>
                                         </button>
-                                        <button type="button" onclick="deleteDocumentStatus(<?= $documentStatus['id'] ?>, '<?= htmlspecialchars($documentStatus['name']) ?>')"
+                                        <button type="button" onclick="deleteSourceType(<?= $sourceType['id'] ?>, '<?= htmlspecialchars($sourceType['name']) ?>')"
                                             class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-red-400 hover:bg-red-50 hover:text-red-600 transition"
                                             title="Delete">
                                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,17 +276,17 @@ $accent = $accent ?? 'primary';
 
 </div>
 
-<div id="documentStatusModal" class="fixed inset-0 z-100 hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="documentStatusModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="documentStatusModalPanel" class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
-        <form id="documentStatusForm" method="POST" action="<?= BASE_URL ?>/master/document-statuses/store">
-            <input type="hidden" name="id" id="documentStatusId" value="">
+<div id="sourceTypeModal" class="fixed inset-0 z-100 hidden items-center justify-center" role="dialog" aria-modal="true">
+    <div id="sourceTypeModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
+    <div id="sourceTypeModalPanel" class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
+        <form id="sourceTypeForm" method="POST" action="<?= BASE_URL ?>/master/source-types/store">
+            <input type="hidden" name="id" id="sourceTypeId" value="">
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
                 <div>
-                    <h3 id="documentStatusModalTitle" class="text-lg font-semibold text-gray-900">Create New Document Status</h3>
-                    <p class="mt-0.5 text-xs text-gray-500">Fill in the document status details below.</p>
+                    <h3 id="sourceTypeModalTitle" class="text-lg font-semibold text-gray-900">Create New Source Type</h3>
+                    <p class="mt-0.5 text-xs text-gray-500">Fill in the source type details below.</p>
                 </div>
-                <button type="button" onclick="closeDocumentStatusModal()" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
+                <button type="button" onclick="closeSourceTypeModal()" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
@@ -303,58 +295,47 @@ $accent = $accent ?? 'primary';
             <div class="p-6 space-y-5">
                 <div>
                     <label class="mb-1.5 block text-xs font-semibold text-gray-700">
-                        Document Status Name <span class="text-red-500">*</span>
+                        Source Type Name <span class="text-red-500">*</span>
                     </label>
-                    <input type="text" name="name" id="documentStatusName" value="<?= old('name') ?>"
+                    <input type="text" name="name" id="sourceTypeName" value="<?= old('name') ?>"
                         class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                        placeholder="e.g. Pending" required>
+                        placeholder="e.g. Visitor" required>
                 </div>
 
                 <div>
                     <label class="mb-1.5 block text-xs font-semibold text-gray-700">Description / Notes</label>
-                    <textarea name="description" id="documentStatusDescription" rows="3"
+                    <textarea name="description" id="sourceTypeDescription" rows="4"
                         class="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                        placeholder="Optional description for this status category..."><?= old('description') ?></textarea>
+                        placeholder="Optional description for this source type..."><?= old('description') ?></textarea>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <label class="mb-1.5 block text-xs font-semibold text-gray-700">Badge Color</label>
-                        <div class="flex items-center gap-2">
-                            <input type="color" name="badge_color" id="documentStatusBadgeColor" value="<?= old('badge_color', '#2563EB') ?>" class="h-11 w-16 cursor-pointer rounded-lg border border-gray-200 bg-white p-1">
-                            <input type="text" id="documentStatusBadgeHex" value="<?= old('badge_color', '#2563EB') ?>" maxlength="7"
-                                class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                        </div>
-                        <p class="mt-1 text-[11px] text-gray-500">This color is used for the badge tag in status listings.</p>
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-xs font-semibold text-gray-700">
-                            Sort Order
-                        </label>
-                        <input type="number" name="sort_order" id="documentStatusSortOrder" min="0" value="<?= old('sort_order', '0') ?>"
-                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            placeholder="0">
-                        <p class="mt-1 text-[11px] text-gray-500">Lower values appear first in dropdowns.</p>
-                    </div>
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700">
+                        Sort Order
+                    </label>
+                    <input type="number" name="sort_order" id="sourceTypeSortOrder" min="0" value="<?= old('sort_order', '0') ?>"
+                        class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        placeholder="0">
+                    <p class="mt-1 text-[11px] text-gray-500">Lower values appear first in the source type list.</p>
                 </div>
 
                 <div class="flex items-end">
                     <div class="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 w-full">
-                        <input type="checkbox" name="is_active" id="documentStatusIsActive" value="1" checked
+                        <input type="checkbox" name="is_active" id="sourceTypeIsActive" value="1" checked
                             class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
                         <div>
-                            <label for="documentStatusIsActive" class="cursor-pointer text-sm font-medium text-gray-800">Set as active</label>
-                            <p class="mt-0.5 text-[11px] text-gray-500">Active document statuses appear in selection lists.</p>
+                            <label for="sourceTypeIsActive" class="cursor-pointer text-sm font-medium text-gray-800">Set as active</label>
+                            <p class="mt-0.5 text-[11px] text-gray-500">Active source types appear in selection lists.</p>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 bg-gray-50 rounded-b-2xl">
-                <button type="button" onclick="closeDocumentStatusModal()"
+                <button type="button" onclick="closeSourceTypeModal()"
                     class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition">
                     Cancel
                 </button>
-                <button type="submit" id="documentStatusSubmitBtn"
+                <button type="submit" id="sourceTypeSubmitBtn"
                     class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-blue-700 transition shadow-sm">
                     <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -399,28 +380,9 @@ $accent = $accent ?? 'primary';
 
 <script>
 const BASE = '<?= BASE_URL ?>';
-let documentStatusModalOpen = false;
+let sourceTypeModalOpen = false;
 let confirmModalOpen = false;
 let pendingAction = null;
-
-function syncBadgeColorInputs() {
-    const colorInput = document.getElementById('documentStatusBadgeColor');
-    const hexInput = document.getElementById('documentStatusBadgeHex');
-    if (!colorInput || !hexInput) return;
-
-    colorInput.addEventListener('input', function () {
-        hexInput.value = colorInput.value;
-    });
-
-    hexInput.addEventListener('input', function () {
-        const val = hexInput.value.trim();
-        if (/^#[0-9a-fA-F]{0,6}$/.test(val)) {
-            if (val.length === 7) {
-                colorInput.value = val;
-            }
-        }
-    });
-}
 
 function showToast(message, type = 'success') {
     const container = document.getElementById('toastContainer');
@@ -460,19 +422,17 @@ function showToast(message, type = 'success') {
     }, 2800);
 }
 
-function resetDocumentStatusForm() {
-    const form = document.getElementById('documentStatusForm');
+function resetSourceTypeForm() {
+    const form = document.getElementById('sourceTypeForm');
     form.reset();
-    document.getElementById('documentStatusId').value = '';
-    document.getElementById('documentStatusName').value = '';
-    document.getElementById('documentStatusDescription').value = '';
-    document.getElementById('documentStatusBadgeColor').value = '#2563EB';
-    document.getElementById('documentStatusBadgeHex').value = '#2563EB';
-    document.getElementById('documentStatusSortOrder').value = '0';
-    document.getElementById('documentStatusIsActive').checked = true;
-    form.action = `${BASE}/master/document-statuses/store`;
-    document.getElementById('documentStatusModalTitle').textContent = 'Create New Document Status';
-    document.getElementById('documentStatusSubmitBtn').innerHTML = `
+    document.getElementById('sourceTypeId').value = '';
+    document.getElementById('sourceTypeName').value = '';
+    document.getElementById('sourceTypeDescription').value = '';
+    document.getElementById('sourceTypeSortOrder').value = '0';
+    document.getElementById('sourceTypeIsActive').checked = true;
+    form.action = `${BASE}/master/source-types/store`;
+    document.getElementById('sourceTypeModalTitle').textContent = 'Create New Source Type';
+    document.getElementById('sourceTypeSubmitBtn').innerHTML = `
         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
         </svg>
@@ -480,14 +440,14 @@ function resetDocumentStatusForm() {
     `;
 }
 
-function openDocumentStatusModal() {
-    if (documentStatusModalOpen) return;
-    resetDocumentStatusForm();
-    documentStatusModalOpen = true;
+function openSourceTypeModal() {
+    if (sourceTypeModalOpen) return;
+    resetSourceTypeForm();
+    sourceTypeModalOpen = true;
 
-    const modal = document.getElementById('documentStatusModal');
-    const panel = document.getElementById('documentStatusModalPanel');
-    const backdrop = document.getElementById('documentStatusModalBackdrop');
+    const modal = document.getElementById('sourceTypeModal');
+    const panel = document.getElementById('sourceTypeModalPanel');
+    const backdrop = document.getElementById('sourceTypeModalBackdrop');
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -497,16 +457,16 @@ function openDocumentStatusModal() {
         panel.classList.add('scale-100', 'opacity-100');
     });
 
-    setTimeout(() => document.getElementById('documentStatusName').focus(), 220);
+    setTimeout(() => document.getElementById('sourceTypeName').focus(), 220);
 }
 
-function closeDocumentStatusModal() {
-    if (!documentStatusModalOpen) return;
-    documentStatusModalOpen = false;
+function closeSourceTypeModal() {
+    if (!sourceTypeModalOpen) return;
+    sourceTypeModalOpen = false;
 
-    const modal = document.getElementById('documentStatusModal');
-    const panel = document.getElementById('documentStatusModalPanel');
-    const backdrop = document.getElementById('documentStatusModalBackdrop');
+    const modal = document.getElementById('sourceTypeModal');
+    const panel = document.getElementById('sourceTypeModalPanel');
+    const backdrop = document.getElementById('sourceTypeModalBackdrop');
 
     backdrop.classList.add('opacity-0');
     panel.classList.remove('scale-100', 'opacity-100');
@@ -518,7 +478,7 @@ function closeDocumentStatusModal() {
     }, 200);
 }
 
-document.getElementById('documentStatusModalBackdrop')?.addEventListener('click', closeDocumentStatusModal);
+document.getElementById('sourceTypeModalBackdrop')?.addEventListener('click', closeSourceTypeModal);
 
 function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', type = 'danger', onConfirm }) {
     if (confirmModalOpen) return;
@@ -588,37 +548,35 @@ function executeConfirmAction() {
 
 document.getElementById('confirmModalBackdrop')?.addEventListener('click', closeConfirmModal);
 
-async function editDocumentStatus(id) {
+async function editSourceType(id) {
     try {
-        const response = await fetch(`${BASE}/master/document-statuses/edit?id=${id}`);
+        const response = await fetch(`${BASE}/master/source-types/edit?id=${id}`);
         const result = await response.json();
         if (!result.success) {
-            showToast(result.message || 'Unable to load document status.', 'error');
+            showToast(result.message || 'Unable to load source type.', 'error');
             return;
         }
 
         const item = result.data;
-        const form = document.getElementById('documentStatusForm');
-        document.getElementById('documentStatusId').value = item.id;
-        document.getElementById('documentStatusName').value = item.name || '';
-        document.getElementById('documentStatusDescription').value = item.description || '';
-        document.getElementById('documentStatusBadgeColor').value = item.badge_color || '#2563EB';
-        document.getElementById('documentStatusBadgeHex').value = item.badge_color || '#2563EB';
-        document.getElementById('documentStatusSortOrder').value = item.sort_order ?? 0;
-        document.getElementById('documentStatusIsActive').checked = Number(item.is_active) === 1;
-        form.action = `${BASE}/master/document-statuses/update`;
-        document.getElementById('documentStatusModalTitle').textContent = 'Edit Document Status';
-        document.getElementById('documentStatusSubmitBtn').innerHTML = `
+        const form = document.getElementById('sourceTypeForm');
+        document.getElementById('sourceTypeId').value = item.id;
+        document.getElementById('sourceTypeName').value = item.name || '';
+        document.getElementById('sourceTypeDescription').value = item.description || '';
+        document.getElementById('sourceTypeSortOrder').value = item.sort_order ?? 0;
+        document.getElementById('sourceTypeIsActive').checked = Number(item.is_active) === 1;
+        form.action = `${BASE}/master/source-types/update`;
+        document.getElementById('sourceTypeModalTitle').textContent = 'Edit Source Type';
+        document.getElementById('sourceTypeSubmitBtn').innerHTML = `
             <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
             </svg>
             Update
         `;
 
-        documentStatusModalOpen = true;
-        const modal = document.getElementById('documentStatusModal');
-        const panel = document.getElementById('documentStatusModalPanel');
-        const backdrop = document.getElementById('documentStatusModalBackdrop');
+        sourceTypeModalOpen = true;
+        const modal = document.getElementById('sourceTypeModal');
+        const panel = document.getElementById('sourceTypeModalPanel');
+        const backdrop = document.getElementById('sourceTypeModalBackdrop');
         modal.classList.remove('hidden');
         modal.classList.add('flex');
         requestAnimationFrame(() => {
@@ -627,25 +585,25 @@ async function editDocumentStatus(id) {
             panel.classList.add('scale-100', 'opacity-100');
         });
     } catch (error) {
-        showToast('Failed to load document status data.', 'error');
+        showToast('Failed to load source type data.', 'error');
     }
 }
 
-function deleteDocumentStatus(id, name) {
+function deleteSourceType(id, name) {
     openConfirmModal({
-        title: 'Delete Document Status',
-        message: `Are you sure you want to delete <strong class="text-gray-800">${name}</strong>?<br><span class="text-xs text-gray-500">This action removes the record permanently.</span>`,
+        title: 'Delete Source Type',
+        message: `Are you sure you want to delete <strong class="text-gray-800">${name}</strong>?<br><span class="text-xs text-gray-500">This action removes the route from the master list.</span>`,
         confirmText: 'Delete',
         type: 'danger',
         onConfirm: async () => {
             const formData = new FormData();
             formData.append('id', id);
-            const response = await fetch(`${BASE}/master/document-statuses/destroy`, {
+            const response = await fetch(`${BASE}/master/source-types/destroy`, {
                 method: 'POST',
                 body: formData,
             });
             const result = await response.json();
-            showToast(result.message || (result.success ? 'Document status deleted successfully.' : 'Failed to delete document status.'), result.success ? 'success' : 'error');
+            showToast(result.message || (result.success ? 'Source type deleted successfully.' : 'Failed to delete source type.'), result.success ? 'success' : 'error');
             if (result.success) setTimeout(() => location.reload(), 800);
         }
     });
@@ -654,34 +612,29 @@ function deleteDocumentStatus(id, name) {
 function toggleStatus(id, name) {
     openConfirmModal({
         title: 'Toggle Status',
-        message: `This will toggle the active status of <strong class="text-gray-800">${name}</strong>.<br><span class="text-xs text-gray-500">Inactive document statuses are hidden from selection dropdowns.</span>`,
+        message: `This will toggle the active status of <strong class="text-gray-800">${name}</strong>.<br><span class="text-xs text-gray-500">Inactive source types are hidden from selection dropdowns.</span>`,
         confirmText: 'Proceed',
         type: 'info',
         onConfirm: async () => {
             const formData = new FormData();
             formData.append('id', id);
-            const response = await fetch(`${BASE}/master/document-statuses/toggle-status`, {
+            const response = await fetch(`${BASE}/master/source-types/toggle-status`, {
                 method: 'POST',
                 body: formData,
             });
             const result = await response.json();
-            showToast(result.message || (result.success ? 'Status updated successfully.' : 'Unable to update document status.'), result.success ? 'success' : 'error');
+            showToast(result.message || (result.success ? 'Status updated successfully.' : 'Unable to update source type.'), result.success ? 'success' : 'error');
             if (result.success) setTimeout(() => location.reload(), 800);
         }
     });
 }
 
-function validateDocumentStatusForm() {
+function validateSourceTypeForm() {
     let valid = true;
-    const name = document.getElementById('documentStatusName');
-    const color = document.getElementById('documentStatusBadgeHex');
-    const sortOrder = document.getElementById('documentStatusSortOrder');
+    const name = document.getElementById('sourceTypeName');
+    const sortOrder = document.getElementById('sourceTypeSortOrder');
 
     if (!name || name.value.trim() === '') {
-        valid = false;
-    }
-
-    if (!color || !/^#[0-9A-Fa-f]{6}$/.test(color.value.trim())) {
         valid = false;
     }
 
@@ -693,13 +646,12 @@ function validateDocumentStatusForm() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    syncBadgeColorInputs();
-    const form = document.getElementById('documentStatusForm');
+    const form = document.getElementById('sourceTypeForm');
     if (form) {
         form.addEventListener('submit', function (event) {
-            if (!validateDocumentStatusForm()) {
+            if (!validateSourceTypeForm()) {
                 event.preventDefault();
-                showToast('Please enter a valid name, color code, and sort order.', 'error');
+                showToast('Please enter a valid name and sort order.', 'error');
             }
         });
     }
@@ -707,7 +659,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-        if (documentStatusModalOpen) closeDocumentStatusModal();
+        if (sourceTypeModalOpen) closeSourceTypeModal();
         if (confirmModalOpen) closeConfirmModal();
     }
 });

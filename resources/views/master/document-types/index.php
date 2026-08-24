@@ -19,7 +19,7 @@ $accent = $accent ?? 'primary';
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-linear-to-br from-primary via-primary to-blue-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
@@ -282,7 +282,7 @@ $accent = $accent ?? 'primary';
 
 </div>
 
-<div id="documentTypeModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
+<div id="documentTypeModal" class="fixed inset-0 z-100 hidden items-center justify-center" role="dialog" aria-modal="true">
     <div id="documentTypeModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
     <div id="documentTypeModalPanel" class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
         <form id="documentTypeForm" method="POST" action="<?= BASE_URL ?>/master/document-types/store">
@@ -364,7 +364,7 @@ $accent = $accent ?? 'primary';
     </div>
 </div>
 
-<div id="confirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
+<div id="confirmModal" class="fixed inset-0 z-100 hidden items-center justify-center" role="dialog" aria-modal="true">
     <div id="confirmModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
     <div id="confirmModalPanel" class="relative z-10 w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
         <div class="p-6">
@@ -393,11 +393,13 @@ $accent = $accent ?? 'primary';
     </div>
 </div>
 
-<div id="toastContainer" class="fixed top-4 right-4 z-[200] space-y-2 pointer-events-none"></div>
+<div id="toastContainer" class="fixed top-4 right-4 z-200 space-y-2 pointer-events-none"></div>
 
 <script>
 const BASE = '<?= BASE_URL ?>';
-let confirmAction = null;
+let documentTypeModalOpen = false;
+let confirmModalOpen = false;
+let pendingAction = null;
 
 function syncBadgeColorInputs() {
     const colorInput = document.getElementById('documentTypeBadgeColor');
@@ -456,13 +458,9 @@ function showToast(message, type = 'success') {
     }, 2800);
 }
 
-function openDocumentTypeModal() {
-    const modal = document.getElementById('documentTypeModal');
-    const panel = document.getElementById('documentTypeModalPanel');
-    const backdrop = document.getElementById('documentTypeModalBackdrop');
+function resetDocumentTypeForm() {
     const form = document.getElementById('documentTypeForm');
-    const title = document.getElementById('documentTypeModalTitle');
-    form.action = `${BASE}/master/document-types/store`;
+    form.reset();
     document.getElementById('documentTypeId').value = '';
     document.getElementById('documentTypeName').value = '';
     document.getElementById('documentTypeDescription').value = '';
@@ -470,7 +468,25 @@ function openDocumentTypeModal() {
     document.getElementById('documentTypeBadgeHex').value = '#2563EB';
     document.getElementById('documentTypeSortOrder').value = '0';
     document.getElementById('documentTypeIsActive').checked = true;
-    title.textContent = 'Create New Document Type';
+    form.action = `${BASE}/master/document-types/store`;
+    document.getElementById('documentTypeModalTitle').textContent = 'Create New Document Type';
+    document.getElementById('documentTypeSubmitBtn').innerHTML = `
+        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        Save
+    `;
+}
+
+function openDocumentTypeModal() {
+    if (documentTypeModalOpen) return;
+    resetDocumentTypeForm();
+    documentTypeModalOpen = true;
+
+    const modal = document.getElementById('documentTypeModal');
+    const panel = document.getElementById('documentTypeModalPanel');
+    const backdrop = document.getElementById('documentTypeModalBackdrop');
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     requestAnimationFrame(() => {
@@ -478,28 +494,62 @@ function openDocumentTypeModal() {
         panel.classList.remove('scale-95', 'opacity-0');
         panel.classList.add('scale-100', 'opacity-100');
     });
+
+    setTimeout(() => document.getElementById('documentTypeName').focus(), 220);
 }
 
 function closeDocumentTypeModal() {
+    if (!documentTypeModalOpen) return;
+    documentTypeModalOpen = false;
+
     const modal = document.getElementById('documentTypeModal');
     const panel = document.getElementById('documentTypeModalPanel');
     const backdrop = document.getElementById('documentTypeModalBackdrop');
+
     backdrop.classList.add('opacity-0');
-    panel.classList.add('scale-95', 'opacity-0');
     panel.classList.remove('scale-100', 'opacity-100');
+    panel.classList.add('scale-95', 'opacity-0');
+
     setTimeout(() => {
-        modal.classList.add('hidden');
         modal.classList.remove('flex');
-    }, 180);
+        modal.classList.add('hidden');
+    }, 200);
 }
 
-function openConfirmModal(title, message, action) {
+document.getElementById('documentTypeModalBackdrop')?.addEventListener('click', closeDocumentTypeModal);
+
+function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', type = 'danger', onConfirm }) {
+    if (confirmModalOpen) return;
+
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').innerHTML = message;
+
+    const proceedBtn = document.getElementById('confirmProceedBtn');
+    const cancelBtn = document.getElementById('confirmCancelBtn');
+    const iconBox = document.getElementById('confirmIconBox');
+    const icon = document.getElementById('confirmIcon');
+
+    if (type === 'danger') {
+        proceedBtn.className = 'inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition shadow-sm';
+        iconBox.className = 'flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100';
+        icon.className = 'h-6 w-6 text-red-600';
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>';
+    } else {
+        proceedBtn.className = 'inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-blue-700 transition shadow-sm';
+        iconBox.className = 'flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100';
+        icon.className = 'h-6 w-6 text-blue-600';
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>';
+    }
+
+    proceedBtn.textContent = confirmText;
+    cancelBtn.textContent = cancelText;
+    pendingAction = onConfirm;
+    confirmModalOpen = true;
+
     const modal = document.getElementById('confirmModal');
     const panel = document.getElementById('confirmModalPanel');
     const backdrop = document.getElementById('confirmModalBackdrop');
-    document.getElementById('confirmTitle').textContent = title;
-    document.getElementById('confirmMessage').textContent = message;
-    confirmAction = action;
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     requestAnimationFrame(() => {
@@ -510,90 +560,111 @@ function openConfirmModal(title, message, action) {
 }
 
 function closeConfirmModal() {
+    if (!confirmModalOpen) return;
+    confirmModalOpen = false;
+    pendingAction = null;
+
     const modal = document.getElementById('confirmModal');
     const panel = document.getElementById('confirmModalPanel');
     const backdrop = document.getElementById('confirmModalBackdrop');
+
     backdrop.classList.add('opacity-0');
-    panel.classList.add('scale-95', 'opacity-0');
     panel.classList.remove('scale-100', 'opacity-100');
+    panel.classList.add('scale-95', 'opacity-0');
+
     setTimeout(() => {
-        modal.classList.add('hidden');
         modal.classList.remove('flex');
-    }, 180);
+        modal.classList.add('hidden');
+    }, 200);
 }
 
 function executeConfirmAction() {
-    if (typeof confirmAction === 'function') {
-        confirmAction();
-    }
+    const fn = pendingAction;
     closeConfirmModal();
+    if (typeof fn === 'function') fn();
 }
 
+document.getElementById('confirmModalBackdrop')?.addEventListener('click', closeConfirmModal);
+
 async function editDocumentType(id) {
-    const response = await fetch(`${BASE}/master/document-types/edit?id=${id}`);
-    const result = await response.json();
-    if (!result.success) {
-        showToast(result.message || 'Unable to load document type.', 'error');
-        return;
+    try {
+        const response = await fetch(`${BASE}/master/document-types/edit?id=${id}`);
+        const result = await response.json();
+        if (!result.success) {
+            showToast(result.message || 'Unable to load document type.', 'error');
+            return;
+        }
+
+        const item = result.data;
+        const form = document.getElementById('documentTypeForm');
+        document.getElementById('documentTypeId').value = item.id;
+        document.getElementById('documentTypeName').value = item.name || '';
+        document.getElementById('documentTypeDescription').value = item.description || '';
+        document.getElementById('documentTypeBadgeColor').value = item.badge_color || '#2563EB';
+        document.getElementById('documentTypeBadgeHex').value = item.badge_color || '#2563EB';
+        document.getElementById('documentTypeSortOrder').value = item.sort_order ?? 0;
+        document.getElementById('documentTypeIsActive').checked = Number(item.is_active) === 1;
+        form.action = `${BASE}/master/document-types/update`;
+        document.getElementById('documentTypeModalTitle').textContent = 'Edit Document Type';
+        document.getElementById('documentTypeSubmitBtn').innerHTML = `
+            <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Update
+        `;
+
+        documentTypeModalOpen = true;
+        const modal = document.getElementById('documentTypeModal');
+        const panel = document.getElementById('documentTypeModalPanel');
+        const backdrop = document.getElementById('documentTypeModalBackdrop');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        requestAnimationFrame(() => {
+            backdrop.classList.remove('opacity-0');
+            panel.classList.remove('scale-95', 'opacity-0');
+            panel.classList.add('scale-100', 'opacity-100');
+        });
+    } catch (error) {
+        showToast('Failed to load document type data.', 'error');
     }
-
-    const item = result.data;
-    const form = document.getElementById('documentTypeForm');
-    const title = document.getElementById('documentTypeModalTitle');
-    form.action = `${BASE}/master/document-types/update`;
-    document.getElementById('documentTypeId').value = item.id;
-    document.getElementById('documentTypeName').value = item.name || '';
-    document.getElementById('documentTypeDescription').value = item.description || '';
-    document.getElementById('documentTypeBadgeColor').value = item.badge_color || '#2563EB';
-    document.getElementById('documentTypeBadgeHex').value = item.badge_color || '#2563EB';
-    document.getElementById('documentTypeSortOrder').value = item.sort_order || 0;
-    document.getElementById('documentTypeIsActive').checked = Number(item.is_active) === 1;
-    title.textContent = 'Edit Document Type';
-
-    const modal = document.getElementById('documentTypeModal');
-    const panel = document.getElementById('documentTypeModalPanel');
-    const backdrop = document.getElementById('documentTypeModalBackdrop');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    requestAnimationFrame(() => {
-        backdrop.classList.remove('opacity-0');
-        panel.classList.remove('scale-95', 'opacity-0');
-        panel.classList.add('scale-100', 'opacity-100');
-    });
 }
 
 function deleteDocumentType(id, name) {
-    openConfirmModal('Delete Document Type', `Are you sure you want to delete "${name}"?`, async () => {
-        const formData = new FormData();
-        formData.append('id', id);
-        const response = await fetch(`${BASE}/master/document-types/destroy`, {
-            method: 'POST',
-            body: formData,
-        });
-        const result = await response.json();
-        if (result.success) {
-            showToast(result.message || 'Document type deleted successfully.', 'success');
-            setTimeout(() => location.reload(), 500);
-        } else {
-            showToast(result.message || 'Failed to delete document type.', 'error');
+    openConfirmModal({
+        title: 'Delete Document Type',
+        message: `Are you sure you want to delete <strong class="text-gray-800">${name}</strong>?<br><span class="text-xs text-gray-500">This action removes the record permanently.</span>`,
+        confirmText: 'Delete',
+        type: 'danger',
+        onConfirm: async () => {
+            const formData = new FormData();
+            formData.append('id', id);
+            const response = await fetch(`${BASE}/master/document-types/destroy`, {
+                method: 'POST',
+                body: formData,
+            });
+            const result = await response.json();
+            showToast(result.message || (result.success ? 'Document type deleted successfully.' : 'Failed to delete document type.'), result.success ? 'success' : 'error');
+            if (result.success) setTimeout(() => location.reload(), 800);
         }
     });
 }
 
 function toggleStatus(id, name) {
-    openConfirmModal('Update Status', `Change the status of "${name}"?`, async () => {
-        const formData = new FormData();
-        formData.append('id', id);
-        const response = await fetch(`${BASE}/master/document-types/toggle-status`, {
-            method: 'POST',
-            body: formData,
-        });
-        const result = await response.json();
-        if (result.success) {
-            showToast(result.message || 'Status updated successfully.', 'success');
-            setTimeout(() => location.reload(), 500);
-        } else {
-            showToast(result.message || 'Unable to update status.', 'error');
+    openConfirmModal({
+        title: 'Toggle Status',
+        message: `This will toggle the active status of <strong class="text-gray-800">${name}</strong>.<br><span class="text-xs text-gray-500">Inactive document types are hidden from selection dropdowns.</span>`,
+        confirmText: 'Proceed',
+        type: 'info',
+        onConfirm: async () => {
+            const formData = new FormData();
+            formData.append('id', id);
+            const response = await fetch(`${BASE}/master/document-types/toggle-status`, {
+                method: 'POST',
+                body: formData,
+            });
+            const result = await response.json();
+            showToast(result.message || (result.success ? 'Status updated successfully.' : 'Unable to update status.'), result.success ? 'success' : 'error');
+            if (result.success) setTimeout(() => location.reload(), 800);
         }
     });
 }
@@ -630,12 +701,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-    document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') {
-            closeDocumentTypeModal();
-            closeConfirmModal();
-        }
-    });
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        if (documentTypeModalOpen) closeDocumentTypeModal();
+        if (confirmModalOpen) closeConfirmModal();
+    }
 });
 
 <?php if ($success): ?>

@@ -1,17 +1,17 @@
-<?php
+<?php 
 ob_start();
 
 $success = $success ?? null;
 $error = $error ?? null;
-$pageTitle = $pageTitle ?? 'Districts Management';
+$pageTitle = $pageTitle ?? 'Hospitals Management';
 $pageSubtitle = $pageSubtitle ?? '';
-$totalDistricts = $totalDistricts ?? 0;
-$activeDistricts = $activeDistricts ?? 0;
-$inactiveDistricts = $inactiveDistricts ?? 0;
+$totalHospitals = $totalHospitals ?? 0;
+$activeHospitals = $activeHospitals ?? 0;
+$inactiveHospitals = $inactiveHospitals ?? 0;
 $totalRows = $totalRows ?? 0;
 $search = $search ?? '';
 $filterStatus = $filterStatus ?? '';
-$districts = $districts ?? [];
+$hospitals = $hospitals ?? [];
 $totalPages = $totalPages ?? 1;
 $page = $page ?? 1;
 $accent = $accent ?? 'primary';
@@ -23,7 +23,7 @@ $accent = $accent ?? 'primary';
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
-                    <p class="text-sm font-medium text-emerald-100">DISTRICT MASTER DATA</p>
+                    <p class="text-sm font-medium text-blue-100">HOSPITALS MASTER DATA</p>
                     <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                         <?= htmlspecialchars($pageTitle) ?>
                     </h1>
@@ -32,12 +32,12 @@ $accent = $accent ?? 'primary';
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <button type="button" onclick="openDistrictModal()"
+                    <button type="button" onclick="openHospitalModal()"
                         class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary shadow-sm hover:bg-blue-50 transition">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
-                        New District
+                        New Hospital
                     </button>
                 </div>
             </div>
@@ -51,22 +51,22 @@ $accent = $accent ?? 'primary';
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Total Districts</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalDistricts) ?></p>
+                        <p class="text-sm text-gray-500">Total Hospitals</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalHospitals) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-icon lucide-map"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hospital-icon lucide-hospital"><path d="M12 7v4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M14 9h-4"/><path d="M18 11h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2"/><path d="M18 21V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"/></svg>
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-600">All districts</span>
+                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-600">All hospitals</span>
                 </div>
             </div>
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Active Districts</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($activeDistricts) ?></p>
+                        <p class="text-sm text-gray-500">Active Hospitals</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($activeHospitals) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,8 +82,8 @@ $accent = $accent ?? 'primary';
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Inactive Districts</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($inactiveDistricts) ?></p>
+                        <p class="text-sm text-gray-500">Inactive Hospitals</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($inactiveHospitals) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,19 +102,19 @@ $accent = $accent ?? 'primary';
     <section class="rounded-2xl border border-gray-200 bg-white">
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <h2 class="font-semibold text-gray-900">Districts List</h2>
+                <h2 class="font-semibold text-gray-900">Hospitals List</h2>
                 <p class="mt-1 text-xs text-gray-500">
                     <?= $totalRows ?> record<?= $totalRows !== 1 ? 's' : '' ?> found
                 </p>
             </div>
-            <form method="GET" action="<?= BASE_URL ?>/master/districts" class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <form method="GET" action="<?= BASE_URL ?>/master/hospitals" class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search district name..."
+                    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search hospital name..."
                         class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-64">
                 </div>
                 <select name="status" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
@@ -126,7 +126,7 @@ $accent = $accent ?? 'primary';
                     Filter
                 </button>
                 <?php if ($search !== '' || $filterStatus !== ''): ?>
-                    <a href="<?= BASE_URL ?>/master/districts"
+                    <a href="<?= BASE_URL ?>/master/hospitals"
                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition text-center">
                         Clear
                     </a>
@@ -138,65 +138,47 @@ $accent = $accent ?? 'primary';
             <table class="w-full text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="px-6 py-3 font-medium">District</th>
-                        <th class="px-6 py-3 font-medium">No.</th>
+                        <th class="px-6 py-3 font-medium">Hospital</th>
                         <th class="px-6 py-3 font-medium">Sort</th>
                         <th class="px-6 py-3 font-medium">Status</th>
                         <th class="px-6 py-3 font-medium text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    <?php if (empty($districts)): ?>
+                    <?php if (empty($hospitals)): ?>
                         <tr>
                             <td colspan="5" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-icon lucide-map"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hospital-icon lucide-hospital"><path d="M12 7v4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M14 9h-4"/><path d="M18 11h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2"/><path d="M18 21V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"/></svg>
                                 </div>
-                                <p class="mt-4 text-sm font-medium text-gray-700">No districts found.</p>
-                                <p class="mt-1 text-xs text-gray-500">Create your first district to populate dropdowns.</p>
-                                <button type="button" onclick="openDistrictModal()"
+                                <p class="mt-4 text-sm font-medium text-gray-700">No hospitals found.</p>
+                                <p class="mt-1 text-xs text-gray-500">Create your first hospital to populate the list.</p>
+                                <button type="button" onclick="openHospitalModal()"
                                     class="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                     </svg>
-                                    Create District
+                                    Create Hospital
                                 </button>
                             </td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($districts as $d): ?>
+                        <?php foreach ($hospitals as $h): ?>
                         <tr class="hover:bg-gray-50/50 transition">
                             <td class="px-6 py-4">
                                 <div>
                                     <div class="font-medium text-gray-900">
-                                        <?= htmlspecialchars($d['name']) ?>
-                                        <?php if (!empty($d['district_number'])): ?>
-                                            <span class="ml-2 inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                                                D<?= (int)$d['district_number'] ?>
-                                            </span>
-                                        <?php endif; ?>
+                                        <?= htmlspecialchars($h['name']) ?>
                                     </div>
-                                    <?php if (!empty($d['description'])): ?>
-                                        <div class="mt-0.5 text-xs text-gray-500 line-clamp-1 max-w-lg"><?= htmlspecialchars($d['description']) ?></div>
-                                    <?php endif; ?>
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <?php if (!empty($d['district_number'])): ?>
-                                    <span class="inline-flex items-center rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                        #<?= (int)$d['district_number'] ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span class="text-xs text-gray-400">—</span>
-                                <?php endif; ?>
-                            </td>
-                            <td class="px-6 py-4">
                                 <span class="inline-flex items-center rounded-lg bg-gray-50 border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600">
-                                    #<?= (int)$d['sort_order'] ?>
+                                    #<?= (int)$h['sort_order'] ?>
                                 </span>
                             </td>
                             <td class="px-6 py-4">
-                                <?php if ($d['is_active']): ?>
+                                <?php if ($h['is_active']): ?>
                                     <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                                         <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span> Active
                                     </span>
@@ -208,7 +190,7 @@ $accent = $accent ?? 'primary';
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-1">
-                                    <button type="button" onclick="editDistrict(<?= $d['id'] ?>)"
+                                    <button type="button" onclick="editHospital(<?= $h['id'] ?>)"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition"
                                         title="Edit">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,10 +198,10 @@ $accent = $accent ?? 'primary';
                                                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                         </svg>
                                     </button>
-                                    <button type="button" onclick="toggleStatus(<?= $d['id'] ?>, '<?= htmlspecialchars($d['name']) ?>')"
+                                    <button type="button" onclick="toggleStatus(<?= $h['id'] ?>, '<?= htmlspecialchars($h['name']) ?>')"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 transition"
-                                        title="<?= $d['is_active'] ? 'Set Inactive' : 'Set Active' ?>">
-                                        <?php if ($d['is_active']): ?>
+                                        title="<?= $h['is_active'] ? 'Set Inactive' : 'Set Active' ?>">
+                                        <?php if ($h['is_active']): ?>
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
@@ -231,7 +213,7 @@ $accent = $accent ?? 'primary';
                                         </svg>
                                         <?php endif; ?>
                                     </button>
-                                    <button type="button" onclick="deleteDistrict(<?= $d['id'] ?>, '<?= htmlspecialchars($d['name']) ?>')"
+                                    <button type="button" onclick="deleteHospital(<?= $h['id'] ?>, '<?= htmlspecialchars($h['name']) ?>')"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-red-400 hover:bg-red-50 hover:text-red-600 transition"
                                         title="Delete">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -293,49 +275,32 @@ $accent = $accent ?? 'primary';
 
 </div>
 
-<!-- District Create/Edit Modal -->
-<div id="districtModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="districtModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="districtModalPanel" class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
-        <form id="districtForm" method="POST" action="<?= BASE_URL ?>/master/districts/store">
-            <input type="hidden" name="id" id="districtId" value="">
+<!-- Hospital Create/Edit Modal -->
+<div id="hospitalModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
+    <div id="hospitalModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
+    <div id="hospitalModalPanel" class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
+        <form id="hospitalForm" method="POST" action="<?= BASE_URL ?>/master/hospitals/store">
+            <input type="hidden" name="id" id="hospitalId" value="">
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
                 <div>
-                    <h3 id="districtModalTitle" class="text-lg font-semibold text-gray-900">Create New District</h3>
-                    <p class="mt-0.5 text-xs text-gray-500">Fill in the district details below.</p>
+                    <h3 id="hospitalModalTitle" class="text-lg font-semibold text-gray-900">Create New Hospital</h3>
+                    <p class="mt-0.5 text-xs text-gray-500">Fill in the user hospital details below.</p>
                 </div>
-                <button type="button" onclick="closeDistrictModal()" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
+                <button type="button" onclick="closeHospitalModal()" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
             </div>
             <div class="p-6 space-y-5">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div class="sm:col-span-2">
+                    <div class="sm:col-span-full">
                         <label class="mb-1.5 block text-xs font-semibold text-gray-700">
-                            District Name <span class="text-red-500">*</span>
+                            Hospital Name <span class="text-red-500">*</span>
                         </label>
-                        <input type="text" name="name" id="districtName" value="<?= old('name') ?>"
+                        <input type="text" name="name" id="hospitalName" value="<?= old('name') ?>"
                             class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            placeholder="e.g. 1st District" required>
+                            placeholder="e.g. Pangasian General Hospital" required>
                     </div>
-                    <div>
-                        <label class="mb-1.5 block text-xs font-semibold text-gray-700">
-                            District Number
-                        </label>
-                        <input type="number" name="district_number" id="districtNumber" min="1" max="100" value="<?= old('district_number', '') ?>"
-                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            placeholder="e.g. 1">
-                        <p class="mt-1 text-[11px] text-gray-500">Optional numeric district #.</p>
-                    </div>
-                </div>
-                <div>
-                    <label class="mb-1.5 block text-xs font-semibold text-gray-700">Description / Notes</label>
-                    <textarea name="description" id="districtDescription" rows="3"
-                        class="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                        placeholder="Optional description or coverage notes about this district..."><?= old('description') ?></textarea>
-                </div>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label class="mb-1.5 block text-xs font-semibold text-gray-700">
@@ -344,7 +309,7 @@ $accent = $accent ?? 'primary';
                         <input type="number" name="sort_order" id="sortOrder" min="0" value="<?= old('sort_order', '0') ?>"
                             class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                             placeholder="0">
-                        <p class="mt-1 text-[11px] text-gray-500">Districts with lower values appear first in dropdowns.</p>
+                        <p class="mt-1 text-[11px] text-gray-500">Hospitals with lower values appear first in dropdowns.</p>
                     </div>
                     <div class="flex items-end">
                         <div class="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 w-full">
@@ -352,18 +317,18 @@ $accent = $accent ?? 'primary';
                                 class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
                             <div>
                                 <label for="isActive" class="cursor-pointer text-sm font-medium text-gray-800">Set as active</label>
-                                <p class="text-[11px] text-gray-500 mt-0.5">Active districts appear in selection dropdowns.</p>
+                                <p class="text-[11px] text-gray-500 mt-0.5">Active hospitals appear in selection dropdowns.</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 bg-gray-50 rounded-b-2xl">
-                <button type="button" onclick="closeDistrictModal()"
+                <button type="button" onclick="closeHospitalModal()"
                     class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition">
                     Cancel
                 </button>
-                <button type="submit" id="districtSubmitBtn"
+                <button type="submit" id="hospitalSubmitBtn"
                     class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-blue-700 transition shadow-sm">
                     <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -435,21 +400,14 @@ function clearFieldError(fieldId) {
     if (errEl) errEl.remove();
 }
 
-function validateDistrictForm() {
+function validateHospitalForm() {
     let valid = true;
 
-    const name = document.getElementById('districtName');
+    const name = document.getElementById('hospitalName');
     if (name.value.trim() === '') {
-        setFieldError('districtName', 'District name is required.');
+        setFieldError('hospitalName', 'Hospital name is required.');
         valid = false;
-    } else clearFieldError('districtName');
-
-    const num = document.getElementById('districtNumber');
-    const numVal = parseInt(num.value);
-    if (num.value !== '' && (isNaN(numVal) || numVal < 1 || numVal > 100)) {
-        setFieldError('districtNumber', 'District number must be 1-100 or blank.');
-        valid = false;
-    } else clearFieldError('districtNumber');
+    } else clearFieldError('hospitalName');
 
     const sort = document.getElementById('sortOrder');
     const sortVal = parseInt(sort.value);
@@ -461,17 +419,17 @@ function validateDistrictForm() {
     return valid;
 }
 
-function attachDistrictValidation() {
-    const fields = ['districtName', 'districtNumber', 'sortOrder'];
+function attachHospitalValidation() {
+    const fields = ['hospitalName', 'hospitalNumber', 'sortOrder'];
     fields.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
-        el.addEventListener('input', validateDistrictForm);
-        el.addEventListener('blur', validateDistrictForm);
-        el.addEventListener('change', validateDistrictForm);
+        el.addEventListener('input', validateHospitalForm);
+        el.addEventListener('blur', validateHospitalForm);
+        el.addEventListener('change', validateHospitalForm);
     });
-    document.getElementById('districtForm')?.addEventListener('submit', (e) => {
-        if (!validateDistrictForm()) {
+    document.getElementById('hospitalForm')?.addEventListener('submit', (e) => {
+        if (!validateHospitalForm()) {
             e.preventDefault();
             showToast('Please fix the errors in the form.', 'error');
             const firstErr = document.querySelector('.border-red-400');
@@ -518,35 +476,33 @@ function showToast(message, type = 'success') {
     }, 4500);
 }
 
-// District Modal
-let districtModalOpen = false;
-function resetDistrictForm() {
-    const form = document.getElementById('districtForm');
+// Hospital Modal
+let hospitalModalOpen = false;
+function resetHospitalForm() {
+    const form = document.getElementById('hospitalForm');
     form.reset();
-    document.getElementById('districtId').value = '';
-    document.getElementById('districtName').value = '';
-    document.getElementById('districtNumber').value = '';
-    document.getElementById('districtDescription').value = '';
+    document.getElementById('hospitalId').value = '';
+    document.getElementById('hospitalName').value = '';
     document.getElementById('sortOrder').value = '0';
     document.getElementById('isActive').checked = true;
-    form.action = '<?= BASE_URL ?>/master/districts/store';
-    document.getElementById('districtModalTitle').textContent = 'Create New District';
-    document.getElementById('districtSubmitBtn').innerHTML = `
+    form.action = '<?= BASE_URL ?>/master/hospitals/store';
+    document.getElementById('hospitalModalTitle').textContent = 'Create New Hospital';
+    document.getElementById('hospitalSubmitBtn').innerHTML = `
         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
         </svg>
         Save
     `;
-    ['districtName', 'districtNumber', 'sortOrder'].forEach(clearFieldError);
-    attachDistrictValidation();
+    ['hospitalName', 'hospitalNumber', 'sortOrder'].forEach(clearFieldError);
+    attachHospitalValidation();
 }
-function openDistrictModal() {
-    if (districtModalOpen) return;
-    resetDistrictForm();
-    districtModalOpen = true;
-    const m = document.getElementById('districtModal');
-    const b = document.getElementById('districtModalBackdrop');
-    const p = document.getElementById('districtModalPanel');
+function openHospitalModal() {
+    if (hospitalModalOpen) return;
+    resetHospitalForm();
+    hospitalModalOpen = true;
+    const m = document.getElementById('hospitalModal');
+    const b = document.getElementById('hospitalModalBackdrop');
+    const p = document.getElementById('hospitalModalPanel');
     m.classList.remove('hidden');
     m.classList.add('flex');
     requestAnimationFrame(() => {
@@ -554,14 +510,14 @@ function openDistrictModal() {
         p.classList.remove('scale-95', 'opacity-0');
         p.classList.add('scale-100', 'opacity-100');
     });
-    setTimeout(() => document.getElementById('districtName').focus(), 220);
+    setTimeout(() => document.getElementById('hospitalName').focus(), 220);
 }
-function closeDistrictModal() {
-    if (!districtModalOpen) return;
-    districtModalOpen = false;
-    const m = document.getElementById('districtModal');
-    const b = document.getElementById('districtModalBackdrop');
-    const p = document.getElementById('districtModalPanel');
+function closeHospitalModal() {
+    if (!hospitalModalOpen) return;
+    hospitalModalOpen = false;
+    const m = document.getElementById('hospitalModal');
+    const b = document.getElementById('hospitalModalBackdrop');
+    const p = document.getElementById('hospitalModalPanel');
     b.classList.add('opacity-0');
     p.classList.remove('scale-100', 'opacity-100');
     p.classList.add('scale-95', 'opacity-0');
@@ -570,41 +526,39 @@ function closeDistrictModal() {
         m.classList.add('hidden');
     }, 200);
 }
-document.getElementById('districtModalBackdrop')?.addEventListener('click', closeDistrictModal);
+document.getElementById('hospitalModalBackdrop')?.addEventListener('click', closeHospitalModal);
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-        if (districtModalOpen) closeDistrictModal();
+        if (hospitalModalOpen) closeHospitalModal();
         if (confirmModalOpen) closeConfirmModal();
     }
 });
 
-async function editDistrict(id) {
+async function editHospital(id) {
     try {
-        const res = await fetch(`<?= BASE_URL ?>/master/districts/edit?id=${id}`);
+        const res = await fetch(`<?= BASE_URL ?>/master/hospitals/edit?id=${id}`);
         const data = await res.json();
         if (!data.success) {
-            showToast(data.message || 'District not found.', 'error');
+            showToast(data.message || 'Hospital not found.', 'error');
             return;
         }
-        const d = data.data;
-        document.getElementById('districtId').value = d.id;
-        document.getElementById('districtName').value = d.name;
-        document.getElementById('districtNumber').value = d.district_number ?? '';
-        document.getElementById('districtDescription').value = d.description || '';
-        document.getElementById('sortOrder').value = d.sort_order ?? 0;
-        document.getElementById('isActive').checked = !!d.is_active;
-        document.getElementById('districtForm').action = '<?= BASE_URL ?>/master/districts/update';
-        document.getElementById('districtModalTitle').textContent = 'Edit District';
-        document.getElementById('districtSubmitBtn').innerHTML = `
+        const h = data.data;
+        document.getElementById('hospitalId').value = h.id;
+        document.getElementById('hospitalName').value = h.name;
+        document.getElementById('sortOrder').value = h.sort_order ?? 0;
+        document.getElementById('isActive').checked = !!h.is_active;
+        document.getElementById('hospitalForm').action = '<?= BASE_URL ?>/master/hospitals/update';
+        document.getElementById('hospitalModalTitle').textContent = 'Edit Hospital';
+        document.getElementById('hospitalSubmitBtn').innerHTML = `
             <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
             </svg>
             Update
         `;
-        districtModalOpen = true;
-        const m = document.getElementById('districtModal');
-        const b = document.getElementById('districtModalBackdrop');
-        const pn = document.getElementById('districtModalPanel');
+        hospitalModalOpen = true;
+        const m = document.getElementById('hospitalModal');
+        const b = document.getElementById('hospitalModalBackdrop');
+        const pn = document.getElementById('hospitalModalPanel');
         m.classList.remove('hidden');
         m.classList.add('flex');
         requestAnimationFrame(() => {
@@ -613,7 +567,7 @@ async function editDistrict(id) {
             pn.classList.add('scale-100', 'opacity-100');
         });
     } catch (e) {
-        showToast('Failed to load district data.', 'error');
+        showToast('Failed to load hospital data.', 'error');
     }
 }
 
@@ -676,9 +630,9 @@ function executeConfirmAction() {
 }
 document.getElementById('confirmModalBackdrop')?.addEventListener('click', closeConfirmModal);
 
-async function deleteDistrict(id, name) {
+async function deleteHospital(id, name) {
     openConfirmModal({
-        title: 'Delete District',
+        title: 'Delete Hospital',
         message: `Are you sure you want to delete <strong class="text-gray-800">${name}</strong>?<br><span class="text-xs text-gray-500">This action soft-deletes the record and hides it from dropdowns.</span>`,
         confirmText: 'Delete',
         type: 'danger',
@@ -686,7 +640,7 @@ async function deleteDistrict(id, name) {
             try {
                 const fd = new FormData();
                 fd.append('id', id);
-                const res = await fetch('<?= BASE_URL ?>/master/districts/destroy', { method: 'POST', body: fd });
+                const res = await fetch('<?= BASE_URL ?>/master/hospitals/destroy', { method: 'POST', body: fd });
                 const data = await res.json();
                 showToast(data.message, data.success ? 'success' : 'error');
                 if (data.success) setTimeout(() => location.reload(), 900);
@@ -698,14 +652,14 @@ async function deleteDistrict(id, name) {
 async function toggleStatus(id, name) {
     openConfirmModal({
         title: 'Toggle Status',
-        message: `This will toggle the active status of <strong class="text-gray-800">${name}</strong>.<br><span class="text-xs text-gray-500">Inactive districts are hidden from selection dropdowns.</span>`,
+        message: `This will toggle the active status of <strong class="text-gray-800">${name}</strong>.<br><span class="text-xs text-gray-500">Inactive hospitals are hidden from selection dropdowns.</span>`,
         confirmText: 'Proceed',
         type: 'info',
         onConfirm: async () => {
             try {
                 const fd = new FormData();
                 fd.append('id', id);
-                const res = await fetch('<?= BASE_URL ?>/master/districts/toggle-status', { method: 'POST', body: fd });
+                const res = await fetch('<?= BASE_URL ?>/master/hospitals/toggle-status', { method: 'POST', body: fd });
                 const data = await res.json();
                 showToast(data.message, data.success ? 'success' : 'error');
                 if (data.success) setTimeout(() => location.reload(), 800);

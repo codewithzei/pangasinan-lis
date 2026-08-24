@@ -8,8 +8,13 @@ class DatabaseSeeder
         RoleSeeder::class,
         PositionSeeder::class,
         DistrictSeeder::class,
+        MuniCitySeeder::class,
         DocumentTypeSeeder::class,
         DocumentStatusSeeder::class,
+        RoutingOptionSeeder::class,
+        HospitalSeeder::class,
+        ExternalOfficeSeeder::class,
+        SourceTypeSeeder::class,
         MasterSeeder::class,
         TermSeeder::class,
     ];
