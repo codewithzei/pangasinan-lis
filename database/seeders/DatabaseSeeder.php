@@ -15,6 +15,9 @@ class DatabaseSeeder
         HospitalSeeder::class,
         ExternalOfficeSeeder::class,
         SourceTypeSeeder::class,
+        CommunicationCategorySeeder::class,
+        OpinionOfficeSeeder::class,
+        OpinionStatusSeeder::class,
         MasterSeeder::class,
         TermSeeder::class,
     ];

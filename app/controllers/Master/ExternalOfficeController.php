@@ -92,7 +92,7 @@ class ExternalOfficeController
         }
 
         try {
-            $stmt = $this->pdo->prepare("INSERT INTO external_offices (name, abbreviation, sort_order, is_active, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $this->pdo->prepare("INSERT INTO external_offices (name, abbreviation, sort_order, is_active, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $data['name'],
                 $data['abbreviation'] ?: null,

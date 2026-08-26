@@ -1,10 +1,10 @@
 <?php
 
-class CreateExternalOfficesTable
+class CreateOpinionOfficesTable
 {
     public function up($pdo)
     {
-        $sql = "CREATE TABLE IF NOT EXISTS external_offices (
+        $sql = "CREATE TABLE IF NOT EXISTS opinion_offices (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
             abbreviation VARCHAR(50) NULL,
@@ -17,10 +17,10 @@ class CreateExternalOfficesTable
             updated_by BIGINT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uk_external_offices_name (name),
-            INDEX idx_external_offices_is_active (is_active),
-            INDEX idx_external_offices_is_deleted (is_deleted),
-            INDEX idx_external_offices_sort_order (sort_order)
+            UNIQUE KEY uk_opinion_offices_name (name),
+            INDEX idx_opinion_offices_is_active (is_active),
+            INDEX idx_opinion_offices_is_deleted (is_deleted),
+            INDEX idx_opinion_offices_sort_order (sort_order)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
 
         $pdo->exec($sql);
@@ -28,6 +28,6 @@ class CreateExternalOfficesTable
 
     public function down($pdo)
     {
-        $pdo->exec("DROP TABLE IF EXISTS external_offices;");
+        $pdo->exec("DROP TABLE IF EXISTS opinion_offices;");
     }
 }

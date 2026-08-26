@@ -3,15 +3,15 @@ ob_start();
 
 $success = $success ?? null;
 $error = $error ?? null;
-$pageTitle = $pageTitle ?? 'Document Statuses Management';
+$pageTitle = $pageTitle ?? 'Opinion Statuses Management';
 $pageSubtitle = $pageSubtitle ?? '';
-$totalDocumentStatuses = $totalDocumentStatuses ?? 0;
-$activeDocumentStatuses = $activeDocumentStatuses ?? 0;
-$inactiveDocumentStatuses = $inactiveDocumentStatuses ?? 0;
+$totalOpinionStatuses = $totalOpinionStatuses ?? 0;
+$activeOpinionStatuses = $activeOpinionStatuses ?? 0;
+$inactiveOpinionStatuses = $inactiveOpinionStatuses ?? 0;
 $totalRows = $totalRows ?? 0;
 $search = $search ?? '';
 $filterStatus = $filterStatus ?? '';
-$documentStatuses = $documentStatuses ?? [];
+$opinionStatuses = $opinionStatuses ?? [];
 $totalPages = $totalPages ?? 1;
 $page = $page ?? 1;
 $accent = $accent ?? 'primary';
@@ -32,7 +32,7 @@ $accent = $accent ?? 'primary';
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <button type="button" onclick="openDocumentStatusModal()"
+                    <button type="button" onclick="openOpinionStatusModal()"
                         class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary shadow-sm hover:bg-blue-50 transition">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -51,14 +51,13 @@ $accent = $accent ?? 'primary';
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Total Document Statuses</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalDocumentStatuses) ?></p>
+                        <p class="text-sm text-gray-500">Total Opinion Statuses</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalOpinionStatuses) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
@@ -69,8 +68,8 @@ $accent = $accent ?? 'primary';
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Active Document Statuses</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($activeDocumentStatuses) ?></p>
+                        <p class="text-sm text-gray-500">Active Opinion Statuses</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($activeOpinionStatuses) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,8 +85,8 @@ $accent = $accent ?? 'primary';
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Inactive Document Statuses</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($inactiveDocumentStatuses) ?></p>
+                        <p class="text-sm text-gray-500">Inactive Opinion Statuses</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($inactiveOpinionStatuses) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,12 +104,12 @@ $accent = $accent ?? 'primary';
     <section class="rounded-2xl border border-gray-200 bg-white">
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <h2 class="font-semibold text-gray-900">Document Statuses List</h2>
+                <h2 class="font-semibold text-gray-900">Opinion Statuses List</h2>
                 <p class="mt-1 text-xs text-gray-500">
                     <?= $totalRows ?> record<?= $totalRows !== 1 ? 's' : '' ?> found
                 </p>
             </div>
-            <form method="GET" action="<?= BASE_URL ?>/master/document-statuses" class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <form method="GET" action="<?= BASE_URL ?>/master/opinion-statuses" class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -127,7 +126,7 @@ $accent = $accent ?? 'primary';
                     Filter
                 </button>
                 <?php if ($search !== '' || $filterStatus !== ''): ?>
-                    <a href="<?= BASE_URL ?>/master/document-statuses"
+                    <a href="<?= BASE_URL ?>/master/opinion-statuses"
                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition text-center">
                         Clear
                     </a>
@@ -139,7 +138,7 @@ $accent = $accent ?? 'primary';
             <table class="w-full text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="px-6 py-3 font-medium">Document Status</th>
+                        <th class="px-6 py-3 font-medium">Opinion Status</th>
                         <th class="px-6 py-3 font-medium">Badge</th>
                         <th class="px-6 py-3 font-medium">Sort</th>
                         <th class="px-6 py-3 font-medium">Status</th>
@@ -147,7 +146,7 @@ $accent = $accent ?? 'primary';
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    <?php if (empty($documentStatuses)): ?>
+                    <?php if (empty($opinionStatuses)): ?>
                         <tr>
                             <td colspan="5" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
@@ -156,9 +155,9 @@ $accent = $accent ?? 'primary';
                                             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                     </svg>
                                 </div>
-                                <p class="mt-4 text-sm font-medium text-gray-700">No document statuses found.</p>
+                                <p class="mt-4 text-sm font-medium text-gray-700">No opinion statuses found.</p>
                                 <p class="mt-1 text-xs text-gray-500">Create a category and assign a color badge to label it.</p>
-                                <button type="button" onclick="openDocumentStatusModal()"
+                                <button type="button" onclick="openOpinionStatusModal()"
                                     class="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -168,14 +167,14 @@ $accent = $accent ?? 'primary';
                             </td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($documentStatuses as $documentStatus): ?>
-                            <?php $badgeColor = !empty($documentStatus['badge_color']) ? $documentStatus['badge_color'] : '#2563EB'; ?>
+                        <?php foreach ($opinionStatuses as $opinionStatus): ?>
+                            <?php $badgeColor = !empty($opinionStatus['badge_color']) ? $opinionStatus['badge_color'] : '#2563EB'; ?>
                             <tr class="hover:bg-gray-50/50 transition">
                                 <td class="px-6 py-4">
                                     <div>
-                                        <div class="font-medium text-gray-900"><?= htmlspecialchars($documentStatus['name']) ?></div>
-                                        <?php if (!empty($documentStatus['description'])): ?>
-                                            <div class="mt-0.5 text-xs text-gray-500 line-clamp-1 max-w-lg"><?= htmlspecialchars($documentStatus['description']) ?></div>
+                                        <div class="font-medium text-gray-900"><?= htmlspecialchars($opinionStatus['name']) ?></div>
+                                        <?php if (!empty($opinionStatus['description'])): ?>
+                                            <div class="mt-0.5 text-xs text-gray-500 line-clamp-1 max-w-lg"><?= htmlspecialchars($opinionStatus['description']) ?></div>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -187,11 +186,11 @@ $accent = $accent ?? 'primary';
                                 </td>
                                 <td class="px-6 py-4">
                                     <span class="inline-flex items-center rounded-lg bg-gray-50 border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600">
-                                        #<?= (int)$documentStatus['sort_order'] ?>
+                                        #<?= (int)$opinionStatus['sort_order'] ?>
                                     </span>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <?php if ($documentStatus['is_active']): ?>
+                                    <?php if ($opinionStatus['is_active']): ?>
                                         <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                                             <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"></span> Active
                                         </span>
@@ -203,17 +202,17 @@ $accent = $accent ?? 'primary';
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-1">
-                                        <button type="button" onclick="editDocumentStatus(<?= $documentStatus['id'] ?>)"
+                                        <button type="button" onclick="editOpinionStatus(<?= $opinionStatus['id'] ?>)"
                                             class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-primary hover:bg-blue-50 hover:text-primary transition"
                                             title="Edit">
                                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                             </svg>
                                         </button>
-                                        <button type="button" onclick="toggleStatus(<?= $documentStatus['id'] ?>, '<?= htmlspecialchars($documentStatus['name']) ?>')"
+                                        <button type="button" onclick="toggleStatus(<?= $opinionStatus['id'] ?>, '<?= htmlspecialchars($opinionStatus['name']) ?>')"
                                             class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 transition"
-                                            title="<?= $documentStatus['is_active'] ? 'Set Inactive' : 'Set Active' ?>">
-                                            <?php if ($documentStatus['is_active']): ?>
+                                            title="<?= $opinionStatus['is_active'] ? 'Set Inactive' : 'Set Active' ?>">
+                                            <?php if ($opinionStatus['is_active']): ?>
                                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
                                             </svg>
@@ -223,7 +222,7 @@ $accent = $accent ?? 'primary';
                                             </svg>
                                             <?php endif; ?>
                                         </button>
-                                        <button type="button" onclick="deleteDocumentStatus(<?= $documentStatus['id'] ?>, '<?= htmlspecialchars($documentStatus['name']) ?>')"
+                                        <button type="button" onclick="deleteOpinionStatus(<?= $opinionStatus['id'] ?>, '<?= htmlspecialchars($opinionStatus['name']) ?>')"
                                             class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-red-400 hover:bg-red-50 hover:text-red-600 transition"
                                             title="Delete">
                                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,17 +283,17 @@ $accent = $accent ?? 'primary';
 
 </div>
 
-<div id="documentStatusModal" class="fixed inset-0 z-100 hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="documentStatusModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="documentStatusModalPanel" class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
-        <form id="documentStatusForm" method="POST" action="<?= BASE_URL ?>/master/document-statuses/store">
-            <input type="hidden" name="id" id="documentStatusId" value="">
+<div id="opinionStatusModal" class="fixed inset-0 z-100 hidden items-center justify-center" role="dialog" aria-modal="true">
+    <div id="opinionStatusModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
+    <div id="opinionStatusModalPanel" class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
+        <form id="opinionStatusForm" method="POST" action="<?= BASE_URL ?>/master/opinion-statuses/store">
+            <input type="hidden" name="id" id="opinionStatusId" value="">
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
                 <div>
-                    <h3 id="documentStatusModalTitle" class="text-lg font-semibold text-gray-900">Create New Document Status</h3>
-                    <p class="mt-0.5 text-xs text-gray-500">Fill in the document status details below.</p>
+                    <h3 id="opinionStatusModalTitle" class="text-lg font-semibold text-gray-900">Create New Opinion Status</h3>
+                    <p class="mt-0.5 text-xs text-gray-500">Fill in the opinion status details below.</p>
                 </div>
-                <button type="button" onclick="closeDocumentStatusModal()" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
+                <button type="button" onclick="closeOpinionStatusModal()" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
@@ -303,16 +302,16 @@ $accent = $accent ?? 'primary';
             <div class="p-6 space-y-5">
                 <div>
                     <label class="mb-1.5 block text-xs font-semibold text-gray-700">
-                        Document Status Name <span class="text-red-500">*</span>
+                        Opinion Status Name <span class="text-red-500">*</span>
                     </label>
-                    <input type="text" name="name" id="documentStatusName" value="<?= old('name') ?>"
+                    <input type="text" name="name" id="opinionStatusName" value="<?= old('name') ?>"
                         class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         placeholder="e.g. Pending" required>
                 </div>
 
                 <div>
                     <label class="mb-1.5 block text-xs font-semibold text-gray-700">Description / Notes</label>
-                    <textarea name="description" id="documentStatusDescription" rows="3"
+                    <textarea name="description" id="opinionStatusDescription" rows="3"
                         class="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         placeholder="Optional description for this status category..."><?= old('description') ?></textarea>
                 </div>
@@ -321,8 +320,8 @@ $accent = $accent ?? 'primary';
                     <div>
                         <label class="mb-1.5 block text-xs font-semibold text-gray-700">Badge Color</label>
                         <div class="flex items-center gap-2">
-                            <input type="color" name="badge_color" id="documentStatusBadgeColor" value="<?= old('badge_color', '#2563EB') ?>" class="h-11 w-16 cursor-pointer rounded-lg border border-gray-200 bg-white p-1">
-                            <input type="text" id="documentStatusBadgeHex" value="<?= old('badge_color', '#2563EB') ?>" maxlength="7"
+                            <input type="color" name="badge_color" id="opinionStatusBadgeColor" value="<?= old('badge_color', '#2563EB') ?>" class="h-11 w-16 cursor-pointer rounded-lg border border-gray-200 bg-white p-1">
+                            <input type="text" id="opinionStatusBadgeHex" value="<?= old('badge_color', '#2563EB') ?>" maxlength="7"
                                 class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         </div>
                         <p class="mt-1 text-[11px] text-gray-500">This color is used for the badge tag in status listings.</p>
@@ -331,7 +330,7 @@ $accent = $accent ?? 'primary';
                         <label class="mb-1.5 block text-xs font-semibold text-gray-700">
                             Sort Order
                         </label>
-                        <input type="number" name="sort_order" id="documentStatusSortOrder" min="0" value="<?= old('sort_order', '0') ?>"
+                        <input type="number" name="sort_order" id="opinionStatusSortOrder" min="0" value="<?= old('sort_order', '0') ?>"
                             class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                             placeholder="0">
                         <p class="mt-1 text-[11px] text-gray-500">Lower values appear first in dropdowns.</p>
@@ -340,21 +339,21 @@ $accent = $accent ?? 'primary';
 
                 <div class="flex items-end">
                     <div class="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 w-full">
-                        <input type="checkbox" name="is_active" id="documentStatusIsActive" value="1" checked
+                        <input type="checkbox" name="is_active" id="opinionStatusIsActive" value="1" checked
                             class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
                         <div>
-                            <label for="documentStatusIsActive" class="cursor-pointer text-sm font-medium text-gray-800">Set as active</label>
-                            <p class="mt-0.5 text-[11px] text-gray-500">Active document statuses appear in selection lists.</p>
+                            <label for="opinionStatusIsActive" class="cursor-pointer text-sm font-medium text-gray-800">Set as active</label>
+                            <p class="mt-0.5 text-[11px] text-gray-500">Active opinion statuses appear in selection lists.</p>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 bg-gray-50 rounded-b-2xl">
-                <button type="button" onclick="closeDocumentStatusModal()"
+                <button type="button" onclick="closeOpinionStatusModal()"
                     class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition">
                     Cancel
                 </button>
-                <button type="submit" id="documentStatusSubmitBtn"
+                <button type="submit" id="opinionStatusSubmitBtn"
                     class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white bg-primary hover:bg-blue-700 transition shadow-sm">
                     <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -399,13 +398,13 @@ $accent = $accent ?? 'primary';
 
 <script>
 const BASE = '<?= BASE_URL ?>';
-let documentStatusModalOpen = false;
+let opinionStatusModalOpen = false;
 let confirmModalOpen = false;
 let pendingAction = null;
 
 function syncBadgeColorInputs() {
-    const colorInput = document.getElementById('documentStatusBadgeColor');
-    const hexInput = document.getElementById('documentStatusBadgeHex');
+    const colorInput = document.getElementById('opinionStatusBadgeColor');
+    const hexInput = document.getElementById('opinionStatusBadgeHex');
     if (!colorInput || !hexInput) return;
 
     colorInput.addEventListener('input', function () {
@@ -460,19 +459,19 @@ function showToast(message, type = 'success') {
     }, 2800);
 }
 
-function resetDocumentStatusForm() {
-    const form = document.getElementById('documentStatusForm');
+function resetOpinionStatusForm() {
+    const form = document.getElementById('opinionStatusForm');
     form.reset();
-    document.getElementById('documentStatusId').value = '';
-    document.getElementById('documentStatusName').value = '';
-    document.getElementById('documentStatusDescription').value = '';
-    document.getElementById('documentStatusBadgeColor').value = '#2563EB';
-    document.getElementById('documentStatusBadgeHex').value = '#2563EB';
-    document.getElementById('documentStatusSortOrder').value = '0';
-    document.getElementById('documentStatusIsActive').checked = true;
-    form.action = `${BASE}/master/document-statuses/store`;
-    document.getElementById('documentStatusModalTitle').textContent = 'Create New Document Status';
-    document.getElementById('documentStatusSubmitBtn').innerHTML = `
+    document.getElementById('opinionStatusId').value = '';
+    document.getElementById('opinionStatusName').value = '';
+    document.getElementById('opinionStatusDescription').value = '';
+    document.getElementById('opinionStatusBadgeColor').value = '#2563EB';
+    document.getElementById('opinionStatusBadgeHex').value = '#2563EB';
+    document.getElementById('opinionStatusSortOrder').value = '0';
+    document.getElementById('opinionStatusIsActive').checked = true;
+    form.action = `${BASE}/master/opinion-statuses/store`;
+    document.getElementById('opinionStatusModalTitle').textContent = 'Create New Opinion Status';
+    document.getElementById('opinionStatusSubmitBtn').innerHTML = `
         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
         </svg>
@@ -480,14 +479,14 @@ function resetDocumentStatusForm() {
     `;
 }
 
-function openDocumentStatusModal() {
-    if (documentStatusModalOpen) return;
-    resetDocumentStatusForm();
-    documentStatusModalOpen = true;
+function openOpinionStatusModal() {
+    if (opinionStatusModalOpen) return;
+    resetOpinionStatusForm();
+    opinionStatusModalOpen = true;
 
-    const modal = document.getElementById('documentStatusModal');
-    const panel = document.getElementById('documentStatusModalPanel');
-    const backdrop = document.getElementById('documentStatusModalBackdrop');
+    const modal = document.getElementById('opinionStatusModal');
+    const panel = document.getElementById('opinionStatusModalPanel');
+    const backdrop = document.getElementById('opinionStatusModalBackdrop');
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -497,16 +496,16 @@ function openDocumentStatusModal() {
         panel.classList.add('scale-100', 'opacity-100');
     });
 
-    setTimeout(() => document.getElementById('documentStatusName').focus(), 220);
+    setTimeout(() => document.getElementById('opinionStatusName').focus(), 220);
 }
 
-function closeDocumentStatusModal() {
-    if (!documentStatusModalOpen) return;
-    documentStatusModalOpen = false;
+function closeOpinionStatusModal() {
+    if (!opinionStatusModalOpen) return;
+    opinionStatusModalOpen = false;
 
-    const modal = document.getElementById('documentStatusModal');
-    const panel = document.getElementById('documentStatusModalPanel');
-    const backdrop = document.getElementById('documentStatusModalBackdrop');
+    const modal = document.getElementById('opinionStatusModal');
+    const panel = document.getElementById('opinionStatusModalPanel');
+    const backdrop = document.getElementById('opinionStatusModalBackdrop');
 
     backdrop.classList.add('opacity-0');
     panel.classList.remove('scale-100', 'opacity-100');
@@ -518,7 +517,7 @@ function closeDocumentStatusModal() {
     }, 200);
 }
 
-document.getElementById('documentStatusModalBackdrop')?.addEventListener('click', closeDocumentStatusModal);
+document.getElementById('opinionStatusModalBackdrop')?.addEventListener('click', closeOpinionStatusModal);
 
 function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', type = 'danger', onConfirm }) {
     if (confirmModalOpen) return;
@@ -588,37 +587,37 @@ function executeConfirmAction() {
 
 document.getElementById('confirmModalBackdrop')?.addEventListener('click', closeConfirmModal);
 
-async function editDocumentStatus(id) {
+async function editOpinionStatus(id) {
     try {
-        const response = await fetch(`${BASE}/master/document-statuses/edit?id=${id}`);
+        const response = await fetch(`${BASE}/master/opinion-statuses/edit?id=${id}`);
         const result = await response.json();
         if (!result.success) {
-            showToast(result.message || 'Unable to load document status.', 'error');
+            showToast(result.message || 'Unable to load opinion status.', 'error');
             return;
         }
 
         const item = result.data;
-        const form = document.getElementById('documentStatusForm');
-        document.getElementById('documentStatusId').value = item.id;
-        document.getElementById('documentStatusName').value = item.name || '';
-        document.getElementById('documentStatusDescription').value = item.description || '';
-        document.getElementById('documentStatusBadgeColor').value = item.badge_color || '#2563EB';
-        document.getElementById('documentStatusBadgeHex').value = item.badge_color || '#2563EB';
-        document.getElementById('documentStatusSortOrder').value = item.sort_order ?? 0;
-        document.getElementById('documentStatusIsActive').checked = Number(item.is_active) === 1;
-        form.action = `${BASE}/master/document-statuses/update`;
-        document.getElementById('documentStatusModalTitle').textContent = 'Edit Document Status';
-        document.getElementById('documentStatusSubmitBtn').innerHTML = `
+        const form = document.getElementById('opinionStatusForm');
+        document.getElementById('opinionStatusId').value = item.id;
+        document.getElementById('opinionStatusName').value = item.name || '';
+        document.getElementById('opinionStatusDescription').value = item.description || '';
+        document.getElementById('opinionStatusBadgeColor').value = item.badge_color || '#2563EB';
+        document.getElementById('opinionStatusBadgeHex').value = item.badge_color || '#2563EB';
+        document.getElementById('opinionStatusSortOrder').value = item.sort_order ?? 0;
+        document.getElementById('opinionStatusIsActive').checked = Number(item.is_active) === 1;
+        form.action = `${BASE}/master/opinion-statuses/update`;
+        document.getElementById('opinionStatusModalTitle').textContent = 'Edit Opinion Status';
+        document.getElementById('opinionStatusSubmitBtn').innerHTML = `
             <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
             </svg>
             Update
         `;
 
-        documentStatusModalOpen = true;
-        const modal = document.getElementById('documentStatusModal');
-        const panel = document.getElementById('documentStatusModalPanel');
-        const backdrop = document.getElementById('documentStatusModalBackdrop');
+        opinionStatusModalOpen = true;
+        const modal = document.getElementById('opinionStatusModal');
+        const panel = document.getElementById('opinionStatusModalPanel');
+        const backdrop = document.getElementById('opinionStatusModalBackdrop');
         modal.classList.remove('hidden');
         modal.classList.add('flex');
         requestAnimationFrame(() => {
@@ -627,25 +626,25 @@ async function editDocumentStatus(id) {
             panel.classList.add('scale-100', 'opacity-100');
         });
     } catch (error) {
-        showToast('Failed to load document status data.', 'error');
+        showToast('Failed to load opinion status data.', 'error');
     }
 }
 
-function deleteDocumentStatus(id, name) {
+function deleteOpinionStatus(id, name) {
     openConfirmModal({
-        title: 'Delete Document Status',
+        title: 'Delete Opinion Status',
         message: `Are you sure you want to delete <strong class="text-gray-800">${name}</strong>?<br><span class="text-xs text-gray-500">This action removes the record permanently.</span>`,
         confirmText: 'Delete',
         type: 'danger',
         onConfirm: async () => {
             const formData = new FormData();
             formData.append('id', id);
-            const response = await fetch(`${BASE}/master/document-statuses/destroy`, {
+            const response = await fetch(`${BASE}/master/opinion-statuses/destroy`, {
                 method: 'POST',
                 body: formData,
             });
             const result = await response.json();
-            showToast(result.message || (result.success ? 'Document status deleted successfully.' : 'Failed to delete document status.'), result.success ? 'success' : 'error');
+            showToast(result.message || (result.success ? 'Opinion status deleted successfully.' : 'Failed to delete opinion status.'), result.success ? 'success' : 'error');
             if (result.success) setTimeout(() => location.reload(), 800);
         }
     });
@@ -654,28 +653,28 @@ function deleteDocumentStatus(id, name) {
 function toggleStatus(id, name) {
     openConfirmModal({
         title: 'Toggle Status',
-        message: `This will toggle the active status of <strong class="text-gray-800">${name}</strong>.<br><span class="text-xs text-gray-500">Inactive document statuses are hidden from selection dropdowns.</span>`,
+        message: `This will toggle the active status of <strong class="text-gray-800">${name}</strong>.<br><span class="text-xs text-gray-500">Inactive opinion statuses are hidden from selection dropdowns.</span>`,
         confirmText: 'Proceed',
         type: 'info',
         onConfirm: async () => {
             const formData = new FormData();
             formData.append('id', id);
-            const response = await fetch(`${BASE}/master/document-statuses/toggle-status`, {
+            const response = await fetch(`${BASE}/master/opinion-statuses/toggle-status`, {
                 method: 'POST',
                 body: formData,
             });
             const result = await response.json();
-            showToast(result.message || (result.success ? 'Status updated successfully.' : 'Unable to update document status.'), result.success ? 'success' : 'error');
+            showToast(result.message || (result.success ? 'Status updated successfully.' : 'Unable to update opinion status.'), result.success ? 'success' : 'error');
             if (result.success) setTimeout(() => location.reload(), 800);
         }
     });
 }
 
-function validateDocumentStatusForm() {
+function validateOpinionStatusForm() {
     let valid = true;
-    const name = document.getElementById('documentStatusName');
-    const color = document.getElementById('documentStatusBadgeHex');
-    const sortOrder = document.getElementById('documentStatusSortOrder');
+    const name = document.getElementById('opinionStatusName');
+    const color = document.getElementById('opinionStatusBadgeHex');
+    const sortOrder = document.getElementById('opinionStatusSortOrder');
 
     if (!name || name.value.trim() === '') {
         valid = false;
@@ -694,10 +693,10 @@ function validateDocumentStatusForm() {
 
 document.addEventListener('DOMContentLoaded', function () {
     syncBadgeColorInputs();
-    const form = document.getElementById('documentStatusForm');
+    const form = document.getElementById('opinionStatusForm');
     if (form) {
         form.addEventListener('submit', function (event) {
-            if (!validateDocumentStatusForm()) {
+            if (!validateOpinionStatusForm()) {
                 event.preventDefault();
                 showToast('Please enter a valid name, color code, and sort order.', 'error');
             }
@@ -707,7 +706,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-        if (documentStatusModalOpen) closeDocumentStatusModal();
+        if (opinionStatusModalOpen) closeOpinionStatusModal();
         if (confirmModalOpen) closeConfirmModal();
     }
 });

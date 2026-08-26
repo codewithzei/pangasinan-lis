@@ -553,6 +553,138 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'master/communication-categories' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/CommunicationCategoryController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/communication-categories/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/CommunicationCategoryController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/communication-categories/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/CommunicationCategoryController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/communication-categories/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/CommunicationCategoryController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/communication-categories/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/CommunicationCategoryController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/communication-categories/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/CommunicationCategoryController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/opinion-offices' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/OpinionOfficeController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/opinion-offices/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/OpinionOfficeController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/opinion-offices/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/OpinionOfficeController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/opinion-offices/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/OpinionOfficeController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/opinion-offices/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/OpinionOfficeController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/opinion-offices/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/OpinionOfficeController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/opinion-statuses' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/OpinionStatusController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/opinion-statuses/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/OpinionStatusController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/opinion-statuses/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/OpinionStatusController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/opinion-statuses/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/OpinionStatusController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/opinion-statuses/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/OpinionStatusController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/opinion-statuses/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/OpinionStatusController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'master/hospitals' => [
         [
             'method' => 'GET',
