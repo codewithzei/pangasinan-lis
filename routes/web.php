@@ -785,6 +785,50 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'master/sp-members' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/SpMemberController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/sp-members/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/SpMemberController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/sp-members/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/SpMemberController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/sp-members/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/SpMemberController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/sp-members/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/SpMemberController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/sp-members/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/SpMemberController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'master/user-roles' => [
         [
             'method' => 'GET',

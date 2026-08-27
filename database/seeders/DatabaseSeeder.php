@@ -20,6 +20,7 @@ class DatabaseSeeder
         OpinionStatusSeeder::class,
         MasterSeeder::class,
         TermSeeder::class,
+        SpMemberSeeder::class,
     ];
 
     public function __construct(PDO $pdo)
