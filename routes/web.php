@@ -180,13 +180,6 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
-    'master/legislative-terms/update-legislator-role' => [
-        'method' => 'POST',
-        'controller' => 'Master/TermController',
-        'action' => 'updateLegislatorRole',
-        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
-    ],
-
     'master/legislative-terms/export-csv' => [
         'method' => 'GET',
         'controller' => 'Master/TermController',

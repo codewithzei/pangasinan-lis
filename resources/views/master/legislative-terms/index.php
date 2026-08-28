@@ -155,7 +155,7 @@ $accent = $accent ?? 'primary';
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Unique Legislators</p>
+                        <p class="text-sm text-gray-500">Unique SP Members</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalLegislators) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
@@ -294,26 +294,17 @@ $accent = $accent ?? 'primary';
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <div class="flex flex-wrap gap-1.5">
-                                    <?php if ((int)$t['author_count'] > 0): ?>
-                                    <span class="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700" title="Authors">
-                                        <?= (int)$t['author_count'] ?> Auth
+                                <?php if ((int)$t['member_count'] > 0): ?>
+                                    <span class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                        </svg>
+                                        <?= (int)$t['member_count'] ?> SP Member<?= (int)$t['member_count'] !== 1 ? 's' : '' ?>
                                     </span>
-                                    <?php endif; ?>
-                                    <?php if ((int)$t['sponsor_count'] > 0): ?>
-                                    <span class="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-700" title="Sponsors">
-                                        <?= (int)$t['sponsor_count'] ?> Spn
-                                    </span>
-                                    <?php endif; ?>
-                                    <?php if ((int)$t['coauthor_count'] > 0): ?>
-                                    <span class="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700" title="Co-authors">
-                                        <?= (int)$t['coauthor_count'] ?> Co
-                                    </span>
-                                    <?php endif; ?>
-                                    <?php if ((int)$t['legislator_count'] === 0): ?>
-                                        <span class="text-xs text-gray-400">No members</span>
-                                    <?php endif; ?>
-                                </div>
+                                <?php else: ?>
+                                    <span class="text-xs text-gray-400">No members</span>
+                                <?php endif; ?>
                             </td>
                             <td class="px-6 py-4">
                                 <?php if ($t['is_active']): ?>

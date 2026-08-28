@@ -48,10 +48,7 @@ class TermController
         $offset = ($page - 1) * $perPage;
 
         $sql = "SELECT t.*,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id AND tl.role = 'Author') AS author_count,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id AND tl.role = 'Sponsor') AS sponsor_count,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id AND tl.role = 'Co-author') AS coauthor_count,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id) AS legislator_count
+            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id) AS member_count
         FROM terms t
         WHERE {$whereSql}
         ORDER BY t.start_date DESC
@@ -68,7 +65,7 @@ class TermController
         $years = $yearStmt->fetchAll();
 
         $totalTerms = (int)$this->pdo->query("SELECT COUNT(*) FROM terms WHERE is_deleted = 0")->fetchColumn();
-        $totalLegislators = (int)$this->pdo->query("SELECT COUNT(DISTINCT user_info_id) FROM term_legislators")->fetchColumn();
+        $totalLegislators = (int)$this->pdo->query("SELECT COUNT(DISTINCT sp_member_id) FROM term_legislators")->fetchColumn();
 
         $success = flash_get('success');
         $error = flash_get('error');
@@ -391,17 +388,16 @@ class TermController
             ]);
             $newTermId = (int)$this->pdo->lastInsertId();
 
-            $legStmt = $this->pdo->prepare("SELECT user_info_id, role, date_assigned, notes FROM term_legislators WHERE term_id = ?");
+            $legStmt = $this->pdo->prepare("SELECT sp_member_id, date_assigned, notes FROM term_legislators WHERE term_id = ?");
             $legStmt->execute([$id]);
             $legislators = $legStmt->fetchAll();
 
             if (!empty($legislators)) {
-                $assignStmt = $this->pdo->prepare("INSERT INTO term_legislators (term_id, user_info_id, role, date_assigned, notes, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $assignStmt = $this->pdo->prepare("INSERT INTO term_legislators (term_id, sp_member_id, date_assigned, notes, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?)");
                 foreach ($legislators as $leg) {
                     $assignStmt->execute([
                         $newTermId,
-                        (int)$leg['user_info_id'],
-                        $leg['role'],
+                        (int)$leg['sp_member_id'],
                         $leg['date_assigned'],
                         $leg['notes'],
                         $userId,
@@ -435,10 +431,7 @@ class TermController
         }
 
         $termStmt = $this->pdo->prepare("SELECT t.*,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id AND tl.role = 'Author') AS author_count,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id AND tl.role = 'Sponsor') AS sponsor_count,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id AND tl.role = 'Co-author') AS coauthor_count,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id) AS legislator_count
+            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id) AS member_count
         FROM terms t WHERE t.id = ? AND t.is_deleted = 0 LIMIT 1");
         $termStmt->execute([$id]);
         $term = $termStmt->fetch();
@@ -448,21 +441,27 @@ class TermController
             redirect('master/legislative-terms');
         }
 
-        $legStmt = $this->pdo->prepare("SELECT tl.*, ui.first_name, ui.middle_name, ui.last_name, ui.suffix, ui.profile_path, ui.contact_number, ua.email
+        $legStmt = $this->pdo->prepare("SELECT tl.*, 
+            sm.first_name, sm.middle_name, sm.last_name, sm.suffix, 
+            sm.photo_path, sm.position, sm.sp_member_id,
+            d.name as district_name
             FROM term_legislators tl
-            INNER JOIN user_info ui ON ui.id = tl.user_info_id
-            INNER JOIN user_accounts ua ON ua.id = ui.user_account_id
+            INNER JOIN sp_members sm ON sm.sp_member_id = tl.sp_member_id
+            LEFT JOIN districts d ON d.id = sm.district_id
             WHERE tl.term_id = ?
-            ORDER BY FIELD(tl.role, 'Sponsor','Author','Co-author','Ex-officio','Guest'), ui.last_name ASC");
+            ORDER BY sm.position ASC, sm.last_name ASC");
         $legStmt->execute([$id]);
         $legislators = $legStmt->fetchAll();
 
-        $availStmt = $this->pdo->prepare("SELECT ui.id, ui.first_name, ui.middle_name, ui.last_name, ui.suffix, ua.email
-            FROM user_info ui
-            INNER JOIN user_accounts ua ON ua.id = ui.user_account_id
-            WHERE ua.is_deleted = 0 AND ua.status = 'active'
-            AND ui.id NOT IN (SELECT user_info_id FROM term_legislators WHERE term_id = ?)
-            ORDER BY ui.last_name ASC");
+        $availStmt = $this->pdo->prepare("SELECT sm.sp_member_id as id, 
+            sm.first_name, sm.middle_name, sm.last_name, sm.suffix, 
+            sm.position, sm.photo_path,
+            d.name as district_name
+            FROM sp_members sm
+            LEFT JOIN districts d ON d.id = sm.district_id
+            WHERE sm.is_deleted = 0 AND sm.is_active = 1
+            AND sm.sp_member_id NOT IN (SELECT sp_member_id FROM term_legislators WHERE term_id = ?)
+            ORDER BY sm.position ASC, sm.last_name ASC");
         $availStmt->execute([$id]);
         $availableMembers = $availStmt->fetchAll();
 
@@ -485,9 +484,6 @@ class TermController
         }
 
         $memberIds = $_POST['member_ids'] ?? [];
-        $role = $_POST['role'] ?? 'Author';
-        $validRoles = ['Author', 'Sponsor', 'Co-author', 'Ex-officio', 'Guest'];
-        if (!in_array($role, $validRoles)) $role = 'Author';
 
         if (empty($memberIds)) {
             flash_set('error', 'Please select at least one member to assign.');
@@ -498,19 +494,32 @@ class TermController
 
         try {
             $this->pdo->beginTransaction();
-            $assignStmt = $this->pdo->prepare("INSERT IGNORE INTO term_legislators (term_id, user_info_id, role, date_assigned, created_by, updated_by) VALUES (?, ?, ?, NOW(), ?, ?)");
+            
+            // Validate that all member IDs exist and are active
+            $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
+            $validateStmt = $this->pdo->prepare("SELECT sp_member_id FROM sp_members WHERE sp_member_id IN ({$placeholders}) AND is_deleted = 0 AND is_active = 1");
+            $validateStmt->execute($memberIds);
+            $validIds = $validateStmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            if (count($validIds) !== count($memberIds)) {
+                $this->pdo->rollBack();
+                flash_set('error', 'One or more selected members are invalid or inactive.');
+                redirect('master/legislative-terms/show?id=' . $termId);
+            }
+            
+            $assignStmt = $this->pdo->prepare("INSERT IGNORE INTO term_legislators (term_id, sp_member_id, date_assigned, created_by, updated_by) VALUES (?, ?, NOW(), ?, ?)");
             $count = 0;
             foreach ($memberIds as $mid) {
                 $mid = (int)$mid;
                 if ($mid > 0) {
-                    $assignStmt->execute([$termId, $mid, $role, $userId, $userId]);
+                    $assignStmt->execute([$termId, $mid, $userId, $userId]);
                     if ($assignStmt->rowCount() > 0) $count++;
                 }
             }
             $this->pdo->commit();
 
-            audit_log('UPDATE', 'Term', (string)$termId, null, ['assigned_count' => $count, 'role' => $role, 'member_ids' => $memberIds], "Assigned {$count} legislator(s) to term with role '{$role}'");
-            system_log('INFO', "Assigned {$count} legislators to term {$termId} (role: {$role})");
+            audit_log('UPDATE', 'Term', (string)$termId, null, ['assigned_count' => $count, 'sp_member_ids' => $memberIds], "Assigned {$count} SP member(s) to term");
+            system_log('INFO', "Assigned {$count} SP members to term {$termId}");
             flash_set('success', "Assigned {$count} member(s) successfully.");
         } catch (\Exception $e) {
             $this->pdo->rollBack();
@@ -531,7 +540,10 @@ class TermController
             exit;
         }
 
-        $oldStmt = $this->pdo->prepare("SELECT tl.*, ui.first_name, ui.last_name FROM term_legislators tl LEFT JOIN user_info ui ON ui.id = tl.user_info_id WHERE tl.id = ? LIMIT 1");
+        $oldStmt = $this->pdo->prepare("SELECT tl.*, sm.first_name, sm.last_name, sm.position 
+            FROM term_legislators tl 
+            LEFT JOIN sp_members sm ON sm.sp_member_id = tl.sp_member_id 
+            WHERE tl.id = ? LIMIT 1");
         $oldStmt->execute([$id]);
         $assignment = $oldStmt->fetch();
 
@@ -541,12 +553,13 @@ class TermController
         header('Content-Type: application/json');
         if ($result) {
             $memberName = trim(($assignment['first_name'] ?? '') . ' ' . ($assignment['last_name'] ?? '')) ?: 'Member';
+            $memberPosition = $assignment['position'] ?? 'SP Member';
             $tid = $assignment['term_id'] ?? $termId;
-            audit_log('UPDATE', 'TermLegislator', (string)$id, $assignment ?: null, null, "Removed legislator {$memberName} from term assignment (role: " . ($assignment['role'] ?? 'N/A') . ")");
+            audit_log('UPDATE', 'TermLegislator', (string)$id, $assignment ?: null, null, "Removed SP member {$memberName} ({$memberPosition}) from term assignment");
             if ($tid) {
-                audit_log('UPDATE', 'Term', (string)$tid, null, ['removed_member' => $memberName, 'role' => $assignment['role'] ?? 'N/A'], "Removed legislator {$memberName} from term");
+                audit_log('UPDATE', 'Term', (string)$tid, null, ['removed_member' => $memberName, 'position' => $memberPosition], "Removed SP member {$memberName} from term");
             }
-            system_log('INFO', "Removed legislator from term_legislators assignment ID: {$id}");
+            system_log('INFO', "Removed SP member from term_legislators assignment ID: {$id}");
             echo json_encode(['success' => true, 'message' => 'Member removed successfully.']);
         } else {
             system_log('WARNING', "Failed to remove legislator assignment (ID: {$id})");
@@ -555,52 +568,11 @@ class TermController
         exit;
     }
 
-    public function updateLegislatorRole(): void
-    {
-        $id = (int)($_POST['id'] ?? 0);
-        $role = $_POST['role'] ?? 'Author';
-        $validRoles = ['Author', 'Sponsor', 'Co-author', 'Ex-officio', 'Guest'];
-        if (!in_array($role, $validRoles)) $role = 'Author';
-
-        if ($id <= 0) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Invalid assignment ID.']);
-            exit;
-        }
-
-        $userId = auth_id();
-
-        $oldStmt = $this->pdo->prepare("SELECT tl.*, ui.first_name, ui.last_name FROM term_legislators tl LEFT JOIN user_info ui ON ui.id = tl.user_info_id WHERE tl.id = ? LIMIT 1");
-        $oldStmt->execute([$id]);
-        $oldAssignment = $oldStmt->fetch();
-        $oldRole = $oldAssignment['role'] ?? null;
-
-        $stmt = $this->pdo->prepare("UPDATE term_legislators SET role = ?, updated_by = ? WHERE id = ?");
-        $result = $stmt->execute([$role, $userId, $id]);
-
-        header('Content-Type: application/json');
-        if ($result) {
-            $memberName = trim(($oldAssignment['first_name'] ?? '') . ' ' . ($oldAssignment['last_name'] ?? '')) ?: 'Member';
-            audit_log('UPDATE', 'TermLegislator', (string)$id, ['role' => $oldRole], ['role' => $role], "Changed role of {$memberName} from '{$oldRole}' to '{$role}'");
-            if (!empty($oldAssignment['term_id'])) {
-                audit_log('UPDATE', 'Term', (string)$oldAssignment['term_id'], null, ['member' => $memberName, 'old_role' => $oldRole, 'new_role' => $role], "Legislator role updated: {$memberName} ({$oldRole} -> {$role})");
-            }
-            system_log('INFO', "TermLegislator role updated (ID: {$id}): {$oldRole} -> {$role}");
-            echo json_encode(['success' => true, 'message' => 'Role updated successfully.']);
-        } else {
-            system_log('WARNING', "Failed to update legislator role (ID: {$id})");
-            echo json_encode(['success' => false, 'message' => 'Failed to update role.']);
-        }
-        exit;
-    }
-
     public function exportCsv(): void
     {
         $stmt = $this->pdo->query("SELECT t.id, t.name, t.session_number, t.year, t.start_date, t.end_date,
             CASE t.is_active WHEN 1 THEN 'Active' ELSE 'Inactive' END AS status,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id AND tl.role = 'Author') AS authors,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id AND tl.role = 'Sponsor') AS sponsors,
-            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id AND tl.role = 'Co-author') AS coauthors,
+            (SELECT COUNT(*) FROM term_legislators tl WHERE tl.term_id = t.id) AS total_members,
             t.description, t.created_at
         FROM terms t WHERE t.is_deleted = 0 ORDER BY t.start_date DESC");
         $terms = $stmt->fetchAll();
@@ -611,13 +583,13 @@ class TermController
         header('Pragma: no-cache');
 
         $output = fopen('php://output', 'w');
-        fputcsv($output, ['ID', 'Name', 'Session #', 'Year', 'Start Date', 'End Date', 'Status', 'Authors', 'Sponsors', 'Co-authors', 'Description', 'Created At']);
+        fputcsv($output, ['ID', 'Name', 'Session #', 'Year', 'Start Date', 'End Date', 'Status', 'Total Members', 'Description', 'Created At']);
 
         foreach ($terms as $t) {
             fputcsv($output, [
                 $t['id'], $t['name'], $t['session_number'], $t['year'],
                 $t['start_date'], $t['end_date'], $t['status'],
-                $t['authors'], $t['sponsors'], $t['coauthors'],
+                $t['total_members'],
                 $t['description'] ?? '', $t['created_at'],
             ]);
         }

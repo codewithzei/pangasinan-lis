@@ -20,13 +20,6 @@ function formatName(array $row): string
     ]);
     return trim(implode(' ', $parts));
 }
-$roleBadgeColors = [
-    'Sponsor' => 'bg-purple-50 text-purple-700 border-purple-200',
-    'Author' => 'bg-blue-50 text-blue-700 border-blue-200',
-    'Co-author' => 'bg-amber-50 text-amber-700 border-amber-200',
-    'Ex-officio' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    'Guest' => 'bg-gray-50 text-gray-700 border-gray-200',
-];
 ?>
 
 <div class="space-y-6">
@@ -98,22 +91,14 @@ $roleBadgeColors = [
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-px bg-gray-100 sm:grid-cols-4">
+        <div class="grid grid-cols-1 gap-px bg-gray-100 sm:grid-cols-2">
             <div class="bg-white px-6 py-4 text-center">
-                <div class="text-xs font-medium text-gray-500">Total Members</div>
-                <div class="mt-1 text-2xl font-bold text-gray-900"><?= (int)($term['legislator_count'] ?? 0) ?></div>
+                <div class="text-xs font-medium text-gray-500">Total SP Members</div>
+                <div class="mt-1 text-2xl font-bold text-gray-900"><?= (int)($term['member_count'] ?? 0) ?></div>
             </div>
             <div class="bg-white px-6 py-4 text-center">
-                <div class="text-xs font-medium text-purple-600">Sponsors</div>
-                <div class="mt-1 text-2xl font-bold text-gray-900"><?= (int)($term['sponsor_count'] ?? 0) ?></div>
-            </div>
-            <div class="bg-white px-6 py-4 text-center">
-                <div class="text-xs font-medium text-blue-600">Authors</div>
-                <div class="mt-1 text-2xl font-bold text-gray-900"><?= (int)($term['author_count'] ?? 0) ?></div>
-            </div>
-            <div class="bg-white px-6 py-4 text-center">
-                <div class="text-xs font-medium text-amber-600">Co-Authors</div>
-                <div class="mt-1 text-2xl font-bold text-gray-900"><?= (int)($term['coauthor_count'] ?? 0) ?></div>
+                <div class="text-xs font-medium text-blue-600">Available to Assign</div>
+                <div class="mt-1 text-2xl font-bold text-gray-900"><?= count($availableMembers) ?></div>
             </div>
         </div>
     </section>
@@ -123,57 +108,82 @@ $roleBadgeColors = [
         <div class="rounded-2xl border border-gray-200 bg-white xl:col-span-1 h-fit">
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
                 <div>
-                    <h2 class="font-semibold text-gray-900">Assign Members</h2>
+                    <h2 class="font-semibold text-gray-900">Assign SP Members</h2>
                     <p class="mt-1 text-xs text-gray-500">Add SP members to this term</p>
                 </div>
             </div>
             <form method="POST" action="<?= BASE_URL ?>/master/legislative-terms/assign-legislators" class="p-6 space-y-4">
                 <input type="hidden" name="term_id" value="<?= (int)($term['id'] ?? 0) ?>">
-                <div>
-                    <label class="mb-1.5 block text-xs font-semibold text-gray-700">Role</label>
-                    <select name="role"
-                        class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                        <option value="Author">Author</option>
-                        <option value="Sponsor">Sponsor</option>
-                        <option value="Co-author">Co-author</option>
-                        <option value="Ex-officio">Ex-officio</option>
-                        <option value="Guest">Guest</option>
-                    </select>
-                </div>
+                
                 <div>
                     <div class="mb-1.5 flex items-center justify-between">
-                        <label class="block text-xs font-semibold text-gray-700">Members</label>
+                        <label class="block text-xs font-semibold text-gray-700">Search Members</label>
+                        <button type="button" id="clearSearch" class="text-xs text-gray-400 hover:text-gray-600 transition hidden">
+                            Clear
+                        </button>
+                    </div>
+                    <div class="relative">
+                        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <input type="text" id="memberSearch" placeholder="Search by name, position, or district..."
+                            class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="mb-1.5 flex items-center justify-between">
+                        <label class="block text-xs font-semibold text-gray-700">SP Members</label>
                         <label class="flex items-center gap-1.5 text-[11px] text-gray-500">
                             <input type="checkbox" id="selectAllMembers" class="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary">
-                            Select all (<?= count($availableMembers) ?>)
+                            <span id="selectAllLabel">Select all (<span id="visibleCount"><?= count($availableMembers) ?></span>)</span>
                         </label>
                     </div>
-                    <div class="max-h-80 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 space-y-1">
+                    <div class="max-h-96 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2 space-y-1" id="membersList">
                         <?php if (empty($availableMembers)): ?>
-                            <div class="py-8 text-center text-xs text-gray-400">
-                                All active members are already assigned.
+                            <div class="py-8 text-center text-xs text-gray-400" id="emptyState">
+                                All active SP members are already assigned to this term.
                             </div>
                         <?php else: ?>
+                            <div class="hidden py-8 text-center text-xs text-gray-400" id="noResultsState">
+                                <svg class="mx-auto h-8 w-8 mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                                No members match your search.
+                            </div>
                             <?php foreach ($availableMembers as $m):
                                 $full = formatName($m);
                                 $mId = (int)($m['id'] ?? 0);
+                                $position = htmlspecialchars($m['position'] ?? '');
+                                $district = htmlspecialchars($m['district_name'] ?? '');
+                                $searchData = strtolower($full . ' ' . $position . ' ' . $district);
                             ?>
-                            <label class="flex items-center gap-2.5 rounded-lg p-2 hover:bg-white cursor-pointer transition">
+                            <label class="member-item flex items-center gap-2.5 rounded-lg p-2 hover:bg-white cursor-pointer transition" data-search="<?= htmlspecialchars($searchData) ?>">
                                 <input type="checkbox" name="member_ids[]" value="<?= $mId ?>"
                                     class="member-checkbox h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
-                                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-primary">
-                                    <?= strtoupper(mb_substr($m['first_name'] ?? '', 0, 1) . mb_substr($m['last_name'] ?? '', 0, 1)) ?>
-                                </div>
+                                <?php if (!empty($m['photo_path'])): ?>
+                                    <img src="<?= htmlspecialchars($m['photo_path']) ?>"
+                                         alt="" class="h-8 w-8 rounded-full object-cover border border-gray-200">
+                                <?php else: ?>
+                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-primary">
+                                        <?= strtoupper(mb_substr($m['first_name'] ?? '', 0, 1) . mb_substr($m['last_name'] ?? '', 0, 1)) ?>
+                                    </div>
+                                <?php endif; ?>
                                 <div class="min-w-0 flex-1">
                                     <div class="truncate text-sm font-medium text-gray-800"><?= htmlspecialchars($full) ?></div>
-                                    <div class="truncate text-[11px] text-gray-500"><?= htmlspecialchars($m['email'] ?? '') ?></div>
+                                    <div class="truncate text-[11px] text-gray-500">
+                                        <?= $position ?><?= $district ? ' · ' . $district : '' ?>
+                                    </div>
                                 </div>
                             </label>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </div>
                 </div>
-                <button type="submit"
+                <button type="submit" id="assignButton"
                     <?= empty($availableMembers) ? 'disabled' : '' ?>
                     class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -188,7 +198,7 @@ $roleBadgeColors = [
         <div class="rounded-2xl border border-gray-200 bg-white xl:col-span-2">
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
                 <div>
-                    <h2 class="font-semibold text-gray-900">Assigned Members</h2>
+                    <h2 class="font-semibold text-gray-900">Assigned SP Members</h2>
                     <p class="mt-1 text-xs text-gray-500">
                         <?= count($legislators) ?> member<?= count($legislators) !== 1 ? 's' : '' ?> assigned to this term
                     </p>
@@ -199,7 +209,8 @@ $roleBadgeColors = [
                     <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                         <tr>
                             <th class="px-6 py-3 font-medium">Member</th>
-                            <th class="px-6 py-3 font-medium">Role</th>
+                            <th class="px-6 py-3 font-medium">Position</th>
+                            <th class="px-6 py-3 font-medium">District</th>
                             <th class="px-6 py-3 font-medium">Assigned</th>
                             <th class="px-6 py-3 font-medium text-right">Actions</th>
                         </tr>
@@ -207,29 +218,29 @@ $roleBadgeColors = [
                     <tbody class="divide-y divide-gray-100">
                         <?php if (empty($legislators)): ?>
                             <tr>
-                                <td colspan="4" class="px-6 py-16 text-center">
+                                <td colspan="5" class="px-6 py-16 text-center">
                                     <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                         <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                                   d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                                         </svg>
                                     </div>
-                                    <p class="mt-4 text-sm font-medium text-gray-700">No members assigned yet.</p>
+                                    <p class="mt-4 text-sm font-medium text-gray-700">No SP members assigned yet.</p>
                                     <p class="mt-1 text-xs text-gray-500">Use the form on the left to add SP members.</p>
                                 </td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($legislators as $leg):
                                 $full = formatName($leg);
-                                $legRole = $leg['role'] ?? 'Guest';
-                                $badge = $roleBadgeColors[$legRole] ?? $roleBadgeColors['Guest'];
                                 $legId = (int)($leg['id'] ?? 0);
+                                $position = htmlspecialchars($leg['position'] ?? 'SP Member');
+                                $district = htmlspecialchars($leg['district_name'] ?? '');
                             ?>
                             <tr class="hover:bg-gray-50/50 transition" data-row-id="<?= $legId ?>">
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
-                                        <?php if (!empty($leg['profile_path'])): ?>
-                                            <img src="<?= htmlspecialchars($leg['profile_path']) ?>"
+                                        <?php if (!empty($leg['photo_path'])): ?>
+                                            <img src="<?= htmlspecialchars($leg['photo_path']) ?>"
                                                  alt="" class="h-10 w-10 rounded-full object-cover border border-gray-200">
                                         <?php else: ?>
                                             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-primary">
@@ -238,24 +249,16 @@ $roleBadgeColors = [
                                         <?php endif; ?>
                                         <div class="min-w-0">
                                             <div class="truncate font-medium text-gray-900"><?= htmlspecialchars($full) ?></div>
-                                            <div class="truncate text-[11px] text-gray-500">
-                                                <?= !empty($leg['email']) ? htmlspecialchars($leg['email']) : (!empty($leg['contact_number']) ? htmlspecialchars($leg['contact_number']) : '') ?>
-                                            </div>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <select onchange="updateRole(<?= $legId ?>, this.value)"
-                                        class="inline-flex rounded-lg border px-2.5 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 <?= $badge ?> appearance-none pr-7 bg-no-repeat bg-right cursor-pointer">
-                                        <?php
-                                        $roles = ['Sponsor', 'Author', 'Co-author', 'Ex-officio', 'Guest'];
-                                        foreach ($roles as $r):
-                                        ?>
-                                            <option value="<?= $r ?>" <?= $legRole === $r ? 'selected' : '' ?> class="bg-white text-gray-800">
-                                                <?= $r ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <span class="inline-flex rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                        <?= $position ?>
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-xs text-gray-600">
+                                    <?= $district ?: '—' ?>
                                 </td>
                                 <td class="px-6 py-4 text-xs text-gray-500">
                                     <?= !empty($leg['date_assigned']) ? date('M j, Y', strtotime($leg['date_assigned'])) : '—' ?>
@@ -266,7 +269,7 @@ $roleBadgeColors = [
                                     <?php endif; ?>
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <button type="button" onclick="removeMember(<?= $legId ?>, '<?= htmlspecialchars($full) ?>')"
+                                    <button type="button" onclick="removeMember(<?= $legId ?>, '<?= htmlspecialchars($full, ENT_QUOTES) ?>')"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-red-400 hover:bg-red-50 hover:text-red-600 transition"
                                         title="Remove">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -362,25 +365,105 @@ function showToast(message, type = 'success') {
     }, 4500);
 }
 
-const selectAll = document.getElementById('selectAllMembers');
-const memberCheckboxes = document.querySelectorAll('.member-checkbox');
-if (selectAll) {
-    selectAll.addEventListener('change', () => {
-        const checked = selectAll.checked;
-        memberCheckboxes.forEach(cb => cb.checked = checked);
-    });
-    memberCheckboxes.forEach(cb => {
-        cb.addEventListener('change', () => {
-            const allChecked = Array.from(memberCheckboxes).every(c => c.checked);
-            const anyChecked = Array.from(memberCheckboxes).some(c => c.checked);
-            selectAll.checked = allChecked;
-            selectAll.indeterminate = !allChecked && anyChecked;
+// Member search functionality
+const memberSearch = document.getElementById('memberSearch');
+const clearSearchBtn = document.getElementById('clearSearch');
+const memberItems = document.querySelectorAll('.member-item');
+const noResultsState = document.getElementById('noResultsState');
+const visibleCountSpan = document.getElementById('visibleCount');
+
+if (memberSearch && memberItems.length > 0) {
+    memberSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        let visibleCount = 0;
+        
+        if (searchTerm === '') {
+            clearSearchBtn.classList.add('hidden');
+        } else {
+            clearSearchBtn.classList.remove('hidden');
+        }
+        
+        memberItems.forEach(item => {
+            const searchData = item.getAttribute('data-search') || '';
+            const checkbox = item.querySelector('.member-checkbox');
+            const isChecked = checkbox && checkbox.checked;
+            
+            if (searchTerm === '' || searchData.includes(searchTerm) || isChecked) {
+                item.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                item.classList.add('hidden');
+            }
         });
+        
+        if (visibleCountSpan) {
+            visibleCountSpan.textContent = visibleCount;
+        }
+        
+        if (noResultsState) {
+            if (visibleCount === 0) {
+                noResultsState.classList.remove('hidden');
+            } else {
+                noResultsState.classList.add('hidden');
+            }
+        }
+        
+        updateSelectAllState();
     });
+    
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', function() {
+            memberSearch.value = '';
+            memberSearch.dispatchEvent(new Event('input'));
+            memberSearch.focus();
+        });
+    }
 }
 
+// Select all functionality
+const selectAll = document.getElementById('selectAllMembers');
+const memberCheckboxes = document.querySelectorAll('.member-checkbox');
+
+function updateSelectAllState() {
+    const visibleCheckboxes = Array.from(memberCheckboxes).filter(cb => {
+        const item = cb.closest('.member-item');
+        return item && !item.classList.contains('hidden');
+    });
+    
+    if (visibleCheckboxes.length === 0) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+        return;
+    }
+    
+    const allChecked = visibleCheckboxes.every(c => c.checked);
+    const anyChecked = visibleCheckboxes.some(c => c.checked);
+    selectAll.checked = allChecked;
+    selectAll.indeterminate = !allChecked && anyChecked;
+}
+
+if (selectAll && memberCheckboxes.length > 0) {
+    selectAll.addEventListener('change', () => {
+        const checked = selectAll.checked;
+        memberCheckboxes.forEach(cb => {
+            const item = cb.closest('.member-item');
+            if (item && !item.classList.contains('hidden')) {
+                cb.checked = checked;
+            }
+        });
+    });
+    
+    memberCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelectAllState);
+    });
+    
+    updateSelectAllState();
+}
+
+// Modal functionality
 let confirmModalOpen = false;
 let pendingAction = null;
+
 function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', type = 'danger', onConfirm }) {
     if (confirmModalOpen) return;
     document.getElementById('confirmTitle').textContent = title;
@@ -412,6 +495,7 @@ function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText 
         p.classList.add('scale-100', 'opacity-100');
     });
 }
+
 function closeConfirmModal() {
     if (!confirmModalOpen) return;
     confirmModalOpen = false;
@@ -427,11 +511,13 @@ function closeConfirmModal() {
         m.classList.add('hidden');
     }, 200);
 }
+
 function executeConfirmAction() {
     const fn = pendingAction;
     closeConfirmModal();
     if (typeof fn === 'function') fn();
 }
+
 document.getElementById('confirmModalBackdrop')?.addEventListener('click', closeConfirmModal);
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && confirmModalOpen) closeConfirmModal();
@@ -439,7 +525,7 @@ document.addEventListener('keydown', (e) => {
 
 async function removeMember(id, name) {
     openConfirmModal({
-        title: 'Remove Member',
+        title: 'Remove SP Member',
         message: `Remove <strong class="text-gray-800">${name}</strong> from this term?<br><span class="text-xs text-gray-500">This only removes their assignment for the current term.</span>`,
         confirmText: 'Remove',
         type: 'danger',
@@ -457,30 +543,6 @@ async function removeMember(id, name) {
     });
 }
 
-async function updateRole(id, role) {
-    try {
-        const fd = new FormData();
-        fd.append('id', id);
-        fd.append('role', role);
-        const res = await fetch(`${BASE}/master/legislative-terms/update-legislator-role`, { method: 'POST', body: fd });
-        const data = await res.json();
-        showToast(data.message, data.success ? 'success' : 'error');
-        if (data.success) {
-            const row = document.querySelector(`tr[data-row-id="${id}"] select`);
-            if (row) {
-                const colorMap = {
-                    'Sponsor': 'bg-purple-50 text-purple-700 border-purple-200',
-                    'Author': 'bg-blue-50 text-blue-700 border-blue-200',
-                    'Co-author': 'bg-amber-50 text-amber-700 border-amber-200',
-                    'Ex-officio': 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                    'Guest': 'bg-gray-50 text-gray-700 border-gray-200',
-                };
-                const cls = colorMap[role] || colorMap['Guest'];
-                row.className = `inline-flex rounded-lg border px-2.5 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 ${cls} appearance-none pr-7 bg-no-repeat bg-right cursor-pointer`;
-            }
-        }
-    } catch (e) { showToast('Network error.', 'error'); }
-}
 <?php if ($success): ?>
 showToast(<?= json_encode((string)$success) ?>, 'success');
 <?php endif; ?>
