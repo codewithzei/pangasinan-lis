@@ -18,6 +18,8 @@ class DatabaseSeeder
         CommunicationCategorySeeder::class,
         OpinionOfficeSeeder::class,
         OpinionStatusSeeder::class,
+        ChecklistSeeder::class,
+        CommitteeSeeder::class,
         MasterSeeder::class,
         TermSeeder::class,
         SpMemberSeeder::class,

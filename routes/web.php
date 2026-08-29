@@ -822,6 +822,78 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'master/checklists' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/ChecklistController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/checklists/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/ChecklistController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/checklists/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/ChecklistController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/checklists/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/ChecklistController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/checklists/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/ChecklistController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/checklists/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/ChecklistController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/checklists/show' => [
+        'method' => 'GET',
+        'controller' => 'Master/ChecklistController',
+        'action' => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/checklists/assign-document-types' => [
+        'method' => 'POST',
+        'controller' => 'Master/ChecklistDocumentTypeController',
+        'action' => 'assign',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/checklists/remove-document-type' => [
+        'method' => 'POST',
+        'controller' => 'Master/ChecklistDocumentTypeController',
+        'action' => 'remove',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/checklists/update-required' => [
+        'method' => 'POST',
+        'controller' => 'Master/ChecklistDocumentTypeController',
+        'action' => 'updateRequired',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'master/user-roles' => [
         [
             'method' => 'GET',
@@ -862,6 +934,50 @@ return [
     'master/user-roles/toggle-status' => [
         'method' => 'POST',
         'controller' => 'Master/UserRoleController',
+        'action' => 'toggleStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/committees' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/CommitteeController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/committees/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/CommitteeController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/committees/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/CommitteeController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/committees/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/CommitteeController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/committees/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/CommitteeController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/committees/toggle-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/CommitteeController',
         'action' => 'toggleStatus',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
