@@ -7,18 +7,20 @@ ob_start();
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-sky-600 to-blue-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 max-w-3xl">
-                <p class="text-sm font-medium text-sky-100">SANGGUNIANG PANLALAWIGAN SECRETARIAT</p>
+                <p class="text-sm font-medium text-blue-100">SANGGUNIANG PANLALAWIGAN SECRETARIAT</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     Welcome, <?= htmlspecialchars($userName) ?>
                 </h1>
-                <p class="mt-2 max-w-xl text-sm leading-6 text-sky-100">
+                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
                     Prepare session agendas, record minutes, manage ordinances &amp; resolutions numbers,
                     and coordinate with Committee chairs and the Presiding Officer.
                 </p>
             </div>
+            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
     </section>
 
@@ -26,7 +28,7 @@ ob_start();
         <div class="rounded-2xl border border-gray-200 bg-white p-5">
             <p class="text-sm text-gray-500">Next Session</p>
             <p class="mt-2 text-2xl font-bold text-gray-900">—</p>
-            <p class="mt-1 text-xs text-sky-600">No scheduled session</p>
+            <p class="mt-1 text-xs text-primary">No scheduled session</p>
         </div>
         <div class="rounded-2xl border border-gray-200 bg-white p-5">
             <p class="text-sm text-gray-500">Agenda Items</p>
@@ -50,7 +52,7 @@ ob_start();
                     <h2 class="font-semibold text-gray-900">Upcoming Sessions</h2>
                     <p class="mt-1 text-xs text-gray-500">Scheduled board meetings</p>
                 </div>
-                <button class="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-700">Schedule</button>
+                <button class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Schedule</button>
             </div>
             <div class="p-6 text-center text-sm text-gray-500">No sessions scheduled yet.</div>
         </div>
@@ -61,19 +63,19 @@ ob_start();
                 <p class="mt-1 text-xs text-gray-500">Frequently used tools</p>
             </div>
             <div class="grid grid-cols-2 gap-3 p-6">
-                <button class="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-sky-50 p-4 text-sky-700 hover:bg-sky-100">
+                <button class="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-blue-50 p-4 text-primary hover:bg-blue-100">
                     <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                     <span class="text-xs font-medium">Prepare Agenda</span>
                 </button>
-                <button class="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-blue-50 p-4 text-blue-700 hover:bg-blue-100">
+                <button class="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-indigo-50 p-4 text-indigo-700 hover:bg-indigo-100">
                     <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                     </svg>
                     <span class="text-xs font-medium">Record Minutes</span>
                 </button>
-                <button class="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-violet-50 p-4 text-violet-700 hover:bg-violet-100">
+                <button class="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-blue-50 p-4 text-primary hover:bg-blue-100">
                     <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
                     </svg>

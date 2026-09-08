@@ -38,15 +38,15 @@ function actionBadgeClass(string $action): string {
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-700 via-teal-600 to-cyan-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
-                    <p class="text-sm font-medium text-emerald-100">USER ACTIVITY &amp; ACCOUNTABILITY</p>
+                    <p class="text-sm font-medium text-blue-100">USER ACTIVITY &amp; ACCOUNTABILITY</p>
                     <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                         <?= htmlspecialchars($pageTitle) ?>
                     </h1>
-                    <p class="mt-2 max-w-xl text-sm leading-6 text-emerald-100">
+                    <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
                         <?= htmlspecialchars($pageSubtitle) ?>
                     </p>
                 </div>
@@ -61,14 +61,14 @@ function actionBadgeClass(string $action): string {
                     $exportUrl = BASE_URL . '/master/audit-logs/export-csv' . (!empty($exportQuery) ? '?' . http_build_query($exportQuery) : '');
                     ?>
                     <a href="<?= $exportUrl ?>"
-                        class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm hover:bg-emerald-50 transition">
+                        class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary shadow-sm hover:bg-blue-50 transition">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
                         Export CSV
                     </a>
                     <button type="button" onclick="openPurgeModal()"
-                        class="inline-flex items-center gap-2 rounded-xl bg-red-500/20 ring-1 ring-white/20 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-500/30 transition">
+                        class="inline-flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                         </svg>
@@ -89,7 +89,7 @@ function actionBadgeClass(string $action): string {
                         <p class="text-sm text-gray-500">Total Actions</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalLogs) ?></p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                   d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
@@ -97,7 +97,7 @@ function actionBadgeClass(string $action): string {
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-700">All recorded activity</span>
+                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-primary">All recorded activity</span>
                 </div>
             </div>
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
@@ -114,7 +114,7 @@ function actionBadgeClass(string $action): string {
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-700">CREATE actions</span>
+                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-primary">CREATE actions</span>
                 </div>
             </div>
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
@@ -172,10 +172,10 @@ function actionBadgeClass(string $action): string {
                                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                             </svg>
                             <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search description, entity..."
-                                class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                                class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         </div>
                     </div>
-                    <select name="action" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                    <select name="action" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         <option value="">All Actions</option>
                         <option value="CREATE" <?= $filterAction === 'CREATE' ? 'selected' : '' ?>>CREATE</option>
                         <option value="UPDATE" <?= $filterAction === 'UPDATE' ? 'selected' : '' ?>>UPDATE</option>
@@ -188,7 +188,7 @@ function actionBadgeClass(string $action): string {
                         <option value="RESTORE" <?= $filterAction === 'RESTORE' ? 'selected' : '' ?>>RESTORE</option>
                         <option value="OTHER" <?= $filterAction === 'OTHER' ? 'selected' : '' ?>>OTHER</option>
                     </select>
-                    <select name="entity" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                    <select name="entity" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         <option value="">All Entities</option>
                         <?php foreach ($entityTypes as $et): ?>
                             <option value="<?= htmlspecialchars($et) ?>" <?= $filterEntity === $et ? 'selected' : '' ?>><?= htmlspecialchars($et) ?></option>
@@ -199,12 +199,12 @@ function actionBadgeClass(string $action): string {
                     <div>
                         <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-gray-400">From</label>
                         <input type="date" name="date_from" value="<?= htmlspecialchars($filterDateFrom) ?>"
-                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 sm:w-40">
+                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-40">
                     </div>
                     <div>
                         <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-gray-400">To</label>
                         <input type="date" name="date_to" value="<?= htmlspecialchars($filterDateTo) ?>"
-                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 sm:w-40">
+                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-40">
                     </div>
                     <div class="flex items-center gap-2 pt-3 sm:pt-5">
                         <button type="submit" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
@@ -312,7 +312,7 @@ function actionBadgeClass(string $action): string {
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <button type="button" onclick="viewLog(<?= $l['id'] ?>)"
-                                    class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 transition"
+                                    class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition"
                                     title="View Details">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -359,7 +359,7 @@ function actionBadgeClass(string $action): string {
                 ?>
                     <a href="?page=<?= $i ?><?= $queryString ?>"
                        class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page
-                           ? 'border-emerald-600 bg-emerald-600 text-white'
+                           ? 'border-primary bg-primary text-white'
                            : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>">
                         <?= $i ?>
                     </a>

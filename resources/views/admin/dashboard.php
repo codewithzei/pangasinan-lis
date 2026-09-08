@@ -7,18 +7,20 @@ ob_start();
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 max-w-3xl">
-                <p class="text-sm font-medium text-indigo-100">ADMINISTRATION &amp; ROUTING</p>
+                <p class="text-sm font-medium text-blue-100">ADMINISTRATION &amp; ROUTING</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     Hi, <?= htmlspecialchars($userName) ?> &#9889;
                 </h1>
-                <p class="mt-2 max-w-xl text-sm leading-6 text-indigo-100">
+                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
                     Review documents received from the Receiving desk, assign routing slips, and forward to
                     SP Secretary, appropriate Committees, Plenary, or Records.
                 </p>
             </div>
+            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
     </section>
 
@@ -27,7 +29,7 @@ ob_start();
         <div class="rounded-2xl border border-gray-200 bg-white p-5">
             <div class="flex items-start justify-between">
                 <div><p class="text-sm text-gray-500">In Queue</p><p class="mt-2 text-3xl font-bold">0</p></div>
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
                     </svg>
@@ -78,7 +80,7 @@ ob_start();
                     <h2 class="font-semibold text-gray-900">Routing Queue</h2>
                     <p class="mt-1 text-xs text-gray-500">Documents requiring your routing decision</p>
                 </div>
-                <button class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
+                <button class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
                     Batch Assign
                 </button>
             </div>

@@ -7,37 +7,39 @@ ob_start();
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 max-w-3xl">
-                <p class="text-sm font-medium text-violet-100">PLENARY SESSIONS</p>
+                <p class="text-sm font-medium text-blue-100">PLENARY SESSIONS</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     Good day, <?= htmlspecialchars($userName) ?>
                 </h1>
-                <p class="mt-2 max-w-xl text-sm leading-6 text-violet-100">
+                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
                     Manage the 1st, 2nd, and 3rd readings of ordinances and resolutions. Record session
                     attendance, voting results, approved measures, and transmit final copies to Records.
                 </p>
             </div>
+            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
     </section>
 
     <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div class="rounded-2xl border border-gray-200 bg-white p-5">
             <p class="text-sm text-gray-500">On First Reading</p>
-            <p class="mt-2 text-3xl font-bold text-violet-700">0</p>
+            <p class="mt-2 text-3xl font-bold">0</p>
         </div>
         <div class="rounded-2xl border border-gray-200 bg-white p-5">
             <p class="text-sm text-gray-500">On Second Reading</p>
-            <p class="mt-2 text-3xl font-bold text-purple-700">0</p>
+            <p class="mt-2 text-3xl font-bold">0</p>
         </div>
         <div class="rounded-2xl border border-gray-200 bg-white p-5">
             <p class="text-sm text-gray-500">On Third Reading</p>
-            <p class="mt-2 text-3xl font-bold text-indigo-700">0</p>
+            <p class="mt-2 text-3xl font-bold">0</p>
         </div>
         <div class="rounded-2xl border border-gray-200 bg-white p-5">
             <p class="text-sm text-gray-500">Approved This Month</p>
-            <p class="mt-2 text-3xl font-bold text-emerald-600">0</p>
+            <p class="mt-2 text-3xl font-bold">0</p>
         </div>
     </section>
 
@@ -55,8 +57,8 @@ ob_start();
             </div>
             <div class="p-6">
                 <div class="space-y-3">
-                    <div class="rounded-xl border-2 border-dashed border-violet-200 bg-violet-50/40 p-5">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-violet-600">No Items</p>
+                    <div class="rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/40 p-5">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-primary">No Items</p>
                         <p class="mt-2 text-sm text-gray-700">The plenary calendar is empty. Documents forwarded from Committees will appear here for readings.</p>
                     </div>
                 </div>
@@ -77,9 +79,9 @@ ob_start();
                     <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">0%</span>
                 </div>
                 <div class="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                    <div class="h-full w-0 rounded-full bg-violet-500"></div>
+                    <div class="h-full w-0 rounded-full bg-primary"></div>
                 </div>
-                <button class="mt-5 w-full rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white hover:bg-violet-700">
+                <button class="mt-5 w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-white hover:bg-blue-700">
                     Take Attendance
                 </button>
             </div>

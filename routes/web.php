@@ -982,4 +982,47 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    // Receiving Routes
+    'receiving/receive-document' => [
+        'method' => 'GET',
+        'controller' => 'Receiving/RouteDocumentController',
+        'action' => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/receive-document/submit' => [
+        'method' => 'POST',
+        'controller' => 'Receiving/RouteDocumentController',
+        'action' => 'submit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/receive-document/get-checklists' => [
+        'method' => 'GET',
+        'controller' => 'Receiving/RouteDocumentController',
+        'action' => 'getChecklistsByDocumentType',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/route-document' => [
+        'method' => 'GET',
+        'controller' => 'Receiving/RouteDocumentController',
+        'action' => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/route-document/submit' => [
+        'method' => 'POST',
+        'controller' => 'Receiving/RouteDocumentController',
+        'action' => 'submit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/route-document/get-checklists' => [
+        'method' => 'GET',
+        'controller' => 'Receiving/RouteDocumentController',
+        'action' => 'getChecklistsByDocumentType',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
 ];

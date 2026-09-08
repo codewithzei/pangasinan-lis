@@ -62,33 +62,128 @@ $navBase = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium t
             </nav>
         </div>
 
-        <!-- <div class="mb-7">
+        <?php if (is_role('Receiving Staff')): ?>
+        <div class="mb-7">
+            <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Document Processing</p>
+            <nav class="space-y-1">
+                <a href="<?= BASE_URL ?>/receiving/inbox" class="<?= $navBase ?> <?= isActiveNav('receiving/inbox', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                    </svg>
+                    Inbox
+                    <span class="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">0</span>
+                </a>
+            </nav>
+        </div>
 
+        <div class="mb-7">
+            <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Document Management</p>
+            <nav class="space-y-1">
+                <a href="<?= BASE_URL ?>/receiving/routed-documents" class="<?= $navBase ?> <?= isActiveNav('receiving/routed', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Routed Documents
+                </a>
+            </nav>
+        </div>
+
+        <div class="mb-7">
+            <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Audit</p>
+            <nav class="space-y-1">
+                <a href="<?= BASE_URL ?>/receiving/logs" class="<?= $navBase ?> <?= isActiveNav('receiving/logs', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Logs &amp; History
+                </a>
+            </nav>
+        </div>
+        <?php endif; ?>
+
+        <?php if (is_role('Admin')): ?>
+        <div class="mb-7">
+            <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Document Processing</p>
+            <nav class="space-y-1">
+                <a href="<?= BASE_URL ?>/admin/inbox" class="<?= $navBase ?> <?= isActiveNav('admin/inbox', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                    </svg>
+                    Inbox
+                    <span class="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">0</span>
+                </a>
+            </nav>
+        </div>
+
+        <div class="mb-7">
+            <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Document Management</p>
+            <nav class="space-y-1">
+                <a href="<?= BASE_URL ?>/admin/routed" class="<?= $navBase ?> <?= isActiveNav('admin/routed', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Routed Documents
+                </a>
+                <a href="<?= BASE_URL ?>/admin/communications" class="<?= $navBase ?> <?= isActiveNav('admin/communications', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                    Communications
+                </a>
+                <a href="<?= BASE_URL ?>/admin/filed" class="<?= $navBase ?> <?= isActiveNav('admin/filed', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/>
+                    </svg>
+                    Filed Documents
+                </a>
+                <a href="<?= BASE_URL ?>/admin/archived" class="<?= $navBase ?> <?= isActiveNav('admin/archived', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                    </svg>
+                    Archived Documents
+                </a>
+            </nav>
+        </div>
+
+        <div class="mb-7">
+            <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Audit</p>
+            <nav class="space-y-1">
+                <a href="<?= BASE_URL ?>/admin/logs" class="<?= $navBase ?> <?= isActiveNav('admin/logs', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Logs &amp; History
+                </a>
+            </nav>
+        </div>
+
+        <div class="mb-7">
+            <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">System Archive</p>
+            <nav class="space-y-1">
+                <a href="<?= BASE_URL ?>/admin/archive" class="<?= $navBase ?> <?= isActiveNav('admin/archive', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+                    </svg>
+                    Archive
+                </a>
+            </nav>
+        </div>
+        <?php endif; ?>
+
+        <?php if (is_role('SP Secretary')): ?>
+        <div class="mb-7">
             <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Legislative Workflow</p>
             <nav class="space-y-1">
-                <?php if ($isMaster || is_role('Receiving Staff')): ?>
-                <a href="<?= BASE_URL ?>/receiving/dashboard" class="<?= $navBase ?> <?= isActiveNav('receiving', $currentRoute) ?>">
-                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                              d="M4 4h16v16H4zM8 9h8M8 13h6"/>
-                    </svg>
-                    Receiving
-                    <span class="ml-auto rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">0</span>
-                </a>
-                <?php endif; ?>
-
-                <?php if ($isMaster || is_role('Admin')): ?>
-                <a href="<?= BASE_URL ?>/admin/dashboard" class="<?= $navBase ?> <?= isActiveNav('admin/', $currentRoute) ?>">
-                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                              d="M4 6h16M4 12h10M4 18h7"/>
-                    </svg>
-                    Routing / Admin
-                    <span class="ml-auto rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">0</span>
-                </a>
-                <?php endif; ?>
-
-                <?php if ($isMaster || is_role('SP Secretary')): ?>
                 <a href="<?= BASE_URL ?>/spsec/dashboard" class="<?= $navBase ?> <?= isActiveNav('spsec', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
@@ -96,9 +191,14 @@ $navBase = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium t
                     </svg>
                     SP Secretary
                 </a>
-                <?php endif; ?>
+            </nav>
+        </div>
+        <?php endif; ?>
 
-                <?php if ($isMaster || is_role('Plenary')): ?>
+        <?php if (is_role('Plenary')): ?>
+        <div class="mb-7">
+            <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Legislative Workflow</p>
+            <nav class="space-y-1">
                 <a href="<?= BASE_URL ?>/plenary/dashboard" class="<?= $navBase ?> <?= isActiveNav('plenary', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
@@ -106,9 +206,14 @@ $navBase = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium t
                     </svg>
                     Plenary
                 </a>
-                <?php endif; ?>
+            </nav>
+        </div>
+        <?php endif; ?>
 
-                <?php if ($isMaster || is_role('Committee')): ?>
+        <?php if (is_role('Committee')): ?>
+        <div class="mb-7">
+            <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Legislative Workflow</p>
+            <nav class="space-y-1">
                 <a href="<?= BASE_URL ?>/committee/dashboard" class="<?= $navBase ?> <?= isActiveNav('committee', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
@@ -116,9 +221,9 @@ $navBase = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium t
                     </svg>
                     Committees
                 </a>
-                <?php endif; ?>
             </nav>
-        </div> -->
+        </div>
+        <?php endif; ?>
 
         <?php if ($isMaster): ?>
         <div class="mb-7">

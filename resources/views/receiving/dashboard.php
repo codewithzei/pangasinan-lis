@@ -7,18 +7,20 @@ ob_start();
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 max-w-3xl">
-                <p class="text-sm font-medium text-emerald-100">RECEIVING SECTION</p>
+                <p class="text-sm font-medium text-blue-100">RECEIVING SECTION</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     Welcome back, <?= htmlspecialchars($userName) ?>
                 </h1>
-                <p class="mt-2 max-w-xl text-sm leading-6 text-emerald-100">
+                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
                     Record, log, and tag incoming legislative documents, requests, and communications as they
                     arrive. Assign tracking numbers before forwarding to Routing / Admin.
                 </p>
             </div>
+            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
     </section>
 
@@ -30,7 +32,7 @@ ob_start();
                     <p class="text-sm text-gray-500">Received Today</p>
                     <p class="mt-2 text-3xl font-bold text-gray-900">0</p>
                 </div>
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"/>
                     </svg>
@@ -87,17 +89,17 @@ ob_start();
     </section>
 
     <section class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div class="rounded-2xl border-2 border-dashed border-emerald-300 bg-emerald-50/50 p-8 text-center lg:col-span-1">
-            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white">
+        <div class="rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50/50 p-8 text-center lg:col-span-1">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white">
                 <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"/>
                 </svg>
             </div>
-            <h3 class="mt-4 text-lg font-semibold text-emerald-900">Log New Document</h3>
-            <p class="mt-1 text-sm text-emerald-700">Assign tracking number, attach files, and record sender details.</p>
-            <button class="mt-5 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">
-                + Receive Item
-            </button>
+            <h3 class="mt-4 text-lg font-semibold text-blue-900">Log New Document</h3>
+            <p class="mt-1 text-sm text-blue-700">Assign tracking number, attach files, and record sender details.</p>
+            <a href="<?= BASE_URL ?>/receiving/receive-document" class="mt-5 inline-block rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
+                + Receive Document
+            </a>
         </div>
 
         <div class="rounded-2xl border border-gray-200 bg-white lg:col-span-2">

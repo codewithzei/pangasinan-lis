@@ -44,15 +44,15 @@ function methodBadgeClass(string $method): string {
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-purple-700 via-violet-600 to-indigo-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
-                    <p class="text-sm font-medium text-purple-100">SYSTEM MONITORING</p>
+                    <p class="text-sm font-medium text-blue-100">SYSTEM MONITORING</p>
                     <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                         <?= htmlspecialchars($pageTitle) ?>
                     </h1>
-                    <p class="mt-2 max-w-xl text-sm leading-6 text-purple-100">
+                    <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
                         <?= htmlspecialchars($pageSubtitle) ?>
                     </p>
                 </div>
@@ -67,14 +67,14 @@ function methodBadgeClass(string $method): string {
                     $exportUrl = BASE_URL . '/master/system-logs/export-csv' . (!empty($exportQuery) ? '?' . http_build_query($exportQuery) : '');
                     ?>
                     <a href="<?= $exportUrl ?>"
-                        class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-purple-700 shadow-sm hover:bg-purple-50 transition">
+                        class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary shadow-sm hover:bg-blue-50 transition">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
                         Export CSV
                     </a>
                     <button type="button" onclick="openPurgeModal()"
-                        class="inline-flex items-center gap-2 rounded-xl bg-red-500/20 ring-1 ring-white/20 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-500/30 transition">
+                        class="inline-flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                         </svg>
@@ -95,7 +95,7 @@ function methodBadgeClass(string $method): string {
                         <p class="text-sm text-gray-500">Total Logs</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalLogs) ?></p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
@@ -103,7 +103,7 @@ function methodBadgeClass(string $method): string {
                     </div>
                 </div>
                 <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-purple-50 px-2 py-1 font-medium text-purple-700">All entries</span>
+                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-primary">All entries</span>
                 </div>
             </div>
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
@@ -178,10 +178,10 @@ function methodBadgeClass(string $method): string {
                                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                             </svg>
                             <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search message, URL, IP..."
-                                class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20">
+                                class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         </div>
                     </div>
-                    <select name="level" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20">
+                    <select name="level" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         <option value="">All Levels</option>
                         <option value="DEBUG" <?= $filterLevel === 'DEBUG' ? 'selected' : '' ?>>DEBUG</option>
                         <option value="INFO" <?= $filterLevel === 'INFO' ? 'selected' : '' ?>>INFO</option>
@@ -190,7 +190,7 @@ function methodBadgeClass(string $method): string {
                         <option value="ERROR" <?= $filterLevel === 'ERROR' ? 'selected' : '' ?>>ERROR</option>
                         <option value="CRITICAL" <?= $filterLevel === 'CRITICAL' ? 'selected' : '' ?>>CRITICAL</option>
                     </select>
-                    <select name="method" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20">
+                    <select name="method" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         <option value="">All Methods</option>
                         <option value="GET" <?= $filterMethod === 'GET' ? 'selected' : '' ?>>GET</option>
                         <option value="POST" <?= $filterMethod === 'POST' ? 'selected' : '' ?>>POST</option>
@@ -202,12 +202,12 @@ function methodBadgeClass(string $method): string {
                     <div>
                         <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-gray-400">From</label>
                         <input type="date" name="date_from" value="<?= htmlspecialchars($filterDateFrom) ?>"
-                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 sm:w-40">
+                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-40">
                     </div>
                     <div>
                         <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-gray-400">To</label>
                         <input type="date" name="date_to" value="<?= htmlspecialchars($filterDateTo) ?>"
-                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20 sm:w-40">
+                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-40">
                     </div>
                     <div class="flex items-center gap-2 pt-3 sm:pt-5">
                         <button type="submit" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
@@ -305,7 +305,7 @@ function methodBadgeClass(string $method): string {
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <button type="button" onclick="viewLog(<?= $l['id'] ?>)"
-                                    class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-600 transition"
+                                    class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition"
                                     title="View Details">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -352,7 +352,7 @@ function methodBadgeClass(string $method): string {
                 ?>
                     <a href="?page=<?= $i ?><?= $queryString ?>"
                        class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page
-                           ? 'border-purple-600 bg-purple-600 text-white'
+                           ? 'border-primary bg-primary text-white'
                            : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>">
                         <?= $i ?>
                     </a>
