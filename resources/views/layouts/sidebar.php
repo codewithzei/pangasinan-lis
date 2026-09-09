@@ -2,6 +2,7 @@
 $user = auth();
 $userName = $user['full_name'] ?? 'Guest';
 $userRole = $user['role_name'] ?? '—';
+$userRoleId = $user['role_id'] ?? null;
 $initial = strtoupper(mb_substr($user['first_name'] ?? $userName, 0, 1) ?: 'U');
 
 $dashboardRoute = dashboard_route_for_role($userRole);
@@ -16,6 +17,27 @@ function isActiveNav(string $prefix, string $current): string
 }
 
 $navBase = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 transition';
+
+// Get inbox count for current user's role
+$inboxCount = 0;
+if ($userRoleId !== null) {
+    try {
+        $database = new Database();
+        $pdo = $database->connect();
+        $stmt = $pdo->prepare("
+            SELECT COUNT(DISTINCT da.document_id) as count
+            FROM document_assignments da
+            WHERE da.assigned_to_role_id = ?
+            AND da.decision = 'PENDING'
+            AND da.completed_at IS NULL
+        ");
+        $stmt->execute([$userRoleId]);
+        $result = $stmt->fetch();
+        $inboxCount = (int)($result['count'] ?? 0);
+    } catch (Throwable $e) {
+        // Silently fail - inbox count will remain 0
+    }
+}
 ?>
 
 <aside
@@ -72,7 +94,9 @@ $navBase = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium t
                               d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
                     </svg>
                     Inbox
-                    <span class="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">0</span>
+                    <?php if ($inboxCount > 0): ?>
+                        <span class="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700"><?= $inboxCount ?></span>
+                    <?php endif; ?>
                 </a>
             </nav>
         </div>
@@ -114,7 +138,9 @@ $navBase = 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium t
                               d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
                     </svg>
                     Inbox
-                    <span class="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">0</span>
+                    <?php if ($inboxCount > 0): ?>
+                        <span class="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700"><?= $inboxCount ?></span>
+                    <?php endif; ?>
                 </a>
             </nav>
         </div>

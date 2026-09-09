@@ -17,8 +17,7 @@ class CreateDocumentsTable
             time_received TIME NOT NULL,
             
             -- Document Details
-            subject_matter TEXT NOT NULL,
-            document_type_id INT NOT NULL,
+            subject_matter_document_type TEXT NOT NULL,
             
             -- Source Information
             source_type_id INT NOT NULL,
@@ -56,7 +55,6 @@ class CreateDocumentsTable
             INDEX idx_documents_current_owner (current_owner_user_id),
             INDEX idx_documents_current_status (current_status_id),
             INDEX idx_documents_current_phase (current_phase),
-            INDEX idx_documents_document_type (document_type_id),
             INDEX idx_documents_source_type (source_type_id),
             INDEX idx_documents_date_received (date_received),
             INDEX idx_documents_tracking_year (tracking_year),
@@ -65,7 +63,6 @@ class CreateDocumentsTable
             INDEX idx_documents_filed_at (filed_at),
             
             -- Foreign Keys
-            CONSTRAINT fk_documents_document_type FOREIGN KEY (document_type_id) REFERENCES document_types(id) ON DELETE RESTRICT,
             CONSTRAINT fk_documents_source_type FOREIGN KEY (source_type_id) REFERENCES source_types(id) ON DELETE RESTRICT,
             CONSTRAINT fk_documents_external_office FOREIGN KEY (external_office_id) REFERENCES external_offices(id) ON DELETE RESTRICT,
             CONSTRAINT fk_documents_hospital FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE RESTRICT,

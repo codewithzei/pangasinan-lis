@@ -1025,4 +1025,18 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'receiving/routed-documents' => [
+        'method' => 'GET',
+        'controller' => 'Receiving/RoutedDocumentController',
+        'action' => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/routed-documents/show' => [
+        'method' => 'GET',
+        'controller' => 'Receiving/RoutedDocumentController',
+        'action' => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
 ];

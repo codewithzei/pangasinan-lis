@@ -128,25 +128,13 @@ ob_start();
                 <h2 class="text-lg font-semibold text-gray-900">Document Details</h2>
                 <p class="mt-1 text-sm text-gray-500">Basic information about the document</p>
                 
-                <div class="mt-4 space-y-4">
+                <div class="mt-4">
                     <div>
-                        <label for="subject_matter" class="block text-sm font-medium text-gray-700">Subject Matter <span class="text-red-500">*</span></label>
-                        <textarea name="subject_matter" id="subject_matter" rows="4" required
+                        <label for="subject_matter_document_type" class="block text-sm font-medium text-gray-700">Subject Matter / Document Type <span class="text-red-500">*</span></label>
+                        <textarea name="subject_matter_document_type" id="subject_matter_document_type" rows="5" required
                                   class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                                  placeholder="Enter the subject matter or brief description of the document..."><?= htmlspecialchars(old('subject_matter') ?? '') ?></textarea>
-                    </div>
-
-                    <div>
-                        <label for="document_type_id" class="block text-sm font-medium text-gray-700">Document Type <span class="text-red-500">*</span></label>
-                        <select name="document_type_id" id="document_type_id" required
-                                class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
-                            <option value="">-- Select Document Type --</option>
-                            <?php foreach ($documentTypes as $type): ?>
-                                <option value="<?= $type['id'] ?? '' ?>" <?= old('document_type_id') == ($type['id'] ?? '') ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($type['name'] ?? '') ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                                  placeholder="Enter the subject matter and document type (e.g., Request for Infrastructure Budget Allocation [Provincial Tax Ordinance])"><?= htmlspecialchars(old('subject_matter_document_type') ?? '') ?></textarea>
+                        <p class="mt-1 text-xs text-gray-500">Include both the subject matter and document type in this field</p>
                     </div>
                 </div>
             </section>
@@ -287,16 +275,6 @@ ob_start();
                 </div>
             </section>
 
-            <!-- Checklist -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="text-lg font-semibold text-gray-900">Document Checklist</h2>
-                <p class="mt-1 text-sm text-gray-500">Select a document type to view required checklist items</p>
-                
-                <div id="checklistContainer" class="mt-4">
-                    <p class="text-sm text-gray-500 italic">No document type selected yet.</p>
-                </div>
-            </section>
-
             <!-- Attachments -->
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="text-lg font-semibold text-gray-900">Attachments <span class="text-red-500">*</span></h2>
@@ -355,16 +333,14 @@ ob_start();
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const sourceTypeSelect = document.getElementById('source_type_id');
-    const documentTypeSelect = document.getElementById('document_type_id');
     const attachmentsInput = document.getElementById('attachments');
     const fileList = document.getElementById('fileList');
-    const checklistContainer = document.getElementById('checklistContainer');
     const submitBtn = document.getElementById('submitBtn');
     const form = document.getElementById('documentForm');
 
     // Null checks for critical elements
-    if (!sourceTypeSelect || !documentTypeSelect || !attachmentsInput || !fileList || 
-        !checklistContainer || !submitBtn || !form) {
+    if (!sourceTypeSelect || !attachmentsInput || !fileList || 
+        !submitBtn || !form) {
         console.error('Required DOM elements not found');
         return;
     }
@@ -417,51 +393,6 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('source_name_client').setAttribute('required', 'required');
             document.getElementById('source_name_client').disabled = false;
         }
-    });
-
-    // Document type change - load checklist
-    documentTypeSelect.addEventListener('change', function() {
-        const documentTypeId = this.value;
-        
-        if (!documentTypeId) {
-            checklistContainer.innerHTML = '<p class="text-sm text-gray-500 italic">No document type selected yet.</p>';
-            return;
-        }
-
-        checklistContainer.innerHTML = '<p class="text-sm text-gray-500">Loading checklist...</p>';
-
-        fetch('<?= BASE_URL ?>/receiving/receive-document/get-checklists?document_type_id=' + documentTypeId)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.data.length > 0) {
-                    let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
-                    data.data.forEach(item => {
-                        html += `
-                            <div class="flex items-start p-3 border border-gray-200 rounded-lg bg-gray-50">
-                                <div class="flex h-5 items-center">
-                                    <input type="hidden" name="checklist_items[${item.id}]" value="0">
-                                    <input id="checklist_${item.id}" name="checklist_items[${item.id}]" type="checkbox" value="1"
-                                           class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
-                                </div>
-                                <div class="ml-3 text-sm flex-1">
-                                    <label for="checklist_${item.id}" class="font-medium text-gray-700">
-                                        ${escapeHtml(item.name)} ${item.is_required == 1 ? '<span class="text-red-500">*</span>' : ''}
-                                    </label>
-                                    ${item.description ? `<p class="text-gray-500 text-xs mt-0.5">${escapeHtml(item.description)}</p>` : ''}
-                                </div>
-                            </div>
-                        `;
-                    });
-                    html += '</div>';
-                    checklistContainer.innerHTML = html;
-                } else {
-                    checklistContainer.innerHTML = '<p class="text-sm text-gray-500 italic">No checklist items configured for this document type.</p>';
-                }
-            })
-            .catch(error => {
-                checklistContainer.innerHTML = '<p class="text-sm text-red-600">Failed to load checklist items.</p>';
-                console.error('Error:', error);
-            });
     });
 
     // File upload display
@@ -555,11 +486,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Trigger source type change on page load if old value exists
     if (sourceTypeSelect.value) {
         sourceTypeSelect.dispatchEvent(new Event('change'));
-    }
-
-    // Trigger document type change on page load if old value exists
-    if (documentTypeSelect.value) {
-        documentTypeSelect.dispatchEvent(new Event('change'));
     }
 });
 </script>

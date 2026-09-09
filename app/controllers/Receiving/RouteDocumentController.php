@@ -15,13 +15,6 @@ class RouteDocumentController
     public function index(): void
     {
         // Load all active, non-deleted lookup data
-        $documentTypes = $this->pdo->query("
-            SELECT id, name, badge_color 
-            FROM document_types 
-            WHERE is_active = 1 AND is_deleted = 0 
-            ORDER BY sort_order ASC, name ASC
-        ")->fetchAll();
-
         $sourceTypes = $this->pdo->query("
             SELECT id, name 
             FROM source_types 
@@ -87,8 +80,7 @@ class RouteDocumentController
         $data = [
             'date_received' => trim($_POST['date_received'] ?? ''),
             'time_received' => trim($_POST['time_received'] ?? ''),
-            'subject_matter' => trim($_POST['subject_matter'] ?? ''),
-            'document_type_id' => (int)($_POST['document_type_id'] ?? 0),
+            'subject_matter_document_type' => trim($_POST['subject_matter_document_type'] ?? ''),
             'source_type_id' => (int)($_POST['source_type_id'] ?? 0),
             'remarks' => trim($_POST['remarks'] ?? ''),
             
@@ -101,9 +93,6 @@ class RouteDocumentController
             'source_contact_number' => trim($_POST['source_contact_number'] ?? ''),
             'source_address' => trim($_POST['source_address'] ?? ''),
             'source_liaison_name' => trim($_POST['source_liaison_name'] ?? ''),
-            
-            // Checklist
-            'checklist_items' => $_POST['checklist_items'] ?? [],
         ];
 
         old_set($_POST);
@@ -190,13 +179,13 @@ class RouteDocumentController
             $insertDocStmt = $this->pdo->prepare("
                 INSERT INTO documents (
                     tracking_year, tracking_sequence, tracking_number,
-                    date_received, time_received, subject_matter,
-                    document_type_id, source_type_id,
+                    date_received, time_received, subject_matter_document_type,
+                    source_type_id,
                     external_office_id, hospital_id, municipality_id,
                     source_name, source_contact_number, source_address, source_liaison_name,
                     current_status_id, current_owner_user_id, current_phase,
                     remarks, created_by, updated_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'ADMIN', ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'ADMIN', ?, ?, ?)
             ");
             $insertDocStmt->execute([
                 $currentYear,
@@ -204,8 +193,7 @@ class RouteDocumentController
                 $trackingNumber,
                 $data['date_received'],
                 $data['time_received'],
-                $data['subject_matter'],
-                $data['document_type_id'],
+                $data['subject_matter_document_type'],
                 $data['source_type_id'],
                 $data['external_office_id'],
                 $data['hospital_id'],
@@ -221,28 +209,6 @@ class RouteDocumentController
             ]);
 
             $documentId = (int)$this->pdo->lastInsertId();
-
-            // 6. Insert document checklist items
-            $checklistStmt = $this->pdo->prepare("
-                SELECT c.id, cdt.is_required
-                FROM checklists c
-                INNER JOIN checklist_document_types cdt ON cdt.checklist_id = c.id
-                WHERE cdt.document_type_id = ? AND c.is_active = 1 AND c.is_deleted = 0
-                ORDER BY cdt.sort_order ASC
-            ");
-            $checklistStmt->execute([$data['document_type_id']]);
-            $checklists = $checklistStmt->fetchAll();
-
-            $insertChecklistItemStmt = $this->pdo->prepare("
-                INSERT INTO document_checklist_items (document_id, checklist_id, is_completed, completed_by, completed_at)
-                VALUES (?, ?, 0, NULL, NULL)
-            ");
-
-            foreach ($checklists as $checklist) {
-                $insertChecklistItemStmt->execute([$documentId, $checklist['id']]);
-            }
-
-            // 7. Insert document revision (initial snapshot)
             $sourceSnapshot = [
                 'external_office_id' => $data['external_office_id'],
                 'hospital_id' => $data['hospital_id'],
@@ -258,28 +224,27 @@ class RouteDocumentController
                 INSERT INTO document_revisions (
                     document_id, revision_number, changed_by, phase,
                     subject_matter, date_received, time_received,
-                    document_type_id, source_type_id, source_snapshot,
+                    source_type_id, source_snapshot,
                     remarks, change_reason
-                ) VALUES (?, 1, ?, 'RECEIVING', ?, ?, ?, ?, ?, ?, ?, 'Initial document receipt')
+                ) VALUES (?, 1, ?, 'RECEIVING', ?, ?, ?, ?, ?, ?, 'Initial document receipt')
             ");
             $insertRevisionStmt->execute([
                 $documentId,
                 $userId,
-                $data['subject_matter'],
+                $data['subject_matter_document_type'],
                 $data['date_received'],
                 $data['time_received'],
-                $data['document_type_id'],
                 $data['source_type_id'],
                 json_encode($sourceSnapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 $data['remarks'] ?: null,
             ]);
 
-            // 8. Process file uploads
+            // 7. Process file uploads
             if (!empty($uploadedFiles['name'][0])) {
                 $uploadedFilePaths = $this->processFileUploads($uploadedFiles, $documentId, $userId);
             }
 
-            // 9. Insert document route to Admin
+            // 8. Insert document route to Admin
             $insertRouteStmt = $this->pdo->prepare("
                 INSERT INTO document_routes (
                     document_id, from_phase, to_phase, routing_option_id,
@@ -293,7 +258,7 @@ class RouteDocumentController
                 $data['remarks'] ?: null,
             ]);
 
-            // 10. Insert Admin inbox assignment
+            // 9. Insert Admin inbox assignment
             $insertAssignmentStmt = $this->pdo->prepare("
                 INSERT INTO document_assignments (
                     document_id, assigned_to_role_id, phase, assigned_by, decision, received_at
@@ -301,7 +266,7 @@ class RouteDocumentController
             ");
             $insertAssignmentStmt->execute([$documentId, $adminRoleId, $userId]);
 
-            // 11. Insert workflow events
+            // 10. Insert workflow events
             $insertEventStmt = $this->pdo->prepare("
                 INSERT INTO document_events (
                     document_id, event_type, phase, performed_by,
@@ -340,7 +305,7 @@ class RouteDocumentController
                 json_encode($routeMetadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ]);
 
-            // 12. Notify Admin users
+            // 11. Notify Admin users
             $this->notifyAdminUsers($documentId, $userId, $trackingNumber, $adminRoleId);
 
             // Commit transaction
@@ -349,9 +314,8 @@ class RouteDocumentController
             // Log audit and system events
             audit_log('CREATE', 'Document', (string)$documentId, null, [
                 'tracking_number' => $trackingNumber,
-                'document_type_id' => $data['document_type_id'],
                 'source_type_id' => $data['source_type_id'],
-                'subject_matter' => substr($data['subject_matter'], 0, 100),
+                'subject_matter_document_type' => substr($data['subject_matter_document_type'], 0, 100),
             ], "Document received: {$trackingNumber}");
 
             system_log('INFO', "Document received and routed to Admin: {$trackingNumber}", [
@@ -385,37 +349,6 @@ class RouteDocumentController
         }
     }
 
-    public function getChecklistsByDocumentType(): void
-    {
-        $documentTypeId = (int)($_GET['document_type_id'] ?? 0);
-
-        if ($documentTypeId <= 0) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Invalid document type ID.']);
-            exit;
-        }
-
-        try {
-            $stmt = $this->pdo->prepare("
-                SELECT c.id, c.name, c.description, cdt.is_required
-                FROM checklists c
-                INNER JOIN checklist_document_types cdt ON cdt.checklist_id = c.id
-                WHERE cdt.document_type_id = ? AND c.is_active = 1 AND c.is_deleted = 0
-                ORDER BY cdt.sort_order ASC, c.name ASC
-            ");
-            $stmt->execute([$documentTypeId]);
-            $checklists = $stmt->fetchAll();
-
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true, 'data' => $checklists]);
-        } catch (Throwable $e) {
-            system_log('ERROR', 'Failed to fetch checklists', ['error' => $e->getMessage(), 'document_type_id' => $documentTypeId]);
-            header('Content-Type: application/json');
-            echo json_encode(['success' => false, 'message' => 'Failed to load checklists.']);
-        }
-        exit;
-    }
-
     protected function validateSubmission(array $data): array
     {
         $errors = [];
@@ -433,22 +366,11 @@ class RouteDocumentController
             $errors[] = 'Invalid time format for time received.';
         }
 
-        // Subject matter
-        if ($data['subject_matter'] === '') {
-            $errors[] = 'Subject matter is required.';
-        } elseif (mb_strlen($data['subject_matter']) > 5000) {
-            $errors[] = 'Subject matter must not exceed 5000 characters.';
-        }
-
-        // Document type
-        if ($data['document_type_id'] <= 0) {
-            $errors[] = 'Document type is required.';
-        } else {
-            $stmt = $this->pdo->prepare("SELECT id FROM document_types WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1");
-            $stmt->execute([$data['document_type_id']]);
-            if (!$stmt->fetch()) {
-                $errors[] = 'Invalid or inactive document type selected.';
-            }
+        // Subject matter / Document type
+        if ($data['subject_matter_document_type'] === '') {
+            $errors[] = 'Subject matter / Document type is required.';
+        } elseif (mb_strlen($data['subject_matter_document_type']) > 5000) {
+            $errors[] = 'Subject matter / Document type must not exceed 5000 characters.';
         }
 
         // Source type
