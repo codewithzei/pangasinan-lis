@@ -146,6 +146,19 @@ if ($userRoleId !== null) {
         </div>
 
         <div class="mb-7">
+            <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Document Intake</p>
+            <nav class="space-y-1">
+                <a href="<?= BASE_URL ?>/admin/receive-document" class="<?= $navBase ?> <?= isActiveNav('admin/receive-document', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Receive Document
+                </a>
+            </nav>
+        </div>
+
+        <div class="mb-7">
             <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Document Management</p>
             <nav class="space-y-1">
                 <a href="<?= BASE_URL ?>/admin/routed" class="<?= $navBase ?> <?= isActiveNav('admin/routed', $currentRoute) ?>">
@@ -210,12 +223,15 @@ if ($userRoleId !== null) {
         <div class="mb-7">
             <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Legislative Workflow</p>
             <nav class="space-y-1">
-                <a href="<?= BASE_URL ?>/spsec/dashboard" class="<?= $navBase ?> <?= isActiveNav('spsec', $currentRoute) ?>">
+                <a href="<?= BASE_URL ?>/spsec/inbox" class="<?= $navBase ?> <?= isActiveNav('spsec/inbox', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
                     </svg>
-                    SP Secretary
+                    Inbox
+                    <?php if ($inboxCount > 0): ?>
+                        <span class="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700"><?= $inboxCount ?></span>
+                    <?php endif; ?>
                 </a>
             </nav>
         </div>

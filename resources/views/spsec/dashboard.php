@@ -63,12 +63,14 @@ ob_start();
                 <p class="mt-1 text-xs text-gray-500">Frequently used tools</p>
             </div>
             <div class="grid grid-cols-2 gap-3 p-6">
-                <button class="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-blue-50 p-4 text-primary hover:bg-blue-100">
+                <a href="<?= BASE_URL ?>/spsec/inbox"
+                   class="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-blue-50 p-4 text-primary hover:bg-blue-100">
                     <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
                     </svg>
-                    <span class="text-xs font-medium">Prepare Agenda</span>
-                </button>
+                    <span class="text-xs font-medium">Document Inbox</span>
+                </a>
                 <button class="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-indigo-50 p-4 text-indigo-700 hover:bg-indigo-100">
                     <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>

@@ -32,9 +32,9 @@ class RoutedDocumentController
         $whereConditions = ['1=1'];
         $params = [];
 
-        // Search filter (tracking number and subject matter/document type)
+        // Search filter (tracking number and subject matter)
         if ($search !== '') {
-            $whereConditions[] = '(d.tracking_number LIKE ? OR d.subject_matter_document_type LIKE ?)';
+            $whereConditions[] = '(d.tracking_number LIKE ? OR d.subject_matter LIKE ?)';
             $params[] = "%{$search}%";
             $params[] = "%{$search}%";
         }
@@ -69,7 +69,10 @@ class RoutedDocumentController
             SELECT 
                 d.id,
                 d.tracking_number,
-                d.subject_matter_document_type,
+                d.subject_matter,
+                d.document_type_id,
+                dt.name as document_type_name,
+                dt.badge_color as document_type_badge_color,
                 d.current_phase,
                 d.date_received,
                 d.time_received,
@@ -77,7 +80,8 @@ class RoutedDocumentController
                 ds.name as status,
                 ds.badge_color as status_badge_color
             FROM documents d
-            INNER JOIN document_statuses ds ON d.current_status_id = ds.id
+            LEFT JOIN document_types dt ON d.document_type_id = dt.id
+            LEFT JOIN document_statuses ds ON d.current_status_id = ds.id
             WHERE {$whereClause}
             ORDER BY d.date_received DESC, d.time_received DESC, d.id DESC
             LIMIT ? OFFSET ?
@@ -148,6 +152,8 @@ class RoutedDocumentController
         $sql = "
             SELECT 
                 d.*,
+                dt.name as document_type_name,
+                dt.badge_color as document_type_badge_color,
                 ds.name as status,
                 ds.badge_color as status_badge_color,
                 st.name as source_type,
@@ -163,8 +169,9 @@ class RoutedDocumentController
                 owner.username as current_owner_username,
                 owner.email as current_owner_email
             FROM documents d
-            INNER JOIN document_statuses ds ON d.current_status_id = ds.id
-            INNER JOIN source_types st ON d.source_type_id = st.id
+            LEFT JOIN document_types dt ON d.document_type_id = dt.id
+            LEFT JOIN document_statuses ds ON d.current_status_id = ds.id
+            LEFT JOIN source_types st ON d.source_type_id = st.id
             LEFT JOIN external_offices eo ON d.external_office_id = eo.id
             LEFT JOIN hospitals h ON d.hospital_id = h.id
             LEFT JOIN municities m ON d.municipality_id = m.id

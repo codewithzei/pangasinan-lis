@@ -82,6 +82,11 @@ function old_clear(): void
     unset($_SESSION['_old']);
 }
 
+function old_get(): array
+{
+    return $_SESSION['_old'] ?? [];
+}
+
 function dashboard_route_for_role(?string $roleName): string
 {
     $map = [

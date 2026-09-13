@@ -222,27 +222,16 @@ function formatPhaseName(string $phase): string
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="max-w-md">
-                                        <?php
-                                        // Extract subject matter and document type
-                                        $fullText = $doc['subject_matter_document_type'];
-                                        // Check if text contains brackets for document type
-                                        if (preg_match('/^(.+?)\s*\[(.+?)\]\s*$/', $fullText, $matches)) {
-                                            $subjectMatter = trim($matches[1]);
-                                            $documentType = trim($matches[2]);
-                                        } else {
-                                            // If no brackets found, show full text as subject matter
-                                            $subjectMatter = $fullText;
-                                            $documentType = '';
-                                        }
-                                        ?>
                                         <div class="text-sm font-medium text-gray-900 line-clamp-2">
-                                            <?= htmlspecialchars($subjectMatter) ?>
+                                            <?= htmlspecialchars($doc['subject_matter']) ?>
                                         </div>
-                                        <?php if (!empty($documentType)): ?>
-                                            <div class="mt-1 text-xs text-gray-500">
-                                                <?= htmlspecialchars($documentType) ?>
-                                            </div>
-                                        <?php endif; ?>
+                                        <div class="mt-1">
+                                            <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                                                  style="background-color: <?= htmlspecialchars($doc['document_type_badge_color'] ?? '#2563EB') ?>1a;
+                                                         color: <?= htmlspecialchars($doc['document_type_badge_color'] ?? '#2563EB') ?>;">
+                                                <?= htmlspecialchars($doc['document_type_name']) ?>
+                                            </span>
+                                        </div>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">

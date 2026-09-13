@@ -63,8 +63,9 @@ return [
     ],
 
     'admin/dashboard' => [
-        'view' => 'admin/dashboard',
-        'title' => 'Admin / Routing Dashboard',
+        'method' => 'GET',
+        'controller' => 'Admin/AdminDashboardController',
+        'action' => 'index',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
@@ -982,7 +983,117 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    // -------------------------------------------------------------------------
+    // Admin Routed Documents Routes
+    // -------------------------------------------------------------------------
+
+    'admin/routed' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminRoutedDocumentController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/routed/show' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminRoutedDocumentController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Admin Inbox Routes
+    // -------------------------------------------------------------------------
+
+    'admin/inbox' => [
+        'method' => 'GET',
+        'controller' => 'Admin/AdminInboxController',
+        'action' => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/inbox/show' => [
+        'method' => 'GET',
+        'controller' => 'Admin/AdminInboxController',
+        'action' => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/inbox/process' => [
+        'method' => 'POST',
+        'controller' => 'Admin/AdminInboxController',
+        'action' => 'process',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/inbox/upload' => [
+        'method' => 'POST',
+        'controller' => 'Admin/AdminInboxController',
+        'action' => 'upload',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // SP Secretary Inbox Routes
+    // -------------------------------------------------------------------------
+
+    'spsec/inbox' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecInboxController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'spsec/inbox/show' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecInboxController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'spsec/inbox/process' => [
+        'method'     => 'POST',
+        'controller' => 'Spsec/SpsecInboxController',
+        'action'     => 'process',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'spsec/inbox/upload' => [
+        'method'     => 'POST',
+        'controller' => 'Spsec/SpsecInboxController',
+        'action'     => 'upload',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Admin Direct Receive Routes
+    // -------------------------------------------------------------------------
+
+    'admin/receive-document' => [
+        'method' => 'GET',
+        'controller' => 'Admin/AdminReceiveDocumentController',
+        'action' => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/receive-document/submit' => [
+        'method' => 'POST',
+        'controller' => 'Admin/AdminReceiveDocumentController',
+        'action' => 'submit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/receive-document/get-checklists' => [
+        'method' => 'GET',
+        'controller' => 'Admin/AdminReceiveDocumentController',
+        'action' => 'getChecklistsByDocumentType',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
     // Receiving Routes
+    // -------------------------------------------------------------------------
+
     'receiving/receive-document' => [
         'method' => 'GET',
         'controller' => 'Receiving/RouteDocumentController',
@@ -1036,6 +1147,41 @@ return [
         'method' => 'GET',
         'controller' => 'Receiving/RoutedDocumentController',
         'action' => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/inbox' => [
+        'method' => 'GET',
+        'controller' => 'Receiving/ReceivingInboxController',
+        'action' => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/inbox/show' => [
+        'method' => 'GET',
+        'controller' => 'Receiving/ReceivingInboxController',
+        'action' => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/inbox/update' => [
+        'method' => 'POST',
+        'controller' => 'Receiving/ReceivingInboxController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/inbox/attachment/delete' => [
+        'method' => 'POST',
+        'controller' => 'Receiving/ReceivingInboxController',
+        'action' => 'deleteAttachment',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/inbox/attachment/upload' => [
+        'method' => 'POST',
+        'controller' => 'Receiving/ReceivingInboxController',
+        'action' => 'uploadAttachment',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
