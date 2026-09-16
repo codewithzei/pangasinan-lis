@@ -4,16 +4,16 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../services/DocumentService.php';
 
 /**
- * AdminInboxController
+ * CommitteeInboxController
  *
- * Handles the Admin inbox: listing pending assignments, viewing document
- * detail, processing actions (Accept / Decline / Route / Noted), and
- * uploading additional attachments.
+ * Handles the Committee inbox: listing pending assignments, viewing document
+ * detail, processing actions (Accept / Return to Admin), and uploading
+ * additional attachments.
  *
- * OWNERSHIP MODEL (migration 050):
+ * OWNERSHIP MODEL (mirrors SpsecInboxController, migration 050):
  *   - A new document assignment arrives as PENDING with accepted_by = NULL
- *     and assigned_to_user_id = NULL.  All active Admin users see it in their
- *     inbox (role-level visibility).
+ *     and assigned_to_user_id = NULL.  All active Committee users see it in
+ *     their inbox (role-level visibility).
  *   - When a user clicks Accept, the atomic UPDATE sets:
  *       decision            = 'ACCEPTED'
  *       accepted_at         = NOW()
@@ -24,23 +24,26 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *       AND (assigned_to_user_id IS NULL OR assigned_to_user_id = <current user id>)
  *     rowCount() = 0 means another user already claimed it — throw concurrency error.
  *   - After acceptance the document is visible ONLY to that user in the
- *     accepted view.  Other Admin users no longer see it in the general inbox.
- *   - For route / decline / noted the ownership is re-verified before any
- *     mutation so no other user can act on an already-claimed document.
+ *     accepted view.  Other Committee users no longer see it in the inbox.
+ *   - For return-to-admin the ownership is re-verified before any mutation so
+ *     no other user can act on an already-claimed document.
+ *
+ * AUTHORIZATION:
+ *   - RoleMiddleware restricts all committee/* routes to ['Super Admin', 'Committee'].
+ *   - Within the controller, every action additionally re-checks document
+ *     ownership against the committee_role_id and accepted_by columns so that
+ *     a Committee user cannot view or modify documents owned by another user.
  */
-class AdminInboxController
+class CommitteeInboxController
 {
     protected PDO             $pdo;
     protected DocumentService $docService;
 
-    // Valid actions the POST handler will accept
+    /** Valid actions the POST handler will accept. */
     private const VALID_ACTIONS = [
         'accept',
-        'decline',
-        'route_sp_secretary',
-        'route_plenary',
-        'route_committee',
-        'noted',
+        'return_to_admin',
+        'endorse',
     ];
 
     public function __construct()
@@ -62,7 +65,7 @@ class AdminInboxController
             redirect('login');
         }
 
-        $adminRoleId = $this->requireAdminRoleId();
+        $committeeRoleId = $this->requireCommitteeRoleId();
 
         // Determine which view: inbox (pending) or accepted
         $view = trim($_GET['view'] ?? 'inbox');
@@ -82,31 +85,29 @@ class AdminInboxController
         //
         // PENDING (inbox):
         //   Show unclaimed (assigned_to_user_id IS NULL) documents to every
-        //   Admin user in the role, PLUS documents that were previously
-        //   assigned directly to the current user but not yet completed.
+        //   Committee user in the role, PLUS documents pre-assigned to the
+        //   current user but not yet completed.
         //   Accepted documents (accepted_by IS NOT NULL) are excluded so that
         //   once one user claims the document it immediately disappears from
         //   every other user's inbox.
         //
         // ACCEPTED:
-        //   Only show documents accepted by THIS user (accepted_by = currentUserId)
-        //   or explicitly assigned to this user (assigned_to_user_id = currentUserId).
-        //   Never expose another user's accepted work in the normal inbox.
+        //   Only show documents accepted by THIS user (accepted_by = userId)
+        //   or explicitly assigned to this user (assigned_to_user_id = userId).
+        //   Never expose another user's accepted work.
         // ─────────────────────────────────────────────────────────────────────
 
-        $where  = ['da.assigned_to_role_id = ?', "da.phase = 'ADMIN'"];
-        $params = [$adminRoleId];
+        $where  = ['da.assigned_to_role_id = ?', "da.phase = 'COMMITTEE'"];
+        $params = [$committeeRoleId];
 
         if ($view === 'inbox') {
             $where[] = "da.decision = 'PENDING'";
             $where[] = 'da.completed_at IS NULL';
-            // Unclaimed OR pre-assigned to this user; never show already-accepted
             $where[] = '(da.assigned_to_user_id IS NULL OR da.assigned_to_user_id = ?)';
             $where[] = 'da.accepted_by IS NULL';
             $params[] = $userId;
         } elseif ($view === 'accepted') {
             $where[] = "da.decision = 'ACCEPTED'";
-            // User-specific: only documents this user accepted or owns
             $where[] = '(da.accepted_by = ? OR da.assigned_to_user_id = ?)';
             $params[] = $userId;
             $params[] = $userId;
@@ -151,6 +152,7 @@ class AdminInboxController
                 ds.badge_color               AS status_badge_color,
                 st.name                      AS source_type,
                 COALESCE(eo.name, h.name, m.name, d.source_name, '—') AS source_display,
+                GROUP_CONCAT(c.name ORDER BY c.name SEPARATOR ', ') AS committee_names,
                 accepted_user.username       AS accepted_by_username,
                 CONCAT(
                     COALESCE(accepted_info.first_name, ''),
@@ -165,9 +167,18 @@ class AdminInboxController
             LEFT  JOIN external_offices  eo            ON d.external_office_id     = eo.id
             LEFT  JOIN hospitals          h            ON d.hospital_id            = h.id
             LEFT  JOIN municities         m            ON d.municipality_id        = m.id
+            LEFT  JOIN document_committees dc          ON d.id                     = dc.document_id
+            LEFT  JOIN committees         c            ON dc.committee_id          = c.id
             LEFT  JOIN user_accounts     accepted_user ON da.accepted_by           = accepted_user.id
             LEFT  JOIN user_info         accepted_info ON accepted_user.id         = accepted_info.user_account_id
             WHERE {$whereClause}
+            GROUP BY
+                da.id, da.received_at, da.accepted_at, da.decision,
+                da.accepted_by, da.assigned_to_user_id,
+                d.id, d.tracking_number, d.subject_matter, d.document_type_id,
+                dt.name, dt.badge_color, d.current_phase, d.date_received, d.time_received,
+                ds.name, ds.badge_color, st.name, eo.name, h.name, m.name, d.source_name,
+                accepted_user.username, accepted_info.first_name, accepted_info.last_name
             ORDER BY da.received_at ASC, d.date_received ASC, d.id ASC
             LIMIT ? OFFSET ?
         ");
@@ -179,8 +190,6 @@ class AdminInboxController
         $errors  = flash_get('errors') ?? [];
 
         // ── Statistics cards (user-scoped) ────────────────────────────────────
-        // Pending count: unclaimed docs for the role + docs pre-assigned to me
-        // Accepted count: only docs accepted by or assigned to me
         $statsStmt = $this->pdo->prepare("
             SELECT
                 COUNT(DISTINCT CASE
@@ -198,18 +207,18 @@ class AdminInboxController
                 COUNT(DISTINCT da.document_id) AS total_count
             FROM document_assignments da
             WHERE da.assigned_to_role_id = ?
-              AND da.phase               = 'ADMIN'
+              AND da.phase               = 'COMMITTEE'
         ");
-        $statsStmt->execute([$userId, $userId, $userId, $adminRoleId]);
+        $statsStmt->execute([$userId, $userId, $userId, $committeeRoleId]);
         $stats = $statsStmt->fetch();
 
         $pendingCount  = (int) ($stats['pending_count']  ?? 0);
         $acceptedCount = (int) ($stats['accepted_count'] ?? 0);
         $totalCount    = (int) ($stats['total_count']    ?? 0);
 
-        $pageTitle   = 'Admin Inbox';
+        $pageTitle   = 'Committee Inbox';
         $currentView = $view;
-        require __DIR__ . '/../../../resources/views/admin/inbox/index.php';
+        require __DIR__ . '/../../../resources/views/committee/inbox/index.php';
     }
 
     // =========================================================================
@@ -227,10 +236,10 @@ class AdminInboxController
         }
         if ($documentId <= 0) {
             flash_set('error', 'Invalid document ID.');
-            redirect('admin/inbox');
+            redirect('committee/inbox');
         }
 
-        $adminRoleId = $this->requireAdminRoleId();
+        $committeeRoleId = $this->requireCommitteeRoleId();
 
         // Fetch document with joins
         $docStmt = $this->pdo->prepare("
@@ -269,18 +278,16 @@ class AdminInboxController
 
         if (!$document) {
             flash_set('error', 'Document not found.');
-            redirect('admin/inbox');
+            redirect('committee/inbox');
         }
 
-        // ── Find the current Admin assignment for this document ───────────────
-        // We need to look for PENDING assignments visible to this user OR
-        // ACCEPTED assignments owned by this user.
+        // ── Find the current Committee assignment for this document ────────────
         $assignStmt = $this->pdo->prepare("
             SELECT *
             FROM document_assignments
             WHERE document_id         = ?
               AND assigned_to_role_id = ?
-              AND phase               = 'ADMIN'
+              AND phase               = 'COMMITTEE'
               AND completed_at        IS NULL
               AND (
                   -- PENDING and unclaimed (or pre-assigned to me)
@@ -295,33 +302,31 @@ class AdminInboxController
             ORDER BY id ASC
             LIMIT 1
         ");
-        $assignStmt->execute([$documentId, $adminRoleId, $userId, $userId, $userId]);
+        $assignStmt->execute([$documentId, $committeeRoleId, $userId, $userId, $userId]);
         $activeAssignment = $assignStmt->fetch();
 
-        // ── Access control for ACCEPTED documents ─────────────────────────────
-        // If there is a completed/accepted assignment that belongs to someone
-        // ELSE, deny access entirely.
+        // ── Access control for ACCEPTED documents ──────────────────────────────
+        // If the document is ACCEPTED by a different user, deny access entirely.
         if ($activeAssignment === false) {
-            // Check whether the document has an accepted assignment owned by another user.
             $otherOwnerStmt = $this->pdo->prepare("
                 SELECT id FROM document_assignments
                 WHERE document_id         = ?
                   AND assigned_to_role_id = ?
-                  AND phase               = 'ADMIN'
+                  AND phase               = 'COMMITTEE'
                   AND decision            = 'ACCEPTED'
                   AND completed_at        IS NULL
                   AND accepted_by         IS NOT NULL
                   AND accepted_by        != ?
                 LIMIT 1
             ");
-            $otherOwnerStmt->execute([$documentId, $adminRoleId, $userId]);
+            $otherOwnerStmt->execute([$documentId, $committeeRoleId, $userId]);
             if ($otherOwnerStmt->fetch()) {
-                flash_set('error', 'This document is assigned to another Admin user.');
-                redirect('admin/inbox');
+                flash_set('error', 'This document is assigned to another Committee user.');
+                redirect('committee/inbox');
             }
         }
 
-        // All assignments for history panel (with accepted-by accountability)
+        // All assignments for history panel
         $allAssignStmt = $this->pdo->prepare("
             SELECT
                 da.*,
@@ -347,6 +352,19 @@ class AdminInboxController
         $allAssignStmt->execute([$documentId]);
         $allAssignments = $allAssignStmt->fetchAll();
 
+        // Named committee assignments for this document
+        $committeeAssignStmt = $this->pdo->prepare("
+            SELECT dc.*, c.name AS committee_name, c.description AS committee_description,
+                   ab.username AS assigned_by_username
+            FROM document_committees dc
+            INNER JOIN committees    c  ON dc.committee_id = c.id
+            LEFT  JOIN user_accounts ab ON dc.assigned_by  = ab.id
+            WHERE dc.document_id = ?
+            ORDER BY c.name ASC
+        ");
+        $committeeAssignStmt->execute([$documentId]);
+        $committeeAssignments = $committeeAssignStmt->fetchAll();
+
         // Attachments
         $attStmt = $this->pdo->prepare("
             SELECT da.*, ua.username AS uploaded_by_username
@@ -362,12 +380,12 @@ class AdminInboxController
         $routeStmt = $this->pdo->prepare("
             SELECT
                 dr.*,
-                rb.username  AS routed_by_username,
-                rr.name      AS routed_to_role_name,
-                ro.name      AS routing_option_name
+                rb.username   AS routed_by_username,
+                rr.name       AS routed_to_role_name,
+                ro.name       AS routing_option_name
             FROM document_routes dr
-            LEFT JOIN user_accounts rb  ON dr.routed_by          = rb.id
-            LEFT JOIN roles         rr  ON dr.routed_to_role_id  = rr.id
+            LEFT JOIN user_accounts  rb ON dr.routed_by          = rb.id
+            LEFT JOIN roles          rr ON dr.routed_to_role_id  = rr.id
             LEFT JOIN routing_options ro ON dr.routing_option_id = ro.id
             WHERE dr.document_id = ?
             ORDER BY dr.created_at ASC
@@ -397,28 +415,11 @@ class AdminInboxController
         $revStmt->execute([$documentId]);
         $revisions = $revStmt->fetchAll();
 
-        // Communication categories for NOTED action
-        $commCategories = $this->docService->getCommunicationCategories();
-
         $success = flash_get('success');
         $error   = flash_get('error');
         $errors  = flash_get('errors') ?? [];
 
-        // ── Derive explicit state variables for the view ─────────────────────
-        //
-        // $assignmentDecision      : 'PENDING' | 'ACCEPTED' | null
-        // $isPendingAssignment     : true when the assignment is PENDING and
-        //                           claimable by this user
-        // $isOwnedAcceptedAssignment : true when ACCEPTED and owned by this user
-        // $canAccept               : show the Accept button
-        // $canProcess              : show post-accept actions (Route / Noted /
-        //                           Decline / Upload)
-        //
-        // These replace the old single-condition:
-        //   $canProcess = $activeAssignment !== false;
-        // which treated PENDING and ACCEPTED identically.
-        // ─────────────────────────────────────────────────────────────────────
-
+        // ── Derive explicit state variables for the view ──────────────────────
         $assignmentDecision = $activeAssignment !== false
             ? ($activeAssignment['decision'] ?? null)
             : null;
@@ -436,20 +437,15 @@ class AdminInboxController
                 || (int) ($activeAssignment['assigned_to_user_id'] ?? 0) === $userId
             );
 
-        // Accept is available only for a PENDING, unclaimed (or pre-assigned)
-        // document that this user can claim.
-        $canAccept = $isPendingAssignment;
-
-        // Post-accept processing actions are available only once this user
-        // owns an ACCEPTED assignment.
+        $canAccept  = $isPendingAssignment;
         $canProcess = $isOwnedAcceptedAssignment;
 
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
-        require __DIR__ . '/../../../resources/views/admin/inbox/show.php';
+        require __DIR__ . '/../../../resources/views/committee/inbox/show.php';
     }
 
     // =========================================================================
-    // 3. Process action (Accept / Decline / Route / Noted)
+    // 3. Process action (Accept / Return to Admin)
     // =========================================================================
 
     public function process(): void
@@ -466,39 +462,30 @@ class AdminInboxController
 
         if ($documentId <= 0) {
             flash_set('error', 'Invalid document ID.');
-            redirect('admin/inbox');
+            redirect('committee/inbox');
         }
 
         if (!in_array($action, self::VALID_ACTIONS, true)) {
             flash_set('error', 'Invalid action specified.');
-            redirect('admin/inbox/show?id=' . $documentId);
+            redirect('committee/inbox/show?id=' . $documentId);
         }
 
-        $adminRoleId = $this->requireAdminRoleId();
+        $committeeRoleId = $this->requireCommitteeRoleId();
 
         // Execute with retry for transient database errors
         $maxRetries = 3;
-        $retryDelay = 100000; // 100ms in microseconds
+        $retryDelay = 100000; // 100 ms in microseconds
         $lastException = null;
 
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             $storedFilePaths  = [];
             $notificationData = null;
+            $endorseAuditData = null;
 
             try {
-                // ── Open transaction ──────────────────────────────────────────
                 $this->pdo->beginTransaction();
 
-                // ── Resolve assignment based on action ────────────────────────
-                //
-                // For 'accept': look for a PENDING, unclaimed assignment
-                //               (or one pre-assigned to this user).
-                //               The actual claim is done atomically in doAccept().
-                //
-                // For all other actions: require an ACCEPTED assignment owned
-                //               by this user — no other Admin may act on a
-                //               document that belongs to someone else.
-
+                // ── Resolve assignment based on action ─────────────────────────
                 if ($action === 'accept') {
                     $assignStmt = $this->pdo->prepare("
                         SELECT *
@@ -512,7 +499,7 @@ class AdminInboxController
                         ORDER BY id ASC
                         LIMIT 1
                     ");
-                    $assignStmt->execute([$documentId, $adminRoleId, $userId]);
+                    $assignStmt->execute([$documentId, $committeeRoleId, $userId]);
                 } else {
                     // All non-accept actions require ownership
                     $assignStmt = $this->pdo->prepare("
@@ -526,7 +513,7 @@ class AdminInboxController
                         ORDER BY id ASC
                         LIMIT 1
                     ");
-                    $assignStmt->execute([$documentId, $adminRoleId, $userId, $userId]);
+                    $assignStmt->execute([$documentId, $committeeRoleId, $userId, $userId]);
                 }
 
                 $assignment = $assignStmt->fetch();
@@ -534,26 +521,23 @@ class AdminInboxController
                 if (!$assignment) {
                     $this->pdo->rollBack();
                     if ($action === 'accept') {
-                        flash_set('error', 'No pending Admin assignment found for this document. It may have already been accepted by another user.');
+                        flash_set('error', 'No pending Committee assignment found for this document. It may have already been accepted by another user.');
                     } else {
-                        flash_set('error', 'You do not have ownership of this document or it has already been processed. Only the Admin user who accepted the document may perform this action.');
+                        flash_set('error', 'You do not have ownership of this document or it has already been processed. Only the Committee user who accepted the document may perform this action.');
                     }
-                    redirect('admin/inbox/show?id=' . $documentId);
+                    redirect('committee/inbox/show?id=' . $documentId);
                 }
 
                 $assignmentId = (int) $assignment['id'];
 
-                // Plain read — no FOR UPDATE needed
-                $docStmt = $this->pdo->prepare("
-                    SELECT * FROM documents WHERE id = ? LIMIT 1
-                ");
+                $docStmt = $this->pdo->prepare("SELECT * FROM documents WHERE id = ? LIMIT 1");
                 $docStmt->execute([$documentId]);
                 $document = $docStmt->fetch();
 
                 if (!$document) {
                     $this->pdo->rollBack();
                     flash_set('error', 'Document not found.');
-                    redirect('admin/inbox');
+                    redirect('committee/inbox');
                 }
 
                 $currentStatusId = (int) $document['current_status_id'];
@@ -561,54 +545,38 @@ class AdminInboxController
                 // ── Dispatch action ───────────────────────────────────────────
                 switch ($action) {
                     case 'accept':
-                        $this->doAccept($documentId, $assignmentId, $userId, $adminRoleId, $currentStatusId, $remarks);
+                        $this->doAccept($documentId, $assignmentId, $userId, $committeeRoleId, $currentStatusId, $remarks);
                         break;
 
-                    case 'decline':
-                        $notificationData = $this->doDecline($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
+                    case 'return_to_admin':
+                        $notificationData = $this->doReturnToAdmin($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
                         break;
 
-                    case 'route_sp_secretary':
-                        $notificationData = $this->doRoute($documentId, $assignmentId, $userId, $currentStatusId, $remarks, 'SP Secretary', 'SP_SECRETARY', 'ROUTED_TO_SP_SECRETARY');
-                        break;
-
-                    case 'route_plenary':
-                        $notificationData = $this->doRoute($documentId, $assignmentId, $userId, $currentStatusId, $remarks, 'Plenary', 'PLENARY', 'ROUTED_TO_PLENARY');
-                        break;
-
-                    case 'route_committee':
-                        $notificationData = $this->doRoute($documentId, $assignmentId, $userId, $currentStatusId, $remarks, 'Committee', 'COMMITTEE', 'ROUTED_TO_COMMITTEE');
-                        break;
-
-                    case 'noted':
-                        $communicationCategoryId = (int) ($_POST['communication_category_id'] ?? 0);
-                        $notificationData = $this->doNoted($documentId, $assignmentId, $document, $userId, $currentStatusId, $remarks, $communicationCategoryId);
+                    case 'endorse':
+                        $endorseAuditData = $this->doEndorseReferred($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
                         break;
                 }
 
                 // ── Commit ────────────────────────────────────────────────────
-                // All audit_log() / system_log() calls MUST come AFTER commit.
-                // Those helpers use _log_pdo() — a separate static PDO
-                // connection — which, if called while the main transaction is
-                // open, competes for the same row locks and causes SQLSTATE
-                // HY000 1205 (lock wait timeout).
+                // audit_log() / system_log() calls MUST come AFTER commit —
+                // they use a separate static PDO connection and must not run
+                // while the main transaction is open.
                 $this->pdo->commit();
 
                 // ── Post-commit: audit log ────────────────────────────────────
                 if ($action === 'accept') {
-                    // Fetch username for the audit entry (safe — outside transaction)
                     $uStmt = $this->pdo->prepare("SELECT username FROM user_accounts WHERE id = ? LIMIT 1");
                     $uStmt->execute([$userId]);
                     $acceptingUsername = (string) ($uStmt->fetchColumn() ?: '');
 
                     audit_log('UPDATE', 'Document', (string) $documentId, null, [
-                        'action'               => 'admin_accepted',
+                        'action'               => 'committee_accepted',
                         'assignment_id'        => $assignmentId,
                         'document_id'          => $documentId,
                         'accepted_by'          => $userId,
                         'accepted_by_username' => $acceptingUsername,
                         'accepted_at'          => date('Y-m-d H:i:s'),
-                    ], "Admin accepted document ID {$documentId} (user: {$acceptingUsername})");
+                    ], "Committee accepted document ID {$documentId} (user: {$acceptingUsername})");
 
                 } elseif ($notificationData !== null && isset($notificationData['auditData'])) {
                     audit_log(
@@ -619,25 +587,22 @@ class AdminInboxController
                         $notificationData['auditData'],
                         $notificationData['auditDescription'] ?? null
                     );
+                } elseif ($action === 'endorse' && isset($endorseAuditData)) {
+                    audit_log(
+                        'UPDATE',
+                        'Document',
+                        (string) $documentId,
+                        null,
+                        $endorseAuditData['auditData'],
+                        $endorseAuditData['auditDescription'] ?? null
+                    );
                 }
 
                 // ── Post-commit: notifications ────────────────────────────────
                 if ($notificationData !== null) {
                     try {
-                        // Routing notifications (route_sp_secretary, route_plenary, route_committee)
-                        if (isset($notificationData['targetRoleId'])) {
-                            $this->docService->notifyRoleUsers(
-                                $notificationData['targetRoleId'],
-                                $notificationData['documentId'],
-                                $notificationData['userId'],
-                                $notificationData['type'],
-                                $notificationData['title'],
-                                $notificationData['message'],
-                                $notificationData['actionUrl']
-                            );
-                        }
-                        // Decline notifications
-                        elseif (isset($notificationData['receivingRoleId'])) {
+                        if (isset($notificationData['adminRoleId'])) {
+                            // Returned to Admin — notify Admin role users
                             if ($notificationData['createdBy'] > 0) {
                                 $this->docService->notifyUser(
                                     $notificationData['createdBy'],
@@ -645,36 +610,22 @@ class AdminInboxController
                                     $notificationData['userId'],
                                     'DOCUMENT_RETURNED',
                                     "Document Returned: {$notificationData['trackingNumber']}",
-                                    "Admin has returned document {$notificationData['trackingNumber']} to Receiving. Reason: {$notificationData['remarks']}",
-                                    BASE_URL . "/receiving/routed-documents/show?id={$notificationData['documentId']}"
+                                    "Committee has returned document {$notificationData['trackingNumber']} to Admin. Reason: {$notificationData['remarks']}",
+                                    BASE_URL . "/admin/inbox/show?id={$notificationData['documentId']}"
                                 );
                             }
                             $this->docService->notifyRoleUsers(
-                                $notificationData['receivingRoleId'],
+                                $notificationData['adminRoleId'],
                                 $notificationData['documentId'],
                                 $notificationData['userId'],
                                 'DOCUMENT_RETURNED',
-                                "Document Returned: {$notificationData['trackingNumber']}",
-                                "Admin has returned document {$notificationData['trackingNumber']} to Receiving. Reason: {$notificationData['remarks']}",
-                                BASE_URL . "/receiving/routed-documents/show?id={$notificationData['documentId']}"
+                                "Document Returned to Admin: {$notificationData['trackingNumber']}",
+                                "Committee has returned document {$notificationData['trackingNumber']} to Admin. Reason: {$notificationData['remarks']}",
+                                BASE_URL . "/admin/inbox/show?id={$notificationData['documentId']}"
                             );
                         }
-                        // Noted notifications
-                        elseif (isset($notificationData['categoryName'])) {
-                            if ($notificationData['createdBy'] > 0) {
-                                $this->docService->notifyUser(
-                                    $notificationData['createdBy'],
-                                    $notificationData['documentId'],
-                                    $notificationData['userId'],
-                                    'DOCUMENT_FINALIZED',
-                                    "Document Noted: {$notificationData['trackingNumber']}",
-                                    "Document {$notificationData['trackingNumber']} has been marked as Noted (Category: {$notificationData['categoryName']}).",
-                                    BASE_URL . "/receiving/routed-documents/show?id={$notificationData['documentId']}"
-                                );
-                            }
-                        }
                     } catch (Throwable $notifyError) {
-                        system_log('WARNING', 'Notification delivery failed after successful document processing', [
+                        system_log('WARNING', 'Notification delivery failed after successful Committee document processing', [
                             'error'       => $notifyError->getMessage(),
                             'document_id' => $documentId,
                             'action'      => $action,
@@ -687,27 +638,29 @@ class AdminInboxController
                 $actionLabel = $this->actionLabel($action);
                 flash_set('success', "Document processed successfully: {$actionLabel}.");
                 old_clear();
-                redirect('admin/inbox');
+                if ($action === 'endorse') {
+                    redirect('committee/referred');
+                } else {
+                    redirect('committee/inbox');
+                }
 
             } catch (RuntimeException $e) {
-                // Race condition / already processed — no retry
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
                 }
                 foreach ($storedFilePaths as $p) {
                     if (file_exists($p)) @unlink($p);
                 }
-                system_log('WARNING', 'Admin process action: runtime error', [
+                system_log('WARNING', 'Committee process action: runtime error', [
                     'error'       => $e->getMessage(),
                     'document_id' => $documentId,
                     'action'      => $action,
                     'user_id'     => $userId,
                 ]);
                 flash_set('error', $e->getMessage());
-                redirect('admin/inbox/show?id=' . $documentId);
+                redirect('committee/inbox/show?id=' . $documentId);
 
             } catch (InvalidArgumentException $e) {
-                // Validation error — no retry
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
                 }
@@ -715,10 +668,9 @@ class AdminInboxController
                     if (file_exists($p)) @unlink($p);
                 }
                 flash_set('error', $e->getMessage());
-                redirect('admin/inbox/show?id=' . $documentId);
+                redirect('committee/inbox/show?id=' . $documentId);
 
             } catch (PDOException $e) {
-                // Transient DB error — retry with backoff
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
                 }
@@ -737,7 +689,7 @@ class AdminInboxController
                 );
 
                 if ($isTransient && $attempt < $maxRetries) {
-                    system_log('WARNING', 'Transient database error, retrying', [
+                    system_log('WARNING', 'Transient database error in Committee process, retrying', [
                         'attempt'     => $attempt,
                         'error_code'  => $errorCode,
                         'error_info'  => $errorInfo,
@@ -764,7 +716,7 @@ class AdminInboxController
         // All retries failed
         if ($lastException !== null) {
             $message = $lastException->getMessage();
-            system_log('ERROR', 'Admin process action failed', [
+            system_log('ERROR', 'Committee process action failed', [
                 'error'       => $message,
                 'document_id' => $documentId,
                 'action'      => $action,
@@ -773,7 +725,7 @@ class AdminInboxController
                 'trace'       => $lastException->getTraceAsString(),
             ]);
             flash_set('error', 'Action failed: ' . $message);
-            redirect('admin/inbox/show?id=' . $documentId);
+            redirect('committee/inbox/show?id=' . $documentId);
         }
     }
 
@@ -792,13 +744,12 @@ class AdminInboxController
         $documentId = (int) ($_POST['document_id'] ?? 0);
         if ($documentId <= 0) {
             flash_set('error', 'Invalid document ID.');
-            redirect('admin/inbox');
+            redirect('committee/inbox');
         }
 
-        $adminRoleId = $this->requireAdminRoleId();
+        $committeeRoleId = $this->requireCommitteeRoleId();
 
-        // Verify document has an active Admin assignment owned by this user
-        // (PENDING unclaimed/pre-assigned OR ACCEPTED and owned by this user)
+        // Verify document has an active Committee assignment owned by this user
         $checkStmt = $this->pdo->prepare("
             SELECT da.id
             FROM document_assignments da
@@ -815,104 +766,73 @@ class AdminInboxController
               )
             LIMIT 1
         ");
-        $checkStmt->execute([$documentId, $adminRoleId, $userId, $userId, $userId]);
+        $checkStmt->execute([$documentId, $committeeRoleId, $userId, $userId, $userId]);
         if (!$checkStmt->fetch()) {
-            flash_set('error', 'No active Admin assignment found for this document, or you do not have ownership.');
-            redirect('admin/inbox/show?id=' . $documentId);
+            flash_set('error', 'No active Committee assignment found for this document, or you do not have ownership.');
+            redirect('committee/inbox/show?id=' . $documentId);
         }
 
-        // Validate files
         $files = $_FILES['attachments'] ?? [];
+
         if (empty($files['name'][0])) {
             flash_set('error', 'No files were selected for upload.');
-            redirect('admin/inbox/show?id=' . $documentId);
+            redirect('committee/inbox/show?id=' . $documentId);
         }
 
-        $fileErrors = $this->docService->validateFileUploads($files, true);
-        if (!empty($fileErrors)) {
-            flash_set('errors', $fileErrors);
-            redirect('admin/inbox/show?id=' . $documentId);
+        $validationErrors = $this->docService->validateFileUploads($files);
+        if (!empty($validationErrors)) {
+            flash_set('errors', $validationErrors);
+            redirect('committee/inbox/show?id=' . $documentId);
         }
-
-        $storedPaths = [];
-        $this->pdo->beginTransaction();
 
         try {
-            $storedPaths = $this->docService->processAdditionalAttachments($files, $documentId, $userId, 'ADMIN');
-
-            $pendingFileLogs = $this->docService->takePendingFileLogs();
-
-            $eventStmt = $this->pdo->prepare("
-                INSERT INTO document_events (
-                    document_id, event_type, phase, performed_by,
-                    remarks, metadata
-                ) VALUES (?, 'DOCUMENT_EDITED', 'ADMIN', ?, ?, ?)
-            ");
-            $eventStmt->execute([
+            $storedPaths = $this->docService->processAdditionalAttachments(
+                $files,
                 $documentId,
                 $userId,
-                'Admin uploaded additional attachments.',
-                json_encode(['file_count' => count($storedPaths), 'ip_address' => client_ip()]),
-            ]);
+                'COMMITTEE'
+            );
 
-            $this->pdo->commit();
+            $fileCount = count($storedPaths);
+            flash_set('success', "{$fileCount} file(s) uploaded successfully.");
 
-            $this->docService->flushFileUploadLogs($pendingFileLogs);
-
-            audit_log('UPDATE', 'Document', (string) $documentId, null, [
-                'action'     => 'admin_attachment_upload',
-                'file_count' => count($storedPaths),
-            ], 'Admin uploaded additional attachments');
-
-            flash_set('success', count($storedPaths) . ' file(s) uploaded successfully.');
-            redirect('admin/inbox/show?id=' . $documentId);
+            audit_log('CREATE', 'Document', (string) $documentId, null, [
+                'action'      => 'committee_attachment_upload',
+                'document_id' => $documentId,
+                'file_count'  => $fileCount,
+            ], "Committee user uploaded {$fileCount} attachment(s) to document ID {$documentId}");
 
         } catch (Throwable $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            foreach ($storedPaths as $p) {
-                if (file_exists($p)) @unlink($p);
-            }
-            system_log('ERROR', 'Admin attachment upload failed', [
+            system_log('ERROR', 'Committee attachment upload failed', [
                 'error'       => $e->getMessage(),
                 'document_id' => $documentId,
                 'user_id'     => $userId,
             ]);
-            flash_set('error', 'Upload failed: ' . $e->getMessage());
-            redirect('admin/inbox/show?id=' . $documentId);
+            flash_set('error', 'File upload failed: ' . $e->getMessage());
         }
+
+        redirect('committee/inbox/show?id=' . $documentId);
     }
 
     // =========================================================================
-    // Action implementations
+    // Private action implementations
     // =========================================================================
 
     /**
-     * Atomically claim the document assignment for the current user.
+     * Atomically claim a PENDING assignment for the current user.
      *
-     * The single UPDATE acts as a compare-and-swap:
-     *   WHERE id = ?
-     *     AND assigned_to_role_id = ?
-     *     AND decision = 'PENDING'
-     *     AND completed_at IS NULL
-     *     AND accepted_by IS NULL
-     *     AND (assigned_to_user_id IS NULL OR assigned_to_user_id = ?)
+     * Uses a WHERE clause that checks accepted_by IS NULL so that only one
+     * concurrent user can succeed — all others get rowCount() = 0 and receive
+     * a concurrency error.
      *
-     * rowCount() = 0 → another user won the race; throw a user-friendly error.
-     * rowCount() = 1 → this user now owns the document.
-     *
-     * Sets both accepted_by (accountability) and assigned_to_user_id (ownership
-     * gate used by inbox queries).
-     *
-     * NOTE: audit_log() is deliberately omitted here because doAccept() runs
-     * inside an open transaction.  process() writes the audit entry after commit.
+     * NOTE: audit_log() is deliberately omitted here — runs inside an open
+     * transaction. process() writes the audit entry after commit.
      */
     private function doAccept(
         int    $documentId,
         int    $assignmentId,
         int    $userId,
-        int    $adminRoleId,
+        int    $committeeRoleId,
         int    $currentStatusId,
         string $remarks
     ): void {
@@ -923,11 +843,11 @@ class AdminInboxController
                 accepted_by         = ?,
                 assigned_to_user_id = ?,
                 remarks             = ?
-            WHERE id                = ?
+            WHERE id                  = ?
               AND assigned_to_role_id = ?
-              AND decision          = 'PENDING'
-              AND completed_at      IS NULL
-              AND accepted_by       IS NULL
+              AND decision            = 'PENDING'
+              AND completed_at        IS NULL
+              AND accepted_by         IS NULL
               AND (assigned_to_user_id IS NULL OR assigned_to_user_id = ?)
         ");
         $stmt->execute([
@@ -935,33 +855,30 @@ class AdminInboxController
             $userId,
             $remarks ?: null,
             $assignmentId,
-            $adminRoleId,
+            $committeeRoleId,
             $userId,
         ]);
 
         if ($stmt->rowCount() === 0) {
             throw new RuntimeException(
-                'This document was already accepted by another user. Please refresh the inbox.'
+                'This document was already accepted by another Committee user. Please refresh the inbox.'
             );
         }
 
-        // Fetch username for the workflow event metadata (inside transaction is fine —
-        // it is a plain SELECT, not a log write via _log_pdo).
         $uStmt = $this->pdo->prepare("SELECT username FROM user_accounts WHERE id = ? LIMIT 1");
         $uStmt->execute([$userId]);
         $username = (string) ($uStmt->fetchColumn() ?: '');
 
-        // Workflow event — performed_by = authenticated user
         $this->pdo->prepare("
             INSERT INTO document_events (
                 document_id, event_type, phase, performed_by,
                 to_status_id, remarks, metadata
-            ) VALUES (?, 'ADMIN_ACCEPTED', 'ADMIN', ?, ?, ?, ?)
+            ) VALUES (?, 'COMMITTEE_ACCEPTED', 'COMMITTEE', ?, ?, ?, ?)
         ")->execute([
             $documentId,
             $userId,
             $currentStatusId,
-            $remarks ?: 'Document accepted by Admin.',
+            $remarks ?: 'Document accepted by Committee.',
             json_encode([
                 'accepted_by'          => $userId,
                 'accepted_by_username' => $username,
@@ -969,26 +886,25 @@ class AdminInboxController
                 'user_agent'           => client_user_agent(),
             ]),
         ]);
-
-        // audit_log() deliberately omitted here (open transaction).
-        // process() writes the audit entry after commit.
     }
 
     /**
-     * Decline the document and return it to Receiving Staff.
+     * Return the document to Admin with a required reason.
      *
-     * Only the user who accepted the document may decline it
-     * (ownership is verified in process() before dispatching here).
+     * Only the user who accepted the document may return it.
+     * Ownership is verified in process() before dispatching here.
      *
-     * Preserves accepted_by and accepted_at in the completed row so the
-     * history shows who originally accepted the document.
+     * Creates a fresh pending Admin assignment with:
+     *   phase                = 'ADMIN'
+     *   accepted_by          = NULL
+     *   assigned_to_user_id  = NULL
      *
-     * The new Receiving assignment is created with accepted_by = NULL and
-     * assigned_to_user_id = NULL so Receiving Staff must claim it fresh.
+     * Preserves accepted_by and accepted_at in the completed Committee row
+     * so the history retains who originally accepted the document.
      *
      * @return array Notification data sent after commit.
      */
-    private function doDecline(
+    private function doReturnToAdmin(
         int    $documentId,
         int    $assignmentId,
         array  $assignment,
@@ -998,17 +914,17 @@ class AdminInboxController
         string $remarks
     ): array {
         if ($remarks === '') {
-            throw new InvalidArgumentException('A decline reason is required.');
+            throw new InvalidArgumentException('A reason is required when returning to Admin.');
         }
 
-        // 1. Snapshot revision before decline
+        // 1. Snapshot revision before return
         $revNum = $this->docService->nextRevisionNumber($documentId);
         $this->pdo->prepare("
             INSERT INTO document_revisions (
                 document_id, revision_number, changed_by, phase,
                 subject_matter, document_type_id, date_received, time_received,
                 source_type_id, source_snapshot, remarks, change_reason
-            ) VALUES (?, ?, ?, 'ADMIN', ?, ?, ?, ?, ?, ?, ?, 'Document declined by Admin — snapshot before return')
+            ) VALUES (?, ?, ?, 'COMMITTEE', ?, ?, ?, ?, ?, ?, ?, 'Document returned to Admin by Committee — snapshot before return')
         ")->execute([
             $documentId,
             $revNum,
@@ -1028,12 +944,11 @@ class AdminInboxController
                 'source_liaison_name'   => $document['source_liaison_name'],
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             $document['remarks'],
+            'Document returned to Admin by Committee — snapshot before return',
         ]);
 
-        // 2. Mark Admin assignment DECLINED — accepted_by / accepted_at are
-        //    preserved (NOT cleared) so history retains who had the document.
-        //    Ownership check was already done in process(); the WHERE here is
-        //    a final concurrency guard.
+        // 2. Mark Committee assignment DECLINED — accepted_by / accepted_at
+        //    are preserved (NOT cleared) so history retains who had the document.
         $stmt = $this->pdo->prepare("
             UPDATE document_assignments
             SET decision       = 'DECLINED',
@@ -1054,31 +969,28 @@ class AdminInboxController
             );
         }
 
-        // 3. Find Receiving Staff role
-        $receivingRole = $this->pdo->query(
-            "SELECT id FROM roles WHERE name = 'Receiving Staff'
-              AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+        // 3. Resolve Admin role
+        $adminRole = $this->pdo->query(
+            "SELECT id FROM roles WHERE name = 'Admin' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
         )->fetch();
-        if (!$receivingRole) {
-            throw new RuntimeException('Receiving Staff role not found.');
+        if (!$adminRole) {
+            throw new RuntimeException('Admin role not found.');
         }
-        $receivingRoleId = (int) $receivingRole['id'];
+        $adminRoleId = (int) $adminRole['id'];
 
-        // 4. New PENDING assignment for Receiving Staff
-        //    accepted_by = NULL and assigned_to_user_id = NULL so the next
-        //    role must claim it fresh — do NOT copy the previous owner's ID.
+        // 4. New PENDING assignment for Admin — fresh slate, no previous owner
         $this->pdo->prepare("
             INSERT INTO document_assignments (
                 document_id, assigned_to_role_id, phase,
                 assigned_by, decision, received_at,
                 accepted_by, assigned_to_user_id
-            ) VALUES (?, ?, 'RECEIVING', ?, 'PENDING', NOW(), NULL, NULL)
-        ")->execute([$documentId, $receivingRoleId, $userId]);
+            ) VALUES (?, ?, 'ADMIN', ?, 'PENDING', NOW(), NULL, NULL)
+        ")->execute([$documentId, $adminRoleId, $userId]);
 
         // 5. Restore document phase / owner
         $this->pdo->prepare("
             UPDATE documents
-            SET current_phase         = 'RECEIVING',
+            SET current_phase         = 'ADMIN',
                 current_owner_user_id = NULL,
                 updated_by            = ?
             WHERE id = ?
@@ -1089,357 +1001,28 @@ class AdminInboxController
             INSERT INTO document_routes (
                 document_id, from_phase, to_phase,
                 routed_by, routed_to_role_id, remarks
-            ) VALUES (?, 'ADMIN', 'RECEIVING', ?, ?, ?)
-        ")->execute([
-            $documentId,
-            $userId,
-            $receivingRoleId,
-            'Returned by Admin: ' . $remarks,
-        ]);
-
-        // 7. ADMIN_DECLINED event — performed_by = declining user
-        $this->pdo->prepare("
-            INSERT INTO document_events (
-                document_id, event_type, phase, performed_by,
-                to_status_id, remarks, metadata
-            ) VALUES (?, 'ADMIN_DECLINED', 'ADMIN', ?, ?, ?, ?)
-        ")->execute([
-            $documentId,
-            $userId,
-            $currentStatusId,
-            $remarks,
-            json_encode(['ip_address' => client_ip()]),
-        ]);
-
-        // 8. ADMIN_RETURNED_TO_RECEIVING event
-        $this->pdo->prepare("
-            INSERT INTO document_events (
-                document_id, event_type, phase, performed_by,
-                to_status_id, remarks, metadata
-            ) VALUES (?, 'ADMIN_RETURNED_TO_RECEIVING', 'RECEIVING', ?, ?, ?, ?)
-        ")->execute([
-            $documentId,
-            $userId,
-            $currentStatusId,
-            'Document returned to Receiving Staff for correction.',
-            json_encode([
-                'decline_reason' => $remarks,
-                'ip_address'     => client_ip(),
-            ]),
-        ]);
-
-        // audit_log() deliberately omitted (open transaction) — process() writes after commit.
-
-        $createdBy = (int) $document['created_by'];
-        return [
-            'createdBy'       => $createdBy,
-            'receivingRoleId' => $receivingRoleId,
-            'documentId'      => $documentId,
-            'userId'          => $userId,
-            'trackingNumber'  => $document['tracking_number'],
-            'remarks'         => $remarks,
-            'auditData'       => [
-                'action'         => 'admin_declined',
-                'assignment_id'  => $assignmentId,
-                'document_id'    => $documentId,
-                'accepted_by'    => $assignment['accepted_by'],
-                'declined_by'    => $userId,
-                'decline_reason' => mb_substr($remarks, 0, 200),
-            ],
-            'auditDescription' => "Admin declined document ID {$documentId}",
-        ];
-    }
-
-    /**
-     * Route the document to SP Secretary, Plenary, or Committee.
-     *
-     * The current Admin assignment is COMPLETED (accepted_by / accepted_at
-     * are preserved in the history row for accountability).
-     * The new assignment for the target role is created with accepted_by = NULL
-     * and assigned_to_user_id = NULL so the next role must claim it fresh.
-     *
-     * @return array Notification data sent after commit.
-     */
-    private function doRoute(
-        int    $documentId,
-        int    $assignmentId,
-        int    $userId,
-        int    $currentStatusId,
-        string $remarks,
-        string $targetRoleName,
-        string $targetPhase,
-        string $eventType
-    ): array {
-        // Snapshot
-        $doc = $this->pdo->prepare("SELECT * FROM documents WHERE id = ? LIMIT 1");
-        $doc->execute([$documentId]);
-        $document = $doc->fetch();
-
-        // If Admin left the remarks field blank, fall back to the original
-        // Receiving remarks stored in documents.remarks so the value is never
-        // lost when the document is routed to Committee (or any other phase).
-        $effectiveRemarks = trim($remarks) !== '' ? trim($remarks) : trim($document['remarks'] ?? '');
-
-        $revNum = $this->docService->nextRevisionNumber($documentId);
-        $this->pdo->prepare("
-            INSERT INTO document_revisions (
-                document_id, revision_number, changed_by, phase,
-                subject_matter, document_type_id, date_received, time_received,
-                source_type_id, source_snapshot, remarks, change_reason
-            ) VALUES (?, ?, ?, 'ADMIN', ?, ?, ?, ?, ?, ?, ?, ?)
-        ")->execute([
-            $documentId,
-            $revNum,
-            $userId,
-            $document['subject_matter'],
-            $document['document_type_id'],
-            $document['date_received'],
-            $document['time_received'],
-            $document['source_type_id'],
-            json_encode([
-                'external_office_id'    => $document['external_office_id'],
-                'hospital_id'           => $document['hospital_id'],
-                'municipality_id'       => $document['municipality_id'],
-                'source_name'           => $document['source_name'],
-                'source_contact_number' => $document['source_contact_number'],
-                'source_address'        => $document['source_address'],
-                'source_liaison_name'   => $document['source_liaison_name'],
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            $document['remarks'],
-            "Admin routed to {$targetRoleName}",
-        ]);
-
-        // Resolve target role
-        $roleStmt = $this->pdo->prepare(
-            "SELECT id FROM roles WHERE name = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
-        );
-        $roleStmt->execute([$targetRoleName]);
-        $targetRole = $roleStmt->fetch();
-        if (!$targetRole) {
-            throw new RuntimeException("Target role '{$targetRoleName}' not found.");
-        }
-        $targetRoleId = (int) $targetRole['id'];
-
-        // Complete Admin assignment — accepted_by and accepted_at are PRESERVED
-        // in the row (not cleared) so history retains who had the document.
-        // Ownership was verified in process(); the WHERE is the concurrency guard.
-        $stmt = $this->pdo->prepare("
-            UPDATE document_assignments
-            SET decision     = 'COMPLETED',
-                completed_at = NOW(),
-                remarks      = ?
-            WHERE id         = ?
-              AND decision   = 'ACCEPTED'
-              AND completed_at IS NULL
-              AND (accepted_by = ? OR assigned_to_user_id = ?)
-        ");
-        $stmt->execute([$effectiveRemarks ?: null, $assignmentId, $userId, $userId]);
-
-        if ($stmt->rowCount() === 0) {
-            throw new RuntimeException(
-                'This assignment has already been processed or you no longer own it. Please refresh the page.'
-            );
-        }
-
-        // New assignment for target role — fresh slate, no previous owner
-        $this->pdo->prepare("
-            INSERT INTO document_assignments (
-                document_id, assigned_to_role_id, phase,
-                assigned_by, decision, received_at,
-                accepted_by, assigned_to_user_id
-            ) VALUES (?, ?, ?, ?, 'PENDING', NOW(), NULL, NULL)
-        ")->execute([$documentId, $targetRoleId, $targetPhase, $userId]);
-
-        // Update document phase
-        $this->pdo->prepare("
-            UPDATE documents
-            SET current_phase         = ?,
-                current_owner_user_id = NULL,
-                updated_by            = ?
-            WHERE id = ?
-        ")->execute([$targetPhase, $userId, $documentId]);
-
-        // Route record
-        $this->pdo->prepare("
-            INSERT INTO document_routes (
-                document_id, from_phase, to_phase,
-                routed_by, routed_to_role_id, remarks
-            ) VALUES (?, 'ADMIN', ?, ?, ?, ?)
-        ")->execute([$documentId, $targetPhase, $userId, $targetRoleId, $effectiveRemarks ?: null]);
-
-        // Workflow event
-        $this->pdo->prepare("
-            INSERT INTO document_events (
-                document_id, event_type, phase, performed_by,
-                to_status_id, remarks, metadata
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        ")->execute([
-            $documentId,
-            $eventType,
-            $targetPhase,
-            $userId,
-            $currentStatusId,
-            $effectiveRemarks ?: "Routed to {$targetRoleName} by Admin.",
-            json_encode(['routed_to_role_id' => $targetRoleId, 'ip_address' => client_ip()]),
-        ]);
-
-        // audit_log() deliberately omitted (open transaction) — process() writes after commit.
-
-        return [
-            'targetRoleId' => $targetRoleId,
-            'documentId'   => $documentId,
-            'userId'       => $userId,
-            'type'         => 'DOCUMENT_ROUTED',
-            'title'        => "Document Routed: {$document['tracking_number']}",
-            'message'      => "Document {$document['tracking_number']} has been routed to {$targetRoleName} by Admin.",
-            'actionUrl'    => BASE_URL . "/{$this->roleDashboardPrefix($targetRoleName)}/inbox/show?id={$documentId}",
-            'auditData'    => [
-                'action'         => 'admin_routed',
-                'assignment_id'  => $assignmentId,
-                'document_id'    => $documentId,
-                'accepted_by'    => $userId,
-                'to_role'        => $targetRoleName,
-                'to_phase'       => $targetPhase,
-            ],
-            'auditDescription' => "Admin routed document ID {$documentId} to {$targetRoleName}",
-        ];
-    }
-
-    /**
-     * Mark the document as NOTED (Communication documents only).
-     *
-     * accepted_by and accepted_at are preserved so history retains who
-     * owned the document when it was noted.
-     *
-     * @return array Notification data sent after commit.
-     */
-    private function doNoted(
-        int    $documentId,
-        int    $assignmentId,
-        array  $document,
-        int    $userId,
-        int    $currentStatusId,
-        string $remarks,
-        int    $communicationCategoryId
-    ): array {
-        // Server-side: verify document is Communication type
-        if (!$this->isCommunicationDocument($document['document_type_name'] ?? '')) {
-            throw new InvalidArgumentException(
-                'The NOTED action is only available for Communication documents.'
-            );
-        }
-
-        if ($communicationCategoryId <= 0) {
-            throw new InvalidArgumentException('A communication category is required for the NOTED action.');
-        }
-        $catStmt = $this->pdo->prepare(
-            "SELECT id, name FROM communication_categories
-              WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
-        );
-        $catStmt->execute([$communicationCategoryId]);
-        $category = $catStmt->fetch();
-        if (!$category) {
-            throw new InvalidArgumentException('Invalid or inactive communication category selected.');
-        }
-
-        // Snapshot
-        $revNum = $this->docService->nextRevisionNumber($documentId);
-        $this->pdo->prepare("
-            INSERT INTO document_revisions (
-                document_id, revision_number, changed_by, phase,
-                subject_matter, document_type_id, date_received, time_received,
-                source_type_id, source_snapshot, remarks, change_reason
-            ) VALUES (?, ?, ?, 'ADMIN', ?, ?, ?, ?, ?, ?, ?, 'Marked as Noted by Admin')
-        ")->execute([
-            $documentId,
-            $revNum,
-            $userId,
-            $document['subject_matter'],
-            $document['document_type_id'],
-            $document['date_received'],
-            $document['time_received'],
-            $document['source_type_id'],
-            json_encode([
-                'external_office_id'    => $document['external_office_id'],
-                'hospital_id'           => $document['hospital_id'],
-                'municipality_id'       => $document['municipality_id'],
-                'source_name'           => $document['source_name'],
-                'source_contact_number' => $document['source_contact_number'],
-                'source_address'        => $document['source_address'],
-                'source_liaison_name'   => $document['source_liaison_name'],
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            $document['remarks'],
-        ]);
-
-        // Look up 'Noted' document status
-        $notedStatus = $this->pdo->query(
-            "SELECT id FROM document_statuses WHERE name = 'Noted' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
-        )->fetch();
-        $notedStatusId = $notedStatus ? (int) $notedStatus['id'] : $currentStatusId;
-
-        $this->pdo->prepare("
-            UPDATE documents
-            SET communication_category_id = ?,
-                current_status_id         = ?,
-                current_phase             = 'ADMIN',
-                current_owner_user_id     = NULL,
-                updated_by                = ?
-            WHERE id = ?
-        ")->execute([$communicationCategoryId, $notedStatusId, $userId, $documentId]);
-
-        // Mark NOTED — accepted_by/accepted_at preserved; ownership guard in WHERE
-        $stmt = $this->pdo->prepare("
-            UPDATE document_assignments
-            SET decision     = 'NOTED',
-                completed_at = NOW(),
-                remarks      = ?
-            WHERE id         = ?
-              AND decision   = 'ACCEPTED'
-              AND completed_at IS NULL
-              AND (accepted_by = ? OR assigned_to_user_id = ?)
-        ");
-        $stmt->execute([$remarks ?: null, $assignmentId, $userId, $userId]);
-
-        if ($stmt->rowCount() === 0) {
-            throw new RuntimeException(
-                'This assignment has already been processed or you no longer own it. Please refresh the page.'
-            );
-        }
-
-        // Route record
-        $adminRole   = $this->pdo->query(
-            "SELECT id FROM roles WHERE name = 'Admin' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
-        )->fetch();
-        $adminRoleId = $adminRole ? (int) $adminRole['id'] : null;
-
-        $this->pdo->prepare("
-            INSERT INTO document_routes (
-                document_id, from_phase, to_phase,
-                routed_by, routed_to_role_id, remarks
-            ) VALUES (?, 'ADMIN', 'ADMIN', ?, ?, ?)
+            ) VALUES (?, 'COMMITTEE', 'ADMIN', ?, ?, ?)
         ")->execute([
             $documentId,
             $userId,
             $adminRoleId,
-            'Marked as Noted — Communication category: ' . $category['name'],
+            'Returned by Committee to Admin: ' . $remarks,
         ]);
 
-        // Workflow event
+        // 7. COMMITTEE_RETURNED_TO_ADMIN event (requires migration 051)
         $this->pdo->prepare("
             INSERT INTO document_events (
                 document_id, event_type, phase, performed_by,
-                from_status_id, to_status_id, remarks, metadata
-            ) VALUES (?, 'DOCUMENT_NOTED', 'ADMIN', ?, ?, ?, ?, ?)
+                to_status_id, remarks, metadata
+            ) VALUES (?, 'COMMITTEE_RETURNED_TO_ADMIN', 'ADMIN', ?, ?, ?, ?)
         ")->execute([
             $documentId,
             $userId,
             $currentStatusId,
-            $notedStatusId,
-            $remarks ?: "Document noted. Category: {$category['name']}.",
+            'Document returned to Admin for re-routing.',
             json_encode([
-                'communication_category_id'   => $communicationCategoryId,
-                'communication_category_name' => $category['name'],
-                'ip_address'                  => client_ip(),
+                'return_reason' => $remarks,
+                'ip_address'    => client_ip(),
             ]),
         ]);
 
@@ -1447,20 +1030,21 @@ class AdminInboxController
 
         $createdBy = (int) $document['created_by'];
         return [
-            'createdBy'      => $createdBy,
-            'documentId'     => $documentId,
-            'userId'         => $userId,
-            'trackingNumber' => $document['tracking_number'],
-            'categoryName'   => $category['name'],
-            'auditData'      => [
-                'action'                      => 'admin_noted',
-                'assignment_id'               => $assignmentId,
-                'document_id'                 => $documentId,
-                'accepted_by'                 => $userId,
-                'communication_category_id'   => $communicationCategoryId,
-                'communication_category_name' => $category['name'],
+            'createdBy'        => $createdBy,
+            'adminRoleId'      => $adminRoleId,
+            'documentId'       => $documentId,
+            'userId'           => $userId,
+            'trackingNumber'   => $document['tracking_number'],
+            'remarks'          => $remarks,
+            'auditData'        => [
+                'action'        => 'committee_returned_to_admin',
+                'assignment_id' => $assignmentId,
+                'document_id'   => $documentId,
+                'accepted_by'   => $assignment['accepted_by'],
+                'returned_by'   => $userId,
+                'return_reason' => mb_substr($remarks, 0, 200),
             ],
-            'auditDescription' => "Admin noted document ID {$documentId}",
+            'auditDescription' => "Committee returned document ID {$documentId} to Admin",
         ];
     }
 
@@ -1468,21 +1052,185 @@ class AdminInboxController
     // Helpers
     // =========================================================================
 
-    /** Check whether the document_type_name string indicates Communication. */
-    private function isCommunicationDocument(string $documentTypeName): bool
-    {
-        return stripos($documentTypeName, 'communication') !== false;
+    /**
+     * Proceed to Endorsement — marks the document as REFERRED.
+     *
+     * Only the user who accepted the assignment may call this action.
+     * Ownership is re-verified inside process() before dispatch here.
+     *
+     * What this does inside the transaction:
+     *   1. Guard against duplicate endorsement (committee_cycles with
+     *      completed_at IS NOT NULL already exists for this document).
+     *   2. Complete the current ACCEPTED Committee assignment
+     *      (decision = COMPLETED, completed_at = NOW()).
+     *   3. Update the document's current_status_id to 8 ('Referred').
+     *      The current_phase stays 'COMMITTEE' — the document remains in the
+     *      Committee phase but its status now reflects the endorsed state.
+     *   4. Create (or complete) a committee_cycles row to record the cycle.
+     *   5. Insert a COMMITTEE_ENDORSED_REFERRED document_event.
+     *   6. Insert a document_routes record (COMMITTEE → COMMITTEE, same phase)
+     *      for the audit trail.
+     *
+     * Returns an array of audit data written after commit by process().
+     *
+     * NOTE: audit_log() is deliberately omitted here — runs inside an open
+     * transaction. process() writes the audit entry after commit.
+     *
+     * FUTURE PHASE HOOK: After this action succeeds the document will appear
+     * in the Referred Documents list. Phase 2 will allow the Committee user
+     * to endorse the referred document to one or more Opinion Offices.
+     */
+    private function doEndorseReferred(
+        int    $documentId,
+        int    $assignmentId,
+        array  $assignment,
+        array  $document,
+        int    $userId,
+        int    $currentStatusId,
+        string $remarks
+    ): array {
+        if ($remarks === '') {
+            throw new InvalidArgumentException('Remarks are required when proceeding to endorsement.');
+        }
+
+        // 1. Guard: reject if a completed endorsement cycle already exists
+        $dupStmt = $this->pdo->prepare("
+            SELECT id FROM committee_cycles
+            WHERE document_id   = ?
+              AND completed_at  IS NOT NULL
+            LIMIT 1
+        ");
+        $dupStmt->execute([$documentId]);
+        if ($dupStmt->fetch()) {
+            throw new RuntimeException(
+                'This document has already been endorsed (Referred). Duplicate endorsement is not allowed.'
+            );
+        }
+
+        // 2. Complete the ACCEPTED assignment (owned by this user)
+        $completeStmt = $this->pdo->prepare("
+            UPDATE document_assignments
+            SET decision     = 'COMPLETED',
+                completed_at = NOW(),
+                remarks      = ?
+            WHERE id           = ?
+              AND decision     = 'ACCEPTED'
+              AND completed_at IS NULL
+              AND (accepted_by = ? OR assigned_to_user_id = ?)
+        ");
+        $completeStmt->execute([$remarks, $assignmentId, $userId, $userId]);
+
+        if ($completeStmt->rowCount() === 0) {
+            throw new RuntimeException(
+                'This assignment could not be completed. It may have been modified by another process. Please refresh the page.'
+            );
+        }
+
+        // 3. Update document status to 8 = 'Referred'
+        $this->pdo->prepare("
+            UPDATE documents
+            SET current_status_id = 8,
+                updated_by        = ?
+            WHERE id = ?
+        ")->execute([$userId, $documentId]);
+
+        // 4. Create the committee_cycles row
+        //    cycle_number = MAX(cycle_number) + 1 for this document (or 1 if none)
+        $cycleNumStmt = $this->pdo->prepare("
+            SELECT COALESCE(MAX(cycle_number), 0) + 1 AS next_num
+            FROM committee_cycles
+            WHERE document_id = ?
+        ");
+        $cycleNumStmt->execute([$documentId]);
+        $cycleNumber = (int) $cycleNumStmt->fetchColumn();
+
+        $this->pdo->prepare("
+            INSERT INTO committee_cycles (
+                document_id, cycle_number,
+                referred_by, accepted_by,
+                decision, remarks,
+                started_at, completed_at
+            ) VALUES (?, ?, ?, ?, 'ACCEPTED', ?, NOW(), NOW())
+        ")->execute([
+            $documentId,
+            $cycleNumber,
+            $userId,   // referred_by — user who performed the endorsement
+            $userId,   // accepted_by — same user (they accepted the assignment)
+            $remarks,
+        ]);
+
+        // 5. COMMITTEE_ENDORSED_REFERRED workflow event
+        $uStmt = $this->pdo->prepare("SELECT username FROM user_accounts WHERE id = ? LIMIT 1");
+        $uStmt->execute([$userId]);
+        $username = (string) ($uStmt->fetchColumn() ?: '');
+
+        $this->pdo->prepare("
+            INSERT INTO document_events (
+                document_id, event_type, phase, performed_by,
+                from_status_id, to_status_id, remarks, metadata
+            ) VALUES (?, 'COMMITTEE_ENDORSED_REFERRED', 'COMMITTEE', ?, ?, 8, ?, ?)
+        ")->execute([
+            $documentId,
+            $userId,
+            $currentStatusId,
+            $remarks,
+            json_encode([
+                'cycle_number'         => $cycleNumber,
+                'endorsed_by'          => $userId,
+                'endorsed_by_username' => $username,
+                'assignment_id'        => $assignmentId,
+                'ip_address'           => client_ip(),
+                'user_agent'           => client_user_agent(),
+                // FUTURE PHASE: opinion_office_ids will be populated here
+                'for_opinion_offices'  => [],
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ]);
+
+        // 6. Route record — same phase transition (COMMITTEE → COMMITTEE)
+        //    Represents the internal workflow step from inbox to referred.
+        $committeeRoleId = (int) ($assignment['assigned_to_role_id'] ?? 0);
+        $this->pdo->prepare("
+            INSERT INTO document_routes (
+                document_id, from_phase, to_phase,
+                routed_by, routed_to_role_id, remarks
+            ) VALUES (?, 'COMMITTEE', 'COMMITTEE', ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $userId,
+            $committeeRoleId ?: null,
+            'Endorsed as Referred by Committee: ' . $remarks,
+        ]);
+
+        // audit_log() deliberately omitted (open transaction) — process() writes after commit.
+
+        return [
+            'auditData' => [
+                'action'         => 'committee_endorsed_referred',
+                'assignment_id'  => $assignmentId,
+                'document_id'    => $documentId,
+                'cycle_number'   => $cycleNumber,
+                'endorsed_by'    => $userId,
+                'endorsed_by_username' => $username,
+                'remarks'        => mb_substr($remarks, 0, 200),
+                'status_changed_to' => 'Referred (id=8)',
+            ],
+            'auditDescription' => "Committee endorsed document ID {$documentId} as Referred (cycle {$cycleNumber}, user: {$username})",
+        ];
     }
 
-    /** Require and return the Admin role ID; redirect if not found. */
-    private function requireAdminRoleId(): int
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    /** Require and return the Committee role ID; redirect if not found. */
+    private function requireCommitteeRoleId(): int
     {
         $stmt = $this->pdo->query(
-            "SELECT id FROM roles WHERE name = 'Admin' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+            "SELECT id FROM roles WHERE name = 'Committee' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
         );
         $row = $stmt->fetch();
         if (!$row) {
-            flash_set('error', 'Admin role not found. Please contact the system administrator.');
+            flash_set('error', 'Committee role not found. Please contact the system administrator.');
             redirect('dashboard');
         }
         return (int) $row['id'];
@@ -1492,24 +1240,10 @@ class AdminInboxController
     private function actionLabel(string $action): string
     {
         return match ($action) {
-            'accept'             => 'Accepted',
-            'decline'            => 'Declined and returned to Receiving',
-            'route_sp_secretary' => 'Routed to SP Secretary',
-            'route_plenary'      => 'Routed to Plenary',
-            'route_committee'    => 'Routed to Committee',
-            'noted'              => 'Marked as Noted',
-            default              => $action,
-        };
-    }
-
-    /** Return the URL prefix for the target role's dashboard. */
-    private function roleDashboardPrefix(string $roleName): string
-    {
-        return match ($roleName) {
-            'SP Secretary' => 'spsec',
-            'Plenary'      => 'plenary',
-            'Committee'    => 'committee',
-            default        => strtolower(str_replace(' ', '', $roleName)),
+            'accept'          => 'Accepted',
+            'return_to_admin' => 'Returned to Admin',
+            'endorse'         => 'Proceeded to Endorsement (Referred)',
+            default           => $action,
         };
     }
 }

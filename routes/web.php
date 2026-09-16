@@ -1066,6 +1066,49 @@ return [
     ],
 
     // -------------------------------------------------------------------------
+    // Committee Inbox Routes
+    // -------------------------------------------------------------------------
+
+    'committee/inbox' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeInboxController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'committee/inbox/show' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeInboxController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'committee/inbox/process' => [
+        'method'     => 'POST',
+        'controller' => 'Committee/CommitteeInboxController',
+        'action'     => 'process',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'committee/inbox/upload' => [
+        'method'     => 'POST',
+        'controller' => 'Committee/CommitteeInboxController',
+        'action'     => 'upload',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Committee Referred Documents Routes
+    // -------------------------------------------------------------------------
+
+    'committee/referred' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeReferredController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
     // Admin Direct Receive Routes
     // -------------------------------------------------------------------------
 

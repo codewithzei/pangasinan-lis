@@ -233,6 +233,20 @@ if ($userRoleId !== null) {
                         <span class="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700"><?= $inboxCount ?></span>
                     <?php endif; ?>
                 </a>
+                <a href="<?= BASE_URL ?>/admin/routed" class="<?= $navBase ?> <?= isActiveNav('admin/routed', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Routed Documents
+                </a>
+                <a href="<?= BASE_URL ?>/spsec/communications" class="<?= $navBase ?> <?= isActiveNav('spsec/communications', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                    Communications
+                </a>
             </nav>
         </div>
         <?php endif; ?>
@@ -256,12 +270,59 @@ if ($userRoleId !== null) {
         <div class="mb-7">
             <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Legislative Workflow</p>
             <nav class="space-y-1">
-                <a href="<?= BASE_URL ?>/committee/dashboard" class="<?= $navBase ?> <?= isActiveNav('committee', $currentRoute) ?>">
+                <a href="<?= BASE_URL ?>/committee/inbox" class="<?= $navBase ?> <?= isActiveNav('committee/inbox', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                              d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 100-8 4 4 0 000 8zm4 2a4 4 0 00-4-4 4 4 0 00-4 4"/>
+                              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
                     </svg>
-                    Committees
+                    Inbox
+                    <?php if ($inboxCount > 0): ?>
+                        <span class="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700"><?= $inboxCount ?></span>
+                    <?php endif; ?>
+                </a>
+                <a href="<?= BASE_URL ?>/committee/referred" class="<?= $navBase ?> <?= isActiveNav('committee/referred', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    Referred Documents
+                </a>
+                <a href="<?= BASE_URL ?>/committee/hearings" class="<?= $navBase ?> <?= isActiveNav('committee/hearings', $currentRoute) ?>">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3l8.384-8.381"/>
+                        <path d="m16 16 6-6"/>
+                        <path d="m21.5 10.5-8-8"/>
+                        <path d="m8 8 6-6"/>
+                        <path d="m8.5 7.5 8 8"/>
+                    </svg>
+                    Hearings
+                </a>
+                <a href="<?= BASE_URL ?>/committee/reports" class="<?= $navBase ?> <?= isActiveNav('committee/reports', $currentRoute) ?>">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+                        <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+                        <path d="M10 9H8"/>
+                        <path d="M16 13H8"/>
+                        <path d="M16 17H8"/>
+                    </svg>
+                    Reports
+                </a>
+                <a href="<?= BASE_URL ?>/committee/cases" class="<?= $navBase ?> <?= isActiveNav('committee/cases', $currentRoute) ?>">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 3v18"/>
+                        <path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/>
+                        <path d="M7 21h10"/>
+                        <path d="m5 8 3 8a5 5 0 0 1-6 0z"/>
+                        <path d="m19 8-3 8a5 5 0 0 0 6 0z"/>
+                    </svg>
+                    Cases
+                </a>
+                <a href="<?= BASE_URL ?>/committee/communications" class="<?= $navBase ?> <?= isActiveNav('committee/communications', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                    Communications
                 </a>
             </nav>
         </div>
