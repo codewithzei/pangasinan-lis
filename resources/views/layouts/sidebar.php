@@ -287,7 +287,10 @@ if ($userRoleId !== null) {
                     </svg>
                     Referred Documents
                 </a>
-                <a href="<?= BASE_URL ?>/committee/hearings" class="<?= $navBase ?> <?= isActiveNav('committee/hearings', $currentRoute) ?>">
+                <?php
+                $isHearingActive = str_starts_with($currentRoute, 'committee/hearing');
+                ?>
+                <a href="<?= BASE_URL ?>/committee/hearing" class="<?= $navBase ?> <?= $isHearingActive ? 'bg-blue-50 text-primary font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-primary' ?>">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3l8.384-8.381"/>
                         <path d="m16 16 6-6"/>
@@ -297,6 +300,32 @@ if ($userRoleId !== null) {
                     </svg>
                     Hearings
                 </a>
+                <?php if ($isHearingActive): ?>
+                <div class="ml-8 mt-0.5 space-y-0.5 border-l border-gray-200 pl-3">
+                    <?php
+                    $hearingSubTabs = [
+                        ''          => 'All Hearings',
+                        'scheduled' => 'Scheduled',
+                        'approved'  => 'Approved',
+                        'deferred'  => 'Deferred',
+                        'remanded'  => 'Remanded',
+                        'withdrawn' => 'Withdrawn',
+                    ];
+                    $activeHearingTab = $_GET['tab'] ?? 'all';
+                    foreach ($hearingSubTabs as $tabKey => $tabLabel):
+                        $effectiveKey = ($tabKey === '') ? 'all' : $tabKey;
+                        $isSubActive  = ($currentRoute === 'committee/hearing' && $activeHearingTab === $effectiveKey);
+                        $href = BASE_URL . '/committee/hearing' . ($tabKey !== '' ? '?tab=' . $tabKey : '');
+                    ?>
+                    <a href="<?= $href ?>"
+                       class="block rounded-lg px-2 py-1.5 text-xs font-medium transition
+                              <?= $isSubActive ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700' ?>"
+                       <?= $isSubActive ? 'aria-current="page"' : '' ?>>
+                        <?= htmlspecialchars($tabLabel) ?>
+                    </a>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
                 <a href="<?= BASE_URL ?>/committee/reports" class="<?= $navBase ?> <?= isActiveNav('committee/reports', $currentRoute) ?>">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>

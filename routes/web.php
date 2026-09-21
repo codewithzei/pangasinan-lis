@@ -1108,6 +1108,158 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    // Endorse a referred document to opinion offices (GET = form, POST = process)
+    'committee/referred/endorse' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeReferredController',
+            'action'     => 'endorseShow',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeReferredController',
+            'action'     => 'endorseStore',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // Submit an opinion for a specific endorsement (GET = form, POST = process)
+    'committee/referred/opinion' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeReferredController',
+            'action'     => 'opinionShow',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeReferredController',
+            'action'     => 'opinionStore',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // Resolve a cycle: Proceed to Agenda or Withdraw Document (GET = form, POST = process)
+    'committee/referred/resolve' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeReferredController',
+            'action'     => 'resolveShow',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeReferredController',
+            'action'     => 'resolveStore',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // Issue a second endorsement for an UNFAVORABLE office (POST only)
+    'committee/referred/second-endorse' => [
+        'method'     => 'POST',
+        'controller' => 'Committee/CommitteeReferredController',
+        'action'     => 'secondEndorseStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Schedule an agenda after a Proceed-to-Agenda resolution (GET = form, POST = process)
+    'committee/referred/agenda' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeReferredController',
+            'action'     => 'agendaShow',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeReferredController',
+            'action'     => 'agendaStore',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Committee Hearing Routes
+    // -------------------------------------------------------------------------
+
+    // List all documents with status "On Going"
+    'committee/hearing' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeHearingController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Detail page + hearing outcome form
+    'committee/hearing/show' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeHearingController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Save hearing outcome
+    'committee/hearing/store' => [
+        'method'     => 'POST',
+        'controller' => 'Committee/CommitteeHearingController',
+        'action'     => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Committee report form (GET) + save (POST)
+    'committee/hearing/report' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeHearingController',
+            'action'     => 'reportShow',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeHearingController',
+            'action'     => 'reportStore',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // Committee report detail view (from hearing workflow)
+    'committee/hearing/report/show' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeHearingController',
+        'action'     => 'reportDetail',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Committee Reports Routes
+    // -------------------------------------------------------------------------
+
+    // Committee Reports list page
+    'committee/reports' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeReportsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Committee Report detail view (from Reports page)
+    'committee/reports/show' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeReportsController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Return to Plenary action
+    'committee/reports/return-to-plenary' => [
+        'method'     => 'POST',
+        'controller' => 'Committee/CommitteeReportsController',
+        'action'     => 'returnToPlenary',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // -------------------------------------------------------------------------
     // Admin Direct Receive Routes
     // -------------------------------------------------------------------------
