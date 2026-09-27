@@ -37,14 +37,14 @@ ob_start();
 <div class="space-y-6">
 
     <!-- Page header -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-7 sm:px-8">
             <div class="relative z-10">
-                <p class="text-sm font-medium text-emerald-100">COMMITTEE / REFERRED / SCHEDULE AGENDA</p>
+                <p class="text-sm font-medium text-blue-100">COMMITTEE / REFERRED / SCHEDULE AGENDA</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     Schedule Agenda
                 </h1>
-                <p class="mt-1 text-sm text-emerald-100">
+                <p class="mt-1 text-sm text-blue-100">
                     Set the date, time, venue, and participants for the committee hearing.
                 </p>
             </div>

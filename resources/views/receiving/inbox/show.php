@@ -65,7 +65,7 @@ function normalizeTimeForInput(?string $time): string {
 <div class="space-y-6">
 
     <!-- Page Header -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-800 via-primary to-indigo-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10">
                 <p class="text-sm font-medium text-blue-100">RECEIVING / INBOX / EDIT DOCUMENT</p>
@@ -532,16 +532,19 @@ function normalizeTimeForInput(?string $time): string {
                                         View
                                     </a>
                                 <?php endif; ?>
-                                <form method="POST"
-                                      action="<?= BASE_URL ?>/receiving/inbox/attachment/delete"
-                                      onsubmit="return confirm('Remove \'<?= htmlspecialchars(addslashes($attachment['file_name'] ?? 'this file'), ENT_QUOTES, 'UTF-8') ?>\'? This cannot be undone.');">
+                                <!-- Hidden delete form — submitted by JS after modal confirmation -->
+                                <form id="deleteAttachmentForm-<?= (int) ($attachment['id'] ?? 0) ?>"
+                                      method="POST"
+                                      action="<?= BASE_URL ?>/receiving/inbox/attachment/delete">
                                     <input type="hidden" name="attachment_id" value="<?= (int) ($attachment['id'] ?? 0) ?>">
                                     <input type="hidden" name="document_id"   value="<?= htmlspecialchars($document['id'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
-                                    <button type="submit"
-                                            class="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 transition">
-                                        Remove
-                                    </button>
                                 </form>
+                                <button type="button"
+                                        class="remove-attachment-btn rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 transition"
+                                        data-form-id="deleteAttachmentForm-<?= (int) ($attachment['id'] ?? 0) ?>"
+                                        data-file-name="<?= htmlspecialchars($attachment['file_name'] ?? 'this file', ENT_QUOTES, 'UTF-8') ?>">
+                                    Remove
+                                </button>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -574,8 +577,8 @@ function normalizeTimeForInput(?string $time): string {
                class="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition">
                 Cancel
             </a>
-            <button type="submit" id="submitBtn"
-                    form="editDocumentForm"
+            <!-- Triggers the process confirmation modal; actual submit happens on Confirm -->
+            <button type="button" id="submitTriggerBtn"
                     class="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition">
                 <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -586,13 +589,110 @@ function normalizeTimeForInput(?string $time): string {
 
     </div>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Process confirmation modal — Save & Route to Admin
+         Direct child of the top-level wrapper so `position:fixed` covers
+         the full viewport without being clipped by any ancestor.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div id="processConfirmModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="processConfirmTitle"
+         aria-describedby="processConfirmBody">
+
+        <div id="processConfirmBackdrop"
+             class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-200 opacity-0"></div>
+
+        <div id="processConfirmPanel"
+             class="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl
+                    border border-gray-100 transition-all duration-200 opacity-0"
+             style="transform:scale(0.95)">
+            <div class="p-6">
+                <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+                    <svg class="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <h3 id="processConfirmTitle"
+                    class="text-base font-semibold text-gray-900 mb-2">Save &amp; Route to Admin?</h3>
+                <p id="processConfirmBody" class="text-sm text-gray-600">
+                    This will save the corrected document details and route it back to Admin for processing.
+                    You will not be able to edit it again unless Admin returns it.
+                </p>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100
+                        bg-gray-50 rounded-b-2xl">
+                <button type="button" id="processConfirmCancelBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-gray-700 bg-white border border-gray-200
+                               hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button type="button" id="processConfirmOkBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-white bg-primary hover:bg-blue-700 transition">
+                    Yes, Route to Admin
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Attachment removal confirmation modal
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div id="removeAttachmentModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="removeAttachmentTitle"
+         aria-describedby="removeAttachmentBody">
+
+        <div id="removeAttachmentBackdrop"
+             class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-200 opacity-0"></div>
+
+        <div id="removeAttachmentPanel"
+             class="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl
+                    border border-gray-100 transition-all duration-200 opacity-0"
+             style="transform:scale(0.95)">
+            <div class="p-6">
+                <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
+                    <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <h3 id="removeAttachmentTitle"
+                    class="text-base font-semibold text-gray-900 mb-2">Remove Attachment?</h3>
+                <p id="removeAttachmentBody" class="text-sm text-gray-600">
+                    This attachment will be permanently removed and cannot be recovered.
+                </p>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100
+                        bg-gray-50 rounded-b-2xl">
+                <button type="button" id="removeAttachmentCancelBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-gray-700 bg-white border border-gray-200
+                               hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button type="button" id="removeAttachmentOkBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition">
+                    Remove
+                </button>
+            </div>
+        </div>
+    </div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const sourceTypeSelect = document.getElementById('source_type_id');
-    const submitBtn        = document.getElementById('submitBtn');
+    const submitTriggerBtn = document.getElementById('submitTriggerBtn');
     const mainForm         = document.getElementById('editDocumentForm');
 
-    if (!sourceTypeSelect || !submitBtn || !mainForm) {
+    if (!sourceTypeSelect || !submitTriggerBtn || !mainForm) {
         console.error('Required DOM elements not found');
         return;
     }
@@ -775,18 +875,158 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ------------------------------------------------------------------
-    // Prevent double submission on Save & Route to Admin
+    // Process confirmation modal — Save & Route to Admin
     // ------------------------------------------------------------------
-    mainForm.addEventListener('submit', function (e) {
-        if (submitBtn.disabled) { e.preventDefault(); return false; }
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = `
-            <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Processing...`;
-        submitBtn.classList.add('opacity-75', 'cursor-not-allowed');
+    const processConfirmModal      = document.getElementById('processConfirmModal');
+    const processConfirmBackdrop   = document.getElementById('processConfirmBackdrop');
+    const processConfirmPanel      = document.getElementById('processConfirmPanel');
+    const processConfirmOkBtn      = document.getElementById('processConfirmOkBtn');
+    const processConfirmCancelBtn  = document.getElementById('processConfirmCancelBtn');
+
+    let processSubmitting = false;
+
+    // Clicking the trigger button opens the modal (does NOT submit)
+    submitTriggerBtn.addEventListener('click', function () {
+        openProcessModal();
+    });
+
+    if (processConfirmOkBtn) {
+        processConfirmOkBtn.addEventListener('click', function () {
+            if (processSubmitting) return;
+            processSubmitting = true;
+
+            // Disable + show spinner on both the modal button and the trigger
+            processConfirmOkBtn.disabled = true;
+            processConfirmOkBtn.innerHTML =
+                '<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">' +
+                '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+                '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>' +
+                '</svg><span class="ml-2">Routing\u2026</span>';
+            submitTriggerBtn.disabled = true;
+
+            mainForm.submit();
+        });
+    }
+
+    if (processConfirmCancelBtn) {
+        processConfirmCancelBtn.addEventListener('click', closeProcessModal);
+    }
+    if (processConfirmBackdrop) {
+        processConfirmBackdrop.addEventListener('click', function () {
+            if (!processSubmitting) closeProcessModal();
+        });
+    }
+
+    function openProcessModal() {
+        processConfirmModal.classList.remove('hidden');
+        processConfirmModal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+        requestAnimationFrame(function () {
+            processConfirmBackdrop.style.opacity = '1';
+            processConfirmPanel.style.opacity    = '1';
+            processConfirmPanel.style.transform  = 'scale(1)';
+            if (processConfirmCancelBtn) processConfirmCancelBtn.focus();
+        });
+    }
+
+    function closeProcessModal() {
+        if (processSubmitting) return;
+        processConfirmBackdrop.style.opacity = '0';
+        processConfirmPanel.style.opacity    = '0';
+        processConfirmPanel.style.transform  = 'scale(0.95)';
+        setTimeout(function () {
+            processConfirmModal.classList.add('hidden');
+            processConfirmModal.classList.remove('flex');
+            document.body.style.overflow = '';
+        }, 200);
+    }
+
+    // ------------------------------------------------------------------
+    // Attachment removal confirmation modal
+    // ------------------------------------------------------------------
+    const removeAttachmentModal      = document.getElementById('removeAttachmentModal');
+    const removeAttachmentBackdrop   = document.getElementById('removeAttachmentBackdrop');
+    const removeAttachmentPanel      = document.getElementById('removeAttachmentPanel');
+    const removeAttachmentBody       = document.getElementById('removeAttachmentBody');
+    const removeAttachmentOkBtn      = document.getElementById('removeAttachmentOkBtn');
+    const removeAttachmentCancelBtn  = document.getElementById('removeAttachmentCancelBtn');
+
+    let pendingDeleteFormId  = null;
+    let deleteSubmitting     = false;
+
+    document.querySelectorAll('.remove-attachment-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            pendingDeleteFormId = this.dataset.formId;
+            const fileName      = this.dataset.fileName || 'this file';
+            if (removeAttachmentBody) {
+                removeAttachmentBody.textContent =
+                    '\u201c' + fileName + '\u201d will be permanently removed and cannot be recovered.';
+            }
+            openRemoveModal();
+        });
+    });
+
+    if (removeAttachmentOkBtn) {
+        removeAttachmentOkBtn.addEventListener('click', function () {
+            if (deleteSubmitting || !pendingDeleteFormId) return;
+            const form = document.getElementById(pendingDeleteFormId);
+            if (!form) return;
+
+            deleteSubmitting = true;
+            removeAttachmentOkBtn.disabled = true;
+            removeAttachmentOkBtn.innerHTML =
+                '<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">' +
+                '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+                '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>' +
+                '</svg><span class="ml-2">Removing\u2026</span>';
+
+            form.submit();
+        });
+    }
+
+    if (removeAttachmentCancelBtn) {
+        removeAttachmentCancelBtn.addEventListener('click', closeRemoveModal);
+    }
+    if (removeAttachmentBackdrop) {
+        removeAttachmentBackdrop.addEventListener('click', function () {
+            if (!deleteSubmitting) closeRemoveModal();
+        });
+    }
+
+    function openRemoveModal() {
+        deleteSubmitting = false;
+        removeAttachmentModal.classList.remove('hidden');
+        removeAttachmentModal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+        requestAnimationFrame(function () {
+            removeAttachmentBackdrop.style.opacity = '1';
+            removeAttachmentPanel.style.opacity    = '1';
+            removeAttachmentPanel.style.transform  = 'scale(1)';
+            if (removeAttachmentCancelBtn) removeAttachmentCancelBtn.focus();
+        });
+    }
+
+    function closeRemoveModal() {
+        if (deleteSubmitting) return;
+        removeAttachmentBackdrop.style.opacity = '0';
+        removeAttachmentPanel.style.opacity    = '0';
+        removeAttachmentPanel.style.transform  = 'scale(0.95)';
+        setTimeout(function () {
+            removeAttachmentModal.classList.add('hidden');
+            removeAttachmentModal.classList.remove('flex');
+            document.body.style.overflow = '';
+            pendingDeleteFormId = null;
+        }, 200);
+    }
+
+    // Escape closes whichever modal is open (if not submitting)
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (removeAttachmentModal && !removeAttachmentModal.classList.contains('hidden') && !deleteSubmitting) {
+            closeRemoveModal();
+        } else if (processConfirmModal && !processConfirmModal.classList.contains('hidden') && !processSubmitting) {
+            closeProcessModal();
+        }
     });
 });
 </script>

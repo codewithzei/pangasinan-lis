@@ -983,6 +983,14 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    // Active committees list as JSON (used by Share-to-Report modal)
+    'master/committees/json' => [
+        'method'     => 'GET',
+        'controller' => 'Master/CommitteeController',
+        'action'     => 'json',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // -------------------------------------------------------------------------
     // Admin Routed Documents Routes
     // -------------------------------------------------------------------------
@@ -1062,6 +1070,60 @@ return [
         'method'     => 'POST',
         'controller' => 'Spsec/SpsecInboxController',
         'action'     => 'upload',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // SP Secretary Route Document Routes
+    // -------------------------------------------------------------------------
+
+    'spsec/route-document' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecRouteDocumentController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'spsec/route-document/submit' => [
+        'method'     => 'POST',
+        'controller' => 'Spsec/SpsecRouteDocumentController',
+        'action'     => 'submit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // SP Secretary Routed Documents Routes
+    // -------------------------------------------------------------------------
+
+    'spsec/routed' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecRoutedDocumentController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'spsec/routed/show' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecRoutedDocumentController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // SP Secretary Communications Routes
+    // -------------------------------------------------------------------------
+
+    'spsec/communications' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecCommunicationsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'spsec/communications/show' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecCommunicationsController',
+        'action'     => 'show',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
@@ -1232,6 +1294,30 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    // Share multiple approved documents to a committee report — dedicated page
+    'committee/hearing/share-to-report' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeHearingController',
+            'action'     => 'shareToReportShow',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeHearingController',
+            'action'     => 'shareToReport',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // JSON endpoint — fetch existing committee reports for the share modal
+    'committee/hearing/reports-json' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeHearingController',
+        'action'     => 'reportsJson',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // -------------------------------------------------------------------------
     // Committee Reports Routes
     // -------------------------------------------------------------------------
@@ -1258,6 +1344,190 @@ return [
         'controller' => 'Committee/CommitteeReportsController',
         'action'     => 'returnToPlenary',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Committee Cases Routes
+    // -------------------------------------------------------------------------
+
+    // Cases index / list page
+    'committee/cases' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeCasesController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Case creation form (GET) + store (POST)
+    'committee/cases/create' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeCasesController',
+            'action'     => 'create',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeCasesController',
+            'action'     => 'store',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // Case detail / timeline view
+    'committee/cases/show' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeCasesController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Add a timeline action to an existing case
+    'committee/cases/actions/store' => [
+        'method'     => 'POST',
+        'controller' => 'Committee/CommitteeCasesController',
+        'action'     => 'storeAction',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Set / update the final outcome for a case
+    'committee/cases/outcome' => [
+        'method'     => 'POST',
+        'controller' => 'Committee/CommitteeCasesController',
+        'action'     => 'outcomeStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Approved cases — For Report list
+    'committee/cases/for-report' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeCasesController',
+        'action'     => 'forReport',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Deferred cases list
+    'committee/cases/deferred' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeCasesController',
+        'action'     => 'deferred',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Withdrawn cases list
+    'committee/cases/withdrawn' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeCasesController',
+        'action'     => 'withdrawn',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Noted cases list
+    'committee/cases/noted' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeCasesController',
+        'action'     => 'noted',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Create Committee Report from case (GET = form, POST = persist)
+    'committee/cases/report' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeCasesController',
+            'action'     => 'caseReportShow',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeCasesController',
+            'action'     => 'caseReportStore',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Committee Communications Routes
+    // -------------------------------------------------------------------------
+
+    // Communications listing page
+    'committee/communications' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeCommunicationsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Communication creation form (GET) + store (POST)
+    'committee/communications/create' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeCommunicationsController',
+            'action'     => 'create',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeCommunicationsController',
+            'action'     => 'store',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // Communication detail view
+    'committee/communications/show' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeCommunicationsController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // Schedule agenda (GET = form, POST = save)
+    'committee/communications/agenda' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeCommunicationsController',
+            'action'     => 'agendaShow',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeCommunicationsController',
+            'action'     => 'agendaStore',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // Record hearing outcome (GET = form, POST = save)
+    'committee/communications/hearing' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeCommunicationsController',
+            'action'     => 'hearingShow',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeCommunicationsController',
+            'action'     => 'hearingStore',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    // Create committee report (GET = form, POST = save)
+    'committee/communications/report' => [
+        [
+            'method'     => 'GET',
+            'controller' => 'Committee/CommitteeCommunicationsController',
+            'action'     => 'reportShow',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+        [
+            'method'     => 'POST',
+            'controller' => 'Committee/CommitteeCommunicationsController',
+            'action'     => 'reportStore',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
     ],
 
     // -------------------------------------------------------------------------

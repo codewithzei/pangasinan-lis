@@ -19,7 +19,7 @@ $accent = $accent ?? 'primary';
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-700 via-primary to-blue-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
@@ -297,9 +297,8 @@ $accent = $accent ?? 'primary';
 </div>
 
 <!-- Opinion Office Create/Edit Modal -->
-<div id="opinionOfficeModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="opinionOfficeModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="opinionOfficeModalPanel" class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
+<div id="opinionOfficeModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" role="dialog" aria-modal="true">
+    <div id="opinionOfficeModalPanel" class="relative w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
         <form id="opinionOfficeForm" method="POST" action="<?= BASE_URL ?>/master/opinion-offices/store">
             <input type="hidden" name="id" id="opinionOfficeId" value="">
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
@@ -372,9 +371,8 @@ $accent = $accent ?? 'primary';
 </div>
 
 <!-- Confirmation Modal -->
-<div id="confirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="confirmModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="confirmModalPanel" class="relative z-10 w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
+<div id="confirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" role="dialog" aria-modal="true">
+    <div id="confirmModalPanel" class="relative w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
         <div class="p-6">
             <div class="flex items-start gap-4">
                 <div id="confirmIconBox" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
@@ -539,12 +537,11 @@ function openOpinionOfficeModal() {
     resetOpinionOfficeForm();
     opinionOfficeModalOpen = true;
     const m = document.getElementById('opinionOfficeModal');
-    const b = document.getElementById('opinionOfficeModalBackdrop');
     const p = document.getElementById('opinionOfficeModalPanel');
     m.classList.remove('hidden');
     m.classList.add('flex');
     requestAnimationFrame(() => {
-        b.classList.remove('opacity-0');
+        m.style.opacity = '1';
         p.classList.remove('scale-95', 'opacity-0');
         p.classList.add('scale-100', 'opacity-100');
     });
@@ -554,9 +551,8 @@ function closeOpinionOfficeModal() {
     if (!opinionOfficeModalOpen) return;
     opinionOfficeModalOpen = false;
     const m = document.getElementById('opinionOfficeModal');
-    const b = document.getElementById('opinionOfficeModalBackdrop');
     const p = document.getElementById('opinionOfficeModalPanel');
-    b.classList.add('opacity-0');
+    m.style.opacity = '0';
     p.classList.remove('scale-100', 'opacity-100');
     p.classList.add('scale-95', 'opacity-0');
     setTimeout(() => {
@@ -564,7 +560,7 @@ function closeOpinionOfficeModal() {
         m.classList.add('hidden');
     }, 200);
 }
-document.getElementById('opinionOfficeModalBackdrop')?.addEventListener('click', closeOpinionOfficeModal);
+document.getElementById('opinionOfficeModal')?.addEventListener('click', function(e) { if (e.target === document.getElementById('opinionOfficeModal')) closeopinionOfficeModal(); });
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         if (opinionOfficeModalOpen) closeOpinionOfficeModal();
@@ -596,12 +592,11 @@ async function editOpinionOffice(id) {
         `;
         opinionOfficeModalOpen = true;
         const m = document.getElementById('opinionOfficeModal');
-        const b = document.getElementById('opinionOfficeModalBackdrop');
-        const pn = document.getElementById('opinionOfficeModalPanel');
+            const pn = document.getElementById('opinionOfficeModalPanel');
         m.classList.remove('hidden');
         m.classList.add('flex');
         requestAnimationFrame(() => {
-            b.classList.remove('opacity-0');
+            m.style.opacity = '1';
             pn.classList.remove('scale-95', 'opacity-0');
             pn.classList.add('scale-100', 'opacity-100');
         });
@@ -637,12 +632,11 @@ function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText 
     pendingAction = onConfirm;
     confirmModalOpen = true;
     const m = document.getElementById('confirmModal');
-    const b = document.getElementById('confirmModalBackdrop');
     const p = document.getElementById('confirmModalPanel');
     m.classList.remove('hidden');
     m.classList.add('flex');
     requestAnimationFrame(() => {
-        b.classList.remove('opacity-0');
+        m.style.opacity = '1';
         p.classList.remove('scale-95', 'opacity-0');
         p.classList.add('scale-100', 'opacity-100');
     });
@@ -652,9 +646,8 @@ function closeConfirmModal() {
     confirmModalOpen = false;
     pendingAction = null;
     const m = document.getElementById('confirmModal');
-    const b = document.getElementById('confirmModalBackdrop');
     const p = document.getElementById('confirmModalPanel');
-    b.classList.add('opacity-0');
+    m.style.opacity = '0';
     p.classList.remove('scale-100', 'opacity-100');
     p.classList.add('scale-95', 'opacity-0');
     setTimeout(() => {
@@ -667,7 +660,7 @@ function executeConfirmAction() {
     closeConfirmModal();
     if (typeof fn === 'function') fn();
 }
-document.getElementById('confirmModalBackdrop')?.addEventListener('click', closeConfirmModal);
+document.getElementById('confirmModal')?.addEventListener('click', function(e) { if (e.target === document.getElementById('confirmModal')) closeConfirmModal(); });
 
 async function deleteOpinionOffice(id, name) {
     openConfirmModal({

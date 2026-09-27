@@ -291,9 +291,8 @@ function formatName(array $row): string
 </div>
 
 <!-- Confirmation Modal -->
-<div id="confirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="confirmModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="confirmModalPanel" class="relative z-10 w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
+<div id="confirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" role="dialog" aria-modal="true">
+    <div id="confirmModalPanel" class="relative w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
         <div class="p-6">
             <div class="flex items-start gap-4">
                 <div id="confirmIconBox" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
@@ -485,12 +484,11 @@ function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText 
     pendingAction = onConfirm;
     confirmModalOpen = true;
     const m = document.getElementById('confirmModal');
-    const b = document.getElementById('confirmModalBackdrop');
     const p = document.getElementById('confirmModalPanel');
     m.classList.remove('hidden');
     m.classList.add('flex');
     requestAnimationFrame(() => {
-        b.classList.remove('opacity-0');
+        m.style.opacity = '1';
         p.classList.remove('scale-95', 'opacity-0');
         p.classList.add('scale-100', 'opacity-100');
     });
@@ -501,9 +499,8 @@ function closeConfirmModal() {
     confirmModalOpen = false;
     pendingAction = null;
     const m = document.getElementById('confirmModal');
-    const b = document.getElementById('confirmModalBackdrop');
     const p = document.getElementById('confirmModalPanel');
-    b.classList.add('opacity-0');
+    m.style.opacity = '0';
     p.classList.remove('scale-100', 'opacity-100');
     p.classList.add('scale-95', 'opacity-0');
     setTimeout(() => {
@@ -518,7 +515,7 @@ function executeConfirmAction() {
     if (typeof fn === 'function') fn();
 }
 
-document.getElementById('confirmModalBackdrop')?.addEventListener('click', closeConfirmModal);
+document.getElementById('confirmModal')?.addEventListener('click', function(e) { if (e.target === document.getElementById('confirmModal')) closeConfirmModal(); });
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && confirmModalOpen) closeConfirmModal();
 });

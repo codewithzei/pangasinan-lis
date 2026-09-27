@@ -19,7 +19,7 @@ $accent = $accent ?? 'primary';
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-primary to-indigo-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
@@ -27,7 +27,7 @@ $accent = $accent ?? 'primary';
                     <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                         <?= htmlspecialchars($pageTitle) ?>
                     </h1>
-                    <p class="mt-2 max-w-xl text-sm leading-6 text-emerald-100">
+                    <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
                         <?= htmlspecialchars($pageSubtitle) ?>
                     </p>
                 </div>
@@ -282,9 +282,8 @@ $accent = $accent ?? 'primary';
 </div>
 
 <!-- User Role Create/Edit Modal -->
-<div id="userRoleModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="userRoleModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="userRoleModalPanel" class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
+<div id="userRoleModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" role="dialog" aria-modal="true">
+    <div id="userRoleModalPanel" class="relative w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
         <form id="userRoleForm" method="POST" action="<?= BASE_URL ?>/master/user-roles/store">
             <input type="hidden" name="id" id="userRoleId" value="">
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
@@ -354,9 +353,8 @@ $accent = $accent ?? 'primary';
 </div>
 
 <!-- Confirmation Modal -->
-<div id="confirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="confirmModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="confirmModalPanel" class="relative z-10 w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
+<div id="confirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" role="dialog" aria-modal="true">
+    <div id="confirmModalPanel" class="relative w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
         <div class="p-6">
             <div class="flex items-start gap-4">
                 <div id="confirmIconBox" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
@@ -515,12 +513,11 @@ function openRoleModal() {
     resetRoleForm();
     userRoleModalOpen = true;
     const m = document.getElementById('userRoleModal');
-    const b = document.getElementById('userRoleModalBackdrop');
     const p = document.getElementById('userRoleModalPanel');
     m.classList.remove('hidden');
     m.classList.add('flex');
     requestAnimationFrame(() => {
-        b.classList.remove('opacity-0');
+        m.style.opacity = '1';
         p.classList.remove('scale-95', 'opacity-0');
         p.classList.add('scale-100', 'opacity-100');
     });
@@ -530,9 +527,8 @@ function closeUserRoleModal() {
     if (!userRoleModalOpen) return;
     userRoleModalOpen = false;
     const m = document.getElementById('userRoleModal');
-    const b = document.getElementById('userRoleModalBackdrop');
     const p = document.getElementById('userRoleModalPanel');
-    b.classList.add('opacity-0');
+    m.style.opacity = '0';
     p.classList.remove('scale-100', 'opacity-100');
     p.classList.add('scale-95', 'opacity-0');
     setTimeout(() => {
@@ -540,7 +536,7 @@ function closeUserRoleModal() {
         m.classList.add('hidden');
     }, 200);
 }
-document.getElementById('userRoleModalBackdrop')?.addEventListener('click', closeUserRoleModal);
+document.getElementById('userRoleModal')?.addEventListener('click', function(e) { if (e.target === document.getElementById('userRoleModal')) closeuserRoleModal(); });
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         if (userRoleModalOpen) closeUserRoleModal();
@@ -572,12 +568,11 @@ async function editRole(id) {
         `;
         userRoleModalOpen = true;
         const m = document.getElementById('userRoleModal');
-        const b = document.getElementById('userRoleModalBackdrop');
-        const pn = document.getElementById('userRoleModalPanel');
+            const pn = document.getElementById('userRoleModalPanel');
         m.classList.remove('hidden');
         m.classList.add('flex');
         requestAnimationFrame(() => {
-            b.classList.remove('opacity-0');
+            m.style.opacity = '1';
             pn.classList.remove('scale-95', 'opacity-0');
             pn.classList.add('scale-100', 'opacity-100');
         });
@@ -613,12 +608,11 @@ function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText 
     pendingAction = onConfirm;
     confirmModalOpen = true;
     const m = document.getElementById('confirmModal');
-    const b = document.getElementById('confirmModalBackdrop');
     const p = document.getElementById('confirmModalPanel');
     m.classList.remove('hidden');
     m.classList.add('flex');
     requestAnimationFrame(() => {
-        b.classList.remove('opacity-0');
+        m.style.opacity = '1';
         p.classList.remove('scale-95', 'opacity-0');
         p.classList.add('scale-100', 'opacity-100');
     });
@@ -628,9 +622,8 @@ function closeConfirmModal() {
     confirmModalOpen = false;
     pendingAction = null;
     const m = document.getElementById('confirmModal');
-    const b = document.getElementById('confirmModalBackdrop');
     const p = document.getElementById('confirmModalPanel');
-    b.classList.add('opacity-0');
+    m.style.opacity = '0';
     p.classList.remove('scale-100', 'opacity-100');
     p.classList.add('scale-95', 'opacity-0');
     setTimeout(() => {
@@ -643,7 +636,7 @@ function executeConfirmAction() {
     closeConfirmModal();
     if (typeof fn === 'function') fn();
 }
-document.getElementById('confirmModalBackdrop')?.addEventListener('click', closeConfirmModal);
+document.getElementById('confirmModal')?.addEventListener('click', function(e) { if (e.target === document.getElementById('confirmModal')) closeConfirmModal(); });
 
 async function deleteRole(id, name) {
     openConfirmModal({

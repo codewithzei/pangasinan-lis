@@ -37,7 +37,7 @@ function formatPhaseName(string $phase): string
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
@@ -263,7 +263,6 @@ function formatPhaseName(string $phase): string
             </table>
         </div>
 
-        <?php if ($totalPages > 1): ?>
         <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
             <p class="text-xs text-gray-500">
                 Showing page <span class="font-medium text-gray-700"><?= $page ?></span> of
@@ -286,12 +285,12 @@ function formatPhaseName(string $phase): string
                 <?php endif; ?>
                 <?php
                 $startPage = max(1, $page - 2);
-                $endPage = min($totalPages, $page + 2);
+                $endPage   = min($totalPages, $page + 2);
                 for ($i = $startPage; $i <= $endPage; $i++):
                 ?>
                     <a href="?page=<?= $i ?><?= $queryString ?>"
                        class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page
-                       ? 'border-primary bg-primary text-white'
+                           ? 'border-primary bg-primary text-white'
                            : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>">
                         <?= $i ?>
                     </a>
@@ -304,7 +303,6 @@ function formatPhaseName(string $phase): string
                 <?php endif; ?>
             </div>
         </div>
-        <?php endif; ?>
     </section>
 
 </div>

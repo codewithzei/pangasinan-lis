@@ -803,33 +803,6 @@ ob_start();
 
                         </form>
 
-                        <!-- Confirmation modal ----------------------------->
-                        <div id="confirmModal"
-                             class="fixed inset-0 z-[200] hidden items-center justify-center"
-                             role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
-                            <div id="confirmModalBackdrop"
-                                 class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-                            <div id="confirmModalPanel"
-                                 class="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
-                                <div class="p-6">
-                                    <h3 id="confirmModalTitle" class="text-base font-semibold text-gray-900 mb-2">
-                                        Confirm Action
-                                    </h3>
-                                    <p id="confirmModalBody" class="text-sm text-gray-600"></p>
-                                </div>
-                                <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-                                    <button type="button" id="confirmCancelBtn"
-                                            class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition">
-                                        Cancel
-                                    </button>
-                                    <button type="button" id="confirmOkBtn"
-                                            class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-blue-700 transition">
-                                        Confirm
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
                     </div><!-- /processing card -->
                 <?php endif; ?>
 
@@ -868,6 +841,50 @@ ob_start();
         </div><!-- /right column -->
 
     </div><!-- /grid -->
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Process confirmation modal
+         Rendered as a direct child of the top-level wrapper (outside every
+         sticky / transformed / overflow ancestor) so that `position:fixed`
+         covers the full viewport without clipping.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div id="confirmModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="confirmModalTitle"
+         aria-describedby="confirmModalBody">
+
+        <!-- Full-viewport dimmed + blurred backdrop -->
+        <div id="confirmModalBackdrop"
+             class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-200 opacity-0"></div>
+
+        <!-- Dialog panel -->
+        <div id="confirmModalPanel"
+             class="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl
+                    border border-gray-100 transition-all duration-200 opacity-0"
+             style="transform:scale(0.95)">
+            <div class="p-6">
+                <h3 id="confirmModalTitle"
+                    class="text-base font-semibold text-gray-900 mb-2">Confirm Action</h3>
+                <p id="confirmModalBody" class="text-sm text-gray-600"></p>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100
+                        bg-gray-50 rounded-b-2xl">
+                <button type="button" id="confirmCancelBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-gray-700 bg-white border border-gray-200
+                               hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button type="button" id="confirmOkBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-white bg-primary hover:bg-blue-700 transition">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
 
 </div><!-- /space-y-6 -->
 
@@ -1039,27 +1056,43 @@ document.addEventListener('DOMContentLoaded', function () {
     if (confirmCancelBtn) {
         confirmCancelBtn.addEventListener('click', closeModal);
     }
+
+    // Backdrop click closes only when not yet submitting
     if (confirmBackdrop) {
-        confirmBackdrop.addEventListener('click', closeModal);
+        confirmBackdrop.addEventListener('click', function () {
+            if (!isSubmitting) closeModal();
+        });
     }
+
+    // Escape key closes only when not yet submitting
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !confirmModal.classList.contains('hidden') && !isSubmitting) {
+            closeModal();
+        }
+    });
 
     function openModal() {
         confirmModal.classList.remove('hidden');
         confirmModal.classList.add('flex');
+        document.body.style.overflow = 'hidden';   // prevent background scroll
+        // Focus the Cancel button so keyboard users land somewhere safe
         requestAnimationFrame(() => {
-            confirmBackdrop.style.opacity = '1';
-            confirmPanel.style.opacity    = '1';
-            confirmPanel.style.transform  = 'scale(1)';
+            confirmBackdrop.style.opacity      = '1';
+            confirmPanel.style.opacity         = '1';
+            confirmPanel.style.transform       = 'scale(1)';
+            if (confirmCancelBtn) confirmCancelBtn.focus();
         });
     }
 
     function closeModal() {
-        confirmBackdrop.style.opacity = '0';
-        confirmPanel.style.opacity    = '0';
-        confirmPanel.style.transform  = 'scale(0.95)';
+        if (isSubmitting) return;
+        confirmBackdrop.style.opacity  = '0';
+        confirmPanel.style.opacity     = '0';
+        confirmPanel.style.transform   = 'scale(0.95)';
         setTimeout(() => {
             confirmModal.classList.add('hidden');
             confirmModal.classList.remove('flex');
+            document.body.style.overflow = '';     // restore scroll
         }, 200);
     }
 

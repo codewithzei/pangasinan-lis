@@ -11,12 +11,15 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *
  * ROUTE MAP
  * ─────────────────────────────────────────────────────────────────────────────
- *  GET  committee/hearing                  index()       — tabbed hearing list
- *  GET  committee/hearing/show             show()        — detail + outcome form
- *  POST committee/hearing/store            store()       — save hearing outcome
- *  GET  committee/hearing/report           reportShow()  — committee report form
- *  POST committee/hearing/report           reportStore() — save committee report
- *  GET  committee/hearing/report/show      reportDetail()— view a saved report
+ *  GET  committee/hearing                  index()            — tabbed hearing list
+ *  GET  committee/hearing/show             show()             — detail + outcome form
+ *  POST committee/hearing/store            store()            — save hearing outcome
+ *  GET  committee/hearing/report           reportShow()       — committee report form
+ *  POST committee/hearing/report           reportStore()      — save committee report
+ *  GET  committee/hearing/report/show      reportDetail()     — view a saved report
+ *  GET  committee/hearing/reports-json     reportsJson()      — JSON list for share page
+ *  GET  committee/hearing/share-to-report  shareToReportShow()— share-to-report page
+ *  POST committee/hearing/share-to-report  shareToReport()    — bulk share to report
  *
  * INDEX TABS
  *   ?tab=all        All hearings visible to this committee user (default)
@@ -1254,6 +1257,848 @@ class CommitteeHearingController
         ");
         $listStmt->execute([$outcome, ...$searchParams, $perPage, $offset]);
         return [$listStmt->fetchAll(), $total];
+    }
+
+    // =========================================================================
+    // 7. reportsJson — JSON list of existing committee reports (for share modal)
+    // =========================================================================
+    // 7. reportsJson — JSON list of existing committee reports (for share modal)
+    //
+    // Returns a lightweight list used to populate the "Existing Report" dropdown.
+    // Each report row includes:
+    //   id, report_number, report_type, committee_names, document_count,
+    //   created_at (ISO), returned_to_plenary_at (ISO|null)
+    //
+    // Only reports that have NOT yet been returned to Plenary are returned,
+    // since adding documents to a returned report makes no workflow sense.
+    // =========================================================================
+
+    public function reportsJson(): void
+    {
+        $userId = auth_id();
+        if ($userId === null) {
+            http_response_code(401);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Unauthorized']);
+            exit;
+        }
+
+        // Fetch reports that are not yet returned to Plenary, newest first.
+        // Includes: committee names, document count, and basic metadata.
+        $stmt = $this->pdo->query("
+            SELECT
+                cr.id,
+                cr.report_number,
+                cr.report_type,
+                cr.created_at,
+                cr.returned_to_plenary_at,
+                GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') AS committee_names,
+                COUNT(DISTINCT crd.document_id)                              AS document_count
+            FROM committee_reports cr
+            LEFT JOIN committee_report_committees crc ON crc.committee_report_id = cr.id
+            LEFT JOIN committees                    c ON c.id = crc.committee_id
+            LEFT JOIN committee_report_documents  crd ON crd.committee_report_id = cr.id
+            WHERE cr.returned_to_plenary_at IS NULL
+            GROUP BY
+                cr.id, cr.report_number, cr.report_type,
+                cr.created_at, cr.returned_to_plenary_at
+            ORDER BY cr.created_at DESC
+            LIMIT 200
+        ");
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Normalise numeric field
+        $reports = array_map(function (array $r): array {
+            $r['document_count'] = (int) $r['document_count'];
+            return $r;
+        }, $rows);
+
+        header('Content-Type: application/json');
+        echo json_encode(['reports' => $reports], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // =========================================================================
+    // 8. shareToReportShow — dedicated GET page for sharing approved documents
+    //
+    // Reads document_ids[] from the query-string (passed by the approved-hearings
+    // page via a GET form/link).  Loads the document rows, all active committees,
+    // and the eligible existing reports, then renders the share-to-report view.
+    //
+    // On validation failure in shareToReport() the POST handler stores the inputs
+    // via old_set() and redirects here so the form is repopulated.
+    // =========================================================================
+
+    public function shareToReportShow(): void
+    {
+        $userId = auth_id();
+        if ($userId === null) {
+            flash_set('error', 'You must be logged in.');
+            redirect('login');
+        }
+
+        // ── Collect & sanitise document IDs (GET param) ───────────────────────
+        $documentIds = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($_GET['document_ids'] ?? []))
+        )));
+
+        if (empty($documentIds)) {
+            flash_set('error', 'No documents selected. Please select at least one approved document to share.');
+            redirect('committee/hearing?tab=approved');
+        }
+
+        if (count($documentIds) > 50) {
+            flash_set('error', 'You may share at most 50 documents at a time.');
+            redirect('committee/hearing?tab=approved');
+        }
+
+        // ── Load the selected document rows (approved hearing required) ────────
+        $ph = implode(',', array_fill(0, count($documentIds), '?'));
+        $docStmt = $this->pdo->prepare("
+            SELECT d.id              AS document_id,
+                   d.tracking_number,
+                   d.subject_matter,
+                   dt.name          AS document_type_name,
+                   dt.badge_color   AS document_type_badge_color,
+                   ds.name          AS status,
+                   ds.badge_color   AS status_badge_color,
+                   ch.id            AS hearing_id,
+                   ch.outcome       AS hearing_outcome,
+                   ch.performed_at  AS outcome_date
+            FROM documents d
+            INNER JOIN committee_hearings ch
+                ON ch.document_id = d.id
+                AND ch.outcome    = 'APPROVED'
+                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
+            LEFT JOIN document_types    dt ON dt.id = d.document_type_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            WHERE d.id IN ({$ph})
+            ORDER BY d.tracking_number ASC
+        ");
+        $docStmt->execute($documentIds);
+        $selectedDocuments = $docStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Guard: if none came back with APPROVED hearing the IDs are invalid/stale
+        if (empty($selectedDocuments)) {
+            flash_set('error', 'None of the selected documents have an approved hearing outcome. Please return to the approved hearings list and try again.');
+            redirect('committee/hearing?tab=approved');
+        }
+
+        // Build a canonical list of validated IDs (only those that passed the query)
+        $validatedIds = array_column($selectedDocuments, 'document_id');
+
+        // ── Build per-document committee mapping from agenda_committees ────────
+        //
+        // Each selected document carries a hearing_id which links to an agenda.
+        // We join: committee_hearings → agendas → agenda_committees → committees
+        // to find the committee(s) in charge for every document individually.
+        //
+        // We do a single query for all validated document IDs to avoid N+1 queries.
+        // The result is keyed by document_id so the view can warn when a document
+        // has no committee assigned.
+        $documentCommittees = [];   // [ document_id => [ ['id'=>..,'name'=>..], ... ] ]
+        foreach ($validatedIds as $vid) {
+            $documentCommittees[$vid] = [];
+        }
+
+        if (!empty($validatedIds)) {
+            $dcPh   = implode(',', array_fill(0, count($validatedIds), '?'));
+            $dcStmt = $this->pdo->prepare("
+                SELECT
+                    d.id             AS document_id,
+                    c.id             AS committee_id,
+                    c.name           AS committee_name,
+                    c.sort_order     AS committee_sort_order
+                FROM documents d
+                INNER JOIN committee_hearings ch
+                    ON ch.document_id = d.id
+                    AND ch.outcome    = 'APPROVED'
+                    AND ch.id = (SELECT MAX(ch2.id)
+                                 FROM committee_hearings ch2
+                                 WHERE ch2.document_id = d.id)
+                INNER JOIN agendas ag
+                    ON ag.id = ch.agenda_id
+                INNER JOIN agenda_committees ac
+                    ON ac.agenda_id = ag.id
+                INNER JOIN committees c
+                    ON c.id = ac.committee_id
+                   AND c.is_active  = 1
+                   AND c.is_deleted = 0
+                WHERE d.id IN ({$dcPh})
+                ORDER BY c.sort_order ASC, c.name ASC
+            ");
+            $dcStmt->execute($validatedIds);
+
+            foreach ($dcStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $docId = (int) $row['document_id'];
+                $documentCommittees[$docId][] = [
+                    'id'   => (int) $row['committee_id'],
+                    'name' => $row['committee_name'],
+                ];
+            }
+        }
+
+        // ── Derive the unique committee list for the selection UI ──────────────
+        //
+        // Walk every document's committee list and collect unique committees by ID.
+        // Order is preserved by the query's ORDER BY (sort_order ASC, name ASC).
+        // This list is what populates the checkboxes in the "New Report" panel.
+        $availableCommittees = [];   // [ committee_id => ['id'=>.., 'name'=>..] ]
+        foreach ($documentCommittees as $docId => $committees) {
+            foreach ($committees as $committee) {
+                $availableCommittees[$committee['id']] = $committee;
+            }
+        }
+        $availableCommittees = array_values($availableCommittees);
+
+        // Default pre-selected IDs = every committee found across all documents
+        $defaultCommIds = array_keys(array_reduce(
+            $documentCommittees,
+            function (array $carry, array $committees): array {
+                foreach ($committees as $c) {
+                    $carry[$c['id']] = true;
+                }
+                return $carry;
+            },
+            []
+        ));
+
+        // ── Load eligible existing reports (not yet returned to Plenary) ───────
+        $rptStmt = $this->pdo->query("
+            SELECT
+                cr.id,
+                cr.report_number,
+                cr.report_type,
+                cr.created_at,
+                GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') AS committee_names,
+                COUNT(DISTINCT crd.document_id)                              AS document_count
+            FROM committee_reports cr
+            LEFT JOIN committee_report_committees crc ON crc.committee_report_id = cr.id
+            LEFT JOIN committees                    c ON c.id = crc.committee_id
+            LEFT JOIN committee_report_documents  crd ON crd.committee_report_id = cr.id
+            WHERE cr.returned_to_plenary_at IS NULL
+            GROUP BY cr.id, cr.report_number, cr.report_type, cr.created_at
+            ORDER BY cr.created_at DESC
+            LIMIT 200
+        ");
+        $existingReports = $rptStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($existingReports as &$r) {
+            $r['document_count'] = (int) $r['document_count'];
+        }
+        unset($r);
+
+        // ── Repopulate from old input (after validation failure in shareToReport) ─
+        $old           = old_get();
+        $oldMode       = $old['share_mode']           ?? 'existing';
+        $oldExistingId = (int) ($old['existing_report_id'] ?? 0);
+        $oldReportNum  = $old['report_number']         ?? '';
+        $oldSummary    = $old['summary_of_findings']   ?? '';
+
+        // $oldCommIds: on repopulation use the user's previous selection;
+        // on first load fall back to $defaultCommIds (pre-selected from agendas).
+        $oldCommIds = isset($old['committee_ids'])
+            ? array_map('intval', (array) $old['committee_ids'])
+            : $defaultCommIds;
+
+        $success = flash_get('success');
+        $error   = flash_get('error');
+        $errors  = flash_get('errors') ?? [];
+
+        $pageTitle = 'Share to Committee Report';
+        require __DIR__ . '/../../../resources/views/committee/hearing/share-to-report.php';
+    }
+
+    // =========================================================================
+    // 9. shareToReport — bulk-share approved documents to one committee report
+    //
+    // BUSINESS RULES (enforced server-side regardless of client state):
+    //   1. Every submitted document_id must have an APPROVED hearing outcome.
+    //   2. Every submitted document_id must have NO existing committee_report_documents row.
+    //      If even ONE document is already assigned to any report the ENTIRE request is
+    //      rejected — no partial saves, full rollback.
+    //   3. The target report (existing or new) must be valid.
+    //   4. Duplicate prevention is enforced at both the application layer (pre-check) and
+    //      the database layer (UNIQUE KEY on committee_report_documents).
+    // =========================================================================
+
+    public function shareToReport(): void
+    {
+        $userId = auth_id();
+        if ($userId === null) {
+            flash_set('error', 'You must be logged in.');
+            redirect('login');
+        }
+
+        // ── Raw inputs ────────────────────────────────────────────────────────
+        $documentIds       = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['document_ids']      ?? [])))));
+        $mode              = trim($_POST['share_mode']           ?? '');   // 'existing' | 'new'
+        $existingRptId     = (int) ($_POST['existing_report_id'] ?? 0);
+        $reportNumber      = trim($_POST['report_number']        ?? '');
+        $summaryOfFindings = trim($_POST['summary_of_findings']  ?? '');
+        $committeeIds      = array_values(array_filter(array_map('intval', (array) ($_POST['committee_ids'] ?? []))));
+
+        $redirectBack = 'committee/hearing?tab=approved';
+
+        // ── Validate: at least one document ───────────────────────────────────
+        if (empty($documentIds)) {
+            flash_set('error', 'Please select at least one approved document to share.');
+            redirect($redirectBack);
+        }
+
+        if (count($documentIds) > 50) {
+            flash_set('error', 'You may share at most 50 documents at a time.');
+            redirect($redirectBack);
+        }
+
+        if (!in_array($mode, ['existing', 'new'], true)) {
+            flash_set('error', 'Invalid share mode.');
+            redirect($redirectBack);
+        }
+
+        // Build a redirect-back-to-share URL that includes the document IDs.
+        // Used for validation failures where we want to repopulate the form.
+        $sharePageUrl = 'committee/hearing/share-to-report?' . http_build_query(
+            ['document_ids' => $documentIds]
+        );
+
+        // ── Validate mode-specific fields ─────────────────────────────────────
+        $errors = [];
+
+        if ($mode === 'existing') {
+            if ($existingRptId <= 0) {
+                $errors[] = 'Please select an existing Committee Report.';
+            }
+        } else {
+            if ($reportNumber === '') {
+                $errors[] = 'Report Number is required.';
+            } elseif (mb_strlen($reportNumber) > 50) {
+                $errors[] = 'Report Number must not exceed 50 characters.';
+            } else {
+                $dupStmt = $this->pdo->prepare(
+                    "SELECT id FROM committee_reports WHERE report_number = ? LIMIT 1"
+                );
+                $dupStmt->execute([$reportNumber]);
+                if ($dupStmt->fetch()) {
+                    $errors[] = "Report Number \"{$reportNumber}\" already exists. Please use a unique number.";
+                }
+            }
+
+            if ($summaryOfFindings === '') {
+                $errors[] = 'Summary of Findings is required.';
+            } elseif (mb_strlen($summaryOfFindings) > 10000) {
+                $errors[] = 'Summary of Findings must not exceed 10,000 characters.';
+            }
+
+            if (empty($committeeIds)) {
+                $errors[] = 'At least one committee must be selected.';
+            }
+        }
+
+        if (!empty($errors)) {
+            old_set([
+                'share_mode'           => $mode,
+                'existing_report_id'   => (string) $existingRptId,
+                'report_number'        => $reportNumber,
+                'summary_of_findings'  => $summaryOfFindings,
+                'committee_ids'        => $committeeIds,
+            ]);
+            flash_set('errors', $errors);
+            flash_set('error', 'Please correct the errors below.');
+            redirect($sharePageUrl);
+        }
+
+        // ── STEP 1: Verify every document has an APPROVED hearing ─────────────
+        // Fetches the latest hearing record per document and confirms outcome = APPROVED.
+        $ph = implode(',', array_fill(0, count($documentIds), '?'));
+        $docCheckStmt = $this->pdo->prepare("
+            SELECT d.id              AS document_id,
+                   d.tracking_number,
+                   d.subject_matter,
+                   ch.id             AS hearing_id,
+                   ch.outcome,
+                   ag.id             AS agenda_id
+            FROM documents d
+            INNER JOIN committee_hearings ch
+                ON ch.document_id = d.id
+                AND ch.outcome    = 'APPROVED'
+                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
+            INNER JOIN agendas ag ON ag.id = ch.agenda_id
+            WHERE d.id IN ({$ph})
+        ");
+        $docCheckStmt->execute($documentIds);
+        $validDocs = $docCheckStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (count($validDocs) !== count($documentIds)) {
+            flash_set('error',
+                'One or more selected documents do not have an approved hearing outcome. ' .
+                'Only freshly approved documents may be shared to a Committee Report.'
+            );
+            redirect($redirectBack);
+        }
+
+        // ── STEP 2: Reject any document that already has a Committee Report ───
+        // This is the stale-data guard: the page may have been loaded before another
+        // user assigned one of these documents. We check committee_report_documents
+        // directly (not just cr.hearing_id) to catch all assignment paths.
+        $alreadyAssignedStmt = $this->pdo->prepare("
+            SELECT crd.document_id,
+                   cr.report_number
+            FROM committee_report_documents crd
+            INNER JOIN committee_reports cr ON cr.id = crd.committee_report_id
+            WHERE crd.document_id IN ({$ph})
+            LIMIT 10
+        ");
+        $alreadyAssignedStmt->execute($documentIds);
+        $alreadyAssigned = $alreadyAssignedStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!empty($alreadyAssigned)) {
+            // Build a readable list for the error message (max 3 shown)
+            $offenders = [];
+            foreach ($alreadyAssigned as $row) {
+                $trackingNumber = '';
+                foreach ($validDocs as $vd) {
+                    if ((int) $vd['document_id'] === (int) $row['document_id']) {
+                        $trackingNumber = $vd['tracking_number'];
+                        break;
+                    }
+                }
+                // Fall back to document_id if not found in validDocs
+                if ($trackingNumber === '') {
+                    $offenders[] = "Document ID {$row['document_id']} (Report #{$row['report_number']})";
+                } else {
+                    $offenders[] = "{$trackingNumber} (Report #{$row['report_number']})";
+                }
+            }
+
+            $listed = implode('; ', array_slice($offenders, 0, 3));
+            $extra  = count($offenders) > 3 ? ' and ' . (count($offenders) - 3) . ' more' : '';
+
+            flash_set('error',
+                'Cannot share: one or more selected documents are already assigned to a Committee Report. ' .
+                'No records were saved. Please refresh the page and try again. ' .
+                'Affected: ' . $listed . $extra . '.'
+            );
+            flash_set('errors', $offenders);
+            redirect($redirectBack);
+        }
+
+        // ── Resolve shared dependencies ───────────────────────────────────────
+        $uStmt = $this->pdo->prepare("SELECT username FROM user_accounts WHERE id = ? LIMIT 1");
+        $uStmt->execute([$userId]);
+        $username = (string) ($uStmt->fetchColumn() ?: '');
+
+        try {
+            $reportCreatedStatus    = $this->requireDocumentStatus('Committee Report Created');
+            $hearingCompletedStatus = $this->requireDocumentStatus('Hearing Completed');
+        } catch (RuntimeException $e) {
+            flash_set('error', 'Required document status not found. Please run pending migrations.');
+            redirect($redirectBack);
+        }
+
+        try {
+            $committeeRoleId = $this->requireCommitteeRoleId();
+        } catch (RuntimeException $e) {
+            flash_set('error', 'Committee role not found. Please contact your administrator.');
+            redirect($redirectBack);
+        }
+
+        // ── Branch: existing report ───────────────────────────────────────────
+        if ($mode === 'existing') {
+            $rptStmt = $this->pdo->prepare(
+                "SELECT id, report_number, report_type FROM committee_reports WHERE id = ? LIMIT 1"
+            );
+            $rptStmt->execute([$existingRptId]);
+            $existingReport = $rptStmt->fetch();
+
+            if (!$existingReport) {
+                flash_set('error', 'The selected Committee Report was not found. Please select a different report.');
+                old_set([
+                    'share_mode'           => $mode,
+                    'existing_report_id'   => (string) $existingRptId,
+                    'report_number'        => $reportNumber,
+                    'summary_of_findings'  => $summaryOfFindings,
+                    'committee_ids'        => $committeeIds,
+                ]);
+                redirect($sharePageUrl);
+            }
+
+            $reportId     = (int) $existingReport['id'];
+            $reportNumber = $existingReport['report_number'] ?? ('RPT-' . $reportId);
+            $reportType   = $existingReport['report_type'];
+
+            // Additional guard: none of the submitted docs should already be in THIS report either
+            $dupInReportStmt = $this->pdo->prepare("
+                SELECT crd.document_id
+                FROM committee_report_documents crd
+                WHERE crd.committee_report_id = ?
+                  AND crd.document_id IN ({$ph})
+                LIMIT 5
+            ");
+            $dupInReportStmt->execute([$reportId, ...$documentIds]);
+            $dupsInReport = $dupInReportStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($dupsInReport)) {
+                $dupIds = array_column($dupsInReport, 'document_id');
+                $dupTracking = array_filter(array_map(function ($vd) use ($dupIds) {
+                    return in_array((int) $vd['document_id'], array_map('intval', $dupIds), true)
+                        ? $vd['tracking_number']
+                        : null;
+                }, $validDocs));
+                old_set([
+                    'share_mode'           => $mode,
+                    'existing_report_id'   => (string) $existingRptId,
+                    'report_number'        => $reportNumber,
+                    'summary_of_findings'  => $summaryOfFindings,
+                    'committee_ids'        => $committeeIds,
+                ]);
+                flash_set('error',
+                    'One or more selected documents are already linked to Committee Report #' . $reportNumber . ': ' .
+                    implode(', ', $dupTracking) . '. No records were saved.'
+                );
+                redirect($sharePageUrl);
+            }
+
+            // ── Transaction ───────────────────────────────────────────────────
+            $sharedDocIds = [];
+
+            try {
+                $this->pdo->beginTransaction();
+
+                // Re-check inside the transaction (prevents TOCTOU race condition)
+                $racecheckStmt = $this->pdo->prepare("
+                    SELECT crd.document_id, cr.report_number
+                    FROM committee_report_documents crd
+                    INNER JOIN committee_reports cr ON cr.id = crd.committee_report_id
+                    WHERE crd.document_id IN ({$ph})
+                    LIMIT 5
+                ");
+                $racecheckStmt->execute($documentIds);
+                $raceConflicts = $racecheckStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (!empty($raceConflicts)) {
+                    $this->pdo->rollBack();
+                    $conflictDetails = implode('; ', array_map(
+                        fn($r) => "Document #{$r['document_id']} → Report #{$r['report_number']}",
+                        $raceConflicts
+                    ));
+                    flash_set('error',
+                        'The page data is out of date: one or more documents were assigned to a Committee Report ' .
+                        'by another user between your page load and submission. No records were saved. ' .
+                        'Please refresh the approved hearings list and try again. Conflicts: ' . $conflictDetails
+                    );
+                    redirect($redirectBack);
+                }
+
+                $insDoc = $this->pdo->prepare("
+                    INSERT INTO committee_report_documents (committee_report_id, document_id)
+                    VALUES (?, ?)
+                ");
+                $insEvent = $this->pdo->prepare("
+                    INSERT INTO document_events
+                        (document_id, event_type, phase, performed_by,
+                         from_status_id, to_status_id, remarks, metadata)
+                    VALUES (?, 'COMMITTEE_REPORT_CREATED', 'COMMITTEE', ?, ?, ?, ?, ?)
+                ");
+                $insRoute = $this->pdo->prepare("
+                    INSERT INTO document_routes
+                        (document_id, from_phase, to_phase, routed_by, routed_to_role_id, remarks)
+                    VALUES (?, 'COMMITTEE', 'COMMITTEE', ?, ?, ?)
+                ");
+                $updDoc = $this->pdo->prepare("
+                    UPDATE documents SET current_status_id = ?, updated_by = ? WHERE id = ?
+                ");
+                $curStatusStmt = $this->pdo->prepare(
+                    "SELECT current_status_id FROM documents WHERE id = ?"
+                );
+
+                foreach ($validDocs as $vDoc) {
+                    $docId = (int) $vDoc['document_id'];
+
+                    // Hard INSERT (no IGNORE) — if DB constraint fires it means a race occurred
+                    $insDoc->execute([$reportId, $docId]);
+
+                    $curStatusStmt->execute([$docId]);
+                    $fromStatusId = (int) ($curStatusStmt->fetchColumn() ?: $hearingCompletedStatus['id']);
+
+                    $updDoc->execute([$reportCreatedStatus['id'], $userId, $docId]);
+
+                    $insEvent->execute([
+                        $docId,
+                        $userId,
+                        $fromStatusId,
+                        $reportCreatedStatus['id'],
+                        "Shared to Committee Report #{$reportNumber} (bulk).",
+                        json_encode([
+                            'report_id'          => $reportId,
+                            'report_type'        => $reportType,
+                            'report_number'      => $reportNumber,
+                            'document_id'        => $docId,
+                            'shared_by'          => $userId,
+                            'shared_by_username' => $username,
+                            'ip_address'         => client_ip(),
+                            'bulk'               => true,
+                        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    ]);
+
+                    $insRoute->execute([
+                        $docId, $userId, $committeeRoleId,
+                        "Shared to Committee Report #{$reportNumber} (bulk).",
+                    ]);
+
+                    $sharedDocIds[] = $docId;
+                }
+
+                $this->pdo->commit();
+
+            } catch (Throwable $e) {
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
+                system_log('ERROR', 'CommitteeHearingController::shareToReport (existing) exception', [
+                    'error'     => $e->getMessage(),
+                    'report_id' => $reportId,
+                ]);
+                // Check if this was a duplicate-key violation (SQLSTATE 23000)
+                if ($e instanceof \PDOException && str_starts_with($e->getCode(), '23')) {
+                    flash_set('error',
+                        'One or more documents could not be saved because they are already assigned to a ' .
+                        'Committee Report. No records were saved. Please refresh the approved hearings list and try again.'
+                    );
+                } else {
+                    flash_set('error', 'A database error occurred while sharing documents. Please try again.');
+                }
+                redirect($redirectBack);
+            }
+
+            // ── Post-commit audit ─────────────────────────────────────────────
+            $docCount = count($sharedDocIds);
+            audit_log(
+                'UPDATE',
+                'CommitteeReport',
+                (string) $reportId,
+                null,
+                [
+                    'action'        => 'bulk_share_documents',
+                    'report_id'     => $reportId,
+                    'report_number' => $reportNumber,
+                    'document_ids'  => $sharedDocIds,
+                    'shared_by'     => $userId,
+                ],
+                "{$docCount} document(s) bulk-shared to Committee Report #{$reportNumber} by {$username}"
+            );
+            system_log('INFO', 'Bulk share to existing committee report', [
+                'report_id'    => $reportId,
+                'report_number'=> $reportNumber,
+                'shared_count' => $docCount,
+                'shared_by'    => $userId,
+            ]);
+
+            $msg = $docCount === 1
+                ? "1 document shared to Committee Report #{$reportNumber} successfully."
+                : "{$docCount} documents shared to Committee Report #{$reportNumber} successfully.";
+            flash_set('success', $msg);
+            redirect('committee/reports');
+        }
+
+        // ── Branch: new report ────────────────────────────────────────────────
+
+        // Validate committee IDs
+        $cPh  = implode(',', array_fill(0, count($committeeIds), '?'));
+        $cChk = $this->pdo->prepare(
+            "SELECT id FROM committees WHERE id IN ({$cPh}) AND is_active = 1 AND is_deleted = 0"
+        );
+        $cChk->execute($committeeIds);
+        $validCIds = array_column($cChk->fetchAll(), 'id');
+
+        if (count($validCIds) !== count($committeeIds)) {
+            old_set([
+                'share_mode'           => $mode,
+                'existing_report_id'   => (string) $existingRptId,
+                'report_number'        => $reportNumber,
+                'summary_of_findings'  => $summaryOfFindings,
+                'committee_ids'        => $committeeIds,
+            ]);
+            flash_set('error', 'One or more selected committees are invalid. Please reselect and try again.');
+            redirect($sharePageUrl);
+        }
+
+        $reportType = count($validCIds) > 1 ? 'JOINT_COMMITTEE_REPORT' : 'COMMITTEE_REPORT';
+
+        // Use the first valid doc's agenda/hearing as the primary report references
+        $primaryDoc     = $validDocs[0];
+        $primaryAgenda  = (int) $primaryDoc['agenda_id'];
+        $primaryHearing = (int) $primaryDoc['hearing_id'];
+
+        $reportId     = null;
+        $linkedDocIds = [];
+
+        try {
+            $this->pdo->beginTransaction();
+
+            // Re-check inside the transaction (TOCTOU guard)
+            $racecheckStmt2 = $this->pdo->prepare("
+                SELECT crd.document_id, cr.report_number
+                FROM committee_report_documents crd
+                INNER JOIN committee_reports cr ON cr.id = crd.committee_report_id
+                WHERE crd.document_id IN ({$ph})
+                LIMIT 5
+            ");
+            $racecheckStmt2->execute($documentIds);
+            $raceConflicts2 = $racecheckStmt2->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($raceConflicts2)) {
+                $this->pdo->rollBack();
+                $conflictDetails2 = implode('; ', array_map(
+                    fn($r) => "Document #{$r['document_id']} → Report #{$r['report_number']}",
+                    $raceConflicts2
+                ));
+                flash_set('error',
+                    'The page data is out of date: one or more documents were assigned to a Committee Report ' .
+                    'by another user between your page load and submission. No records were saved. ' .
+                    'Please refresh the approved hearings list and try again. Conflicts: ' . $conflictDetails2
+                );
+                redirect($redirectBack);
+            }
+
+            // 1. Create the report
+            $this->pdo->prepare("
+                INSERT INTO committee_reports
+                    (report_type, report_number, summary_of_findings,
+                     agenda_id, hearing_id, created_by, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ")->execute([
+                $reportType,
+                $reportNumber,
+                $summaryOfFindings,
+                $primaryAgenda,
+                $primaryHearing,
+                $userId,
+            ]);
+            $reportId = (int) $this->pdo->lastInsertId();
+
+            // 2. Link committees
+            $insRc = $this->pdo->prepare("
+                INSERT IGNORE INTO committee_report_committees (committee_report_id, committee_id)
+                VALUES (?, ?)
+            ");
+            foreach ($validCIds as $cId) {
+                $insRc->execute([$reportId, $cId]);
+            }
+
+            // 3. Link each document + write events + update statuses (hard INSERT, no IGNORE)
+            $insDoc = $this->pdo->prepare("
+                INSERT INTO committee_report_documents (committee_report_id, document_id)
+                VALUES (?, ?)
+            ");
+            $insEvent = $this->pdo->prepare("
+                INSERT INTO document_events
+                    (document_id, event_type, phase, performed_by,
+                     from_status_id, to_status_id, remarks, metadata)
+                VALUES (?, 'COMMITTEE_REPORT_CREATED', 'COMMITTEE', ?, ?, ?, ?, ?)
+            ");
+            $insRoute = $this->pdo->prepare("
+                INSERT INTO document_routes
+                    (document_id, from_phase, to_phase, routed_by, routed_to_role_id, remarks)
+                VALUES (?, 'COMMITTEE', 'COMMITTEE', ?, ?, ?)
+            ");
+            $updDoc = $this->pdo->prepare("
+                UPDATE documents SET current_status_id = ?, updated_by = ? WHERE id = ?
+            ");
+            $curStatusStmt = $this->pdo->prepare(
+                "SELECT current_status_id FROM documents WHERE id = ?"
+            );
+
+            foreach ($validDocs as $vDoc) {
+                $docId = (int) $vDoc['document_id'];
+
+                $insDoc->execute([$reportId, $docId]);
+
+                $curStatusStmt->execute([$docId]);
+                $fromStatusId = (int) ($curStatusStmt->fetchColumn() ?: $hearingCompletedStatus['id']);
+
+                $updDoc->execute([$reportCreatedStatus['id'], $userId, $docId]);
+
+                $insEvent->execute([
+                    $docId,
+                    $userId,
+                    $fromStatusId,
+                    $reportCreatedStatus['id'],
+                    "Committee Report #{$reportNumber} created (bulk).",
+                    json_encode([
+                        'report_id'          => $reportId,
+                        'report_type'        => $reportType,
+                        'report_number'      => $reportNumber,
+                        'committee_ids'      => $validCIds,
+                        'document_id'        => $docId,
+                        'created_by'         => $userId,
+                        'created_by_username'=> $username,
+                        'ip_address'         => client_ip(),
+                        'bulk'               => true,
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ]);
+
+                $insRoute->execute([
+                    $docId, $userId, $committeeRoleId,
+                    "Committee Report #{$reportNumber} created ({$reportType}, bulk).",
+                ]);
+
+                $linkedDocIds[] = $docId;
+            }
+
+            $this->pdo->commit();
+
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            system_log('ERROR', 'CommitteeHearingController::shareToReport (new) exception', [
+                'error'      => $e->getMessage(),
+                'report_num' => $reportNumber,
+            ]);
+            // Duplicate-key violation = race condition
+            if ($e instanceof \PDOException && str_starts_with($e->getCode(), '23')) {
+                flash_set('error',
+                    'One or more documents could not be saved because they are already assigned to a ' .
+                    'Committee Report. No records were saved. Please refresh the approved hearings list and try again.'
+                );
+            } else {
+                flash_set('error',
+                    'A database error occurred while creating the Committee Report. Please try again.'
+                );
+            }
+            redirect($redirectBack);
+        }
+
+        // ── Post-commit audit ─────────────────────────────────────────────────
+        $docCount = count($linkedDocIds);
+        audit_log(
+            'CREATE',
+            'CommitteeReport',
+            (string) $reportId,
+            null,
+            [
+                'action'        => 'bulk_create_report',
+                'report_id'     => $reportId,
+                'report_type'   => $reportType,
+                'report_number' => $reportNumber,
+                'document_ids'  => $linkedDocIds,
+                'committee_ids' => $validCIds,
+                'created_by'    => $userId,
+            ],
+            "Committee Report #{$reportNumber} ({$reportType}) created for {$docCount} document(s) by {$username}"
+        );
+        system_log('INFO', 'Bulk committee report created', [
+            'report_id'    => $reportId,
+            'report_number'=> $reportNumber,
+            'doc_count'    => $docCount,
+            'created_by'   => $userId,
+        ]);
+
+        $msg = $docCount === 1
+            ? "Committee Report #{$reportNumber} created and 1 document shared successfully."
+            : "Committee Report #{$reportNumber} created and {$docCount} documents shared successfully.";
+        flash_set('success', $msg);
+        redirect('committee/reports');
     }
 
     // =========================================================================

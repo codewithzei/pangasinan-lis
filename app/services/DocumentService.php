@@ -588,9 +588,14 @@ class DocumentService
         int    $userId,
         string $phase = 'ADMIN'
     ): array {
-        // 'ADMIN_FILE' is added to the document_attachments.attachment_type
-        // ENUM by migration 048_add_admin_file_attachment_type.php.
-        return $this->processFileUploads($files, $documentId, $userId, $phase, 'ADMIN_FILE');
+        // Derive a phase-specific attachment_type so files are traceable by origin.
+        // Each type must exist in the document_attachments.attachment_type ENUM.
+        $attachmentType = match ($phase) {
+            'SP_SECRETARY' => 'SPSEC_FILE',
+            'COMMITTEE'    => 'COMMITTEE_FILE',
+            default        => 'ADMIN_FILE',
+        };
+        return $this->processFileUploads($files, $documentId, $userId, $phase, $attachmentType);
     }
 
     // -------------------------------------------------------------------------

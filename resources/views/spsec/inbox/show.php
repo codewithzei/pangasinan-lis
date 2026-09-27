@@ -27,6 +27,9 @@ $revisions        = $revisions        ?? [];
 $success          = $success          ?? null;
 $error            = $error            ?? null;
 $errors           = $errors           ?? [];
+$commCategories   = $commCategories   ?? [];
+$committees       = $committees       ?? [];
+$isCommunication  = $isCommunication  ?? false;
 
 $documentId     = (int) ($document['id'] ?? 0);
 $trackingNumber = $document['tracking_number'] ?? '';
@@ -683,11 +686,10 @@ ob_start();
                 <?php endif; ?>
 
                 <!-- ═══════════════════════════════════════════════════════════
-                     SECTION B — ACCEPTED (owned by me): post-accept actions
-                     Return to Admin / Upload.
+                     SECTION B — ACCEPTED (owned by me): full routing panel
                 ════════════════════════════════════════════════════════════ -->
                 <?php if ($canProcess): ?>
-                    <div class="rounded-2xl border border-gray-200 bg-white p-6">
+                    <div class="rounded-2xl border border-gray-200 bg-white p-6" id="process-panel">
                         <div class="mb-5 flex items-center gap-2">
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
                                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -703,60 +705,99 @@ ob_start();
                             <input type="hidden" name="document_id" value="<?= $documentId ?>">
                             <input type="hidden" name="action"      id="actionInput" value="">
 
-                            <!-- Remarks / Notes ---------------------------->
+                            <!-- Remarks / Notes ─────────────────────────── -->
                             <div class="mb-4">
                                 <label for="remarks" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                                     Remarks / Notes
                                     <span id="remarksRequiredHint" class="text-red-500 hidden">*</span>
                                 </label>
-                                <textarea name="remarks" id="remarks" rows="4"
+                                <textarea name="remarks" id="remarks" rows="3"
                                           class="block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                                          placeholder="Enter remarks or return reason…"><?= htmlspecialchars(old('remarks') ?? '') ?></textarea>
+                                          placeholder="Enter remarks (optional unless returning to Admin)…"><?= htmlspecialchars(old('remarks') ?? '') ?></textarea>
                                 <p id="remarksHelp" class="mt-1 text-xs text-gray-400 hidden">
                                     A reason is required when returning to Admin.
                                 </p>
                             </div>
 
-                            <!-- Action buttons ---------------------------->
-                            <div class="space-y-2">
+                            <!-- ── Route to Plenary ─────────────────────── -->
+                            <div class="mb-2" id="route-plenary">
+                                <button type="button" data-action="route_plenary"
+                                        class="action-btn w-full inline-flex items-center justify-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-700 hover:bg-violet-100 transition">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                    </svg>
+                                    Route to Plenary
+                                </button>
+                            </div>
 
-                                <!-- Return to Admin -->
+                            <!-- ── Route to Committee ───────────────────── -->
+                            <div class="mb-2" id="route-committee">
+                                <button type="button" data-action="route_committee"
+                                        class="action-btn w-full inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 hover:bg-amber-100 transition">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 100-8 4 4 0 000 8z"/>
+                                    </svg>
+                                    Route to Committee
+                                </button>
+                                <!-- Committee selector (hidden until action selected) -->
+                                <div id="committeeSelectWrap" class="mt-2 hidden">
+                                    <label for="committee_id" class="block text-xs font-semibold text-gray-600 mb-1">
+                                        Select Committee <span class="text-red-500">*</span>
+                                    </label>
+                                    <select name="committee_id" id="committee_id"
+                                            class="block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                                        <option value="">— Select a committee —</option>
+                                        <?php foreach ($committees ?? [] as $cmte): ?>
+                                            <option value="<?= (int) $cmte['id'] ?>"
+                                                <?= (old('committee_id') == $cmte['id']) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($cmte['name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- ── Mark as Noted (Communication only) ───── -->
+                            <?php if ($isCommunication): ?>
+                            <div class="mb-2" id="noted">
+                                <button type="button" data-action="noted"
+                                        class="action-btn w-full inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    Mark as Noted
+                                </button>
+                                <!-- Communication category selector (hidden until Noted selected) -->
+                                <div id="categorySelectWrap" class="mt-2 hidden">
+                                    <label for="communication_category_id" class="block text-xs font-semibold text-gray-600 mb-1">
+                                        Communication Category <span class="text-red-500">*</span>
+                                    </label>
+                                    <select name="communication_category_id" id="communication_category_id"
+                                            class="block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                                        <option value="">— Select a category —</option>
+                                        <?php foreach ($commCategories ?? [] as $cat): ?>
+                                            <option value="<?= (int) $cat['id'] ?>"
+                                                <?= (old('communication_category_id') == $cat['id']) ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($cat['name']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+
+                            <!-- ── Return to Admin ───────────────────────── -->
+                            <div class="mt-3 pt-3 border-t border-gray-100">
                                 <button type="button" data-action="return_to_admin"
-                                        class="action-btn w-full inline-flex items-center justify-center gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition">
+                                        class="action-btn w-full inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-100 transition">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                     </svg>
                                     Return to Admin
                                 </button>
-
-                            </div><!-- /action buttons -->
+                            </div>
 
                         </form>
-
-                        <!-- Confirmation modal ----------------------------->
-                        <div id="confirmModal"
-                             class="fixed inset-0 z-[200] hidden items-center justify-center"
-                             role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
-                            <div id="confirmModalBackdrop"
-                                 class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-                            <div id="confirmModalPanel"
-                                 class="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
-                                <div class="p-6">
-                                    <h3 id="confirmModalTitle" class="text-base font-semibold text-gray-900 mb-2">Confirm Action</h3>
-                                    <p id="confirmModalBody" class="text-sm text-gray-600"></p>
-                                </div>
-                                <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-                                    <button type="button" id="confirmCancelBtn"
-                                            class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition">
-                                        Cancel
-                                    </button>
-                                    <button type="button" id="confirmOkBtn"
-                                            class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-blue-700 transition">
-                                        Confirm
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
 
                     </div><!-- /processing card -->
                 <?php endif; ?>
@@ -793,6 +834,50 @@ ob_start();
         </div><!-- /right column -->
 
     </div><!-- /grid -->
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Process confirmation modal
+         Rendered as a direct child of the top-level wrapper (outside every
+         sticky / transformed / overflow ancestor) so that `position:fixed`
+         covers the full viewport without clipping.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div id="confirmModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="confirmModalTitle"
+         aria-describedby="confirmModalBody">
+
+        <!-- Full-viewport dimmed + blurred backdrop -->
+        <div id="confirmModalBackdrop"
+             class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-200 opacity-0"></div>
+
+        <!-- Dialog panel -->
+        <div id="confirmModalPanel"
+             class="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl
+                    border border-gray-100 transition-all duration-200 opacity-0"
+             style="transform:scale(0.95)">
+            <div class="p-6">
+                <h3 id="confirmModalTitle"
+                    class="text-base font-semibold text-gray-900 mb-2">Confirm Action</h3>
+                <p id="confirmModalBody" class="text-sm text-gray-600"></p>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100
+                        bg-gray-50 rounded-b-2xl">
+                <button type="button" id="confirmCancelBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-gray-700 bg-white border border-gray-200
+                               hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button type="button" id="confirmOkBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-white bg-primary hover:bg-blue-700 transition">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
 
 </div><!-- /space-y-6 -->
 
@@ -849,46 +934,94 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ── Process form / confirmation modal ───────────────────────────────────
-    const actionInput      = document.getElementById('actionInput');
-    const remarksEl        = document.getElementById('remarks');
-    const remarksHint      = document.getElementById('remarksRequiredHint');
-    const remarksHelp      = document.getElementById('remarksHelp');
-    const processForm      = document.getElementById('processForm');
-    const confirmModal     = document.getElementById('confirmModal');
-    const confirmBackdrop  = document.getElementById('confirmModalBackdrop');
-    const confirmPanel     = document.getElementById('confirmModalPanel');
-    const confirmBody      = document.getElementById('confirmModalBody');
-    const confirmOkBtn     = document.getElementById('confirmOkBtn');
-    const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+    const actionInput          = document.getElementById('actionInput');
+    const remarksEl            = document.getElementById('remarks');
+    const remarksHint          = document.getElementById('remarksRequiredHint');
+    const remarksHelp          = document.getElementById('remarksHelp');
+    const processForm          = document.getElementById('processForm');
+    const confirmModal         = document.getElementById('confirmModal');
+    const confirmBackdrop      = document.getElementById('confirmModalBackdrop');
+    const confirmPanel         = document.getElementById('confirmModalPanel');
+    const confirmBody          = document.getElementById('confirmModalBody');
+    const confirmOkBtn         = document.getElementById('confirmOkBtn');
+    const confirmCancelBtn     = document.getElementById('confirmCancelBtn');
+    const committeeSelectWrap  = document.getElementById('committeeSelectWrap');
+    const committeeSelect      = document.getElementById('committee_id');
+    const categorySelectWrap   = document.getElementById('categorySelectWrap');
+    const categorySelect       = document.getElementById('communication_category_id');
 
     if (!processForm) return;
 
     const actionLabels = {
-        'return_to_admin': 'Return this document to Admin? A remarks/reason is required.',
+        'route_plenary':   'Route this document to Plenary?',
+        'route_committee': 'Route this document to the selected Committee?',
+        'noted':           'Mark this Communication document as Noted with the selected category?',
+        'return_to_admin': 'Return this document to Admin? A return reason is required.',
     };
 
+    // Actions that require the committee selector to be visible
+    const needsCommittee = ['route_committee'];
+    // Actions that require the category selector to be visible
+    const needsCategory  = ['noted'];
+    // Actions where remarks is mandatory
+    const requiresRemarks = ['return_to_admin'];
+
     let pendingAction = null;
+
+    // Hide/show sub-fields based on which action button was clicked
+    function updateSubFields(action) {
+        // Committee selector
+        if (committeeSelectWrap) {
+            if (needsCommittee.includes(action)) {
+                committeeSelectWrap.classList.remove('hidden');
+            } else {
+                committeeSelectWrap.classList.add('hidden');
+                if (committeeSelect) committeeSelect.value = '';
+            }
+        }
+        // Category selector
+        if (categorySelectWrap) {
+            if (needsCategory.includes(action)) {
+                categorySelectWrap.classList.remove('hidden');
+            } else {
+                categorySelectWrap.classList.add('hidden');
+                if (categorySelect) categorySelect.value = '';
+            }
+        }
+        // Remarks required hint
+        if (requiresRemarks.includes(action)) {
+            if (remarksHint) remarksHint.classList.remove('hidden');
+            if (remarksHelp) remarksHelp.classList.remove('hidden');
+        } else {
+            if (remarksHint) remarksHint.classList.add('hidden');
+            if (remarksHelp) remarksHelp.classList.add('hidden');
+        }
+    }
 
     document.querySelectorAll('.action-btn').forEach(btn => {
         btn.addEventListener('click', function () {
             pendingAction = this.dataset.action;
+            updateSubFields(pendingAction);
 
             // Client-side validation before showing modal
-            if (pendingAction === 'return_to_admin' && remarksEl && remarksEl.value.trim() === '') {
+            if (requiresRemarks.includes(pendingAction) && remarksEl && remarksEl.value.trim() === '') {
                 remarksEl.classList.add('border-red-400');
-                if (remarksHelp)      remarksHelp.classList.remove('hidden');
-                if (remarksHint)      remarksHint.classList.remove('hidden');
+                if (remarksHelp) remarksHelp.classList.remove('hidden');
+                if (remarksHint) remarksHint.classList.remove('hidden');
                 remarksEl.focus();
                 return;
             }
 
-            // Show the required hint for return_to_admin
-            if (pendingAction === 'return_to_admin') {
-                if (remarksHint) remarksHint.classList.remove('hidden');
-                if (remarksHelp) remarksHelp.classList.remove('hidden');
-            } else {
-                if (remarksHint) remarksHint.classList.add('hidden');
-                if (remarksHelp) remarksHelp.classList.add('hidden');
+            if (needsCommittee.includes(pendingAction) && committeeSelect && committeeSelect.value === '') {
+                committeeSelect.classList.add('border-red-400');
+                committeeSelect.focus();
+                return;
+            }
+
+            if (needsCategory.includes(pendingAction) && categorySelect && categorySelect.value === '') {
+                categorySelect.classList.add('border-red-400');
+                categorySelect.focus();
+                return;
             }
 
             confirmBody.textContent = actionLabels[pendingAction] || 'Proceed with this action?';
@@ -901,6 +1034,16 @@ document.addEventListener('DOMContentLoaded', function () {
             this.classList.remove('border-red-400');
         });
     }
+    if (committeeSelect) {
+        committeeSelect.addEventListener('change', function () {
+            this.classList.remove('border-red-400');
+        });
+    }
+    if (categorySelect) {
+        categorySelect.addEventListener('change', function () {
+            this.classList.remove('border-red-400');
+        });
+    }
 
     // Confirm OK → submit form
     let isSubmitting = false;
@@ -908,16 +1051,29 @@ document.addEventListener('DOMContentLoaded', function () {
         confirmOkBtn.addEventListener('click', function () {
             if (!pendingAction || isSubmitting) return;
 
-            if (pendingAction === 'return_to_admin' && remarksEl && remarksEl.value.trim() === '') {
+            // Re-validate before submit
+            if (requiresRemarks.includes(pendingAction) && remarksEl && remarksEl.value.trim() === '') {
                 closeModal();
                 remarksEl.classList.add('border-red-400');
                 remarksEl.focus();
                 return;
             }
+            if (needsCommittee.includes(pendingAction) && committeeSelect && committeeSelect.value === '') {
+                closeModal();
+                committeeSelect.classList.add('border-red-400');
+                committeeSelect.focus();
+                return;
+            }
+            if (needsCategory.includes(pendingAction) && categorySelect && categorySelect.value === '') {
+                closeModal();
+                categorySelect.classList.add('border-red-400');
+                categorySelect.focus();
+                return;
+            }
 
             isSubmitting = true;
             confirmOkBtn.disabled = true;
-            confirmOkBtn.innerHTML = '<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> <span class="ml-2">Processing...</span>';
+            confirmOkBtn.innerHTML = '<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> <span class="ml-2">Processing\u2026</span>';
 
             if (actionInput) actionInput.value = pendingAction;
             closeModal();
@@ -928,27 +1084,42 @@ document.addEventListener('DOMContentLoaded', function () {
     if (confirmCancelBtn) {
         confirmCancelBtn.addEventListener('click', closeModal);
     }
+
+    // Backdrop click closes only when not yet submitting
     if (confirmBackdrop) {
-        confirmBackdrop.addEventListener('click', closeModal);
+        confirmBackdrop.addEventListener('click', function () {
+            if (!isSubmitting) closeModal();
+        });
     }
+
+    // Escape key closes only when not yet submitting
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !confirmModal.classList.contains('hidden') && !isSubmitting) {
+            closeModal();
+        }
+    });
 
     function openModal() {
         confirmModal.classList.remove('hidden');
         confirmModal.classList.add('flex');
+        document.body.style.overflow = 'hidden';   // prevent background scroll
         requestAnimationFrame(() => {
             confirmBackdrop.style.opacity = '1';
             confirmPanel.style.opacity    = '1';
             confirmPanel.style.transform  = 'scale(1)';
+            if (confirmCancelBtn) confirmCancelBtn.focus();
         });
     }
 
     function closeModal() {
+        if (isSubmitting) return;
         confirmBackdrop.style.opacity = '0';
         confirmPanel.style.opacity    = '0';
         confirmPanel.style.transform  = 'scale(0.95)';
         setTimeout(() => {
             confirmModal.classList.add('hidden');
             confirmModal.classList.remove('flex');
+            document.body.style.overflow = '';     // restore scroll
         }, 200);
     }
 
@@ -957,6 +1128,16 @@ document.addEventListener('DOMContentLoaded', function () {
         return String(text).replace(/[&<>"']/g, m => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
         })[m]);
+    }
+
+    // ── Auto-open sub-fields if URL has an anchor matching an action ─────────
+    const hash = window.location.hash;
+    if (hash === '#route-committee') {
+        const btn = document.querySelector('.action-btn[data-action="route_committee"]');
+        if (btn) { updateSubFields('route_committee'); btn.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    } else if (hash === '#noted') {
+        const btn = document.querySelector('.action-btn[data-action="noted"]');
+        if (btn) { updateSubFields('noted'); btn.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
     }
 });
 </script>

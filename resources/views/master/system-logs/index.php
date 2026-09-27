@@ -44,7 +44,7 @@ function methodBadgeClass(string $method): string {
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">

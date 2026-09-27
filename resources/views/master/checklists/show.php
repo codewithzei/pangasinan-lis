@@ -263,9 +263,8 @@ $accent = $accent ?? 'primary';
 <!-- ================================================================ -->
 <!-- STATUS TOGGLE MODAL                                              -->
 <!-- ================================================================ -->
-<div id="statusModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="statusModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="statusModalPanel" class="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
+<div id="statusModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" role="dialog" aria-modal="true">
+    <div id="statusModalPanel" class="relative w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
         <div class="p-6">
             <div class="flex items-start gap-4">
                 <div id="statusIconBox" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100">
@@ -318,9 +317,8 @@ $accent = $accent ?? 'primary';
 <!-- ================================================================ -->
 <!-- CONFIRMATION MODAL (Remove Document Type)                        -->
 <!-- ================================================================ -->
-<div id="confirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="confirmModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="confirmModalPanel" class="relative z-10 w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
+<div id="confirmModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" role="dialog" aria-modal="true">
+    <div id="confirmModalPanel" class="relative w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
         <div class="p-6">
             <div class="flex items-start gap-4">
                 <div id="confirmIconBox" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
@@ -487,12 +485,11 @@ function openStatusModal(id, name, currentRequired) {
     statusModalOpen = true;
     
     const m = document.getElementById('statusModal');
-    const b = document.getElementById('statusModalBackdrop');
     const p = document.getElementById('statusModalPanel');
     m.classList.remove('hidden');
     m.classList.add('flex');
     requestAnimationFrame(() => {
-        b.classList.remove('opacity-0');
+        m.style.opacity = '1';
         p.classList.remove('scale-95', 'opacity-0');
         p.classList.add('scale-100', 'opacity-100');
     });
@@ -504,9 +501,8 @@ function closeStatusModal() {
     pendingStatusUpdate = null;
     
     const m = document.getElementById('statusModal');
-    const b = document.getElementById('statusModalBackdrop');
     const p = document.getElementById('statusModalPanel');
-    b.classList.add('opacity-0');
+    m.style.opacity = '0';
     p.classList.remove('scale-100', 'opacity-100');
     p.classList.add('scale-95', 'opacity-0');
     setTimeout(() => {
@@ -550,7 +546,7 @@ async function executeStatusUpdate() {
     }
 }
 
-document.getElementById('statusModalBackdrop')?.addEventListener('click', closeStatusModal);
+document.getElementById('statusModal')?.addEventListener('click', function(e) { if (e.target === document.getElementById('statusModal')) closestatusModal(); });
 
 /* ------------------------------------------------------------------ */
 /* Confirmation Modal                                                   */
@@ -587,12 +583,11 @@ function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText 
     confirmModalOpen = true;
     
     const m = document.getElementById('confirmModal');
-    const b = document.getElementById('confirmModalBackdrop');
     const p = document.getElementById('confirmModalPanel');
     m.classList.remove('hidden');
     m.classList.add('flex');
     requestAnimationFrame(() => {
-        b.classList.remove('opacity-0');
+        m.style.opacity = '1';
         p.classList.remove('scale-95', 'opacity-0');
         p.classList.add('scale-100', 'opacity-100');
     });
@@ -604,9 +599,8 @@ function closeConfirmModal() {
     pendingAction = null;
     
     const m = document.getElementById('confirmModal');
-    const b = document.getElementById('confirmModalBackdrop');
     const p = document.getElementById('confirmModalPanel');
-    b.classList.add('opacity-0');
+    m.style.opacity = '0';
     p.classList.remove('scale-100', 'opacity-100');
     p.classList.add('scale-95', 'opacity-0');
     setTimeout(() => {
@@ -623,7 +617,7 @@ function executeConfirmAction() {
     }
 }
 
-document.getElementById('confirmModalBackdrop')?.addEventListener('click', closeConfirmModal);
+document.getElementById('confirmModal')?.addEventListener('click', function(e) { if (e.target === document.getElementById('confirmModal')) closeConfirmModal(); });
 
 /* ------------------------------------------------------------------ */
 /* Document Type Actions                                                */

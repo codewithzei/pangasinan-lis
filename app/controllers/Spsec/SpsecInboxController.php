@@ -7,8 +7,9 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  * SpsecInboxController
  *
  * Handles the SP Secretary inbox: listing pending assignments, viewing
- * document detail, processing actions (Accept / Decline / Return to Admin),
- * and uploading additional attachments.
+ * document detail, processing actions (Accept / Return to Admin /
+ * Route to Plenary / Route to Committee / Noted), and uploading
+ * additional attachments.
  *
  * OWNERSHIP MODEL (mirrors AdminInboxController, migration 050):
  *   - A new document assignment arrives as PENDING with accepted_by = NULL
@@ -25,8 +26,8 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *     rowCount() = 0 means another user already claimed it — throw concurrency error.
  *   - After acceptance the document is visible ONLY to that user in the
  *     accepted view.  Other SP Secretary users no longer see it in the inbox.
- *   - For decline / return-to-admin the ownership is re-verified before any
- *     mutation so no other user can act on an already-claimed document.
+ *   - For route / noted / return-to-admin the ownership is re-verified before
+ *     any mutation so no other user can act on an already-claimed document.
  */
 class SpsecInboxController
 {
@@ -37,6 +38,9 @@ class SpsecInboxController
     private const VALID_ACTIONS = [
         'accept',
         'return_to_admin',
+        'route_plenary',
+        'route_committee',
+        'noted',
     ];
 
     public function __construct()
@@ -75,21 +79,6 @@ class SpsecInboxController
         $offset  = ($page - 1) * $perPage;
 
         // ── Build WHERE clause based on view ──────────────────────────────────
-        //
-        // PENDING (inbox):
-        //   Show unclaimed (assigned_to_user_id IS NULL) documents to every
-        //   SP Secretary user in the role, PLUS documents pre-assigned to the
-        //   current user but not yet completed.
-        //   Accepted documents (accepted_by IS NOT NULL) are excluded so that
-        //   once one user claims the document it immediately disappears from
-        //   every other user's inbox.
-        //
-        // ACCEPTED:
-        //   Only show documents accepted by THIS user (accepted_by = currentUserId)
-        //   or explicitly assigned to this user (assigned_to_user_id = currentUserId).
-        //   Never expose another user's accepted work.
-        // ─────────────────────────────────────────────────────────────────────
-
         $where  = ['da.assigned_to_role_id = ?', "da.phase = 'SP_SECRETARY'"];
         $params = [$spsecRoleId];
 
@@ -384,6 +373,17 @@ class SpsecInboxController
         $revStmt->execute([$documentId]);
         $revisions = $revStmt->fetchAll();
 
+        // Communication categories (for NOTED action)
+        $commCategories = $this->docService->getCommunicationCategories();
+
+        // Active committees (for Route to Committee action)
+        $committees = $this->pdo->query("
+            SELECT id, name
+            FROM committees
+            WHERE is_active = 1 AND is_deleted = 0
+            ORDER BY sort_order ASC, name ASC
+        ")->fetchAll();
+
         $success = flash_get('success');
         $error   = flash_get('error');
         $errors  = flash_get('errors') ?? [];
@@ -409,12 +409,15 @@ class SpsecInboxController
         $canAccept  = $isPendingAssignment;
         $canProcess = $isOwnedAcceptedAssignment;
 
+        // Is this document a Communication type? (drives Noted button visibility)
+        $isCommunication = $this->isCommunicationDocument($document['document_type_name'] ?? '');
+
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
         require __DIR__ . '/../../../resources/views/spsec/inbox/show.php';
     }
 
     // =========================================================================
-    // 3. Process action (Accept / Return to Admin)
+    // 3. Process action (Accept / Return to Admin / Route / Noted)
     // =========================================================================
 
     public function process(): void
@@ -498,7 +501,16 @@ class SpsecInboxController
 
                 $assignmentId = (int) $assignment['id'];
 
-                $docStmt = $this->pdo->prepare("SELECT * FROM documents WHERE id = ? LIMIT 1");
+                $docStmt = $this->pdo->prepare("
+                    SELECT
+                        d.*,
+                        dt.name        AS document_type_name,
+                        dt.badge_color AS document_type_badge_color
+                    FROM documents d
+                    LEFT JOIN document_types dt ON d.document_type_id = dt.id
+                    WHERE d.id = ?
+                    LIMIT 1
+                ");
                 $docStmt->execute([$documentId]);
                 $document = $docStmt->fetch();
 
@@ -519,12 +531,26 @@ class SpsecInboxController
                     case 'return_to_admin':
                         $notificationData = $this->doReturnToAdmin($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
                         break;
+
+                    case 'route_plenary':
+                        $notificationData = $this->doRoute($documentId, $assignmentId, $document, $userId, $currentStatusId, $remarks, 'Plenary', 'PLENARY', 'ROUTED_TO_PLENARY');
+                        break;
+
+                    case 'route_committee':
+                        $committeeId = (int) ($_POST['committee_id'] ?? 0);
+                        $notificationData = $this->doRoute($documentId, $assignmentId, $document, $userId, $currentStatusId, $remarks, 'Committee', 'COMMITTEE', 'ROUTED_TO_COMMITTEE', $committeeId);
+                        break;
+
+                    case 'noted':
+                        $communicationCategoryId = (int) ($_POST['communication_category_id'] ?? 0);
+                        $notificationData = $this->doNoted($documentId, $assignmentId, $document, $userId, $currentStatusId, $remarks, $communicationCategoryId);
+                        break;
                 }
 
-                // ── Commit ────────────────────────────────────────────────────
+                // ── Commit ─────────────────────────────────────────────────────
                 // audit_log() / system_log() calls MUST come AFTER commit —
-                // they use a separate static PDO connection and must not run
-                // while the main transaction is open.
+                // they use a separate static PDO connection (_log_pdo()) and
+                // must not run while the main transaction is open.
                 $this->pdo->commit();
 
                 // ── Post-commit: audit log ────────────────────────────────────
@@ -556,8 +582,20 @@ class SpsecInboxController
                 // ── Post-commit: notifications ────────────────────────────────
                 if ($notificationData !== null) {
                     try {
-                        if (isset($notificationData['adminRoleId'])) {
-                            // Returned to Admin — notify the Admin role
+                        // Routing notifications (route_plenary, route_committee)
+                        if (isset($notificationData['targetRoleId'])) {
+                            $this->docService->notifyRoleUsers(
+                                $notificationData['targetRoleId'],
+                                $notificationData['documentId'],
+                                $notificationData['userId'],
+                                $notificationData['type'],
+                                $notificationData['title'],
+                                $notificationData['message'],
+                                $notificationData['actionUrl']
+                            );
+                        }
+                        // Return-to-Admin notifications
+                        elseif (isset($notificationData['adminRoleId'])) {
                             if ($notificationData['createdBy'] > 0) {
                                 $this->docService->notifyUser(
                                     $notificationData['createdBy'],
@@ -579,6 +617,20 @@ class SpsecInboxController
                                 BASE_URL . "/admin/inbox/show?id={$notificationData['documentId']}"
                             );
                         }
+                        // Noted notifications — notify the document creator
+                        elseif (isset($notificationData['categoryName'])) {
+                            if ($notificationData['createdBy'] > 0) {
+                                $this->docService->notifyUser(
+                                    $notificationData['createdBy'],
+                                    $notificationData['documentId'],
+                                    $notificationData['userId'],
+                                    'DOCUMENT_FINALIZED',
+                                    "Document Noted: {$notificationData['trackingNumber']}",
+                                    "Document {$notificationData['trackingNumber']} has been marked as Noted (Category: {$notificationData['categoryName']}).",
+                                    BASE_URL . "/spsec/routed/show?id={$notificationData['documentId']}"
+                                );
+                            }
+                        }
                     } catch (Throwable $notifyError) {
                         system_log('WARNING', 'Notification delivery failed after successful SP Secretary document processing', [
                             'error'       => $notifyError->getMessage(),
@@ -593,14 +645,17 @@ class SpsecInboxController
                 $actionLabel = $this->actionLabel($action);
                 flash_set('success', "Document processed successfully: {$actionLabel}.");
                 old_clear();
-                redirect('spsec/inbox');
+
+                // Routing actions redirect to accepted view; noted/return redirect to inbox root
+                if (in_array($action, ['route_plenary', 'route_committee', 'noted'], true)) {
+                    redirect('spsec/inbox?view=accepted');
+                } else {
+                    redirect('spsec/inbox');
+                }
 
             } catch (RuntimeException $e) {
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
-                }
-                foreach ($storedFilePaths as $p) {
-                    if (file_exists($p)) @unlink($p);
                 }
                 system_log('WARNING', 'SP Secretary process action: runtime error', [
                     'error'       => $e->getMessage(),
@@ -615,18 +670,12 @@ class SpsecInboxController
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
                 }
-                foreach ($storedFilePaths as $p) {
-                    if (file_exists($p)) @unlink($p);
-                }
                 flash_set('error', $e->getMessage());
                 redirect('spsec/inbox/show?id=' . $documentId);
 
             } catch (PDOException $e) {
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
-                }
-                foreach ($storedFilePaths as $p) {
-                    if (file_exists($p)) @unlink($p);
                 }
 
                 $lastException = $e;
@@ -655,9 +704,6 @@ class SpsecInboxController
             } catch (Throwable $e) {
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
-                }
-                foreach ($storedFilePaths as $p) {
-                    if (file_exists($p)) @unlink($p);
                 }
                 $lastException = $e;
                 break;
@@ -870,16 +916,8 @@ class SpsecInboxController
     /**
      * Return the document to Admin with a required reason.
      *
-     * Only the user who accepted the document may return it.
-     * Ownership is verified in process() before dispatching here.
-     *
-     * Creates a fresh pending Admin assignment with:
-     *   phase                = 'ADMIN'
-     *   accepted_by          = NULL
-     *   assigned_to_user_id  = NULL
-     *
      * Preserves accepted_by and accepted_at in the completed SP Secretary row
-     * so the history retains who originally accepted the document.
+     * so history retains who originally accepted the document.
      *
      * @return array Notification data sent after commit.
      */
@@ -903,7 +941,7 @@ class SpsecInboxController
                 document_id, revision_number, changed_by, phase,
                 subject_matter, document_type_id, date_received, time_received,
                 source_type_id, source_snapshot, remarks, change_reason
-            ) VALUES (?, ?, ?, 'SP_SECRETARY', ?, ?, ?, ?, ?, ?, ?, 'Document returned to Admin by SP Secretary — snapshot before return')
+            ) VALUES (?, ?, ?, 'SP_SECRETARY', ?, ?, ?, ?, ?, ?, ?, 'Document returned to Admin by SP Secretary')
         ")->execute([
             $documentId,
             $revNum,
@@ -923,7 +961,6 @@ class SpsecInboxController
                 'source_liaison_name'   => $document['source_liaison_name'],
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             $document['remarks'],
-            'Document returned to Admin by SP Secretary — snapshot before return',
         ]);
 
         // 2. Mark SP Secretary assignment DECLINED — accepted_by / accepted_at
@@ -948,7 +985,7 @@ class SpsecInboxController
             );
         }
 
-        // 3. Resolve Admin role
+        // 3. Find Admin role
         $adminRole = $this->pdo->query(
             "SELECT id FROM roles WHERE name = 'Admin' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
         )->fetch();
@@ -975,7 +1012,7 @@ class SpsecInboxController
             WHERE id = ?
         ")->execute([$userId, $documentId]);
 
-        // 6. Route record for the return
+        // 6. Route record
         $this->pdo->prepare("
             INSERT INTO document_routes (
                 document_id, from_phase, to_phase,
@@ -988,7 +1025,7 @@ class SpsecInboxController
             'Returned by SP Secretary to Admin: ' . $remarks,
         ]);
 
-        // 7. SP_SECRETARY_REJECTED event
+        // 7. Workflow events
         $this->pdo->prepare("
             INSERT INTO document_events (
                 document_id, event_type, phase, performed_by,
@@ -1002,7 +1039,6 @@ class SpsecInboxController
             json_encode(['ip_address' => client_ip()]),
         ]);
 
-        // 8. SP_SECRETARY_RETURNED_TO_ADMIN event
         $this->pdo->prepare("
             INSERT INTO document_events (
                 document_id, event_type, phase, performed_by,
@@ -1012,7 +1048,7 @@ class SpsecInboxController
             $documentId,
             $userId,
             $currentStatusId,
-            'Document returned to Admin for correction.',
+            'Document returned to Admin by SP Secretary.',
             json_encode([
                 'decline_reason' => $remarks,
                 'ip_address'     => client_ip(),
@@ -1023,13 +1059,13 @@ class SpsecInboxController
 
         $createdBy = (int) $document['created_by'];
         return [
-            'createdBy'       => $createdBy,
-            'adminRoleId'     => $adminRoleId,
-            'documentId'      => $documentId,
-            'userId'          => $userId,
-            'trackingNumber'  => $document['tracking_number'],
-            'remarks'         => $remarks,
-            'auditData'       => [
+            'createdBy'        => $createdBy,
+            'adminRoleId'      => $adminRoleId,
+            'documentId'       => $documentId,
+            'userId'           => $userId,
+            'trackingNumber'   => $document['tracking_number'],
+            'remarks'          => $remarks,
+            'auditData'        => [
                 'action'         => 'spsec_returned_to_admin',
                 'assignment_id'  => $assignmentId,
                 'document_id'    => $documentId,
@@ -1041,9 +1077,371 @@ class SpsecInboxController
         ];
     }
 
+    /**
+     * Route the document to Plenary or Committee.
+     *
+     * The current SP Secretary assignment is COMPLETED (accepted_by /
+     * accepted_at are preserved in the history row for accountability).
+     * The new assignment for the target role is created with
+     * accepted_by = NULL and assigned_to_user_id = NULL so the next role
+     * must claim it fresh.
+     *
+     * @param  int    $committeeId  Only relevant for route_committee; 0 = no committee selected.
+     * @return array  Notification data sent after commit.
+     */
+    private function doRoute(
+        int    $documentId,
+        int    $assignmentId,
+        array  $document,
+        int    $userId,
+        int    $currentStatusId,
+        string $remarks,
+        string $targetRoleName,
+        string $targetPhase,
+        string $eventType,
+        int    $committeeId = 0
+    ): array {
+        // If remarks field blank, fall back to the original remarks so data is never lost
+        $effectiveRemarks = trim($remarks) !== '' ? trim($remarks) : trim($document['remarks'] ?? '');
+
+        // Snapshot revision
+        $revNum = $this->docService->nextRevisionNumber($documentId);
+        $this->pdo->prepare("
+            INSERT INTO document_revisions (
+                document_id, revision_number, changed_by, phase,
+                subject_matter, document_type_id, date_received, time_received,
+                source_type_id, source_snapshot, remarks, change_reason
+            ) VALUES (?, ?, ?, 'SP_SECRETARY', ?, ?, ?, ?, ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $revNum,
+            $userId,
+            $document['subject_matter'],
+            $document['document_type_id'],
+            $document['date_received'],
+            $document['time_received'],
+            $document['source_type_id'],
+            json_encode([
+                'external_office_id'    => $document['external_office_id'],
+                'hospital_id'           => $document['hospital_id'],
+                'municipality_id'       => $document['municipality_id'],
+                'source_name'           => $document['source_name'],
+                'source_contact_number' => $document['source_contact_number'],
+                'source_address'        => $document['source_address'],
+                'source_liaison_name'   => $document['source_liaison_name'],
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            $document['remarks'],
+            "SP Secretary routed to {$targetRoleName}",
+        ]);
+
+        // Resolve target role
+        $roleStmt = $this->pdo->prepare(
+            "SELECT id FROM roles WHERE name = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+        );
+        $roleStmt->execute([$targetRoleName]);
+        $targetRole = $roleStmt->fetch();
+        if (!$targetRole) {
+            throw new RuntimeException("Target role '{$targetRoleName}' not found.");
+        }
+        $targetRoleId = (int) $targetRole['id'];
+
+        // Validate committee selection when routing to Committee
+        if ($targetPhase === 'COMMITTEE') {
+            if ($committeeId <= 0) {
+                throw new InvalidArgumentException('A committee must be selected when routing to Committee.');
+            }
+            $commCheck = $this->pdo->prepare(
+                "SELECT id FROM committees WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+            );
+            $commCheck->execute([$committeeId]);
+            if (!$commCheck->fetch()) {
+                throw new InvalidArgumentException('Invalid or inactive committee selected.');
+            }
+        }
+
+        // Resolve routing option (Plenary / Committee)
+        $routingOptionName = ($targetPhase === 'PLENARY') ? 'Plenary' : 'Committee';
+        $roStmt = $this->pdo->prepare(
+            "SELECT id FROM routing_options WHERE name = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+        );
+        $roStmt->execute([$routingOptionName]);
+        $routingOption   = $roStmt->fetch();
+        $routingOptionId = $routingOption ? (int) $routingOption['id'] : null;
+
+        // Complete SP Secretary assignment — accepted_by and accepted_at PRESERVED
+        $stmt = $this->pdo->prepare("
+            UPDATE document_assignments
+            SET decision     = 'COMPLETED',
+                completed_at = NOW(),
+                remarks      = ?
+            WHERE id         = ?
+              AND decision   = 'ACCEPTED'
+              AND completed_at IS NULL
+              AND (accepted_by = ? OR assigned_to_user_id = ?)
+        ");
+        $stmt->execute([$effectiveRemarks ?: null, $assignmentId, $userId, $userId]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException(
+                'This assignment has already been processed or you no longer own it. Please refresh the page.'
+            );
+        }
+
+        // New assignment for target role — fresh slate, no previous owner
+        $this->pdo->prepare("
+            INSERT INTO document_assignments (
+                document_id, assigned_to_role_id, phase,
+                assigned_by, decision, received_at,
+                accepted_by, assigned_to_user_id
+            ) VALUES (?, ?, ?, ?, 'PENDING', NOW(), NULL, NULL)
+        ")->execute([$documentId, $targetRoleId, $targetPhase, $userId]);
+
+        // Update document phase
+        $this->pdo->prepare("
+            UPDATE documents
+            SET current_phase         = ?,
+                current_owner_user_id = NULL,
+                updated_by            = ?
+            WHERE id = ?
+        ")->execute([$targetPhase, $userId, $documentId]);
+
+        // Save committee relationship if routing to Committee
+        if ($targetPhase === 'COMMITTEE' && $committeeId > 0) {
+            // Use INSERT IGNORE to avoid duplicate-key on re-route to same committee
+            $this->pdo->prepare("
+                INSERT IGNORE INTO document_committees (document_id, committee_id, assigned_by)
+                VALUES (?, ?, ?)
+            ")->execute([$documentId, $committeeId, $userId]);
+        }
+
+        // Route record
+        $this->pdo->prepare("
+            INSERT INTO document_routes (
+                document_id, from_phase, to_phase,
+                routing_option_id, routed_by, routed_to_role_id, remarks
+            ) VALUES (?, 'SP_SECRETARY', ?, ?, ?, ?, ?)
+        ")->execute([$documentId, $targetPhase, $routingOptionId, $userId, $targetRoleId, $effectiveRemarks ?: null]);
+
+        // Workflow event
+        $this->pdo->prepare("
+            INSERT INTO document_events (
+                document_id, event_type, phase, performed_by,
+                to_status_id, remarks, metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $eventType,
+            $targetPhase,
+            $userId,
+            $currentStatusId,
+            $effectiveRemarks ?: "Routed to {$targetRoleName} by SP Secretary.",
+            json_encode([
+                'routed_to_role_id' => $targetRoleId,
+                'committee_id'      => $committeeId > 0 ? $committeeId : null,
+                'ip_address'        => client_ip(),
+            ]),
+        ]);
+
+        // audit_log() deliberately omitted (open transaction) — process() writes after commit.
+
+        return [
+            'targetRoleId' => $targetRoleId,
+            'documentId'   => $documentId,
+            'userId'       => $userId,
+            'type'         => 'DOCUMENT_ROUTED',
+            'title'        => "Document Routed: {$document['tracking_number']}",
+            'message'      => "Document {$document['tracking_number']} has been routed to {$targetRoleName} by SP Secretary.",
+            'actionUrl'    => BASE_URL . "/{$this->roleDashboardPrefix($targetRoleName)}/inbox/show?id={$documentId}",
+            'auditData'    => [
+                'action'        => 'spsec_routed',
+                'assignment_id' => $assignmentId,
+                'document_id'   => $documentId,
+                'accepted_by'   => $userId,
+                'to_role'       => $targetRoleName,
+                'to_phase'      => $targetPhase,
+                'committee_id'  => $committeeId > 0 ? $committeeId : null,
+            ],
+            'auditDescription' => "SP Secretary routed document ID {$documentId} to {$targetRoleName}",
+        ];
+    }
+
+    /**
+     * Mark the document as NOTED (Communication documents only).
+     *
+     * accepted_by and accepted_at are preserved so history retains who
+     * owned the document when it was noted.
+     *
+     * @return array Notification data sent after commit.
+     */
+    private function doNoted(
+        int    $documentId,
+        int    $assignmentId,
+        array  $document,
+        int    $userId,
+        int    $currentStatusId,
+        string $remarks,
+        int    $communicationCategoryId
+    ): array {
+        // Server-side: verify document is Communication type
+        if (!$this->isCommunicationDocument($document['document_type_name'] ?? '')) {
+            throw new InvalidArgumentException(
+                'The NOTED action is only available for Communication documents.'
+            );
+        }
+
+        if ($communicationCategoryId <= 0) {
+            throw new InvalidArgumentException('A communication category is required for the NOTED action.');
+        }
+        $catStmt = $this->pdo->prepare(
+            "SELECT id, name FROM communication_categories
+              WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+        );
+        $catStmt->execute([$communicationCategoryId]);
+        $category = $catStmt->fetch();
+        if (!$category) {
+            throw new InvalidArgumentException('Invalid or inactive communication category selected.');
+        }
+
+        // Snapshot revision
+        $revNum = $this->docService->nextRevisionNumber($documentId);
+        $this->pdo->prepare("
+            INSERT INTO document_revisions (
+                document_id, revision_number, changed_by, phase,
+                subject_matter, document_type_id, date_received, time_received,
+                source_type_id, source_snapshot, remarks, change_reason
+            ) VALUES (?, ?, ?, 'SP_SECRETARY', ?, ?, ?, ?, ?, ?, ?, 'Marked as Noted by SP Secretary')
+        ")->execute([
+            $documentId,
+            $revNum,
+            $userId,
+            $document['subject_matter'],
+            $document['document_type_id'],
+            $document['date_received'],
+            $document['time_received'],
+            $document['source_type_id'],
+            json_encode([
+                'external_office_id'    => $document['external_office_id'],
+                'hospital_id'           => $document['hospital_id'],
+                'municipality_id'       => $document['municipality_id'],
+                'source_name'           => $document['source_name'],
+                'source_contact_number' => $document['source_contact_number'],
+                'source_address'        => $document['source_address'],
+                'source_liaison_name'   => $document['source_liaison_name'],
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            $document['remarks'],
+        ]);
+
+        // Look up 'Noted' document status
+        $notedStatus   = $this->pdo->query(
+            "SELECT id FROM document_statuses WHERE name = 'Noted' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+        )->fetch();
+        $notedStatusId = $notedStatus ? (int) $notedStatus['id'] : $currentStatusId;
+
+        // Update document — keep current_phase = 'SP_SECRETARY' (terminal for Noted)
+        $this->pdo->prepare("
+            UPDATE documents
+            SET communication_category_id = ?,
+                current_status_id         = ?,
+                current_phase             = 'SP_SECRETARY',
+                current_owner_user_id     = NULL,
+                updated_by                = ?
+            WHERE id = ?
+        ")->execute([$communicationCategoryId, $notedStatusId, $userId, $documentId]);
+
+        // Mark assignment NOTED — accepted_by/accepted_at preserved
+        $stmt = $this->pdo->prepare("
+            UPDATE document_assignments
+            SET decision     = 'NOTED',
+                completed_at = NOW(),
+                remarks      = ?
+            WHERE id         = ?
+              AND decision   = 'ACCEPTED'
+              AND completed_at IS NULL
+              AND (accepted_by = ? OR assigned_to_user_id = ?)
+        ");
+        $stmt->execute([$remarks ?: null, $assignmentId, $userId, $userId]);
+
+        if ($stmt->rowCount() === 0) {
+            throw new RuntimeException(
+                'This assignment has already been processed or you no longer own it. Please refresh the page.'
+            );
+        }
+
+        // Resolve 'Noted' routing option
+        $notedRo = $this->pdo->query(
+            "SELECT id FROM routing_options WHERE name = 'Noted' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+        )->fetch();
+        $notedRoId = $notedRo ? (int) $notedRo['id'] : null;
+
+        // Resolve SP Secretary role ID for the route record's routed_to_role_id
+        $spsecRole   = $this->pdo->query(
+            "SELECT id FROM roles WHERE name = 'SP Secretary' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+        )->fetch();
+        $spsecRoleId = $spsecRole ? (int) $spsecRole['id'] : null;
+
+        // Route record (terminal — from and to are both SP_SECRETARY)
+        $this->pdo->prepare("
+            INSERT INTO document_routes (
+                document_id, from_phase, to_phase,
+                routing_option_id, routed_by, routed_to_role_id, remarks
+            ) VALUES (?, 'SP_SECRETARY', 'SP_SECRETARY', ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $notedRoId,
+            $userId,
+            $spsecRoleId,
+            'Marked as Noted — Communication category: ' . $category['name'],
+        ]);
+
+        // Workflow event
+        $this->pdo->prepare("
+            INSERT INTO document_events (
+                document_id, event_type, phase, performed_by,
+                from_status_id, to_status_id, remarks, metadata
+            ) VALUES (?, 'DOCUMENT_NOTED', 'SP_SECRETARY', ?, ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $userId,
+            $currentStatusId,
+            $notedStatusId,
+            $remarks ?: "Document noted. Category: {$category['name']}.",
+            json_encode([
+                'communication_category_id'   => $communicationCategoryId,
+                'communication_category_name' => $category['name'],
+                'ip_address'                  => client_ip(),
+            ]),
+        ]);
+
+        // audit_log() deliberately omitted (open transaction) — process() writes after commit.
+
+        $createdBy = (int) $document['created_by'];
+        return [
+            'createdBy'      => $createdBy,
+            'documentId'     => $documentId,
+            'userId'         => $userId,
+            'trackingNumber' => $document['tracking_number'],
+            'categoryName'   => $category['name'],
+            'auditData'      => [
+                'action'                      => 'spsec_noted',
+                'assignment_id'               => $assignmentId,
+                'document_id'                 => $documentId,
+                'accepted_by'                 => $userId,
+                'communication_category_id'   => $communicationCategoryId,
+                'communication_category_name' => $category['name'],
+            ],
+            'auditDescription' => "SP Secretary noted document ID {$documentId}",
+        ];
+    }
+
     // =========================================================================
     // Helpers
     // =========================================================================
+
+    /** Check whether the document_type_name string indicates Communication. */
+    private function isCommunicationDocument(string $documentTypeName): bool
+    {
+        return strcasecmp(trim($documentTypeName), 'Communication') === 0;
+    }
 
     /** Require and return the SP Secretary role ID; redirect if not found. */
     private function requireSpsecRoleId(): int
@@ -1065,7 +1463,20 @@ class SpsecInboxController
         return match ($action) {
             'accept'          => 'Accepted',
             'return_to_admin' => 'Returned to Admin',
+            'route_plenary'   => 'Routed to Plenary',
+            'route_committee' => 'Routed to Committee',
+            'noted'           => 'Marked as Noted',
             default           => $action,
+        };
+    }
+
+    /** Return the URL prefix for the target role's inbox. */
+    private function roleDashboardPrefix(string $roleName): string
+    {
+        return match ($roleName) {
+            'Plenary'   => 'plenary',
+            'Committee' => 'committee',
+            default     => strtolower(str_replace(' ', '', $roleName)),
         };
     }
 }

@@ -17,7 +17,7 @@ ob_start();
     <div class="w-full max-w-md">
 
         <div class="mb-8 text-center">
-            <div class="mx-auto flex h-20 w-20 items-center justify-center overflow-hidden">
+            <div class="mx-auto flex h-25 w-25 items-center justify-center overflow-hidden">
                 <img 
                     src="/Pangasinan-lis/public/assets/images/branding/logo.png" 
                     alt="Pangasinan LIS Logo" 

@@ -35,14 +35,14 @@ ob_start();
 <div class="space-y-6">
 
     <!-- Page Header ---------------------------------------------------------->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-600 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10">
-                <p class="text-sm font-medium text-emerald-100">ADMIN / DIRECT INTAKE</p>
+                <p class="text-sm font-medium text-blue-100">ADMIN / DIRECT INTAKE</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     Receive Document
                 </h1>
-                <p class="mt-2 max-w-2xl text-sm leading-6 text-emerald-100">
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
                     Directly receive and encode an incoming document when Receiving staff are unavailable.
                     The same validation rules and document workflow apply.
                 </p>

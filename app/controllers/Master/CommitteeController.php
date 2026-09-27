@@ -290,4 +290,30 @@ class CommitteeController
 
         return $errors;
     }
+
+    /**
+     * JSON endpoint — returns all active committees for AJAX use (e.g. share modal).
+     * GET master/committees/json
+     */
+    public function json(): void
+    {
+        if (auth_id() === null) {
+            http_response_code(401);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Unauthorized']);
+            exit;
+        }
+
+        $stmt = $this->pdo->query("
+            SELECT id, name
+            FROM committees
+            WHERE is_active = 1 AND is_deleted = 0
+            ORDER BY sort_order ASC, name ASC
+        ");
+        $committees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        header('Content-Type: application/json');
+        echo json_encode(['committees' => $committees]);
+        exit;
+    }
 }

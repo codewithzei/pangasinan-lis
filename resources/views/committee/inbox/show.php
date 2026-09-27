@@ -49,6 +49,8 @@ if (!isset($canAccept)) {
 if (!isset($canProcess)) {
     $canProcess = false;
 }
+$showProceedToCases = $showProceedToCases ?? false;
+$existingCase       = $existingCase       ?? null;
 
 // ── Phase / decision / event label helpers ────────────────────────────────────
 function committeeShowPhase(string $phase): string
@@ -850,38 +852,164 @@ ob_start();
                             </div><!-- /action buttons -->
                         </form>
 
-                        <!-- Confirmation modal ----------------------------->
-                        <div id="confirmModal"
-                             class="fixed inset-0 z-[200] hidden items-center justify-center"
-                             role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
-                            <div id="confirmModalBackdrop"
-                                 class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-                            <div id="confirmModalPanel"
-                                 class="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl
-                                        border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
-                                <div class="p-6">
-                                    <h3 id="confirmModalTitle"
-                                        class="text-base font-semibold text-gray-900 mb-2">Confirm Action</h3>
-                                    <p id="confirmModalBody" class="text-sm text-gray-600"></p>
-                                </div>
-                                <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100
-                                            bg-gray-50 rounded-b-2xl">
-                                    <button type="button" id="confirmCancelBtn"
-                                            class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm
-                                                   font-medium text-gray-700 bg-white border border-gray-200
-                                                   hover:bg-gray-50 transition">
-                                        Cancel
-                                    </button>
-                                    <button type="button" id="confirmOkBtn"
-                                            class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm
-                                                   font-medium text-white bg-primary hover:bg-blue-700 transition">
-                                        Confirm
-                                    </button>
-                                </div>
+                    </div><!-- /processing card -->
+                <?php endif; ?>
+
+                <!-- ═══════════════════════════════════════════════════════════
+                     SECTION B2 — Proceed to Cases button
+                     Shown only when:
+                       • Document type is Administrative Cases or Complaint
+                       • This user owns the accepted assignment
+                       • No case record exists yet
+                     Also shows a read-only link when a case already exists.
+                ════════════════════════════════════════════════════════════ -->
+                <?php if ($showProceedToCases): ?>
+                    <div class="rounded-2xl border border-purple-200 bg-purple-50 p-6">
+                        <div class="mb-4 flex items-center gap-2">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100">
+                                <svg class="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                          d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3
+                                             1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0
+                                             16H9m3 0h3"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-purple-600">
+                                    Cases Workflow
+                                </p>
+                                <p class="text-sm font-semibold text-purple-900">Ready to Docket</p>
                             </div>
                         </div>
+                        <p class="mb-4 text-xs text-purple-700 leading-relaxed">
+                            This document type is eligible for case docketing. No case record has been created yet.
+                        </p>
+                        <a href="<?= BASE_URL ?>/committee/cases/create?document_id=<?= $documentId ?>"
+                           class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600
+                                  px-4 py-2.5 text-sm font-semibold text-white hover:bg-purple-700 transition">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Proceed to Cases
+                        </a>
+                    </div>
+                <?php elseif ($existingCase !== null && $canProcess): ?>
+                    <!-- Case already exists — show link to case details -->
+                    <div class="rounded-2xl border border-purple-200 bg-purple-50 p-6">
+                        <div class="mb-3 flex items-center gap-2">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100">
+                                <svg class="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-purple-600">
+                                    Cases Workflow
+                                </p>
+                                <p class="text-sm font-semibold text-purple-900">Case Docketed</p>
+                            </div>
+                        </div>
+                        <p class="mb-1 text-xs text-purple-700">
+                            Docket No.:
+                            <span class="font-mono font-semibold">
+                                <?= htmlspecialchars($existingCase['docket_number']) ?>
+                            </span>
+                        </p>
+                        <a href="<?= BASE_URL ?>/committee/cases/show?id=<?= (int) $existingCase['id'] ?>"
+                           class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl
+                                  border border-purple-300 bg-white px-4 py-2.5 text-sm font-semibold
+                                  text-purple-700 hover:bg-purple-50 transition">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943
+                                         9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            View Case Details
+                        </a>
+                    </div>
+                <?php endif; ?>
 
-                    </div><!-- /processing card -->
+                <!-- ═══════════════════════════════════════════════════════════
+                     SECTION B3 — Proceed to Communications button
+                     Shown only when:
+                       • Document type is "Communication"
+                       • This user owns the accepted assignment
+                       • No communication record exists yet
+                     Also shows a read-only link when a record already exists.
+                ════════════════════════════════════════════════════════════ -->
+                <?php
+                $showProceedToComms = $showProceedToComms ?? false;
+                $existingComm       = $existingComm       ?? null;
+                ?>
+                <?php if ($showProceedToComms): ?>
+                    <div class="rounded-2xl border border-teal-200 bg-teal-50 p-6">
+                        <div class="mb-4 flex items-center gap-2">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-100">
+                                <svg class="h-5 w-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0
+                                             002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-teal-600">
+                                    Communications Workflow
+                                </p>
+                                <p class="text-sm font-semibold text-teal-900">Ready to Log</p>
+                            </div>
+                        </div>
+                        <p class="mb-4 text-xs text-teal-700 leading-relaxed">
+                            This document is classified as a Communication. No record has been created yet.
+                            Create one to begin the agenda, hearing, and report workflow.
+                        </p>
+                        <a href="<?= BASE_URL ?>/committee/communications/create?document_id=<?= $documentId ?>"
+                           class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600
+                                  px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Proceed to Communications
+                        </a>
+                    </div>
+                <?php elseif ($existingComm !== null && $canProcess): ?>
+                    <!-- Communication already exists — show link to record -->
+                    <div class="rounded-2xl border border-teal-200 bg-teal-50 p-6">
+                        <div class="mb-3 flex items-center gap-2">
+                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-100">
+                                <svg class="h-5 w-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-teal-600">
+                                    Communications Workflow
+                                </p>
+                                <p class="text-sm font-semibold text-teal-900">Communication Logged</p>
+                            </div>
+                        </div>
+                        <p class="mb-1 text-xs text-teal-700 truncate" title="<?= htmlspecialchars($existingComm['subject'] ?? '') ?>">
+                            <?= htmlspecialchars(mb_strimwidth($existingComm['subject'] ?? '', 0, 60, '…')) ?>
+                        </p>
+                        <a href="<?= BASE_URL ?>/committee/communications/show?id=<?= (int) $existingComm['id'] ?>"
+                           class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl
+                                  border border-teal-300 bg-white px-4 py-2.5 text-sm font-semibold
+                                  text-teal-700 hover:bg-teal-50 transition">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943
+                                         9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            View Communication Details
+                        </a>
+                    </div>
                 <?php endif; ?>
 
                 <!-- ═══════════════════════════════════════════════════════════
@@ -916,6 +1044,50 @@ ob_start();
         </div><!-- /right column -->
 
     </div><!-- /grid -->
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Process confirmation modal
+         Rendered as a direct child of the top-level wrapper (outside every
+         sticky / transformed / overflow ancestor) so that `position:fixed`
+         covers the full viewport without clipping.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div id="confirmModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="confirmModalTitle"
+         aria-describedby="confirmModalBody">
+
+        <!-- Full-viewport dimmed + blurred backdrop -->
+        <div id="confirmModalBackdrop"
+             class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-200 opacity-0"></div>
+
+        <!-- Dialog panel -->
+        <div id="confirmModalPanel"
+             class="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl
+                    border border-gray-100 transition-all duration-200 opacity-0"
+             style="transform:scale(0.95)">
+            <div class="p-6">
+                <h3 id="confirmModalTitle"
+                    class="text-base font-semibold text-gray-900 mb-2">Confirm Action</h3>
+                <p id="confirmModalBody" class="text-sm text-gray-600"></p>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100
+                        bg-gray-50 rounded-b-2xl">
+                <button type="button" id="confirmCancelBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-gray-700 bg-white border border-gray-200
+                               hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button type="button" id="confirmOkBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-white bg-primary hover:bg-blue-700 transition">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
 
 </div><!-- /space-y-6 -->
 
@@ -1058,27 +1230,42 @@ document.addEventListener('DOMContentLoaded', function () {
     if (confirmCancelBtn) {
         confirmCancelBtn.addEventListener('click', closeModal);
     }
+
+    // Backdrop click closes only when not yet submitting
     if (confirmBackdrop) {
-        confirmBackdrop.addEventListener('click', closeModal);
+        confirmBackdrop.addEventListener('click', function () {
+            if (!isSubmitting) closeModal();
+        });
     }
+
+    // Escape key closes only when not yet submitting
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !confirmModal.classList.contains('hidden') && !isSubmitting) {
+            closeModal();
+        }
+    });
 
     function openModal() {
         confirmModal.classList.remove('hidden');
         confirmModal.classList.add('flex');
+        document.body.style.overflow = 'hidden';   // prevent background scroll
         requestAnimationFrame(function () {
             confirmBackdrop.style.opacity = '1';
             confirmPanel.style.opacity    = '1';
             confirmPanel.style.transform  = 'scale(1)';
+            if (confirmCancelBtn) confirmCancelBtn.focus();
         });
     }
 
     function closeModal() {
+        if (isSubmitting) return;
         confirmBackdrop.style.opacity = '0';
         confirmPanel.style.opacity    = '0';
         confirmPanel.style.transform  = 'scale(0.95)';
         setTimeout(function () {
             confirmModal.classList.add('hidden');
             confirmModal.classList.remove('flex');
+            document.body.style.overflow = '';     // restore scroll
         }, 200);
     }
 

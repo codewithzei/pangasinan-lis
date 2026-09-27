@@ -137,6 +137,11 @@ class CommitteeReportsController
                 -- Hearing outcome
                 ch.outcome                          AS hearing_outcome,
 
+                -- Case fields (NULL when report came from the hearing workflow)
+                cc.id                               AS case_id,
+                cc.docket_number                    AS case_docket_number,
+                cc.nature_of_case                   AS case_nature,
+
                 -- Attachment count
                 (
                     SELECT COUNT(*)
@@ -155,6 +160,7 @@ class CommitteeReportsController
             LEFT JOIN user_accounts               ua  ON ua.id = cr.created_by
             LEFT JOIN user_info                   ui  ON ui.user_account_id = ua.id
             LEFT JOIN committee_hearings          ch  ON ch.id = cr.hearing_id
+            LEFT JOIN committee_cases             cc  ON cc.document_id = d.id
             WHERE 1=1 {$where}
             GROUP BY
                 cr.id, cr.report_type, cr.report_number, cr.summary_of_findings,
@@ -163,7 +169,8 @@ class CommitteeReportsController
                 d.id, d.tracking_number, d.subject_matter,
                 dt.name, dt.badge_color,
                 ds.name, ds.badge_color,
-                ch.outcome
+                ch.outcome,
+                cc.id, cc.docket_number, cc.nature_of_case
             ORDER BY cr.created_at DESC, cr.id DESC
             LIMIT ? OFFSET ?
         ";
@@ -296,6 +303,21 @@ class CommitteeReportsController
 
         // Resolve "Committee Report Created" status ID for button visibility
         $committeeReportCreatedId = $this->resolveStatusId('Committee Report Created');
+
+        // ── Linked case (present when the report came from the Cases workflow) ─
+        $linkedCase = null;
+        if (!empty($reportDocuments)) {
+            $primaryDocId = (int) $reportDocuments[0]['id'];
+            $ccStmt = $this->pdo->prepare("
+                SELECT cc.id, cc.docket_number, cc.nature_of_case,
+                       cc.complainant_details, cc.respondents, cc.final_outcome
+                FROM committee_cases cc
+                WHERE cc.document_id = ?
+                LIMIT 1
+            ");
+            $ccStmt->execute([$primaryDocId]);
+            $linkedCase = $ccStmt->fetch() ?: null;
+        }
 
         // Source route for breadcrumb back-link
         $fromReports = true;

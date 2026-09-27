@@ -40,7 +40,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 <div class="space-y-6">
 
     <!-- ── Page header ─────────────────────────────────────────────────────── -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10">
                 <div class="flex items-center gap-3">

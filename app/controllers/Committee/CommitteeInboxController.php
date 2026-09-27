@@ -108,9 +108,32 @@ class CommitteeInboxController
             $params[] = $userId;
         } elseif ($view === 'accepted') {
             $where[] = "da.decision = 'ACCEPTED'";
+            $where[] = 'da.completed_at IS NULL';
             $where[] = '(da.accepted_by = ? OR da.assigned_to_user_id = ?)';
             $params[] = $userId;
             $params[] = $userId;
+            // Exclude documents that have already been processed into their
+            // respective workflow (Cases or Communications).
+            $where[] = "(
+                (SELECT dt_inner.name FROM document_types dt_inner WHERE dt_inner.id = d.document_type_id LIMIT 1)
+                    NOT IN ('Complaint', 'Administrative Cases', 'Communication')
+                OR (
+                    (SELECT dt_inner.name FROM document_types dt_inner WHERE dt_inner.id = d.document_type_id LIMIT 1)
+                        IN ('Complaint', 'Administrative Cases')
+                    AND NOT EXISTS (
+                        SELECT 1 FROM committee_cases cc
+                        WHERE cc.document_id = da.document_id
+                    )
+                )
+                OR (
+                    (SELECT dt_inner.name FROM document_types dt_inner WHERE dt_inner.id = d.document_type_id LIMIT 1)
+                        = 'Communication'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM committee_communications ccomm
+                        WHERE ccomm.document_id = da.document_id
+                    )
+                )
+            )";
         }
 
         if ($search !== '') {
@@ -190,6 +213,12 @@ class CommitteeInboxController
         $errors  = flash_get('errors') ?? [];
 
         // ── Statistics cards (user-scoped) ────────────────────────────────────
+        // The accepted_count mirrors the Accepted tab filter exactly:
+        //   - decision = ACCEPTED, completed_at IS NULL, owned by this user
+        //   - Complaints / Administrative Cases with an existing committee_cases
+        //     record are excluded (already processed into Cases workflow).
+        //   - Communications with an existing committee_communications record
+        //     are excluded (already processed into Communications workflow).
         $statsStmt = $this->pdo->prepare("
             SELECT
                 COUNT(DISTINCT CASE
@@ -200,12 +229,34 @@ class CommitteeInboxController
                     THEN da.document_id
                 END) AS pending_count,
                 COUNT(DISTINCT CASE
-                    WHEN da.decision = 'ACCEPTED'
+                    WHEN da.decision     = 'ACCEPTED'
+                     AND da.completed_at IS NULL
                      AND (da.accepted_by = ? OR da.assigned_to_user_id = ?)
+                     AND (
+                         (SELECT dt_s.name FROM document_types dt_s WHERE dt_s.id = d.document_type_id LIMIT 1)
+                             NOT IN ('Complaint', 'Administrative Cases', 'Communication')
+                         OR (
+                             (SELECT dt_s.name FROM document_types dt_s WHERE dt_s.id = d.document_type_id LIMIT 1)
+                                 IN ('Complaint', 'Administrative Cases')
+                             AND NOT EXISTS (
+                                 SELECT 1 FROM committee_cases cc
+                                 WHERE cc.document_id = da.document_id
+                             )
+                         )
+                         OR (
+                             (SELECT dt_s.name FROM document_types dt_s WHERE dt_s.id = d.document_type_id LIMIT 1)
+                                 = 'Communication'
+                             AND NOT EXISTS (
+                                 SELECT 1 FROM committee_communications ccomm
+                                 WHERE ccomm.document_id = da.document_id
+                             )
+                         )
+                     )
                     THEN da.document_id
                 END) AS accepted_count,
                 COUNT(DISTINCT da.document_id) AS total_count
             FROM document_assignments da
+            INNER JOIN documents d ON da.document_id = d.id
             WHERE da.assigned_to_role_id = ?
               AND da.phase               = 'COMMITTEE'
         ");
@@ -439,6 +490,56 @@ class CommitteeInboxController
 
         $canAccept  = $isPendingAssignment;
         $canProcess = $isOwnedAcceptedAssignment;
+
+        // ── Committee Cases: check eligibility + existence for the button ─────
+        // Eligible document types for the Cases workflow.
+        $caseEligibleTypes = ['Administrative Cases', 'Complaint'];
+        $isCaseEligibleType = in_array(
+            $document['document_type_name'] ?? '',
+            $caseEligibleTypes,
+            true
+        );
+
+        // Check if a case record already exists for this document.
+        $existingCase = null;
+        if ($isCaseEligibleType) {
+            $existingCaseStmt = $this->pdo->prepare(
+                "SELECT id, docket_number FROM committee_cases WHERE document_id = ? LIMIT 1"
+            );
+            $existingCaseStmt->execute([$documentId]);
+            $existingCase = $existingCaseStmt->fetch() ?: null;
+        }
+
+        // Show the "Proceed to Cases" button only when:
+        //  1. Document type is eligible.
+        //  2. This user owns the accepted assignment.
+        //  3. No case record exists yet.
+        $showProceedToCases = $isCaseEligibleType
+            && $isOwnedAcceptedAssignment
+            && $existingCase === null;
+
+        // ── Committee Communications: check eligibility + existence ───────────
+        // Eligible document type for the Communications workflow.
+        $commEligibleType   = 'Communication';
+        $isCommEligibleType = ($document['document_type_name'] ?? '') === $commEligibleType;
+
+        // Check if a communication record already exists for this document.
+        $existingComm = null;
+        if ($isCommEligibleType) {
+            $existingCommStmt = $this->pdo->prepare(
+                "SELECT id, subject FROM committee_communications WHERE document_id = ? LIMIT 1"
+            );
+            $existingCommStmt->execute([$documentId]);
+            $existingComm = $existingCommStmt->fetch() ?: null;
+        }
+
+        // Show "Proceed to Communications" button only when:
+        //  1. Document type is "Communication".
+        //  2. This user owns the accepted assignment.
+        //  3. No communication record exists yet.
+        $showProceedToComms = $isCommEligibleType
+            && $isOwnedAcceptedAssignment
+            && $existingComm === null;
 
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
         require __DIR__ . '/../../../resources/views/committee/inbox/show.php';

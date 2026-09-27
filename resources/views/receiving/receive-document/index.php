@@ -19,7 +19,7 @@ ob_start();
 <div class="space-y-6">
 
     <!-- Page Header -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-800 via-primary to-indigo-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10">
                 <p class="text-sm font-medium text-blue-100">RECEIVING SECTION</p>

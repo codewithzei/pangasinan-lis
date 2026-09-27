@@ -62,22 +62,37 @@ class CommitteeReferredController
             $tab = 'referred';
         }
 
-        $search  = trim($_GET['search'] ?? '');
-        $page    = max(1, (int) ($_GET['page'] ?? 1));
-        $perPage = 20;
-        $offset  = ($page - 1) * $perPage;
+        $search         = trim($_GET['search']        ?? '');
+        $filterDocType  = (int) ($_GET['doc_type']      ?? 0);
+        $page           = max(1, (int) ($_GET['page']   ?? 1));
+        $perPage        = 20;
+        $offset         = ($page - 1) * $perPage;
 
         $total      = 0;
         $totalPages = 1;
         $documents  = [];
 
-        // ── Search clause helper ──────────────────────────────────────────────
-        $searchWhere  = '';
-        $searchParams = [];
+        // ── Search / filter clause helpers ────────────────────────────────────
+        $filterConditions = [];
+        $filterParams     = [];
+
         if ($search !== '') {
-            $searchWhere  = ' AND (d.tracking_number LIKE ? OR d.subject_matter LIKE ?)';
-            $searchParams = ["%{$search}%", "%{$search}%"];
+            $filterConditions[] = '(d.tracking_number LIKE ? OR d.subject_matter LIKE ?)';
+            $filterParams[]     = "%{$search}%";
+            $filterParams[]     = "%{$search}%";
         }
+
+        // Document-type filter is applicable to every tab except for_opinion
+        // (for_opinion has no doc-type column in its aggregate summary, but the
+        // filter still applies because we JOIN document_types in every query).
+        if ($filterDocType > 0) {
+            $filterConditions[] = 'd.document_type_id = ?';
+            $filterParams[]     = $filterDocType;
+        }
+
+        $filterWhere  = count($filterConditions) > 0
+            ? ' AND ' . implode(' AND ', $filterConditions)
+            : '';
 
         switch ($tab) {
 
@@ -87,7 +102,7 @@ class CommitteeReferredController
             // for the latest cycle) AND have not been resolved.
             case 'referred':
                 [$total, $totalPages, $documents] = $this->queryReferredTab(
-                    $searchWhere, $searchParams, $perPage, $offset
+                    $filterWhere, $filterParams, $perPage, $offset
                 );
                 break;
 
@@ -96,7 +111,7 @@ class CommitteeReferredController
             // and have not yet been resolved (no committee_opinion_resolutions row).
             case 'for_opinion':
                 [$total, $totalPages, $documents] = $this->queryForOpinionTab(
-                    $searchWhere, $searchParams, $perPage, $offset
+                    $filterWhere, $filterParams, $perPage, $offset
                 );
                 break;
 
@@ -104,7 +119,7 @@ class CommitteeReferredController
             // Documents resolved as PROCEED_TO_AGENDA but no agenda row yet.
             case 'ready_for_agenda':
                 [$total, $totalPages, $documents] = $this->queryReadyForAgendaTab(
-                    $searchWhere, $searchParams, $perPage, $offset
+                    $filterWhere, $filterParams, $perPage, $offset
                 );
                 break;
 
@@ -112,7 +127,7 @@ class CommitteeReferredController
             // Documents resolved as WITHDRAW_DOCUMENT.
             case 'withdrawn':
                 [$total, $totalPages, $documents] = $this->queryWithdrawnTab(
-                    $searchWhere, $searchParams, $perPage, $offset
+                    $filterWhere, $filterParams, $perPage, $offset
                 );
                 break;
         }
@@ -122,6 +137,16 @@ class CommitteeReferredController
         $forOpinionCount     = $this->countForOpinionTab();
         $readyForAgendaCount = $this->countReadyForAgendaTab();
         $withdrawnCount      = $this->countWithdrawnTab();
+
+        // ── Document-type dropdown (used by view filter) ─────────────────────
+        // Only fetch types that actually appear in the referred workflow so
+        // the dropdown stays relevant.  A simple lookup from document_types
+        // is sufficient because the view will only show applicable options.
+        $documentTypes = $this->pdo->query(
+            "SELECT id, name FROM document_types
+             WHERE is_active = 1 AND is_deleted = 0
+             ORDER BY name ASC"
+        )->fetchAll();
 
         $success = flash_get('success');
         $error   = flash_get('error');
@@ -1137,7 +1162,7 @@ class CommitteeReferredController
      * REFERRED tab: completed cycles with no endorsements for the latest cycle
      * AND no resolution. Documents still waiting to be sent to opinion offices.
      */
-    private function queryReferredTab(string $searchWhere, array $searchParams, int $perPage, int $offset): array
+    private function queryReferredTab(string $filterWhere, array $filterParams, int $perPage, int $offset): array
     {
         $countStmt = $this->pdo->prepare("
             SELECT COUNT(DISTINCT d.id) AS total
@@ -1153,9 +1178,9 @@ class CommitteeReferredController
             -- No resolution for this cycle
             LEFT JOIN committee_opinion_resolutions cor ON cor.cycle_id = cc.id
             WHERE cce.id IS NULL AND cor.id IS NULL
-            {$searchWhere}
+            {$filterWhere}
         ");
-        $countStmt->execute($searchParams);
+        $countStmt->execute($filterParams);
         $total      = (int) $countStmt->fetchColumn();
         $totalPages = max(1, (int) ceil($total / $perPage));
 
@@ -1204,11 +1229,11 @@ class CommitteeReferredController
             LEFT JOIN user_accounts rb  ON rb.id  = dr.routed_by
             LEFT JOIN user_info     rbi ON rbi.user_account_id = rb.id
             WHERE cce.id IS NULL AND cor.id IS NULL
-            {$searchWhere}
+            {$filterWhere}
             ORDER BY de.created_at DESC, d.id DESC
             LIMIT ? OFFSET ?
         ");
-        $listStmt->execute([...$searchParams, $perPage, $offset]);
+        $listStmt->execute([...$filterParams, $perPage, $offset]);
         $documents = $listStmt->fetchAll();
 
         return [$total, $totalPages, $documents];
@@ -1218,7 +1243,7 @@ class CommitteeReferredController
      * FOR OPINION tab: documents with endorsements for the latest cycle,
      * no resolution yet.
      */
-    private function queryForOpinionTab(string $searchWhere, array $searchParams, int $perPage, int $offset): array
+    private function queryForOpinionTab(string $filterWhere, array $filterParams, int $perPage, int $offset): array
     {
         $countStmt = $this->pdo->prepare("
             SELECT COUNT(DISTINCT d.id) AS total
@@ -1232,9 +1257,9 @@ class CommitteeReferredController
             INNER JOIN committee_cycle_endorsements cce ON cce.cycle_id = cc.id
             LEFT JOIN committee_opinion_resolutions cor ON cor.cycle_id = cc.id
             WHERE cor.id IS NULL
-            {$searchWhere}
+            {$filterWhere}
         ");
-        $countStmt->execute($searchParams);
+        $countStmt->execute($filterParams);
         $total      = (int) $countStmt->fetchColumn();
         $totalPages = max(1, (int) ceil($total / $perPage));
 
@@ -1267,14 +1292,14 @@ class CommitteeReferredController
             LEFT JOIN document_types    dt ON dt.id = d.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             WHERE cor.id IS NULL
-            {$searchWhere}
+            {$filterWhere}
             GROUP BY d.id, d.tracking_number, d.subject_matter,
                      dt.name, dt.badge_color, ds.name, ds.badge_color,
                      cc.id, cc.cycle_number
             ORDER BY d.id DESC
             LIMIT ? OFFSET ?
         ");
-        $listStmt->execute([...$searchParams, $perPage, $offset]);
+        $listStmt->execute([...$filterParams, $perPage, $offset]);
         $documents = $listStmt->fetchAll();
 
         // For each document also load its per-office endorsement rows
@@ -1289,7 +1314,7 @@ class CommitteeReferredController
     /**
      * READY FOR AGENDA tab: resolved as PROCEED_TO_AGENDA, no agenda yet.
      */
-    private function queryReadyForAgendaTab(string $searchWhere, array $searchParams, int $perPage, int $offset): array
+    private function queryReadyForAgendaTab(string $filterWhere, array $filterParams, int $perPage, int $offset): array
     {
         $countStmt = $this->pdo->prepare("
             SELECT COUNT(DISTINCT d.id) AS total
@@ -1304,9 +1329,9 @@ class CommitteeReferredController
                 ON cor.cycle_id = cc.id AND cor.resolution = 'PROCEED_TO_AGENDA'
             LEFT JOIN agendas ag ON ag.cycle_id = cc.id
             WHERE ag.id IS NULL
-            {$searchWhere}
+            {$filterWhere}
         ");
-        $countStmt->execute($searchParams);
+        $countStmt->execute($filterParams);
         $total      = (int) $countStmt->fetchColumn();
         $totalPages = max(1, (int) ceil($total / $perPage));
 
@@ -1336,11 +1361,11 @@ class CommitteeReferredController
             LEFT JOIN document_types    dt ON dt.id = d.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             WHERE ag.id IS NULL
-            {$searchWhere}
+            {$filterWhere}
             ORDER BY cor.resolved_at DESC, d.id DESC
             LIMIT ? OFFSET ?
         ");
-        $listStmt->execute([...$searchParams, $perPage, $offset]);
+        $listStmt->execute([...$filterParams, $perPage, $offset]);
         $documents = $listStmt->fetchAll();
 
         return [$total, $totalPages, $documents];
@@ -1349,7 +1374,7 @@ class CommitteeReferredController
     /**
      * WITHDRAWN tab: resolved as WITHDRAW_DOCUMENT.
      */
-    private function queryWithdrawnTab(string $searchWhere, array $searchParams, int $perPage, int $offset): array
+    private function queryWithdrawnTab(string $filterWhere, array $filterParams, int $perPage, int $offset): array
     {
         $countStmt = $this->pdo->prepare("
             SELECT COUNT(DISTINCT d.id) AS total
@@ -1362,9 +1387,9 @@ class CommitteeReferredController
             INNER JOIN committee_cycles cc ON cc.id = lc.max_cycle_id
             INNER JOIN committee_opinion_resolutions cor
                 ON cor.cycle_id = cc.id AND cor.resolution = 'WITHDRAW_DOCUMENT'
-            WHERE 1=1 {$searchWhere}
+            WHERE 1=1 {$filterWhere}
         ");
-        $countStmt->execute($searchParams);
+        $countStmt->execute($filterParams);
         $total      = (int) $countStmt->fetchColumn();
         $totalPages = max(1, (int) ceil($total / $perPage));
 
@@ -1398,11 +1423,11 @@ class CommitteeReferredController
             LEFT JOIN document_statuses ds  ON ds.id = d.current_status_id
             LEFT JOIN user_accounts     ua  ON ua.id = cor.resolved_by
             LEFT JOIN user_info         ui  ON ui.user_account_id = ua.id
-            WHERE 1=1 {$searchWhere}
+            WHERE 1=1 {$filterWhere}
             ORDER BY cor.resolved_at DESC, d.id DESC
             LIMIT ? OFFSET ?
         ");
-        $listStmt->execute([...$searchParams, $perPage, $offset]);
+        $listStmt->execute([...$filterParams, $perPage, $offset]);
         $documents = $listStmt->fetchAll();
 
         return [$total, $totalPages, $documents];

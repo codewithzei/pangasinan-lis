@@ -19,7 +19,7 @@ $accent = $accent ?? 'primary';
 
 <div class="space-y-6">
 
-    <section class="overflow-hidden rounded-2xl bg-linear-to-br from-primary via-primary to-blue-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
@@ -276,9 +276,8 @@ $accent = $accent ?? 'primary';
 
 </div>
 
-<div id="communicationCategoryModal" class="fixed inset-0 z-100 hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="communicationCategoryModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="communicationCategoryModalPanel" class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
+<div id="communicationCategoryModal" class="fixed inset-0 z-100 hidden items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" role="dialog" aria-modal="true">
+    <div id="communicationCategoryModalPanel" class="relative w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
         <form id="communicationCategoryForm" method="POST" action="<?= BASE_URL ?>/master/communication-categories/store">
             <input type="hidden" name="id" id="communicationCategoryId" value="">
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
@@ -347,9 +346,8 @@ $accent = $accent ?? 'primary';
     </div>
 </div>
 
-<div id="confirmModal" class="fixed inset-0 z-100 hidden items-center justify-center" role="dialog" aria-modal="true">
-    <div id="confirmModalBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
-    <div id="confirmModalPanel" class="relative z-10 w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
+<div id="confirmModal" class="fixed inset-0 z-100 hidden items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" role="dialog" aria-modal="true">
+    <div id="confirmModalPanel" class="relative w-full max-w-sm mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200">
         <div class="p-6">
             <div class="flex items-start gap-4">
                 <div id="confirmIconBox" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
@@ -447,12 +445,11 @@ function openCommunicationCategoryModal() {
 
     const modal = document.getElementById('communicationCategoryModal');
     const panel = document.getElementById('communicationCategoryModalPanel');
-    const backdrop = document.getElementById('communicationCategoryModalBackdrop');
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     requestAnimationFrame(() => {
-        backdrop.classList.remove('opacity-0');
+        modal.style.opacity = '1';
         panel.classList.remove('scale-95', 'opacity-0');
         panel.classList.add('scale-100', 'opacity-100');
     });
@@ -466,9 +463,8 @@ function closeCommunicationCategoryModal() {
 
     const modal = document.getElementById('communicationCategoryModal');
     const panel = document.getElementById('communicationCategoryModalPanel');
-    const backdrop = document.getElementById('communicationCategoryModalBackdrop');
 
-    backdrop.classList.add('opacity-0');
+    modal.style.opacity = '0';
     panel.classList.remove('scale-100', 'opacity-100');
     panel.classList.add('scale-95', 'opacity-0');
 
@@ -478,7 +474,7 @@ function closeCommunicationCategoryModal() {
     }, 200);
 }
 
-document.getElementById('communicationCategoryModalBackdrop')?.addEventListener('click', closeCommunicationCategoryModal);
+document.getElementById('communicationCategoryModal')?.addEventListener('click', function(e) { if (e.target === document.getElementById('communicationCategoryModal')) closecommunicationCategoryModal(); });
 
 function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', type = 'danger', onConfirm }) {
     if (confirmModalOpen) return;
@@ -510,12 +506,10 @@ function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText 
 
     const modal = document.getElementById('confirmModal');
     const panel = document.getElementById('confirmModalPanel');
-    const backdrop = document.getElementById('confirmModalBackdrop');
-
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     requestAnimationFrame(() => {
-        backdrop.classList.remove('opacity-0');
+        modal.style.opacity = '1';
         panel.classList.remove('scale-95', 'opacity-0');
         panel.classList.add('scale-100', 'opacity-100');
     });
@@ -528,9 +522,7 @@ function closeConfirmModal() {
 
     const modal = document.getElementById('confirmModal');
     const panel = document.getElementById('confirmModalPanel');
-    const backdrop = document.getElementById('confirmModalBackdrop');
-
-    backdrop.classList.add('opacity-0');
+    modal.style.opacity = '0';
     panel.classList.remove('scale-100', 'opacity-100');
     panel.classList.add('scale-95', 'opacity-0');
 
@@ -546,7 +538,7 @@ function executeConfirmAction() {
     if (typeof fn === 'function') fn();
 }
 
-document.getElementById('confirmModalBackdrop')?.addEventListener('click', closeConfirmModal);
+document.getElementById('confirmModal')?.addEventListener('click', function(e) { if (e.target === document.getElementById('confirmModal')) closeConfirmModal(); });
 
 async function editCommunicationCategory(id) {
     try {
@@ -576,11 +568,10 @@ async function editCommunicationCategory(id) {
         communicationCategoryModalOpen = true;
         const modal = document.getElementById('communicationCategoryModal');
         const panel = document.getElementById('communicationCategoryModalPanel');
-        const backdrop = document.getElementById('communicationCategoryModalBackdrop');
         modal.classList.remove('hidden');
         modal.classList.add('flex');
         requestAnimationFrame(() => {
-            backdrop.classList.remove('opacity-0');
+            modal.style.opacity = '1';
             panel.classList.remove('scale-95', 'opacity-0');
             panel.classList.add('scale-100', 'opacity-100');
         });

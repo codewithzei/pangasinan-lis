@@ -90,14 +90,14 @@ ob_start();
 <div class="space-y-6">
 
     <!-- Page header -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-7 sm:px-8">
             <div class="relative z-10">
                 <p class="text-sm font-medium text-blue-100">COMMITTEE / HEARING / RECORD OUTCOME</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     Committee Hearing
                 </h1>
-                <p class="mt-1 font-mono text-sm text-blue-200">
+                <p class="mt-1 font-mono text-sm text-blue-100">
                     <?= htmlspecialchars($document['tracking_number'] ?? '—') ?>
                 </p>
             </div>

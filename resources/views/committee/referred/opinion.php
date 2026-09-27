@@ -38,14 +38,14 @@ ob_start();
 <div class="space-y-6">
 
     <!-- Page header -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-violet-700 via-violet-600 to-purple-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-7 sm:px-8">
             <div class="relative z-10">
-                <p class="text-sm font-medium text-violet-100">COMMITTEE / REFERRED / FOR OPINION</p>
+                <p class="text-sm font-medium text-blue-100">COMMITTEE / REFERRED / FOR OPINION</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     Submit Opinion
                 </h1>
-                <p class="mt-1 text-sm text-violet-100">
+                <p class="mt-1 text-sm text-blue-100">
                     Endorsement #<?= $endorsementNumber ?> &middot;
                     <?= htmlspecialchars($officeName) ?>
                 </p>

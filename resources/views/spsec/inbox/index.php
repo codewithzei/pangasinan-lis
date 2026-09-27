@@ -29,6 +29,7 @@ $totalCount    = $totalCount    ?? 0;
 $success       = $success       ?? null;
 $error         = $error         ?? null;
 $errors        = $errors        ?? [];
+$currentUserId = auth_id();
 
 ob_start();
 
@@ -58,7 +59,7 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
 <div class="space-y-6">
 
     <!-- Page header ---------------------------------------------------------->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 max-w-3xl">
                 <p class="text-sm font-medium text-blue-100">SP SECRETARY / DOCUMENT PROCESSING</p>
@@ -215,7 +216,9 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                             <th class="px-6 py-3 font-medium">Accepted By</th>
                             <th class="px-6 py-3 font-medium">Accepted At</th>
                         <?php endif; ?>
-                        <th class="px-6 py-3 font-medium text-right">Action</th>
+                        <th class="px-6 py-3 font-medium text-right">
+                            <?= $currentView === 'accepted' ? 'Actions' : 'Action' ?>
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -324,15 +327,66 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                     </td>
                                 <?php endif; ?>
                                 <td class="px-6 py-4 text-right">
-                                    <a href="<?= BASE_URL ?>/spsec/inbox/show?id=<?= (int) $row['document_id'] ?>"
-                                       class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:bg-blue-50 hover:text-primary transition"
-                                       title="View Details">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                        </svg>
-                                        <?= $currentView === 'inbox' ? 'Process' : 'View Details' ?>
-                                    </a>
+                                    <div class="inline-flex items-center gap-2 flex-wrap justify-end">
+                                        <?php
+                                        $isOwner = $currentView === 'accepted'
+                                            && (
+                                                (int)($row['accepted_by'] ?? 0) === $currentUserId
+                                                || (int)($row['assigned_to_user_id'] ?? 0) === $currentUserId
+                                            );
+                                        ?>
+                                        <!-- View / Process link -->
+                                        <a href="<?= BASE_URL ?>/spsec/inbox/show?id=<?= (int) $row['document_id'] ?>"
+                                           class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:bg-blue-50 hover:text-primary transition"
+                                           title="<?= $currentView === 'inbox' ? 'Process Document' : 'View Details' ?>">
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                            </svg>
+                                            <?= $currentView === 'inbox' ? 'Process' : 'Details' ?>
+                                        </a>
+
+                                        <?php if ($isOwner): ?>
+                                            <!-- Route to Plenary -->
+                                            <form method="POST" action="<?= BASE_URL ?>/spsec/inbox/process"
+                                                  onsubmit="return confirm('Route document <?= htmlspecialchars($row['tracking_number']) ?> to Plenary?');">
+                                                <input type="hidden" name="document_id" value="<?= (int) $row['document_id'] ?>">
+                                                <input type="hidden" name="action"      value="route_plenary">
+                                                <button type="submit"
+                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 transition"
+                                                        title="Route to Plenary">
+                                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                                    </svg>
+                                                    Plenary
+                                                </button>
+                                            </form>
+
+                                            <!-- Route to Committee (links to detail page for committee selection) -->
+                                            <a href="<?= BASE_URL ?>/spsec/inbox/show?id=<?= (int) $row['document_id'] ?>#route-committee"
+                                               class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition"
+                                               title="Route to Committee">
+                                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 100-8 4 4 0 000 8z"/>
+                                                </svg>
+                                                Committee
+                                            </a>
+
+                                            <?php
+                                            // Noted only for Communication documents
+                                            $isCommunication = stripos($row['document_type_name'] ?? '', 'communication') !== false;
+                                            if ($isCommunication): ?>
+                                                <a href="<?= BASE_URL ?>/spsec/inbox/show?id=<?= (int) $row['document_id'] ?>#noted"
+                                                   class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition"
+                                                   title="Mark as Noted">
+                                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                    </svg>
+                                                    Noted
+                                                </a>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -342,46 +396,44 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
         </div>
 
         <!-- Pagination -------------------------------------------------------->
-        <?php if ($totalPages > 1): ?>
-            <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
-                <p class="text-xs text-gray-500">
-                    Showing page <span class="font-medium text-gray-700"><?= $page ?></span> of
-                    <span class="font-medium text-gray-700"><?= $totalPages ?></span>
-                    (<?= $total ?> total records)
-                </p>
-                <div class="flex items-center gap-1">
-                    <?php
-                    $query = ['view' => $currentView];
-                    if ($search !== '') $query['search'] = $search;
-                    $queryString = !empty($query) ? '&' . http_build_query($query) : '';
-                    ?>
-                    <?php if ($page > 1): ?>
-                        <a href="?page=<?= $page - 1 ?><?= $queryString ?>"
-                           class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-                            Prev
-                        </a>
-                    <?php endif; ?>
-                    <?php
-                    $startPage = max(1, $page - 2);
-                    $endPage   = min($totalPages, $page + 2);
-                    for ($i = $startPage; $i <= $endPage; $i++):
-                    ?>
-                        <a href="?page=<?= $i ?><?= $queryString ?>"
-                           class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page
-                               ? 'border-primary bg-primary text-white'
-                               : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>">
-                            <?= $i ?>
-                        </a>
-                    <?php endfor; ?>
-                    <?php if ($page < $totalPages): ?>
-                        <a href="?page=<?= $page + 1 ?><?= $queryString ?>"
-                           class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-                            Next
-                        </a>
-                    <?php endif; ?>
-                </div>
+        <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
+            <p class="text-xs text-gray-500">
+                Showing page <span class="font-medium text-gray-700"><?= $page ?></span> of
+                <span class="font-medium text-gray-700"><?= $totalPages ?></span>
+                (<?= $total ?> total records)
+            </p>
+            <div class="flex items-center gap-1">
+                <?php
+                $query = ['view' => $currentView];
+                if ($search !== '') $query['search'] = $search;
+                $queryString = !empty($query) ? '&' . http_build_query($query) : '';
+                ?>
+                <?php if ($page > 1): ?>
+                    <a href="?page=<?= $page - 1 ?><?= $queryString ?>"
+                       class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                        Prev
+                    </a>
+                <?php endif; ?>
+                <?php
+                $startPage = max(1, $page - 2);
+                $endPage   = min($totalPages, $page + 2);
+                for ($i = $startPage; $i <= $endPage; $i++):
+                ?>
+                    <a href="?page=<?= $i ?><?= $queryString ?>"
+                       class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page
+                           ? 'border-primary bg-primary text-white'
+                           : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>">
+                        <?= $i ?>
+                    </a>
+                <?php endfor; ?>
+                <?php if ($page < $totalPages): ?>
+                    <a href="?page=<?= $page + 1 ?><?= $queryString ?>"
+                       class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                        Next
+                    </a>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
+        </div>
     </section>
 
 </div>

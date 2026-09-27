@@ -41,14 +41,14 @@ ob_start();
 <div class="space-y-6">
 
     <!-- Page header -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600 via-orange-600 to-red-600 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-7 sm:px-8">
             <div class="relative z-10">
-                <p class="text-sm font-medium text-orange-100">COMMITTEE / REFERRED / RESOLVE CYCLE</p>
+                <p class="text-sm font-medium text-blue-100">COMMITTEE / REFERRED / RESOLVE CYCLE</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     Resolve Committee Cycle
                 </h1>
-                <p class="mt-1 text-sm text-orange-100">
+                <p class="mt-1 text-sm text-blue-100">
                     Choose how to proceed: schedule an agenda or withdraw the document.
                 </p>
             </div>

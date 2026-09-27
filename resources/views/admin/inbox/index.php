@@ -58,7 +58,7 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
 <div class="space-y-6">
 
     <!-- Page header ---------------------------------------------------------->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-blue-700 shadow-md">
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 max-w-3xl">
                 <p class="text-sm font-medium text-blue-100">ADMIN / ROUTING</p>
@@ -344,46 +344,44 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
         </div>
 
         <!-- Pagination -------------------------------------------------------->
-        <?php if ($totalPages > 1): ?>
-            <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
-                <p class="text-xs text-gray-500">
-                    Showing page <span class="font-medium text-gray-700"><?= $page ?></span> of
-                    <span class="font-medium text-gray-700"><?= $totalPages ?></span>
-                    (<?= $total ?> total records)
-                </p>
-                <div class="flex items-center gap-1">
-                    <?php
-                    $query = ['view' => $currentView];
-                    if ($search !== '') $query['search'] = $search;
-                    $queryString = !empty($query) ? '&' . http_build_query($query) : '';
-                    ?>
-                    <?php if ($page > 1): ?>
-                        <a href="?page=<?= $page - 1 ?><?= $queryString ?>"
-                           class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-                            Prev
-                        </a>
-                    <?php endif; ?>
-                    <?php
-                    $startPage = max(1, $page - 2);
-                    $endPage = min($totalPages, $page + 2);
-                    for ($i = $startPage; $i <= $endPage; $i++):
-                    ?>
-                        <a href="?page=<?= $i ?><?= $queryString ?>"
-                           class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page
+        <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
+            <p class="text-xs text-gray-500">
+                Showing page <span class="font-medium text-gray-700"><?= $page ?></span> of
+                <span class="font-medium text-gray-700"><?= $totalPages ?></span>
+                (<?= $total ?> total records)
+            </p>
+            <div class="flex items-center gap-1">
+                <?php
+                $query = ['view' => $currentView];
+                if ($search !== '') $query['search'] = $search;
+                $queryString = !empty($query) ? '&' . http_build_query($query) : '';
+                ?>
+                <?php if ($page > 1): ?>
+                    <a href="?page=<?= $page - 1 ?><?= $queryString ?>"
+                       class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                        Prev
+                    </a>
+                <?php endif; ?>
+                <?php
+                $startPage = max(1, $page - 2);
+                $endPage   = min($totalPages, $page + 2);
+                for ($i = $startPage; $i <= $endPage; $i++):
+                ?>
+                    <a href="?page=<?= $i ?><?= $queryString ?>"
+                       class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page
                            ? 'border-primary bg-primary text-white'
-                               : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>">
-                            <?= $i ?>
-                        </a>
-                    <?php endfor; ?>
-                    <?php if ($page < $totalPages): ?>
-                        <a href="?page=<?= $page + 1 ?><?= $queryString ?>"
-                           class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-                            Next
-                        </a>
-                    <?php endif; ?>
-                </div>
+                           : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>">
+                        <?= $i ?>
+                    </a>
+                <?php endfor; ?>
+                <?php if ($page < $totalPages): ?>
+                    <a href="?page=<?= $page + 1 ?><?= $queryString ?>"
+                       class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                        Next
+                    </a>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
+        </div>
     </section>
 
 </div>
