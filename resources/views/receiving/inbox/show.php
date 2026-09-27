@@ -33,6 +33,7 @@ $success         = $success         ?? null;
 $error           = $error           ?? null;
 $errors          = $errors          ?? [];
 $old             = $old             ?? [];
+$isAccepted      = $isAccepted      ?? false;
 
 ob_start();
 
@@ -68,12 +69,14 @@ function normalizeTimeForInput(?string $time): string {
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10">
-                <p class="text-sm font-medium text-blue-100">RECEIVING / INBOX / EDIT DOCUMENT</p>
+                <p class="text-sm font-medium text-blue-100">RECEIVING / INBOX / <?= $isAccepted ? 'EDIT DOCUMENT' : 'VIEW RETURNED DOCUMENT' ?></p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                    Edit Returned Document
+                    <?= $isAccepted ? 'Edit Returned Document' : 'Returned Document' ?>
                 </h1>
                 <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
-                    Correct the document details and re-submit to Admin for processing.
+                    <?= $isAccepted
+                        ? 'Correct the document details and re-submit to Admin for processing.'
+                        : 'Review the return reason and accept this document to begin corrections.' ?>
                 </p>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
@@ -172,7 +175,7 @@ function normalizeTimeForInput(?string $time): string {
                     <span class="font-medium text-primary"><?= htmlspecialchars($document['tracking_number'] ?? '—') ?></span>
                 </p>
             </div>
-            <a href="<?= BASE_URL ?>/receiving/inbox"
+            <a href="<?= BASE_URL ?>/receiving/inbox<?= $isAccepted ? '?view=accepted' : '' ?>"
                class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
                 ← Back to Inbox
             </a>
@@ -207,6 +210,245 @@ function normalizeTimeForInput(?string $time): string {
             </div>
         </div>
     </section>
+
+<?php if (!$isAccepted): ?>
+    <!-- ═══════════════════════════════════════════════════════════════════
+         PENDING STATE — document not yet accepted by Receiving Staff.
+         Show a read-only summary and a single Accept button.
+         Editing and routing are blocked until the document is accepted.
+    ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Read-only document summary -->
+    <section class="rounded-2xl border border-gray-200 bg-white p-6">
+        <h2 class="text-lg font-semibold text-gray-900">Document Details</h2>
+        <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            <div>
+                <dt class="text-xs font-medium text-gray-500">Subject Matter</dt>
+                <dd class="mt-1 text-sm text-gray-900"><?= nl2br(htmlspecialchars($document['subject_matter'] ?? '—')) ?></dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500">Document Type</dt>
+                <dd class="mt-1">
+                    <?php if (!empty($document['document_type_badge_color'])): ?>
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
+                              style="background-color: <?= htmlspecialchars($document['document_type_badge_color']) ?>;">
+                            <?= htmlspecialchars($document['document_type_name'] ?? '') ?>
+                        </span>
+                    <?php else: ?>
+                        <span class="text-sm text-gray-900"><?= htmlspecialchars($document['document_type_name'] ?? '—') ?></span>
+                    <?php endif; ?>
+                </dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500">Source Type</dt>
+                <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_type'] ?? '—') ?></dd>
+            </div>
+            <?php if (!empty($document['external_office_name'])): ?>
+            <div>
+                <dt class="text-xs font-medium text-gray-500">External Office</dt>
+                <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['external_office_name']) ?></dd>
+            </div>
+            <?php elseif (!empty($document['hospital_name'])): ?>
+            <div>
+                <dt class="text-xs font-medium text-gray-500">Hospital</dt>
+                <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['hospital_name']) ?></dd>
+            </div>
+            <?php elseif (!empty($document['source_name'])): ?>
+            <div>
+                <dt class="text-xs font-medium text-gray-500">Source Name</dt>
+                <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_name']) ?></dd>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($document['remarks'])): ?>
+            <div class="sm:col-span-2">
+                <dt class="text-xs font-medium text-gray-500">Remarks</dt>
+                <dd class="mt-1 text-sm text-gray-900"><?= nl2br(htmlspecialchars($document['remarks'])) ?></dd>
+            </div>
+            <?php endif; ?>
+        </dl>
+    </section>
+
+    <?php if (!empty($attachments)): ?>
+    <section class="rounded-2xl border border-gray-200 bg-white p-6">
+        <h2 class="text-lg font-semibold text-gray-900">Attachments</h2>
+        <div class="mt-4 space-y-2">
+            <?php foreach ($attachments as $attachment): ?>
+                <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <svg class="h-5 w-5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                        </svg>
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium text-gray-900">
+                                <?= htmlspecialchars($attachment['file_name'] ?? 'Attachment', ENT_QUOTES, 'UTF-8') ?>
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                Uploaded <?= formatDateTime($attachment['created_at'] ?? null) ?>
+                            </p>
+                        </div>
+                    </div>
+                    <?php if (!empty($attachment['stored_path'])): ?>
+                        <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars($attachment['stored_path'], ENT_QUOTES, 'UTF-8') ?>"
+                           target="_blank"
+                           class="ml-3 shrink-0 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200 transition">
+                            View
+                        </a>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </section>
+    <?php endif; ?>
+
+    <!-- Accept action -->
+    <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+        <div class="flex items-start gap-4">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+                <svg class="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-sm font-semibold text-amber-900">Acceptance Required</h3>
+                <p class="mt-1 text-sm text-amber-800">
+                    Review the return reason above, then accept this document to unlock editing and re-routing.
+                    Once accepted, you can correct the details and route it back to Admin.
+                </p>
+                <!-- Hidden form — submitted by the modal OK button -->
+                <form id="acceptDocumentForm" method="POST" action="<?= BASE_URL ?>/receiving/inbox/accept">
+                    <input type="hidden" name="document_id"   value="<?= (int) ($document['id'] ?? 0) ?>">
+                    <input type="hidden" name="assignment_id" value="<?= (int) ($assignment['id'] ?? 0) ?>">
+                </form>
+                <div class="mt-4">
+                    <button type="button" id="acceptTriggerBtn"
+                            class="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400 transition">
+                        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Accept Document
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Back link -->
+    <div class="flex justify-start">
+        <a href="<?= BASE_URL ?>/receiving/inbox"
+           class="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition">
+            ← Back to Inbox
+        </a>
+    </div>
+
+    <!-- Accept confirmation modal -->
+    <div id="acceptConfirmModal"
+         class="fixed inset-0 z-[9999] hidden items-center justify-center"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="acceptConfirmTitle"
+         aria-describedby="acceptConfirmBody">
+
+        <div id="acceptConfirmBackdrop"
+             class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity duration-200 opacity-0"></div>
+
+        <div id="acceptConfirmPanel"
+             class="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl
+                    border border-gray-100 transition-all duration-200 opacity-0"
+             style="transform:scale(0.95)">
+            <div class="p-6">
+                <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
+                    <svg class="h-6 w-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                </div>
+                <h3 id="acceptConfirmTitle"
+                    class="text-base font-semibold text-gray-900 mb-2">Accept This Document?</h3>
+                <p id="acceptConfirmBody" class="text-sm text-gray-600">
+                    Accepting will allow you to edit and correct the document details,
+                    then route it back to Admin. This cannot be undone.
+                </p>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100
+                        bg-gray-50 rounded-b-2xl">
+                <button type="button" id="acceptConfirmCancelBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-gray-700 bg-white border border-gray-200
+                               hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button type="button" id="acceptConfirmOkBtn"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2
+                               text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 transition">
+                    Yes, Accept
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const triggerBtn = document.getElementById('acceptTriggerBtn');
+        const modal      = document.getElementById('acceptConfirmModal');
+        const backdrop   = document.getElementById('acceptConfirmBackdrop');
+        const panel      = document.getElementById('acceptConfirmPanel');
+        const okBtn      = document.getElementById('acceptConfirmOkBtn');
+        const cancelBtn  = document.getElementById('acceptConfirmCancelBtn');
+        const form       = document.getElementById('acceptDocumentForm');
+        let   submitting = false;
+
+        function openModal() {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+            requestAnimationFrame(function () {
+                backdrop.style.opacity  = '1';
+                panel.style.opacity     = '1';
+                panel.style.transform   = 'scale(1)';
+                if (cancelBtn) cancelBtn.focus();
+            });
+        }
+
+        function closeModal() {
+            if (submitting) return;
+            backdrop.style.opacity  = '0';
+            panel.style.opacity     = '0';
+            panel.style.transform   = 'scale(0.95)';
+            setTimeout(function () {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                document.body.style.overflow = '';
+            }, 200);
+        }
+
+        if (triggerBtn) triggerBtn.addEventListener('click', openModal);
+        if (cancelBtn)  cancelBtn.addEventListener('click', closeModal);
+        if (backdrop)   backdrop.addEventListener('click', function () { if (!submitting) closeModal(); });
+
+        if (okBtn && form) {
+            okBtn.addEventListener('click', function () {
+                if (submitting) return;
+                submitting = true;
+                okBtn.disabled = true;
+                okBtn.innerHTML =
+                    '<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">' +
+                    '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+                    '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>' +
+                    '</svg><span class="ml-2">Accepting\u2026</span>';
+                triggerBtn.disabled = true;
+                form.submit();
+            });
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden') && !submitting) closeModal();
+        });
+    }());
+    </script>
+
+<?php else: ?>
+    <!-- ═══════════════════════════════════════════════════════════════════
+         ACCEPTED STATE — document accepted, edit form is active.
+    ═══════════════════════════════════════════════════════════════════ -->
 
     <!--
         editDocumentForm — covers Receipt Info, Document Details, Source Info,
@@ -1031,8 +1273,10 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<?php endif; // end $isAccepted ?>
+
 <?php
 $content   = ob_get_clean();
-$pageTitle = 'Edit Returned Document';
+$pageTitle = $isAccepted ? 'Edit Returned Document' : 'View Returned Document';
 require __DIR__ . '/../../layouts/app.php';
 ?>

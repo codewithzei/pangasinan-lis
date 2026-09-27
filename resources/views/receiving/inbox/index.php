@@ -311,7 +311,7 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                     </td>
                                 <?php else: ?>
                                     <td class="px-6 py-4 text-gray-700">
-                                        <?= formatDateTime($assignment['completed_at'] ?? null) ?>
+                                        <?= formatDateTime($assignment['accepted_at'] ?? null) ?>
                                     </td>
                                     <td class="px-6 py-4 text-gray-700">
                                         <?= htmlspecialchars($assignment['accepted_by_name'] ?? $assignment['accepted_by_username'] ?? '—') ?>
@@ -319,10 +319,17 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                 <?php endif; ?>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-2">
-                                        <a href="<?= BASE_URL ?>/receiving/inbox/show?id=<?= $assignment['document_id'] ?>" 
-                                           class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition">
-                                            <?= $currentView === 'returned' ? 'Edit' : 'View' ?>
-                                        </a>
+                                        <?php if ($currentView === 'returned'): ?>
+                                            <a href="<?= BASE_URL ?>/receiving/inbox/show?id=<?= $assignment['document_id'] ?>"
+                                               class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition">
+                                                View
+                                            </a>
+                                        <?php else: ?>
+                                            <a href="<?= BASE_URL ?>/receiving/inbox/show?id=<?= $assignment['document_id'] ?>"
+                                               class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition">
+                                                Edit
+                                            </a>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>

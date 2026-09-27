@@ -1629,6 +1629,13 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'receiving/inbox/accept' => [
+        'method' => 'POST',
+        'controller' => 'Receiving/ReceivingInboxController',
+        'action' => 'acceptDocument',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'receiving/inbox/update' => [
         'method' => 'POST',
         'controller' => 'Receiving/ReceivingInboxController',

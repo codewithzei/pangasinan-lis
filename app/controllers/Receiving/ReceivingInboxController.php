@@ -69,9 +69,11 @@ class ReceivingInboxController
                   AND da_admin.declined_at IS NOT NULL
             )";
         } elseif ($view === 'accepted') {
-            // Accepted: documents that Receiving Staff accepted/completed
+            // Accepted: documents that Receiving Staff accepted (awaiting edit) OR
+            // completed (already re-routed to Admin after editing).
+            // ACCEPTED has completed_at = NULL (still being worked on).
+            // COMPLETED has completed_at IS NOT NULL (already re-routed).
             $where[] = "da.decision IN ('ACCEPTED', 'COMPLETED')";
-            $where[] = 'da.completed_at IS NOT NULL';
             
             // Only show accepted returned documents (not initial submissions)
             $where[] = "EXISTS (
@@ -159,6 +161,7 @@ class ReceivingInboxController
                 SELECT
                     da.id              AS assignment_id,
                     da.received_at,
+                    da.accepted_at,
                     da.completed_at,
                     da.decision,
                     d.id               AS document_id,
@@ -184,10 +187,10 @@ class ReceivingInboxController
                 LEFT  JOIN external_offices  eo ON d.external_office_id = eo.id
                 LEFT  JOIN hospitals          h ON d.hospital_id        = h.id
                 LEFT  JOIN municities         m ON d.municipality_id    = m.id
-                LEFT  JOIN user_accounts ua_accepted ON da.assigned_by = ua_accepted.id
+                LEFT  JOIN user_accounts ua_accepted ON da.accepted_by = ua_accepted.id
                 LEFT  JOIN user_info ui_accepted ON ua_accepted.id = ui_accepted.user_account_id
                 WHERE {$whereClause}
-                ORDER BY da.completed_at DESC, d.date_received DESC, d.id DESC
+                ORDER BY da.accepted_at DESC, d.date_received DESC, d.id DESC
                 LIMIT ? OFFSET ?
             ");
         }
@@ -215,7 +218,6 @@ class ReceivingInboxController
                 END) AS returned_count,
                 COUNT(DISTINCT CASE 
                     WHEN da.decision IN ('ACCEPTED', 'COMPLETED') 
-                    AND da.completed_at IS NOT NULL
                     AND EXISTS (
                         SELECT 1 FROM document_assignments da2
                         WHERE da2.document_id = da.document_id
@@ -239,7 +241,86 @@ class ReceivingInboxController
     }
 
     // =========================================================================
-    // 2. Document detail / edit page for returned documents
+    // 2. Accept a returned document (move PENDING → ACCEPTED)
+    // =========================================================================
+
+    public function acceptDocument(): void
+    {
+        $userId       = auth_id();
+        $documentId   = (int) ($_POST['document_id']   ?? 0);
+        $assignmentId = (int) ($_POST['assignment_id'] ?? 0);
+
+        if ($userId === null) {
+            flash_set('error', 'You must be logged in.');
+            redirect('login');
+        }
+        if ($documentId <= 0 || $assignmentId <= 0) {
+            flash_set('error', 'Invalid document or assignment ID.');
+            redirect('receiving/inbox');
+        }
+
+        $receivingRoleId = $this->requireReceivingRoleId();
+
+        // ── Optimistic guard: only accept a still-PENDING assignment ──────────
+        // The WHERE clause doubles as a duplicate-acceptance guard.
+        $acceptStmt = $this->pdo->prepare("
+            UPDATE document_assignments
+            SET decision    = 'ACCEPTED',
+                accepted_at = NOW(),
+                accepted_by = ?
+            WHERE id                  = ?
+              AND document_id         = ?
+              AND assigned_to_role_id = ?
+              AND phase               = 'RECEIVING'
+              AND decision            = 'PENDING'
+              AND completed_at        IS NULL
+        ");
+        $acceptStmt->execute([$userId, $assignmentId, $documentId, $receivingRoleId]);
+
+        if ($acceptStmt->rowCount() === 0) {
+            // Either already accepted, already completed, or wrong role — show friendly message
+            flash_set('error', 'This document has already been accepted or is no longer pending. Please refresh the page.');
+            redirect('receiving/inbox');
+        }
+
+        // ── Fetch document tracking number for messages / logs ────────────────
+        $docStmt = $this->pdo->prepare("SELECT tracking_number FROM documents WHERE id = ? LIMIT 1");
+        $docStmt->execute([$documentId]);
+        $doc = $docStmt->fetch();
+        $trackingNumber = $doc['tracking_number'] ?? "#{$documentId}";
+
+        // ── Workflow event ─────────────────────────────────────────────────────
+        $this->pdo->prepare("
+            INSERT INTO document_events (
+                document_id, event_type, phase, performed_by,
+                remarks, metadata
+            ) VALUES (?, 'DOCUMENT_EDITED', 'RECEIVING', ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $userId,
+            'Document accepted by Receiving Staff for correction.',
+            json_encode(['action' => 'receiving_accept', 'ip_address' => client_ip()],
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ]);
+
+        // ── Post-action audit / system log ────────────────────────────────────
+        audit_log('UPDATE', 'Document', (string) $documentId, null, [
+            'action'        => 'receiving_accept_returned',
+            'assignment_id' => $assignmentId,
+        ], "Receiving Staff accepted returned document {$trackingNumber}");
+
+        system_log('INFO', "Returned document accepted by Receiving Staff: {$trackingNumber}", [
+            'document_id'   => $documentId,
+            'assignment_id' => $assignmentId,
+            'user_id'       => $userId,
+        ]);
+
+        flash_set('success', "Document {$trackingNumber} accepted. You may now edit and route it back to Admin.");
+        redirect('receiving/inbox/show?id=' . $documentId);
+    }
+
+    // =========================================================================
+    // 3. Document detail / edit page for returned documents
     // =========================================================================
 
     public function show(): void
@@ -296,15 +377,18 @@ class ReceivingInboxController
             redirect('receiving/inbox');
         }
 
-        // Check if there's a pending Receiving assignment for this document
+        // Accept both PENDING (returned, not yet accepted by Receiving) and
+        // ACCEPTED (accepted, ready to edit) assignments.  COMPLETED assignments
+        // are intentionally excluded — a completed assignment means the document
+        // has already been re-routed to Admin and is no longer editable here.
         $assignmentStmt = $this->pdo->prepare("
-            SELECT id, decision, received_at
+            SELECT id, decision, received_at, accepted_at, accepted_by
             FROM document_assignments
-            WHERE document_id = ?
+            WHERE document_id         = ?
               AND assigned_to_role_id = ?
-              AND phase = 'RECEIVING'
-              AND decision = 'PENDING'
-              AND completed_at IS NULL
+              AND phase               = 'RECEIVING'
+              AND decision            IN ('PENDING', 'ACCEPTED')
+              AND completed_at        IS NULL
             ORDER BY received_at DESC
             LIMIT 1
         ");
@@ -312,9 +396,13 @@ class ReceivingInboxController
         $assignment = $assignmentStmt->fetch();
 
         if (!$assignment) {
-            flash_set('error', 'No pending Receiving assignment found for this document.');
+            flash_set('error', 'No active Receiving assignment found for this document.');
             redirect('receiving/inbox');
         }
+
+        // Expose whether the assignment has been accepted so the view can
+        // decide to show the read-only Accept step or the editable form.
+        $isAccepted = ($assignment['decision'] === 'ACCEPTED');
 
         // Fetch decline reason from Admin
         $declineStmt = $this->pdo->prepare("
@@ -404,12 +492,12 @@ class ReceivingInboxController
         $errors  = flash_get('errors') ?? [];
         $old     = old_get();
 
-        $pageTitle = 'Edit Returned Document';
+        $pageTitle = $isAccepted ? 'Edit Returned Document' : 'View Returned Document';
         require __DIR__ . '/../../../resources/views/receiving/inbox/show.php';
     }
 
     // =========================================================================
-    // 3. Update document and route back to Admin
+    // 4. Update document and route back to Admin
     // =========================================================================
 
     public function update(): void
@@ -664,11 +752,11 @@ class ReceivingInboxController
                 // documents first and Admin locked document_assignments first.
                 // ═══════════════════════════════════════════════════════════
 
-                // ── 1. Verify Receiving assignment is still pending ──────────
-                // Plain SELECT (no FOR UPDATE) — the WHERE clause on decision
-                // = 'PENDING' / completed_at IS NULL acts as the optimistic-
-                // lock guard.  The matching UPDATE in step 5 will return
-                // rowCount() = 0 if a concurrent request races us.
+                // ── 1. Verify Receiving assignment is still ACCEPTED ─────────
+                // Only an ACCEPTED (not PENDING) assignment may be edited and
+                // re-routed.  The WHERE clause on decision = 'ACCEPTED' / completed_at
+                // IS NULL acts as the optimistic-lock guard.  The matching UPDATE
+                // in step 8 will return rowCount() = 0 if a concurrent request races us.
                 $assignmentStmt = $this->pdo->prepare("
                     SELECT id, decision, completed_at
                     FROM document_assignments
@@ -676,7 +764,7 @@ class ReceivingInboxController
                       AND document_id       = ?
                       AND assigned_to_role_id = ?
                       AND phase             = 'RECEIVING'
-                      AND decision          = 'PENDING'
+                      AND decision          = 'ACCEPTED'
                       AND completed_at      IS NULL
                     LIMIT 1
                 ");
@@ -684,9 +772,9 @@ class ReceivingInboxController
                 $assignment = $assignmentStmt->fetch();
 
                 if (!$assignment) {
-                    // Non-retryable: another request already processed this.
+                    // Non-retryable: document not yet accepted, or already completed.
                     throw new RuntimeException(
-                        'This assignment has already been processed or is no longer pending.'
+                        'This document must be accepted before it can be edited and routed. Please accept it first.'
                     );
                 }
 
@@ -808,7 +896,7 @@ class ReceivingInboxController
                     SET decision     = 'COMPLETED',
                         completed_at = NOW()
                     WHERE id           = ?
-                      AND decision     = 'PENDING'
+                      AND decision     = 'ACCEPTED'
                       AND completed_at IS NULL
                 ");
                 $completeStmt->execute([$assignmentId]);
@@ -1153,19 +1241,19 @@ class ReceivingInboxController
 
         $receivingRoleId = $this->requireReceivingRoleId();
 
-        // Verify the document belongs to a pending Receiving assignment
+        // Verify the document belongs to an ACCEPTED Receiving assignment
         $assignmentStmt = $this->pdo->prepare("
             SELECT id FROM document_assignments
             WHERE document_id = ?
               AND assigned_to_role_id = ?
               AND phase = 'RECEIVING'
-              AND decision = 'PENDING'
+              AND decision = 'ACCEPTED'
               AND completed_at IS NULL
             LIMIT 1
         ");
         $assignmentStmt->execute([$documentId, $receivingRoleId]);
         if (!$assignmentStmt->fetch()) {
-            flash_set('error', 'No pending Receiving assignment found for this document.');
+            flash_set('error', 'This document must be accepted before attachments can be removed.');
             redirect('receiving/inbox/show?id=' . $documentId);
         }
 
@@ -1231,19 +1319,19 @@ class ReceivingInboxController
 
         $receivingRoleId = $this->requireReceivingRoleId();
 
-        // Verify a pending Receiving assignment exists for this document
+        // Verify a ACCEPTED Receiving assignment exists for this document
         $assignmentStmt = $this->pdo->prepare("
             SELECT id FROM document_assignments
             WHERE document_id = ?
               AND assigned_to_role_id = ?
               AND phase = 'RECEIVING'
-              AND decision = 'PENDING'
+              AND decision = 'ACCEPTED'
               AND completed_at IS NULL
             LIMIT 1
         ");
         $assignmentStmt->execute([$documentId, $receivingRoleId]);
         if (!$assignmentStmt->fetch()) {
-            flash_set('error', 'No pending Receiving assignment found for this document.');
+            flash_set('error', 'This document must be accepted before attachments can be uploaded.');
             redirect('receiving/inbox/show?id=' . $documentId);
         }
 
