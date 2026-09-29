@@ -43,6 +43,8 @@ class AdminReceiveDocumentController
         $hospitals       = $this->docService->getHospitals();
         $spMembers       = $this->docService->getSpMembers();
         $municities      = $this->docService->getMunicities();
+        $routingOptions         = $this->docService->getRoutingOptions();
+        $communicationCategories = $this->docService->getCommunicationCategories();
 
         $success = flash_get('success');
         $error   = flash_get('error');
@@ -89,11 +91,48 @@ class AdminReceiveDocumentController
             $data['checklist_items'] = array_map('intval', $_POST['checklist_items']);
         }
 
+        // Routing option (optional — Admin may receive without routing)
+        $routingOptionId       = (int) ($_POST['routing_option_id']        ?? 0);
+        $communicationCategoryId = (int) ($_POST['communication_category_id'] ?? 0);
+
         // Preserve form values for repopulation on error
         old_set($_POST);
 
         // Validate fields (reuses the shared DocumentService rules)
         $errors = $this->docService->validateSubmission($data);
+
+        // Validate routing option (optional, but if provided must be a valid active option id 3–6)
+        if ($routingOptionId > 0) {
+            $validOptions = array_column($this->docService->getRoutingOptions(), 'id');
+            if (!in_array($routingOptionId, array_map('intval', $validOptions), true)) {
+                $errors[] = 'Invalid routing option selected.';
+            }
+        }
+
+        // If Noted (id=6) is selected, communication category is required
+        if ($routingOptionId === 6) {
+            if ($communicationCategoryId <= 0) {
+                $errors[] = 'Communication Category is required when routing option is Noted.';
+            } else {
+                $validCategories = array_column($this->docService->getCommunicationCategories(), 'id');
+                if (!in_array($communicationCategoryId, array_map('intval', $validCategories), true)) {
+                    $errors[] = 'Invalid communication category selected.';
+                }
+            }
+
+            // Verify document type is Communication
+            $docType = $this->docService->getDocumentTypes();
+            $selectedDocType = null;
+            foreach ($docType as $dt) {
+                if ((int) $dt['id'] === (int) $data['document_type_id']) {
+                    $selectedDocType = $dt;
+                    break;
+                }
+            }
+            if (!$selectedDocType || $selectedDocType['name'] !== 'Communication') {
+                $errors[] = 'The Noted routing option is only available for Communication documents.';
+            }
+        }
 
         // Validate attachments — same rules as Receiving (at least 1, max 10, 25 MB, allowed types)
         $uploadedFiles = $_FILES['attachments'] ?? [];
@@ -106,13 +145,27 @@ class AdminReceiveDocumentController
         }
 
         try {
-            $result = $this->docService->receiveDocument($data, $uploadedFiles, $userId, 'ADMIN');
+            $result = $this->docService->receiveDocument($data, $uploadedFiles, $userId, 'ADMIN', $routingOptionId, $communicationCategoryId);
 
             old_clear();
-            flash_set(
-                'success',
-                "Document {$result['tracking_number']} successfully received and queued in the Admin Inbox."
-            );
+            $routingOptionNames = [3 => 'SP Secretary', 4 => 'Plenary', 5 => 'Committee'];
+            if ($routingOptionId === 6) {
+                flash_set(
+                    'success',
+                    "Document {$result['tracking_number']} successfully received and marked as Noted."
+                );
+            } elseif (isset($routingOptionNames[$routingOptionId])) {
+                $destName = $routingOptionNames[$routingOptionId];
+                flash_set(
+                    'success',
+                    "Document {$result['tracking_number']} successfully received and routed directly to {$destName}."
+                );
+            } else {
+                flash_set(
+                    'success',
+                    "Document {$result['tracking_number']} successfully received and queued in the Admin Inbox."
+                );
+            }
             redirect('admin/receive-document');
 
         } catch (Throwable $e) {

@@ -992,6 +992,24 @@ return [
     ],
 
     // -------------------------------------------------------------------------
+    // Admin Communications Routes
+    // -------------------------------------------------------------------------
+
+    'admin/communications' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminCommunicationsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/communications/show' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminCommunicationsController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
     // Admin Routed Documents Routes
     // -------------------------------------------------------------------------
 

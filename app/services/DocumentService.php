@@ -260,7 +260,9 @@ class DocumentService
         array  $data,
         array  $uploadedFiles,
         int    $userId,
-        string $initialPhase = 'ADMIN'
+        string $initialPhase = 'ADMIN',
+        int    $routingOptionId = 0,
+        int    $communicationCategoryId = 0
     ): array {
         $this->pdo->beginTransaction();
         $storedFilePaths = [];
@@ -274,19 +276,49 @@ class DocumentService
             $trackingNumber  = $trackingInfo['tracking_number'];
             $trackingSeq     = $trackingInfo['tracking_sequence'];
 
-            // 2. Initial status (Pending)
-            $initialStatus = $this->pdo->query(
-                "SELECT id FROM document_statuses
-                  WHERE name = 'Pending' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
-            )->fetch();
-            if (!$initialStatus) {
-                throw new RuntimeException(
-                    "Initial document status 'Pending' not found. Please configure document statuses."
-                );
-            }
-            $statusId = (int) $initialStatus['id'];
+            // 2. Determine initial status and phase based on routing
+            $isNoted = ($routingOptionId === 6);
+            $notedStatusId = null;
+            $spsecRoleId = null;
 
-            // 3. Admin role
+            if ($isNoted) {
+                $notedStatus = $this->pdo->query(
+                    "SELECT id FROM document_statuses
+                      WHERE name = 'Noted' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+                )->fetch();
+                if (!$notedStatus) {
+                    throw new RuntimeException(
+                        "Document status 'Noted' not found. Please configure document statuses."
+                    );
+                }
+                $notedStatusId = (int) $notedStatus['id'];
+
+                $spsecRole = $this->pdo->query(
+                    "SELECT id FROM roles
+                      WHERE name = 'SP Secretary' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+                )->fetch();
+                if (!$spsecRole) {
+                    throw new RuntimeException(
+                        "SP Secretary role not found. Please configure roles."
+                    );
+                }
+                $spsecRoleId = (int) $spsecRole['id'];
+            } else {
+                $initialStatus = $this->pdo->query(
+                    "SELECT id FROM document_statuses
+                      WHERE name = 'Pending' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+                )->fetch();
+                if (!$initialStatus) {
+                    throw new RuntimeException(
+                        "Initial document status 'Pending' not found. Please configure document statuses."
+                    );
+                }
+            }
+
+            $statusId = $isNoted ? $notedStatusId : (int) $initialStatus['id'];
+            $docPhase = $isNoted ? 'ADMIN' : $initialPhase;
+
+            // 3. Admin role (always needed for the RECEIVING → ADMIN route)
             $adminRole = $this->pdo->query(
                 "SELECT id FROM roles
                   WHERE name = 'Admin' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
@@ -318,7 +350,20 @@ class DocumentService
                 }
             }
 
-            // 5. Insert document
+            // 5. Verify document type is Communication when Noted is selected
+            if ($isNoted) {
+                $docTypeCheck = $this->pdo->prepare(
+                    "SELECT name FROM document_types WHERE id = ? AND name = 'Communication' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+                );
+                $docTypeCheck->execute([$data['document_type_id']]);
+                if (!$docTypeCheck->fetch()) {
+                    throw new RuntimeException(
+                        "The NOTED routing option is only available for Communication document types."
+                    );
+                }
+            }
+
+            // 6. Insert document
             $insertDoc = $this->pdo->prepare("
                 INSERT INTO documents (
                     tracking_year, tracking_sequence, tracking_number,
@@ -334,7 +379,7 @@ class DocumentService
                     ?,
                     ?, ?, ?,
                     ?, ?, ?, ?,
-                    ?, NULL, ?,
+                    ?, ?, ?,
                     ?, ?, ?
                 )
             ");
@@ -355,7 +400,8 @@ class DocumentService
                 $data['source_address']        ?: null,
                 $data['source_liaison_name']   ?: null,
                 $statusId,
-                $initialPhase,
+                null,           // current_owner_user_id — not assigned at intake
+                $docPhase,
                 $data['remarks']              ?: null,
                 $userId,
                 $userId,
@@ -408,39 +454,119 @@ class DocumentService
             // below, outside the try/catch transaction block).
             $pendingFileLogs = $this->takePendingFileLogs();
 
-            // 8. Route record: RECEIVING → ADMIN
+            // 8. Determine if a non-Noted forward routing option was selected.
+            //    Routing options: 3=SP Secretary, 4=Plenary, 5=Committee, 6=Noted.
+            //    When Admin selects one of 3–5 during direct intake the document
+            //    is already routed out — it must NOT sit in the Admin Inbox.
+            $forwardRouteMap = [
+                3 => ['phase' => 'SP_SECRETARY', 'role' => 'SP Secretary', 'event' => 'ROUTED_TO_SP_SECRETARY'],
+                4 => ['phase' => 'PLENARY',      'role' => 'Plenary',      'event' => 'ROUTED_TO_PLENARY'],
+                5 => ['phase' => 'COMMITTEE',    'role' => 'Committee',    'event' => 'ROUTED_TO_COMMITTEE'],
+            ];
+            $isForwardRouted = isset($forwardRouteMap[$routingOptionId]);
+
+            // Resolve target role/phase when a forward routing option is chosen.
+            $targetRoleId    = null;
+            $targetPhase     = null;
+            $forwardEventType = null;
+            if ($isForwardRouted) {
+                $map          = $forwardRouteMap[$routingOptionId];
+                $targetPhase  = $map['phase'];
+                $forwardEventType = $map['event'];
+
+                $targetRoleRow = $this->pdo->prepare(
+                    "SELECT id FROM roles
+                      WHERE name = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+                );
+                $targetRoleRow->execute([$map['role']]);
+                $targetRoleResult = $targetRoleRow->fetch();
+                if (!$targetRoleResult) {
+                    throw new RuntimeException("Target role '{$map['role']}' not found.");
+                }
+                $targetRoleId = (int) $targetRoleResult['id'];
+            }
+
+            // 8a. Route record: RECEIVING → ADMIN (always created)
             $insertRoute = $this->pdo->prepare("
                 INSERT INTO document_routes (
                     document_id, from_phase, to_phase, routing_option_id,
                     routed_by, routed_to_role_id, remarks
-                ) VALUES (?, 'RECEIVING', 'ADMIN', NULL, ?, ?, ?)
+                ) VALUES (?, 'RECEIVING', 'ADMIN', ?, ?, ?, ?)
             ");
             $insertRoute->execute([
                 $documentId,
+                $routingOptionId > 0 ? $routingOptionId : null,
                 $userId,
                 $adminRoleId,
                 $data['remarks'] ?: null,
             ]);
 
-            // 9. Admin inbox assignment
-            //    accepted_by and assigned_to_user_id are NULL: the assignment
-            //    is unclaimed and visible to all Admin users until one of them
-            //    clicks Accept (which atomically sets both columns).
-            $insertAssign = $this->pdo->prepare("
-                INSERT INTO document_assignments (
-                    document_id, assigned_to_role_id, phase,
-                    assigned_by, decision, received_at,
-                    accepted_by, assigned_to_user_id
-                ) VALUES (?, ?, 'ADMIN', ?, 'PENDING', NOW(), NULL, NULL)
-            ");
-            $insertAssign->execute([$documentId, $adminRoleId, $userId]);
+            // 8b. When a forward routing option (SP Secretary / Plenary /
+            //     Committee) is selected, immediately create the ADMIN → target
+            //     route so the document appears in Admin Routed Documents and
+            //     in the target role's inbox — NOT in the Admin Inbox.
+            if ($isForwardRouted) {
+                // Update document phase/status to reflect immediate forward routing.
+                // Use "Under Processing" status (id=6) to signal it is in transit.
+                $forwardStatusRow = $this->pdo->query(
+                    "SELECT id FROM document_statuses
+                      WHERE name = 'Under Processing' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+                )->fetch();
+                $forwardStatusId = $forwardStatusRow ? (int) $forwardStatusRow['id'] : $statusId;
+
+                $this->pdo->prepare("
+                    UPDATE documents
+                    SET current_phase         = ?,
+                        current_status_id     = ?,
+                        current_owner_user_id = NULL,
+                        updated_by            = ?
+                    WHERE id = ?
+                ")->execute([$targetPhase, $forwardStatusId, $userId, $documentId]);
+
+                // Route record: ADMIN → target phase
+                $this->pdo->prepare("
+                    INSERT INTO document_routes (
+                        document_id, from_phase, to_phase, routing_option_id,
+                        routed_by, routed_to_role_id, remarks
+                    ) VALUES (?, 'ADMIN', ?, ?, ?, ?, ?)
+                ")->execute([
+                    $documentId,
+                    $targetPhase,
+                    $routingOptionId,
+                    $userId,
+                    $targetRoleId,
+                    $data['remarks'] ?: null,
+                ]);
+
+                // Assignment for the target role (PENDING, unclaimed)
+                $this->pdo->prepare("
+                    INSERT INTO document_assignments (
+                        document_id, assigned_to_role_id, phase,
+                        assigned_by, decision, received_at,
+                        accepted_by, assigned_to_user_id
+                    ) VALUES (?, ?, ?, ?, 'PENDING', NOW(), NULL, NULL)
+                ")->execute([$documentId, $targetRoleId, $targetPhase, $userId]);
+
+            } elseif (!$isNoted) {
+                // 9. No routing option selected — document stays in Admin Inbox
+                //    as PENDING for the Admin role to process later.
+                $insertAssign = $this->pdo->prepare("
+                    INSERT INTO document_assignments (
+                        document_id, assigned_to_role_id, phase,
+                        assigned_by, decision, received_at,
+                        accepted_by, assigned_to_user_id
+                    ) VALUES (?, ?, 'ADMIN', ?, 'PENDING', NOW(), NULL, NULL)
+                ");
+                $insertAssign->execute([$documentId, $adminRoleId, $userId]);
+            }
 
             // 10. Save checklist items (if any were selected)
             if (!empty($data['checklist_items']) && is_array($data['checklist_items'])) {
                 $this->saveDocumentChecklistItems($documentId, $data['checklist_items'], $userId);
             }
 
-            // 11. Workflow events
+            // Prepare the event INSERT statement and base metadata now,
+            // before any code path that needs to insert a document_event row.
             $insertEvent = $this->pdo->prepare("
                 INSERT INTO document_events (
                     document_id, event_type, phase, performed_by,
@@ -453,6 +579,61 @@ class DocumentService
                 'user_agent' => client_user_agent(),
             ];
 
+            // 10b. Noted routing: add ADMIN→ADMIN route, event, and assignment
+            if ($isNoted && $communicationCategoryId > 0) {
+                // Update document: set communication_category_id, current_phase=ADMIN, current_status_id=Noted
+                $updateDoc = $this->pdo->prepare("
+                    UPDATE documents
+                    SET communication_category_id = ?,
+                        current_phase             = 'ADMIN',
+                        current_status_id         = ?,
+                        updated_by                = ?
+                    WHERE id = ?
+                ");
+                $updateDoc->execute([$communicationCategoryId, $notedStatusId, $userId, $documentId]);
+
+                // Route record: ADMIN → ADMIN with Noted
+                // This is the pattern AdminCommunicationsController queries for.
+                $insertRoute2 = $this->pdo->prepare("
+                    INSERT INTO document_routes (
+                        document_id, from_phase, to_phase, routing_option_id,
+                        routed_by, routed_to_role_id, remarks
+                    ) VALUES (?, 'ADMIN', 'ADMIN', ?, ?, ?, ?)
+                ");
+                $insertRoute2->execute([
+                    $documentId,
+                    $routingOptionId,
+                    $userId,
+                    $adminRoleId,
+                    'Marked as Noted — Communication category: ' . $this->getCommunicationCategoryName($communicationCategoryId),
+                ]);
+
+                // Assignment for Admin role — decision=NOTED
+                $insertAssign2 = $this->pdo->prepare("
+                    INSERT INTO document_assignments (
+                        document_id, assigned_to_role_id, phase,
+                        assigned_by, decision, received_at,
+                        accepted_by, assigned_to_user_id
+                    ) VALUES (?, ?, 'ADMIN', ?, 'NOTED', NOW(), NULL, NULL)
+                ");
+                $insertAssign2->execute([$documentId, $adminRoleId, $userId]);
+
+                // Workflow event: DOCUMENT_NOTED
+                $insertEvent->execute([
+                    $documentId,
+                    'DOCUMENT_NOTED',
+                    'ADMIN',
+                    $userId,
+                    $notedStatusId,
+                    'Document marked as Noted (Communication category) by Admin during receipt',
+                    json_encode(
+                        array_merge($baseMetadata, ['communication_category_id' => $communicationCategoryId]),
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                    ),
+                ]);
+            }
+
+            // Event: DOCUMENT_RECEIVED (always recorded)
             $insertEvent->execute([
                 $documentId,
                 'DOCUMENT_RECEIVED',
@@ -466,18 +647,48 @@ class DocumentService
                 ),
             ]);
 
-            $insertEvent->execute([
-                $documentId,
-                'ROUTED_TO_ADMIN',
-                'ADMIN',
-                $userId,
-                $statusId,
-                'Document routed to Admin for processing',
-                json_encode(
-                    array_merge($baseMetadata, ['routed_to_role_id' => $adminRoleId]),
-                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-                ),
-            ]);
+            // Route event: ROUTED_TO_SP_SECRETARY / ROUTED_TO_PLENARY /
+            //             ROUTED_TO_COMMITTEE / ROUTED_TO_ADMIN
+            if ($isNoted) {
+                $insertEvent->execute([
+                    $documentId,
+                    'DOCUMENT_NOTED',
+                    'ADMIN',
+                    $userId,
+                    $notedStatusId,
+                    'Document noted as Communication and stored in Admin Communications',
+                    json_encode(
+                        array_merge($baseMetadata, ['routed_to_role_id' => $adminRoleId]),
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                    ),
+                ]);
+            } elseif ($isForwardRouted) {
+                $insertEvent->execute([
+                    $documentId,
+                    $forwardEventType,
+                    'ADMIN',
+                    $userId,
+                    $forwardStatusId,
+                    "Document routed directly to {$forwardRouteMap[$routingOptionId]['role']} at intake",
+                    json_encode(
+                        array_merge($baseMetadata, ['routed_to_role_id' => $targetRoleId]),
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                    ),
+                ]);
+            } else {
+                $insertEvent->execute([
+                    $documentId,
+                    'ROUTED_TO_ADMIN',
+                    'ADMIN',
+                    $userId,
+                    $statusId,
+                    'Document routed to Admin for processing',
+                    json_encode(
+                        array_merge($baseMetadata, ['routed_to_role_id' => $adminRoleId]),
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                    ),
+                ]);
+            }
 
             // ----------------------------------------------------------------
             // COMMIT — all document rows are now durable.
@@ -491,19 +702,39 @@ class DocumentService
             // a separate connection — so it must never run inside the main tx).
             $this->flushFileUploadLogs($pendingFileLogs);
 
-            // Post-commit: notify Admin users.
-            // Notification failure must NOT roll back an already-committed
-            // document, so we catch and log it as a warning instead.
+            // Post-commit: notify appropriate users.
             try {
-                $this->notifyRoleUsers(
-                    $adminRoleId,
-                    $documentId,
-                    $userId,
-                    'DOCUMENT_ASSIGNED',
-                    "New Document Assigned: {$trackingNumber}",
-                    "A new document ({$trackingNumber}) has been received and assigned to Admin for routing.",
-                    BASE_URL . "/admin/inbox/show?id={$documentId}"
-                );
+                if ($isNoted) {
+                    $this->notifyRoleUsers(
+                        $adminRoleId,
+                        $documentId,
+                        $userId,
+                        'DOCUMENT_ASSIGNED',
+                        "New Communication Document: {$trackingNumber}",
+                        "A communication document ({$trackingNumber}) has been received and marked as Noted. It is now available in Admin Communications.",
+                        BASE_URL . "/admin/communications"
+                    );
+                } elseif ($isForwardRouted) {
+                    $this->notifyRoleUsers(
+                        $targetRoleId,
+                        $documentId,
+                        $userId,
+                        'DOCUMENT_ASSIGNED',
+                        "New Document Assigned: {$trackingNumber}",
+                        "Document {$trackingNumber} has been received and routed directly to your inbox.",
+                        BASE_URL . "/" . strtolower(str_replace('_', '/', $targetPhase)) . "/inbox/show?id={$documentId}"
+                    );
+                } else {
+                    $this->notifyRoleUsers(
+                        $adminRoleId,
+                        $documentId,
+                        $userId,
+                        'DOCUMENT_ASSIGNED',
+                        "New Document Assigned: {$trackingNumber}",
+                        "A new document ({$trackingNumber}) has been received and assigned to Admin for routing.",
+                        BASE_URL . "/admin/inbox/show?id={$documentId}"
+                    );
+                }
             } catch (Throwable $notifyEx) {
                 system_log('WARNING', "Notification failed after document commit: {$notifyEx->getMessage()}", [
                     'document_id'    => $documentId,
@@ -519,12 +750,14 @@ class DocumentService
                 'source_type_id'   => $data['source_type_id'],
                 'document_type_id' => $data['document_type_id'],
                 'subject_matter'   => mb_substr($data['subject_matter'], 0, 100),
-            ], "Document received: {$trackingNumber}");
+                'routing_option'   => $isNoted ? 'Noted' : null,
+            ], "Document received: {$trackingNumber}" . ($isNoted ? ' [Noted]' : ''));
 
-            system_log('INFO', "Document received and routed to Admin: {$trackingNumber}", [
+            system_log('INFO', "Document received and routed to " . ($isNoted ? 'Admin Communications' : 'Admin') . ": {$trackingNumber}", [
                 'document_id'    => $documentId,
                 'tracking_number' => $trackingNumber,
                 'user_id'        => $userId,
+                'routing_option' => $isNoted ? 'Noted' : null,
             ]);
 
             return [
@@ -656,6 +889,24 @@ class DocumentService
         return $this->pdo->query(
             "SELECT id, name FROM communication_categories
               WHERE is_active = 1 AND is_deleted = 0 ORDER BY sort_order ASC, name ASC"
+        )->fetchAll();
+    }
+
+    /**
+     * Return the routing options available for an Admin routing decision.
+     *
+     * Excludes Receiving Staff (id=1) and Admin (id=2) because the Admin
+     * is the receiving point; those roles are not valid forward targets.
+     * Returns: SP Secretary (3), Plenary (4), Committee (5), Noted (6).
+     *
+     * @return array  Each row: id, name, description
+     */
+    public function getRoutingOptions(): array
+    {
+        return $this->pdo->query(
+            "SELECT id, name, description FROM routing_options
+              WHERE id IN (3,4,5,6) AND is_active = 1 AND is_deleted = 0
+              ORDER BY sort_order ASC, name ASC"
         )->fetchAll();
     }
 
@@ -1052,6 +1303,20 @@ class DocumentService
     }
 
     // -------------------------------------------------------------------------
+    /**
+     * Get the name of a communication category by ID.
+     */
+    private function getCommunicationCategoryName(int $categoryId): string
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT name FROM communication_categories
+              WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+        );
+        $stmt->execute([$categoryId]);
+        $row = $stmt->fetch();
+        return $row ? $row['name'] : '—';
+    }
+
     // Small format / validation helpers
     // -------------------------------------------------------------------------
 

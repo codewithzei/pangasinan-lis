@@ -3,15 +3,17 @@
 require_once __DIR__ . '/../../config/database.php';
 
 /**
- * SpsecCommunicationsController
+ * AdminCommunicationsController
  *
- * Dedicated controller for SP Secretary Communications:
- *   GET spsec/communications      → index() (lists Communication documents marked as Noted)
- *   GET spsec/communications/show → show()  (detail view of a noted Communication document)
+ * Handles the Admin Communications section — documents that were received
+ * by Admin and marked as Noted (Communication type).
+ *
+ *   GET admin/communications      → index()
+ *   GET admin/communications/show → show()
  */
-class SpsecCommunicationsController
+class AdminCommunicationsController
 {
-    protected PDO $pdo;
+    private PDO $pdo;
 
     public function __construct()
     {
@@ -20,7 +22,7 @@ class SpsecCommunicationsController
     }
 
     // =========================================================================
-    // 1. GET spsec/communications
+    // 1. GET admin/communications
     // =========================================================================
 
     public function index(): void
@@ -30,7 +32,7 @@ class SpsecCommunicationsController
             redirect('login');
         }
 
-        $this->requireSpsecAccess();
+        $this->requireAdminAccess();
 
         // Pagination
         $page    = max(1, (int) ($_GET['page'] ?? 1));
@@ -38,23 +40,22 @@ class SpsecCommunicationsController
         $offset  = ($page - 1) * $perPage;
 
         // Filters
-        $search        = trim($_GET['search']   ?? '');
-        $filterStatus  = trim($_GET['status']   ?? '');
-        $filterCat     = trim($_GET['category'] ?? '');
+        $search       = trim($_GET['search']   ?? '');
+        $filterStatus = trim($_GET['status']   ?? '');
+        $filterCat    = trim($_GET['category'] ?? '');
 
         $filterConditions = [];
         $filterParams     = [];
 
-        // Base constraint: Communication documents noted via SP Secretary.
+        // Base constraint: Communication documents noted via Admin.
         //
         // We use a derived table (latest_nr) to find the MAX(id) of all Noted
-        // route records per document. This avoids selecting non-aggregated columns
-        // from a grouped query and is fully compatible with ONLY_FULL_GROUP_BY.
+        // route records per document. This avoids non-aggregated columns in a
+        // grouped query and is fully compatible with ONLY_FULL_GROUP_BY.
         //
-        // $baseJoinCount  — used in the count query; only needs existence of the
-        //                   latest noted route, not the full row.
-        // $baseJoinDetail — used in the main list query; also joins back to
-        //                   document_routes (alias nr) to fetch the full route row.
+        // from_phase = 'ADMIN' AND to_phase = 'ADMIN' AND routing_options.name = 'Noted'
+        // is the exact pattern written by DocumentService::receiveDocument() when
+        // Admin selects "Noted" during document intake.
         $baseJoinCount = "
             INNER JOIN (
                 SELECT dr.document_id, MAX(dr.id) AS latest_route_id
@@ -63,8 +64,8 @@ class SpsecCommunicationsController
                     ON  ro2.id         = dr.routing_option_id
                     AND ro2.name       = 'Noted'
                     AND ro2.is_deleted = 0
-                WHERE  dr.from_phase = 'SP_SECRETARY'
-                  AND  dr.to_phase   = 'SP_SECRETARY'
+                WHERE  dr.from_phase = 'ADMIN'
+                  AND  dr.to_phase   = 'ADMIN'
                 GROUP BY dr.document_id
             ) latest_nr
                 ON  latest_nr.document_id = d.id
@@ -82,8 +83,8 @@ class SpsecCommunicationsController
                     ON  ro2.id         = dr.routing_option_id
                     AND ro2.name       = 'Noted'
                     AND ro2.is_deleted = 0
-                WHERE  dr.from_phase = 'SP_SECRETARY'
-                  AND  dr.to_phase   = 'SP_SECRETARY'
+                WHERE  dr.from_phase = 'ADMIN'
+                  AND  dr.to_phase   = 'ADMIN'
                 GROUP BY dr.document_id
             ) latest_nr
                 ON  latest_nr.document_id = d.id
@@ -115,7 +116,7 @@ class SpsecCommunicationsController
             ? 'AND ' . implode(' AND ', $filterConditions)
             : '';
 
-        // Count query — uses the derived-table join (no nr.* columns selected)
+        // Count query
         $countSql = "
             SELECT COUNT(DISTINCT d.id) AS total
             FROM documents d
@@ -129,8 +130,7 @@ class SpsecCommunicationsController
         $totalRows  = (int) ($countStmt->fetch()['total'] ?? 0);
         $totalPages = max(1, (int) ceil($totalRows / $perPage));
 
-        // Main list query — uses the derived-table join + the full nr row.
-        // No GROUP BY needed: the derived table guarantees one nr row per document.
+        // Main list query
         $sql = "
             SELECT
                 d.id,
@@ -184,7 +184,7 @@ class SpsecCommunicationsController
             ORDER BY name ASC
         ")->fetchAll();
 
-        // Statistics — counts all noted communication documents (no filters)
+        // Statistics — total noted communications (unfiltered)
         $totalNotedStmt = $this->pdo->prepare("
             SELECT COUNT(DISTINCT d.id) AS cnt
             FROM documents d
@@ -195,8 +195,8 @@ class SpsecCommunicationsController
                     ON  ro2.id         = dr.routing_option_id
                     AND ro2.name       = 'Noted'
                     AND ro2.is_deleted = 0
-                WHERE  dr.from_phase = 'SP_SECRETARY'
-                  AND  dr.to_phase   = 'SP_SECRETARY'
+                WHERE  dr.from_phase = 'ADMIN'
+                  AND  dr.to_phase   = 'ADMIN'
                 GROUP BY dr.document_id
             ) noted_docs
                 ON  noted_docs.document_id = d.id
@@ -212,13 +212,13 @@ class SpsecCommunicationsController
         $error   = flash_get('error');
 
         $pageTitle    = 'Communications';
-        $pageSubtitle = 'Communication documents marked as Noted by the SP Secretary';
+        $pageSubtitle = 'Communication documents marked as Noted by Admin';
 
-        require __DIR__ . '/../../../resources/views/spsec/communications/index.php';
+        require __DIR__ . '/../../../resources/views/admin/communications/index.php';
     }
 
     // =========================================================================
-    // 2. GET spsec/communications/show
+    // 2. GET admin/communications/show
     // =========================================================================
 
     public function show(): void
@@ -228,15 +228,15 @@ class SpsecCommunicationsController
             redirect('login');
         }
 
-        $this->requireSpsecAccess();
+        $this->requireAdminAccess();
 
         $documentId = (int) ($_GET['id'] ?? 0);
         if ($documentId <= 0) {
             flash_set('error', 'Invalid document ID.');
-            redirect('spsec/communications');
+            redirect('admin/communications');
         }
 
-        // Fetch document details
+        // Fetch full document row
         $docStmt = $this->pdo->prepare("
             SELECT
                 d.*,
@@ -271,24 +271,28 @@ class SpsecCommunicationsController
 
         if (!$document) {
             flash_set('error', 'Document not found.');
-            redirect('spsec/communications');
+            redirect('admin/communications');
         }
 
-        // Verify the document is a Noted Communication
+        // Verify this is a valid Admin-Noted Communication
         $isNotedComm = $this->pdo->prepare("
             SELECT COUNT(*) AS cnt
             FROM documents d
-            INNER JOIN document_types dt ON d.document_type_id = dt.id AND dt.name = 'Communication' AND dt.is_deleted = 0
-            INNER JOIN document_routes dr ON dr.document_id = d.id
-            INNER JOIN routing_options ro ON ro.id = dr.routing_option_id AND ro.name = 'Noted' AND ro.is_deleted = 0
-            WHERE d.id = ?
-              AND d.current_phase = 'SP_SECRETARY'
-              AND dr.from_phase = 'SP_SECRETARY' AND dr.to_phase = 'SP_SECRETARY'
+            INNER JOIN document_types  dt ON d.document_type_id       = dt.id
+                                         AND dt.name       = 'Communication'
+                                         AND dt.is_deleted = 0
+            INNER JOIN document_routes dr ON dr.document_id           = d.id
+            INNER JOIN routing_options ro ON ro.id                    = dr.routing_option_id
+                                         AND ro.name       = 'Noted'
+                                         AND ro.is_deleted = 0
+            WHERE d.id           = ?
+              AND dr.from_phase  = 'ADMIN'
+              AND dr.to_phase    = 'ADMIN'
         ");
         $isNotedComm->execute([$documentId]);
-        if (!$isNotedComm->fetch()['cnt']) {
-            flash_set('error', 'This document is not a valid Noted Communication.');
-            redirect('spsec/communications');
+        if (!(int) ($isNotedComm->fetch()['cnt'] ?? 0)) {
+            flash_set('error', 'This document is not a valid Admin Noted Communication.');
+            redirect('admin/communications');
         }
 
         // Route history
@@ -300,10 +304,10 @@ class SpsecCommunicationsController
                 rr.name      AS routed_to_role_name,
                 ro.name      AS routing_option_name
             FROM document_routes dr
-            LEFT JOIN user_accounts  rb  ON dr.routed_by         = rb.id
-            LEFT JOIN user_info      rbi ON rb.id                = rbi.user_account_id
-            LEFT JOIN roles          rr  ON dr.routed_to_role_id = rr.id
-            LEFT JOIN routing_options ro ON dr.routing_option_id = ro.id
+            LEFT JOIN user_accounts   rb  ON dr.routed_by         = rb.id
+            LEFT JOIN user_info       rbi ON rb.id                = rbi.user_account_id
+            LEFT JOIN roles           rr  ON dr.routed_to_role_id = rr.id
+            LEFT JOIN routing_options ro  ON dr.routing_option_id = ro.id
             WHERE dr.document_id = ?
             ORDER BY dr.created_at ASC
         ");
@@ -342,7 +346,7 @@ class SpsecCommunicationsController
         $attStmt->execute([$documentId]);
         $attachments = $attStmt->fetchAll();
 
-        // Events
+        // Workflow events
         $eventStmt = $this->pdo->prepare("
             SELECT de.*, ua.username AS performed_by_username
             FROM document_events de
@@ -356,18 +360,31 @@ class SpsecCommunicationsController
         $pageTitle    = 'Communication Details — ' . htmlspecialchars($document['tracking_number']);
         $pageSubtitle = 'Noted communication document details and history';
 
-        require __DIR__ . '/../../../resources/views/spsec/communications/show.php';
+        require __DIR__ . '/../../../resources/views/admin/communications/show.php';
     }
 
     // =========================================================================
     // Helpers
     // =========================================================================
 
-    private function requireSpsecAccess(): void
+    private function requireAdminAccess(): void
     {
-        if (!is_role('SP Secretary') && !is_role('Super Admin')) {
+        if (!is_role('Admin') && !is_role('Super Admin')) {
             flash_set('error', 'You do not have permission to access that page.');
             redirect('dashboard');
         }
+    }
+
+    private function formatPhaseName(string $phase): string
+    {
+        return [
+            'RECEIVING'    => 'Receiving',
+            'ADMIN'        => 'Admin',
+            'SP_SECRETARY' => 'SP Secretary',
+            'PLENARY'      => 'Plenary',
+            'COMMITTEE'    => 'Committee',
+            'FINALIZED'    => 'Finalized',
+            'FILED'        => 'Filed',
+        ][$phase] ?? $phase;
     }
 }

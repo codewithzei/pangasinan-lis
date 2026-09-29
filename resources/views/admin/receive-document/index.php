@@ -18,16 +18,18 @@
  *   $errors                 array
  */
 
-$trackingNumberPreview = $trackingNumberPreview ?? '';
-$documentTypes         = $documentTypes         ?? [];
-$sourceTypes           = $sourceTypes           ?? [];
-$externalOffices       = $externalOffices       ?? [];
-$hospitals             = $hospitals             ?? [];
-$spMembers             = $spMembers             ?? [];
-$municities            = $municities            ?? [];
-$success               = $success               ?? null;
-$error                 = $error                 ?? null;
-$errors                = $errors                ?? [];
+$trackingNumberPreview   = $trackingNumberPreview   ?? '';
+$documentTypes           = $documentTypes           ?? [];
+$sourceTypes             = $sourceTypes             ?? [];
+$externalOffices         = $externalOffices         ?? [];
+$hospitals               = $hospitals               ?? [];
+$spMembers               = $spMembers               ?? [];
+$municities              = $municities              ?? [];
+$routingOptions          = $routingOptions          ?? [];
+$communicationCategories = $communicationCategories ?? [];
+$success                 = $success                 ?? null;
+$error                   = $error                   ?? null;
+$errors                  = $errors                  ?? [];
 
 ob_start();
 ?>
@@ -178,6 +180,56 @@ ob_start();
                             <?php endforeach; ?>
                         </select>
                         <p class="mt-1 text-xs text-gray-500">Select the type of document</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Routing Option ---------------------------------------------->
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Routing Option</h2>
+                <p class="mt-1 text-sm text-gray-500">
+                    Select where this document should be forwarded (optional).
+                    The <em>Noted</em> option appears only when Document Type is <strong>Communication</strong>.
+                </p>
+
+                <div class="mt-4 space-y-4">
+                    <div>
+                        <label for="routing_option_id" class="block text-sm font-medium text-gray-700">
+                            Routing Option
+                        </label>
+                        <select name="routing_option_id" id="routing_option_id"
+                                class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                            <option value="">-- Select Routing Option --</option>
+                            <?php foreach ($routingOptions as $opt): ?>
+                                <?php
+                                    // Noted (id=6) starts hidden; JS will reveal it when doc type = Communication
+                                    $isNoted  = ((int) $opt['id'] === 6);
+                                    $selected = (old('routing_option_id') == $opt['id']) ? 'selected' : '';
+                                ?>
+                                <option value="<?= (int) $opt['id'] ?>"
+                                        <?= $selected ?>
+                                        <?= $isNoted ? 'class="noted-option hidden"' : '' ?>>
+                                    <?= htmlspecialchars($opt['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <!-- Communication Category — visible only when Noted is selected -->
+                    <div id="communicationCategoryWrapper" class="hidden">
+                        <label for="communication_category_id" class="block text-sm font-medium text-gray-700">
+                            Communication Category <span class="text-red-500">*</span>
+                        </label>
+                        <select name="communication_category_id" id="communication_category_id"
+                                class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                            <option value="">-- Select Communication Category --</option>
+                            <?php foreach ($communicationCategories as $cat): ?>
+                                <option value="<?= (int) $cat['id'] ?>"
+                                        <?= (old('communication_category_id') == $cat['id']) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($cat['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </div>
             </section>
@@ -461,6 +513,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!documentTypeId) {
             checklistSection.classList.add('hidden');
+            syncNotedOption();
             return;
         }
 
@@ -470,6 +523,9 @@ document.addEventListener('DOMContentLoaded', function () {
         checklistItems.classList.add('hidden');
         checklistEmpty.classList.add('hidden');
         checklistItems.innerHTML = '';
+
+        // Sync Noted visibility whenever document type changes
+        syncNotedOption();
 
         // Fetch checklists via AJAX
         fetch('<?= BASE_URL ?>/admin/receive-document/get-checklists?document_type_id=' + documentTypeId)
@@ -518,6 +574,70 @@ document.addEventListener('DOMContentLoaded', function () {
                 checklistEmpty.classList.remove('hidden');
             });
     });
+
+    // -------------------------------------------------------------------------
+    // Routing Option + Communication Category logic
+    // -------------------------------------------------------------------------
+
+    const routingSelect    = document.getElementById('routing_option_id');
+    const commCatWrapper   = document.getElementById('communicationCategoryWrapper');
+    const commCatSelect    = document.getElementById('communication_category_id');
+
+    /**
+     * Show or hide the "Noted" option based on whether the selected document
+     * type name is exactly "Communication".
+     * If Noted was selected and is now being hidden, reset the routing select
+     * and hide the communication category dropdown.
+     */
+    function syncNotedOption() {
+        if (!routingSelect) return;
+
+        const selectedOption = documentTypeSelect.options[documentTypeSelect.selectedIndex];
+        const docTypeName    = selectedOption ? selectedOption.text.trim() : '';
+        const isCommunication = (docTypeName === 'Communication');
+
+        const notedOptions = routingSelect.querySelectorAll('option.noted-option');
+        notedOptions.forEach(function (opt) {
+            if (isCommunication) {
+                opt.classList.remove('hidden');
+                opt.disabled = false;
+            } else {
+                // If Noted is currently selected, reset the routing dropdown first
+                if (parseInt(routingSelect.value) === 6) {
+                    routingSelect.value = '';
+                    syncCommCategory();
+                }
+                opt.classList.add('hidden');
+                opt.disabled = true;
+            }
+        });
+    }
+
+    /**
+     * Show or hide the Communication Category dropdown depending on whether
+     * Noted (id=6) is the selected routing option.
+     */
+    function syncCommCategory() {
+        if (!routingSelect || !commCatWrapper || !commCatSelect) return;
+
+        const isNoted = (parseInt(routingSelect.value) === 6);
+        if (isNoted) {
+            commCatWrapper.classList.remove('hidden');
+            commCatSelect.setAttribute('required', 'required');
+        } else {
+            commCatWrapper.classList.add('hidden');
+            commCatSelect.removeAttribute('required');
+            commCatSelect.value = '';
+        }
+    }
+
+    if (routingSelect) {
+        routingSelect.addEventListener('change', syncCommCategory);
+    }
+
+    // Initialise on page load (handles repopulation after a validation error)
+    syncNotedOption();
+    syncCommCategory();
 
     // Source type change handler — identical behaviour to Receiving form
     sourceTypeSelect.addEventListener('change', function () {
