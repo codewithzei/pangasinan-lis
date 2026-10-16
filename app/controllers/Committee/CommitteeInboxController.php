@@ -208,10 +208,6 @@ class CommitteeInboxController
         $listStmt->execute([...$params, $perPage, $offset]);
         $assignments = $listStmt->fetchAll();
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         // ── Statistics cards (user-scoped) ────────────────────────────────────
         // The accepted_count mirrors the Accepted tab filter exactly:
         //   - decision = ACCEPTED, completed_at IS NULL, owned by this user
@@ -465,10 +461,6 @@ class CommitteeInboxController
         ");
         $revStmt->execute([$documentId]);
         $revisions = $revStmt->fetchAll();
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         // ── Derive explicit state variables for the view ──────────────────────
         $assignmentDecision = $activeAssignment !== false

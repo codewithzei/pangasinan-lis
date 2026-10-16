@@ -198,10 +198,6 @@ class ReceivingInboxController
         $listStmt->execute([...$params, $perPage, $offset]);
         $assignments = $listStmt->fetchAll();
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         // Statistics for the dashboard cards
         $statsStmt = $this->pdo->prepare("
             SELECT 
@@ -487,9 +483,6 @@ class ReceivingInboxController
         ");
         $spMembers = $spMembersStmt->fetchAll();
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
         $old     = old_get();
 
         $pageTitle = $isAccepted ? 'Edit Returned Document' : 'View Returned Document';

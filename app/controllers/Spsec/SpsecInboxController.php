@@ -157,10 +157,6 @@ class SpsecInboxController
         $listStmt->execute([...$params, $perPage, $offset]);
         $assignments = $listStmt->fetchAll();
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         // ── Statistics cards (user-scoped) ────────────────────────────────────
         $statsStmt = $this->pdo->prepare("
             SELECT
@@ -383,10 +379,6 @@ class SpsecInboxController
             WHERE is_active = 1 AND is_deleted = 0
             ORDER BY sort_order ASC, name ASC
         ")->fetchAll();
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         // ── Derive explicit state variables for the view ──────────────────────
         $assignmentDecision = $activeAssignment !== false

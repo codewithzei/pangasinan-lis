@@ -222,9 +222,6 @@ class AdminRoutedDocumentController
         $routeEventStmt->execute([$authUserId]);
         $totalRouteEvents = (int)($routeEventStmt->fetch()['cnt'] ?? 0);
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-
         $pageTitle    = 'Routed Documents';
         $pageSubtitle = 'Documents you have personally routed through the system';
 

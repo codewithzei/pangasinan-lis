@@ -148,10 +148,6 @@ class CommitteeCommunicationsController
         $statsStmt->execute([$userId]);
         $totalCommunications = (int) $statsStmt->fetch(PDO::FETCH_ASSOC)['total_communications'];
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         $pageTitle = 'Committee Communications';
         require __DIR__ . '/../../../resources/views/committee/communications/index.php';
     }
@@ -179,9 +175,6 @@ class CommitteeCommunicationsController
             redirect('committee/communications/show?id=' . (int) $existing['id']);
         }
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
         $old     = old_get();
 
         $pageTitle = 'Log Communication — ' . htmlspecialchars($document['tracking_number']);
@@ -449,10 +442,6 @@ class CommitteeCommunicationsController
             $linkedReport = $rStmt->fetch() ?: null;
         }
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         $pageTitle = 'Communication — ' . htmlspecialchars($comm['tracking_number'] ?? '');
         require __DIR__ . '/../../../resources/views/committee/communications/show.php';
     }
@@ -505,10 +494,6 @@ class CommitteeCommunicationsController
             WHERE is_active = 1 AND is_deleted = 0
             ORDER BY last_name ASC, first_name ASC
         ")->fetchAll(PDO::FETCH_ASSOC);
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         $pageTitle = 'Schedule Agenda — Communication';
         require __DIR__ . '/../../../resources/views/committee/communications/agenda.php';
@@ -795,10 +780,6 @@ class CommitteeCommunicationsController
         $agStmt->execute([(int) $comm['agenda_id']]);
         $agenda = $agStmt->fetch() ?: [];
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         $pageTitle = 'Record Hearing — Communication';
         require __DIR__ . '/../../../resources/views/committee/communications/hearing.php';
     }
@@ -1016,9 +997,6 @@ class CommitteeCommunicationsController
         $acStmt->execute([(int) $comm['agenda_id']]);
         $agendaCommitteeIds = array_column($acStmt->fetchAll(PDO::FETCH_ASSOC), 'committee_id');
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
         $old     = old_get();
 
         // On validation failure repopulate from old input; otherwise use agenda defaults.

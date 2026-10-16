@@ -187,9 +187,6 @@ class SpsecRoutedDocumentController
         ");
         $committeeCount = (int) ($committeeCountStmt->fetch()['cnt'] ?? 0);
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-
         $pageTitle    = 'Routed Documents';
         $pageSubtitle = 'Documents routed through the SP Secretary workflow';
 

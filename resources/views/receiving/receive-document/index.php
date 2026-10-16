@@ -2,9 +2,6 @@
 // Safe variable defaults to prevent undefined warnings
 $user = auth();
 $pageTitle = isset($pageTitle) ? $pageTitle : 'Route Document';
-$success = isset($success) ? $success : null;
-$error = isset($error) ? $error : null;
-$errors = (isset($errors) && is_array($errors)) ? $errors : [];
 $trackingNumberPreview = isset($trackingNumberPreview) ? $trackingNumberPreview : '';
 $documentTypes = (isset($documentTypes) && is_array($documentTypes)) ? $documentTypes : [];
 $sourceTypes = (isset($sourceTypes) && is_array($sourceTypes)) ? $sourceTypes : [];
@@ -34,57 +31,6 @@ ob_start();
             <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
     </section>
-
-    <!-- Flash Messages -->
-    <?php if (isset($success) && $success): ?>
-        <div class="rounded-2xl border border-green-200 bg-green-50 p-4">
-            <div class="flex items-start">
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-100">
-                    <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                    </svg>
-                </div>
-                <div class="ml-3 flex-1">
-                    <p class="text-sm font-medium text-green-800"><?= htmlspecialchars($success) ?></p>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <?php if (isset($error) && $error): ?>
-        <div class="rounded-2xl border border-red-200 bg-red-50 p-4">
-            <div class="flex items-start">
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100">
-                    <svg class="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </div>
-                <div class="ml-3 flex-1">
-                    <p class="text-sm font-medium text-red-800"><?= htmlspecialchars($error) ?></p>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <?php if (isset($errors) && !empty($errors)): ?>
-        <div class="rounded-2xl border border-red-200 bg-red-50 p-4">
-            <div class="flex items-start">
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100">
-                    <svg class="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-                <div class="ml-3 flex-1">
-                    <p class="text-sm font-semibold text-red-800">Please correct the following errors:</p>
-                    <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-red-700">
-                        <?php foreach ($errors as $err): ?>
-                            <li><?= htmlspecialchars($err) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <!-- Form -->
     <form method="POST" action="<?= BASE_URL ?>/receiving/receive-document/submit" enctype="multipart/form-data" id="documentForm">

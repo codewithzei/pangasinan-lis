@@ -36,9 +36,6 @@ $oldExistingId       = $oldExistingId       ?? 0;
 $oldReportNum        = $oldReportNum        ?? '';
 $oldSummary          = $oldSummary          ?? '';
 $oldCommIds          = $oldCommIds          ?? [];
-$success             = $success             ?? null;
-$error               = $error               ?? null;
-$errors              = $errors              ?? [];
 
 // Identify documents that have no committee assigned (no agenda_committees row found)
 $docsWithoutCommittee = [];
@@ -92,34 +89,6 @@ ob_start();
         </svg>
         <span class="font-medium text-gray-700">Share to Committee Report</span>
     </nav>
-
-    <!-- ── Flash messages ────────────────────────────────────────────────── -->
-    <?php if ($success): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-4" role="alert">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
-            <p class="text-sm font-medium text-green-800"><?= htmlspecialchars($success) ?></p>
-        </div>
-    <?php endif; ?>
-
-    <?php if ($error): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4" role="alert">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-            <div class="text-sm text-red-800">
-                <p class="font-semibold"><?= htmlspecialchars($error) ?></p>
-                <?php if (!empty($errors)): ?>
-                    <ul class="mt-1 list-disc pl-4 space-y-0.5">
-                        <?php foreach ($errors as $e): ?>
-                            <li><?= htmlspecialchars($e) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <!-- ── Main layout ───────────────────────────────────────────────────── -->
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">

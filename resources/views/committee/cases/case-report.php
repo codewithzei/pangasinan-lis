@@ -16,9 +16,6 @@
 $case                 = $case                 ?? [];
 $allCommittees        = $allCommittees        ?? [];
 $assignedCommitteeIds = $assignedCommitteeIds ?? [];
-$success              = $success              ?? null;
-$error                = $error                ?? null;
-$errors               = $errors               ?? [];
 $old                  = $old                  ?? [];
 
 $caseId      = (int) ($case['id']           ?? 0);
@@ -74,25 +71,6 @@ ob_start();
         </svg>
         <span class="font-medium text-gray-700">Create Committee Report</span>
     </nav>
-
-    <!-- Flash messages ------------------------------------------------------->
-    <?php if ($error): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-            <div class="text-sm text-red-800">
-                <p class="font-semibold"><?= htmlspecialchars($error) ?></p>
-                <?php if (!empty($errors)): ?>
-                    <ul class="mt-1 list-disc pl-4 space-y-0.5">
-                        <?php foreach ($errors as $e): ?>
-                            <li><?= htmlspecialchars($e) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
 

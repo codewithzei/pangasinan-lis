@@ -208,9 +208,6 @@ class AdminCommunicationsController
         $totalNotedStmt->execute();
         $totalNoted = (int) ($totalNotedStmt->fetch()['cnt'] ?? 0);
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-
         $pageTitle    = 'Communications';
         $pageSubtitle = 'Communication documents marked as Noted by Admin';
 

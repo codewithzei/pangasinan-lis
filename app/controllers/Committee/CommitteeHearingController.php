@@ -134,9 +134,6 @@ class CommitteeHearingController
 
         $totalPages = max(1, (int) ceil($total / $perPage));
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-
         $pageTitle = 'Committee Hearings';
         require __DIR__ . '/../../../resources/views/committee/hearing/index.php';
     }
@@ -277,10 +274,6 @@ class CommitteeHearingController
             $rptStmt->execute([$existingHearing['id']]);
             $existingReport = $rptStmt->fetch() ?: null;
         }
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         $pageTitle = 'Committee Hearing — ' . htmlspecialchars($document['tracking_number']);
         require __DIR__ . '/../../../resources/views/committee/hearing/show.php';
@@ -548,10 +541,6 @@ class CommitteeHearingController
         $reportType = count($agendaCommittees) > 1
             ? 'JOINT_COMMITTEE_REPORT'
             : 'COMMITTEE_REPORT';
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         $pageTitle = 'Create Committee Report';
         require __DIR__ . '/../../../resources/views/committee/hearing/report.php';
@@ -937,9 +926,6 @@ class CommitteeHearingController
             $hStmt->execute([$report['hearing_id']]);
             $hearing = $hStmt->fetch();
         }
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
 
         $pageTitle = 'Committee Report #' . htmlspecialchars($report['report_number'] ?? $reportId);
         require __DIR__ . '/../../../resources/views/committee/hearing/report-show.php';
@@ -1499,10 +1485,6 @@ class CommitteeHearingController
         $oldCommIds = isset($old['committee_ids'])
             ? array_map('intval', (array) $old['committee_ids'])
             : $defaultCommIds;
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         $pageTitle = 'Share to Committee Report';
         require __DIR__ . '/../../../resources/views/committee/hearing/share-to-report.php';

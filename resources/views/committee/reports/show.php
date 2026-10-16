@@ -23,8 +23,6 @@ $agenda                   = $agenda                   ?? null;
 $hearing                  = $hearing                  ?? null;
 $committeeReportCreatedId = $committeeReportCreatedId ?? 0;
 $fromReports              = $fromReports              ?? true;
-$success                  = $success                  ?? null;
-$error                    = $error                    ?? null;
 
 $reportId   = (int) ($report['id'] ?? 0);
 $isJoint    = ($report['report_type'] ?? '') === 'JOINT_COMMITTEE_REPORT';
@@ -75,24 +73,6 @@ ob_start();
             <?= !empty($report['report_number']) ? '#' . htmlspecialchars($report['report_number']) : '' ?>
         </span>
     </nav>
-
-    <!-- ── Flash messages ──────────────────────────────────────────────────── -->
-    <?php if ($success): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-4">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
-            <p class="text-sm font-medium text-green-800"><?= htmlspecialchars($success) ?></p>
-        </div>
-    <?php endif; ?>
-    <?php if ($error): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-            <p class="text-sm font-medium text-red-800"><?= htmlspecialchars($error) ?></p>
-        </div>
-    <?php endif; ?>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
 

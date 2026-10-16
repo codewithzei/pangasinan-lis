@@ -23,8 +23,6 @@ $page       = $page       ?? 1;
 $perPage    = $perPage    ?? 20;
 $search     = $search     ?? '';
 $counts     = $counts     ?? ['all' => 0, 'scheduled' => 0, 'approved' => 0, 'deferred' => 0, 'remanded' => 0, 'withdrawn' => 0];
-$success    = $success    ?? null;
-$error      = $error      ?? null;
 
 // Tab configuration: key => [label, inactive badge class]
 $tabConfig = [
@@ -89,33 +87,6 @@ ob_start();
             <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
     </section>
-
-    <!-- ── Flash messages ────────────────────────────────────────────────── -->
-    <?php if ($success): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-4" role="alert">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
-            <p class="text-sm font-medium text-green-800"><?= htmlspecialchars($success) ?></p>
-        </div>
-    <?php endif; ?>
-    <?php if ($error): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4" role="alert">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-            <div class="text-sm text-red-800">
-                <p class="font-semibold"><?= htmlspecialchars($error) ?></p>
-                <?php $flashErrors = flash_get('errors') ?? []; if (!empty($flashErrors)): ?>
-                    <ul class="mt-1 list-disc pl-4 space-y-0.5">
-                        <?php foreach ($flashErrors as $fe): ?>
-                            <li><?= htmlspecialchars($fe) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <!-- ── Tab navigation ────────────────────────────────────────────────── -->
     <div class="border-b border-gray-200">

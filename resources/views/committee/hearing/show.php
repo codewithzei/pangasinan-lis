@@ -26,9 +26,6 @@ $events             = $events             ?? [];
 $existingHearing    = $existingHearing    ?? false;
 $existingReport     = $existingReport     ?? null;
 $isOnGoing          = $isOnGoing          ?? true;
-$success            = $success            ?? null;
-$error              = $error              ?? null;
-$errors             = $errors             ?? [];
 
 $documentId  = (int) ($document['id'] ?? 0);
 $agendaId    = (int) ($agenda['id']   ?? 0);
@@ -113,33 +110,6 @@ ob_start();
         </svg>
         <span class="font-medium text-gray-700">Record Outcome</span>
     </nav>
-
-    <!-- Flash messages -->
-    <?php if ($success): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-4">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
-            <p class="text-sm font-medium text-green-800"><?= htmlspecialchars($success) ?></p>
-        </div>
-    <?php endif; ?>
-    <?php if ($error): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-            <div class="text-sm text-red-800">
-                <p class="font-semibold"><?= htmlspecialchars($error) ?></p>
-                <?php if (!empty($errors)): ?>
-                    <ul class="mt-1 list-disc pl-4 space-y-0.5">
-                        <?php foreach ($errors as $e): ?>
-                            <li><?= htmlspecialchars($e) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <!-- Already recorded banner -->
     <?php if ($alreadyDone): ?>

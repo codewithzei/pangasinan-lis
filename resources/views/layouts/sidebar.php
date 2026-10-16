@@ -182,7 +182,7 @@ if ($userRoleId !== null) {
                     </svg>
                     Filed Documents
                 </a>
-                <a href="<?= BASE_URL ?>/admin/archived" class="<?= $navBase ?> <?= isActiveNav('admin/archived', $currentRoute) ?>">
+                <a href="<?= BASE_URL ?>/admin/archived-records" class="<?= $navBase ?> <?= isActiveNav('admin/archived-records', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                               d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
@@ -208,7 +208,7 @@ if ($userRoleId !== null) {
         <div class="mb-7">
             <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">System Archive</p>
             <nav class="space-y-1">
-                <a href="<?= BASE_URL ?>/admin/archive" class="<?= $navBase ?> <?= isActiveNav('admin/archive', $currentRoute) ?>">
+                <a href="<?= BASE_URL ?>/admin/archived-records" class="<?= $navBase ?> <?= isActiveNav('admin/archived-records', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                               d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>

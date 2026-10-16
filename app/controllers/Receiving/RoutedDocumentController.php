@@ -127,9 +127,6 @@ class RoutedDocumentController
             WHERE d.current_phase != 'RECEIVING'
         ")->fetch()['count'];
 
-        $success = flash_get('success');
-        $error = flash_get('error');
-
         $pageTitle = 'Routed Documents';
         $pageSubtitle = 'View and track all documents that have been routed through the system';
 

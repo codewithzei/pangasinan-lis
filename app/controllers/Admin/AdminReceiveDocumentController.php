@@ -46,10 +46,6 @@ class AdminReceiveDocumentController
         $routingOptions         = $this->docService->getRoutingOptions();
         $communicationCategories = $this->docService->getCommunicationCategories();
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         $pageTitle    = 'Receive Document (Admin)';
         $pageSubtitle = 'Directly receive and encode an incoming document';
 

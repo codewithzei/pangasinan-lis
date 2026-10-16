@@ -49,10 +49,6 @@ class RouteDocumentController
         $spMembers       = $this->docService->getSpMembers();
         $municities      = $this->docService->getMunicities();
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         $pageTitle    = 'Receive Document';
         $pageSubtitle = 'Receive and route incoming documents to Admin';
 

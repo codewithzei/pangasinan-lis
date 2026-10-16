@@ -174,10 +174,6 @@ class AdminInboxController
         $listStmt->execute([...$params, $perPage, $offset]);
         $assignments = $listStmt->fetchAll();
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         // ── Statistics cards (user-scoped) ────────────────────────────────────
         // Pending count: unclaimed docs for the role + docs pre-assigned to me
         // Accepted count: only docs accepted by or assigned to me
@@ -399,10 +395,6 @@ class AdminInboxController
 
         // Communication categories for NOTED action
         $commCategories = $this->docService->getCommunicationCategories();
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         // ── Derive explicit state variables for the view ─────────────────────
         //

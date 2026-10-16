@@ -32,9 +32,6 @@ $referredCount       = $referredCount       ?? 0;
 $forOpinionCount     = $forOpinionCount     ?? 0;
 $readyForAgendaCount = $readyForAgendaCount ?? 0;
 $withdrawnCount      = $withdrawnCount      ?? 0;
-$success             = $success             ?? null;
-$error               = $error               ?? null;
-$errors              = $errors              ?? [];
 
 ob_start();
 
@@ -86,38 +83,6 @@ $hasFilter = $search !== '' || $filterDocType > 0;
             <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
     </section>
-
-    <!-- ── Flash messages ───────────────────────────────────────────────────── -->
-    <?php if ($success): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-4">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-100">
-                <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-            </div>
-            <p class="mt-1.5 text-sm font-medium text-green-800"><?= htmlspecialchars($success) ?></p>
-        </div>
-    <?php endif; ?>
-
-    <?php if ($error): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100">
-                <svg class="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </div>
-            <div class="mt-1.5 text-sm text-red-800">
-                <p class="font-medium"><?= htmlspecialchars($error) ?></p>
-                <?php if (!empty($errors)): ?>
-                    <ul class="mt-1 list-disc pl-4 space-y-0.5">
-                        <?php foreach ($errors as $e): ?>
-                            <li><?= htmlspecialchars($e) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <!-- ── Tab navigation ───────────────────────────────────────────────────── -->
     <div class="border-b border-gray-200">

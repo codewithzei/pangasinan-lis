@@ -182,9 +182,6 @@ class CommitteeReportsController
         // ── Resolve "Committee Report Created" status ID for eligibility check ─
         $committeeReportCreatedId = $this->resolveStatusId('Committee Report Created');
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-
         $pageTitle = 'Committee Reports';
         require __DIR__ . '/../../../resources/views/committee/reports/index.php';
     }
@@ -321,9 +318,6 @@ class CommitteeReportsController
 
         // Source route for breadcrumb back-link
         $fromReports = true;
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
 
         $pageTitle = 'Committee Report #' . htmlspecialchars($report['report_number'] ?? $reportId);
         require __DIR__ . '/../../../resources/views/committee/reports/show.php';

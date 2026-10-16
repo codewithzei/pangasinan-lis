@@ -45,52 +45,53 @@ $toastErrors = flash_get('errors', []);
         <div class="flex items-center gap-2 sm:gap-4">
 
             <div class="hidden items-center gap-2 sm:flex">
-                <?php if ($toastSuccess !== null && $toastSuccess !== ''): ?>
-                    <div id="toast-success" class="fixed top-24 right-6 z-50 flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 shadow-lg animate-slide-in-right">
-                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <p class="text-sm font-semibold text-emerald-800">Success</p>
-                            <p class="text-xs text-emerald-700"><?= htmlspecialchars($toastSuccess) ?></p>
-                        </div>
-                    </div>
-                <?php endif; ?>
-                <?php if ($toastError !== null && $toastError !== ''): ?>
-                    <div id="toast-error" class="fixed top-24 right-6 z-50 flex items-center gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 shadow-lg">
-                        <div class="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-600">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <p class="text-sm font-semibold text-red-800">Error</p>
-                            <p class="text-xs text-red-700"><?= htmlspecialchars($toastError) ?></p>
-                        </div>
-                    </div>
-                <?php endif; ?>
-                <?php if (!empty($toastErrors)): ?>
-                    <div id="toast-errors" class="fixed top-24 right-6 z-50 max-w-sm rounded-xl border border-red-100 bg-red-50 px-4 py-3 shadow-lg">
-                        <div class="flex items-start gap-3">
-                            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-red-800">Please review the following:</p>
-                                <ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs text-red-700">
-                                    <?php foreach ($toastErrors as $err): ?>
-                                        <li><?= htmlspecialchars($err) ?></li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                <?php endif; ?>
             </div>
+
+            <?php if ($toastSuccess !== null && $toastSuccess !== ''): ?>
+                <div id="toast-success" class="fixed top-24 right-6 z-50 flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 shadow-lg animate-slide-in-right max-w-sm">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shrink-0">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold text-emerald-800">Success</p>
+                        <p class="text-xs text-emerald-700 break-words"><?= htmlspecialchars($toastSuccess) ?></p>
+                    </div>
+                </div>
+            <?php endif; ?>
+            <?php if ($toastError !== null && $toastError !== ''): ?>
+                <div id="toast-error" class="fixed top-24 right-6 z-50 flex items-center gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 shadow-lg max-w-sm">
+                    <div class="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-600 shrink-0">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold text-red-800">Error</p>
+                        <p class="text-xs text-red-700 break-words"><?= htmlspecialchars($toastError) ?></p>
+                    </div>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($toastErrors)): ?>
+                <div id="toast-errors" class="fixed top-24 right-6 z-50 max-w-sm rounded-xl border border-red-100 bg-red-50 px-4 py-3 shadow-lg">
+                    <div class="flex items-start gap-3">
+                        <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-red-800">Please review the following:</p>
+                            <ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs text-red-700">
+                                <?php foreach ($toastErrors as $err): ?>
+                                    <li><?= htmlspecialchars($err) ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
 
             <button
                 type="button"

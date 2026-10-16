@@ -1,8 +1,6 @@
 <?php
 ob_start();
 
-$success = $success ?? null;
-$error = $error ?? null;
 $pageTitle = $pageTitle ?? 'Routed Documents';
 $pageSubtitle = $pageSubtitle ?? '';
 $totalDocuments = $totalDocuments ?? 0;
@@ -54,36 +52,6 @@ function formatPhaseName(string $phase): string
             <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
     </section>
-
-    <?php if (isset($success) && $success): ?>
-        <div class="rounded-2xl border border-green-200 bg-green-50 p-4">
-            <div class="flex items-start">
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-100">
-                    <svg class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                    </svg>
-                </div>
-                <div class="ml-3 flex-1">
-                    <p class="text-sm font-medium text-green-800"><?= htmlspecialchars($success) ?></p>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <?php if (isset($error) && $error): ?>
-        <div class="rounded-2xl border border-red-200 bg-red-50 p-4">
-            <div class="flex items-start">
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100">
-                    <svg class="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </div>
-                <div class="ml-3 flex-1">
-                    <p class="text-sm font-medium text-red-800"><?= htmlspecialchars($error) ?></p>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
 
     <section>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

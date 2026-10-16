@@ -154,10 +154,6 @@ class CommitteeCasesController
         $statsStmt->execute([$userId]);
         $totalCases = (int) $statsStmt->fetch(PDO::FETCH_ASSOC)['total_cases'];
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         $pageTitle = 'Committee Cases';
         require __DIR__ . '/../../../resources/views/committee/cases/index.php';
     }
@@ -188,9 +184,6 @@ class CommitteeCasesController
         // Preview the next docket number (informational — not committed here).
         $docketPreview = $this->previewNextDocketNumber((int) date('Y'));
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
         $old     = old_get();
 
         $pageTitle = 'Create Case — ' . htmlspecialchars($document['tracking_number']);
@@ -517,10 +510,6 @@ class CommitteeCasesController
         ");
         $linkedReportStmt->execute([(int) $case['document_id']]);
         $linkedReport = $linkedReportStmt->fetch(PDO::FETCH_ASSOC) ?: null;
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         $pageTitle = 'Case Details — ' . htmlspecialchars($case['docket_number']);
         require __DIR__ . '/../../../resources/views/committee/cases/show.php';
@@ -1009,9 +998,6 @@ class CommitteeCasesController
         $acStmt->execute([$documentId]);
         $assignedCommitteeIds = array_column($acStmt->fetchAll(PDO::FETCH_ASSOC), 'committee_id');
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
         $old     = old_get();
 
         $pageTitle = 'Create Committee Report — ' . htmlspecialchars($case['docket_number']);
@@ -1703,9 +1689,6 @@ class CommitteeCasesController
         ");
         $listStmt->execute([...$params, $perPage, $offset]);
         $cases = $listStmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
 
         require __DIR__ . "/../../../resources/views/committee/cases/{$viewSlug}.php";
     }

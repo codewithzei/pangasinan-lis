@@ -1060,6 +1060,59 @@ return [
     ],
 
     // -------------------------------------------------------------------------
+    // Admin Archived Records Routes
+    // -------------------------------------------------------------------------
+
+    'admin/archived-records' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/ArchivedRecordsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/archived-records/show' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/ArchivedRecordsController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/archived-records/store' => [
+        'method'     => 'POST',
+        'controller' => 'Admin/ArchivedRecordsController',
+        'action'     => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/archived-records/update' => [
+        'method'     => 'POST',
+        'controller' => 'Admin/ArchivedRecordsController',
+        'action'     => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/archived-records/destroy' => [
+        'method'     => 'POST',
+        'controller' => 'Admin/ArchivedRecordsController',
+        'action'     => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/archived-records/upload' => [
+        'method'     => 'POST',
+        'controller' => 'Admin/ArchivedRecordsController',
+        'action'     => 'uploadAttachment',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/archived-records/attachment/delete' => [
+        'method'     => 'POST',
+        'controller' => 'Admin/ArchivedRecordsController',
+        'action'     => 'deleteAttachment',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
     // SP Secretary Inbox Routes
     // -------------------------------------------------------------------------
 

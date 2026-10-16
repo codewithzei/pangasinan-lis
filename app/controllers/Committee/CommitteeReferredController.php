@@ -148,10 +148,6 @@ class CommitteeReferredController
              ORDER BY name ASC"
         )->fetchAll();
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         $pageTitle = 'Referred Documents';
         require __DIR__ . '/../../../resources/views/committee/referred/index.php';
     }
@@ -180,10 +176,6 @@ class CommitteeReferredController
 
         // Load active opinion offices
         $opinionOffices = $this->fetchOpinionOffices();
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         $pageTitle = 'Endorse to Opinion Offices';
         require __DIR__ . '/../../../resources/views/committee/referred/endorse.php';
@@ -387,10 +379,6 @@ class CommitteeReferredController
         ");
         $officeRow->execute([$endorsement['opinion_office_id']]);
         $office = $officeRow->fetch();
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         $pageTitle = 'Submit Opinion';
         require __DIR__ . '/../../../resources/views/committee/referred/opinion.php';
@@ -730,10 +718,6 @@ class CommitteeReferredController
         $endorsements = $this->latestCycleEndorsements($cycle['id']);
         $submissions  = $this->loadSubmissionsForEndorsements($endorsements);
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
-
         $pageTitle = 'Resolve Committee Cycle';
         require __DIR__ . '/../../../resources/views/committee/referred/resolve.php';
     }
@@ -917,10 +901,6 @@ class CommitteeReferredController
 
         // Load SP members
         $spMembers = $this->docService->getSpMembers();
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors') ?? [];
 
         $pageTitle = 'Schedule Agenda';
         require __DIR__ . '/../../../resources/views/committee/referred/agenda.php';
