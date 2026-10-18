@@ -45,7 +45,7 @@ class AuthController
             FROM user_accounts ua
             INNER JOIN roles r ON r.id = ua.role_id
             LEFT JOIN user_info ui ON ui.user_account_id = ua.id
-            WHERE ua.username = ? OR ua.email = ?
+            WHERE (ua.username = ? OR ua.email = ?) AND ua.is_deleted = 0
             LIMIT 1
         ");
         $stmt->execute([$username, $username]);
@@ -130,7 +130,9 @@ class AuthController
             'contact_number' => trim($_POST['contact_number'] ?? ''),
         ];
 
-        old_set($data);
+        $oldInput = $data;
+        unset($oldInput['password'], $oldInput['password_confirm']);
+        old_set($oldInput);
 
         $errors = [];
 
@@ -138,7 +140,12 @@ class AuthController
         if ($data['email'] === '') $errors[] = 'Email is required.';
         elseif (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Invalid email format.';
         if ($data['password'] === '') $errors[] = 'Password is required.';
-        elseif (strlen($data['password']) < 6) $errors[] = 'Password must be at least 6 characters.';
+        else {
+            $policyError = validate_password_policy($data['password']);
+            if ($policyError !== null) {
+                $errors[] = $policyError;
+            }
+        }
         if ($data['password'] !== $data['password_confirm']) $errors[] = 'Passwords do not match.';
         if ($data['first_name'] === '') $errors[] = 'First name is required.';
         if ($data['last_name'] === '') $errors[] = 'Last name is required.';

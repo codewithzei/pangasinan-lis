@@ -255,12 +255,36 @@ if ($userRoleId !== null) {
         <div class="mb-7">
             <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Legislative Workflow</p>
             <nav class="space-y-1">
-                <a href="<?= BASE_URL ?>/plenary/dashboard" class="<?= $navBase ?> <?= isActiveNav('plenary', $currentRoute) ?>">
+                <a href="<?= BASE_URL ?>/plenary/inbox" class="<?= $navBase ?> <?= isActiveNav('plenary/inbox', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                              d="M6 20V10m6 10V4m6 16v-7"/>
+                              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
                     </svg>
-                    Plenary
+                    Inbox
+                    <?php if ($inboxCount > 0): ?>
+                        <span class="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700"><?= $inboxCount ?></span>
+                    <?php endif; ?>
+                </a>
+                <a href="<?= BASE_URL ?>/plenary/first-reading" class="<?= $navBase ?> <?= isActiveNav('plenary/first-reading', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M7 7h10M7 12h10m-3 5H7"/>
+                    </svg>
+                    First Reading
+                </a>
+                <a href="<?= BASE_URL ?>/plenary/second-reading" class="<?= $navBase ?> <?= isActiveNav('plenary/second-reading', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                    Second Reading
+                </a>
+                <a href="<?= BASE_URL ?>/plenary/status-list" class="<?= $navBase ?> <?= isActiveNav('plenary/status-list', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Finalized Documents
                 </a>
             </nav>
         </div>

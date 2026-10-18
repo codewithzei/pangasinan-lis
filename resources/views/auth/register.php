@@ -109,15 +109,16 @@ ob_start();
                         </div>
                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
-                                <label class="mb-1 block text-xs font-medium text-gray-700">Password *</label>
-                                <input type="password" name="password" required autocomplete="new-password"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-blue-100" placeholder="At least 6 characters">
-                            </div>
-                            <div>
-                                <label class="mb-1 block text-xs font-medium text-gray-700">Confirm Password *</label>
-                                <input type="password" name="password_confirm" required autocomplete="new-password"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-blue-100" placeholder="Re-enter password">
-                            </div>
+                            <label class="mb-1 block text-xs font-medium text-gray-700">Password *</label>
+                            <input type="password" name="password" required minlength="12" autocomplete="new-password"
+                                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-blue-100" placeholder="Min. 12 characters">
+                            <p class="mt-1 text-[11px] text-gray-500">At least 12 characters, with uppercase and lowercase letters, a number, and a special character.</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-gray-700">Confirm Password *</label>
+                            <input type="password" name="password_confirm" required minlength="12" autocomplete="new-password"
+                                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-blue-100" placeholder="Re-enter password">
+                        </div>
                         </div>
                     </div>
                 </div>

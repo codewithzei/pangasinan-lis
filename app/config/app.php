@@ -233,6 +233,47 @@ function system_log(string $level, string $message, ?array $context = null): voi
 define('LOGIN_LOCKOUT_THRESHOLD', 5);
 define('LOGIN_LOCKOUT_MINUTES', 15);
 
+define('PASSWORD_MIN_LENGTH', 12);
+define('PASSWORD_REQUIRE_UPPERCASE', true);
+define('PASSWORD_REQUIRE_LOWERCASE', true);
+define('PASSWORD_REQUIRE_NUMBER', true);
+define('PASSWORD_REQUIRE_SPECIAL', true);
+
+/**
+ * Validate a plaintext password against the project's strong-password policy.
+ *
+ * Rules (must all pass for the password to be accepted):
+ *   - At least PASSWORD_MIN_LENGTH characters.
+ *   - At least one uppercase letter.
+ *   - At least one lowercase letter.
+ *   - At least one digit.
+ *   - At least one special (non-alphanumeric) character.
+ *
+ * @return string|null Human-readable error message, or null when the password is acceptable.
+ */
+function validate_password_policy(string $password): ?string
+{
+    if (mb_strlen($password) < PASSWORD_MIN_LENGTH) {
+        return sprintf(
+            'Password must be at least %d characters long.',
+            PASSWORD_MIN_LENGTH
+        );
+    }
+    if (PASSWORD_REQUIRE_UPPERCASE && !preg_match('/[A-Z]/', $password)) {
+        return 'Password must include at least one uppercase letter.';
+    }
+    if (PASSWORD_REQUIRE_LOWERCASE && !preg_match('/[a-z]/', $password)) {
+        return 'Password must include at least one lowercase letter.';
+    }
+    if (PASSWORD_REQUIRE_NUMBER && !preg_match('/\d/', $password)) {
+        return 'Password must include at least one number.';
+    }
+    if (PASSWORD_REQUIRE_SPECIAL && !preg_match('/[^A-Za-z0-9]/', $password)) {
+        return 'Password must include at least one special character.';
+    }
+    return null;
+}
+
 function check_login_lockout(int $accountId, ?string $username = null): bool
 {
     $pdo = _log_pdo();

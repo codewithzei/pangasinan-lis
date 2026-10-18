@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 return [
 
@@ -895,6 +895,50 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'master/users' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/UserAccountController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/users/store' => [
+        'method' => 'POST',
+        'controller' => 'Master/UserAccountController',
+        'action' => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/users/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/UserAccountController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/users/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/UserAccountController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/users/update-status' => [
+        'method' => 'POST',
+        'controller' => 'Master/UserAccountController',
+        'action' => 'updateStatus',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/users/destroy' => [
+        'method' => 'POST',
+        'controller' => 'Master/UserAccountController',
+        'action' => 'destroy',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'master/user-roles' => [
         [
             'method' => 'GET',
@@ -1365,7 +1409,7 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
-    // Share multiple approved documents to a committee report — dedicated page
+    // Share multiple approved documents to a committee report â€” dedicated page
     'committee/hearing/share-to-report' => [
         [
             'method'     => 'GET',
@@ -1381,7 +1425,7 @@ return [
         ],
     ],
 
-    // JSON endpoint — fetch existing committee reports for the share modal
+    // JSON endpoint â€” fetch existing committee reports for the share modal
     'committee/hearing/reports-json' => [
         'method'     => 'GET',
         'controller' => 'Committee/CommitteeHearingController',
@@ -1469,7 +1513,7 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
-    // Approved cases — For Report list
+    // Approved cases â€” For Report list
     'committee/cases/for-report' => [
         'method'     => 'GET',
         'controller' => 'Committee/CommitteeCasesController',
@@ -1728,4 +1772,133 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+
+    // =========================================================================
+    // Plenary Workflow Routes
+    // =========================================================================
+
+    // -------------------------------------------------------------------------
+    // Plenary Inbox
+    // -------------------------------------------------------------------------
+
+    'plenary/inbox' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryInboxController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/inbox/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryInboxController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/inbox/accept' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryInboxController',
+        'action'     => 'accept',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/inbox/process' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryInboxController',
+        'action'     => 'processPredecision',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Plenary First Reading
+    // -------------------------------------------------------------------------
+
+    'plenary/first-reading' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'firstReadingIndex',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/first-reading/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'firstReadingShow',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/first-reading/store' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'firstReadingStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Plenary Second Reading
+    // -------------------------------------------------------------------------
+
+    'plenary/second-reading' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'secondReadingIndex',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/second-reading/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'secondReadingShow',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/second-reading/store' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'secondReadingStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/second-reading/return-deferred' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'secondReadingReturnDeferred',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/second-reading/advance-from-committee' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'advanceFromCommittee',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Plenary Finalization (redirects to second-reading)
+    // -------------------------------------------------------------------------
+
+    'plenary/finalize/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'finalizeShow',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/finalize/store' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'finalizeStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
+    // Plenary Status List (Finalized Documents)
+    // -------------------------------------------------------------------------
+
+    'plenary/status-list' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'statusList',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
 ];
