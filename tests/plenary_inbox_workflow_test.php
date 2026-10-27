@@ -3,7 +3,7 @@
  * Test: Plenary Inbox Workflow
  *
  * Covers:
- *   1. Status-dependent form behavior (processing form gated on "Under Processing")
+ *   1. Status-dependent form behavior (processing form gated on "On Process")
  *   2. Required/optional fields per action
  *   3. Document-type numbering exceptions (Communication, Administrative Case, Complaint)
  *   4. Multi-author and multi-committee persistence and replacement
@@ -301,7 +301,7 @@ try {
     // Pre-decision statuses (must already be seeded by migration 065)
     $preDecisionRows = $pdo->query("
         SELECT id, name FROM document_statuses
-        WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','Under Processing','Withdrawn')
+        WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','On Process','Withdrawn')
           AND is_active=1
     ")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -371,7 +371,7 @@ try {
         doAccept($pdo, $d2['document_id'], $d2['assignment_id'], $userA, $plenaryRoleId, $docStatusId);
 
         // Save each of the six pre-decision statuses
-        $allowedNames = ['Deferred','Lay on the Table','Noted','Remanded','Under Processing','Withdrawn'];
+        $allowedNames = ['Deferred','Lay on the Table','Noted','Remanded','On Process','Withdrawn'];
         foreach ($allowedNames as $name) {
             if (!isset($preDecisionStatuses[$name])) {
                 echo "  [SKIP] Status '{$name}' not found in DB — skipping." . PHP_EOL;
@@ -388,10 +388,10 @@ try {
         $row = $pdo->query("SELECT remarks FROM plenary_document_details WHERE document_id={$d2['document_id']}")->fetch();
         check('2.7: Remarks persisted correctly', $row['remarks'] === $remarksText);
 
-        // Processing form is gated on "Under Processing"
-        $isUnder = false;
-        if (isset($preDecisionStatuses['Under Processing'])) {
-            doPreDecision($pdo, $d2['document_id'], $preDecisionStatuses['Under Processing'], '', $userA);
+        // Processing form is gated on "On Process"
+        $isOnProcess = false;
+        if (isset($preDecisionStatuses['On Process'])) {
+            doPreDecision($pdo, $d2['document_id'], $preDecisionStatuses['On Process'], '', $userA);
             $pddRow = $pdo->prepare("
                 SELECT pdd.*, ds.name AS status_name
                 FROM plenary_document_details pdd
@@ -400,9 +400,9 @@ try {
             ");
             $pddRow->execute([$d2['document_id']]);
             $pddData = $pddRow->fetch();
-            $isUnder = strtolower(trim($pddData['status_name'] ?? '')) === 'under processing';
+            $isOnProcess = strtolower(trim($pddData['status_name'] ?? '')) === 'on process';
         }
-        check('2.8: Status = Under Processing enables processing form condition', $isUnder);
+        check('2.8: Status = On Process enables processing form condition', $isOnProcess);
     }
 
     // ==========================================================================
@@ -440,17 +440,17 @@ try {
     // ==========================================================================
     echo PHP_EOL . "Group 4: Multi-author and multi-committee persistence" . PHP_EOL;
 
-    if (count($spMemberIds) >= 2 && isset($preDecisionStatuses['Under Processing'])) {
+    if (count($spMemberIds) >= 2 && isset($preDecisionStatuses['On Process'])) {
         $d4 = createPlenaryDoc($pdo, $genericDocTypeId, $sourceTypeId, $docStatusId,
                                 $plenaryRoleId, $userA, $genericDocTypeName);
         doAccept($pdo, $d4['document_id'], $d4['assignment_id'], $userA, $plenaryRoleId, $docStatusId);
-        doPreDecision($pdo, $d4['document_id'], $preDecisionStatuses['Under Processing'], '', $userA);
+        doPreDecision($pdo, $d4['document_id'], $preDecisionStatuses['On Process'], '', $userA);
 
         $authorIds   = [$spMemberIds[0]];
         $coAuthorIds = [$spMemberIds[1]];
         $cmtIds      = count($committeeIds) >= 2 ? [$committeeIds[0], $committeeIds[1]] : (count($committeeIds) === 1 ? [$committeeIds[0]] : []);
 
-        doSaveProcessing($pdo, $d4['document_id'], $preDecisionStatuses['Under Processing'],
+        doSaveProcessing($pdo, $d4['document_id'], $preDecisionStatuses['On Process'],
                          'PLT-TEST-001', date('Y-m-d'), 'REGULAR',
                          $authorIds, $coAuthorIds, $cmtIds, $userA);
 
@@ -463,7 +463,7 @@ try {
 
         // Replace authors (new save should delete old)
         $newAuthorIds = [$spMemberIds[1]];  // swap
-        doSaveProcessing($pdo, $d4['document_id'], $preDecisionStatuses['Under Processing'],
+        doSaveProcessing($pdo, $d4['document_id'], $preDecisionStatuses['On Process'],
                          'PLT-TEST-001', date('Y-m-d'), 'REGULAR',
                          $newAuthorIds, [], $cmtIds, $userA);
 
@@ -486,7 +486,7 @@ try {
         check('4.9: Session type persisted',     ($pddRow['session_type'] ?? '') === 'REGULAR');
 
     } else {
-        echo "  [SKIP] Not enough SP Members or Under Processing status missing — skipping group 4." . PHP_EOL;
+        echo "  [SKIP] Not enough SP Members or On Process status missing — skipping group 4." . PHP_EOL;
     }
 
     // ==========================================================================
@@ -494,20 +494,20 @@ try {
     // ==========================================================================
     echo PHP_EOL . "Group 5: Proposed number uniqueness" . PHP_EOL;
 
-    if (isset($preDecisionStatuses['Under Processing'])) {
+    if (isset($preDecisionStatuses['On Process'])) {
         $d5a = createPlenaryDoc($pdo, $genericDocTypeId, $sourceTypeId, $docStatusId,
                                  $plenaryRoleId, $userA, $genericDocTypeName);
         $d5b = createPlenaryDoc($pdo, $genericDocTypeId, $sourceTypeId, $docStatusId,
                                  $plenaryRoleId, $userA, $genericDocTypeName);
         doAccept($pdo, $d5a['document_id'], $d5a['assignment_id'], $userA, $plenaryRoleId, $docStatusId);
         doAccept($pdo, $d5b['document_id'], $d5b['assignment_id'], $userA, $plenaryRoleId, $docStatusId);
-        doPreDecision($pdo, $d5a['document_id'], $preDecisionStatuses['Under Processing'], '', $userA);
-        doPreDecision($pdo, $d5b['document_id'], $preDecisionStatuses['Under Processing'], '', $userA);
+        doPreDecision($pdo, $d5a['document_id'], $preDecisionStatuses['On Process'], '', $userA);
+        doPreDecision($pdo, $d5b['document_id'], $preDecisionStatuses['On Process'], '', $userA);
 
         $uniqueNum = 'PLT-UNIQ-' . uniqid();
 
         // Save first document with unique number
-        doSaveProcessing($pdo, $d5a['document_id'], $preDecisionStatuses['Under Processing'],
+        doSaveProcessing($pdo, $d5a['document_id'], $preDecisionStatuses['On Process'],
                          $uniqueNum, '', '', [], [], [], $userA);
 
         // The controller's uniqueness check (simulated here directly)
@@ -525,7 +525,7 @@ try {
         $selfDup = $dupStmt->fetch();
         check('5.2: Updating own proposed_number does not trigger false duplicate', $selfDup === false);
     } else {
-        echo "  [SKIP] Under Processing status not seeded — skipping group 5." . PHP_EOL;
+        echo "  [SKIP] On Process status not seeded — skipping group 5." . PHP_EOL;
     }
 
     // ==========================================================================
@@ -612,12 +612,12 @@ try {
     echo PHP_EOL . "Group 8: Pre-decision status restriction" . PHP_EOL;
 
     // The validation query in the controller uses IN (...) — simulate it
-    $allowedPreDecision = ['Deferred','Lay on the Table','Noted','Remanded','Under Processing','Withdrawn'];
+    $allowedPreDecision = ['Deferred','Lay on the Table','Noted','Remanded','On Process','Withdrawn'];
     foreach ($allowedPreDecision as $name) {
         $stmt = $pdo->prepare("
             SELECT id FROM document_statuses
             WHERE name = ?
-              AND name IN ('Deferred','Lay on the Table','Noted','Remanded','Under Processing','Withdrawn')
+              AND name IN ('Deferred','Lay on the Table','Noted','Remanded','On Process','Withdrawn')
               AND is_active = 1 AND is_deleted = 0
             LIMIT 1
         ");
@@ -629,14 +629,14 @@ try {
     // A random other status must NOT pass the restriction
     $badStatusRow = $pdo->query("
         SELECT id FROM document_statuses
-        WHERE name NOT IN ('Deferred','Lay on the Table','Noted','Remanded','Under Processing','Withdrawn')
+        WHERE name NOT IN ('Deferred','Lay on the Table','Noted','Remanded','On Process','Withdrawn')
           AND is_active=1 LIMIT 1
     ")->fetch();
     if ($badStatusRow) {
         $stmt = $pdo->prepare("
             SELECT id FROM document_statuses
             WHERE id = ?
-              AND name IN ('Deferred','Lay on the Table','Noted','Remanded','Under Processing','Withdrawn')
+              AND name IN ('Deferred','Lay on the Table','Noted','Remanded','On Process','Withdrawn')
               AND is_active = 1 AND is_deleted = 0
             LIMIT 1
         ");
@@ -644,6 +644,59 @@ try {
         check('8.7: Non-pre-decision status is rejected by restriction query', $stmt->fetch() === false);
     } else {
         echo "  [SKIP] No other statuses available to test rejection." . PHP_EOL;
+    }
+
+    // ==========================================================================
+    // TEST GROUP 9: On Process available from Deferred and other outcome tabs
+    // ==========================================================================
+    echo PHP_EOL . "Group 9: On Process status availability from outcome tabs" . PHP_EOL;
+
+    if (isset($preDecisionStatuses['Deferred']) && isset($preDecisionStatuses['On Process'])) {
+        $d9 = createPlenaryDoc($pdo, $genericDocTypeId, $sourceTypeId, $docStatusId,
+                                $plenaryRoleId, $userA, $genericDocTypeName);
+        doAccept($pdo, $d9['document_id'], $d9['assignment_id'], $userA, $plenaryRoleId, $docStatusId);
+
+        // Set document to Deferred
+        doPreDecision($pdo, $d9['document_id'], $preDecisionStatuses['Deferred'], 'Deferred remarks', $userA);
+
+        // Verify document is in Deferred status
+        $pddRow = $pdo->prepare("
+            SELECT pdd.*, ds.name AS status_name
+            FROM plenary_document_details pdd
+            LEFT JOIN document_statuses ds ON ds.id = pdd.status_id
+            WHERE pdd.document_id = ?
+        ");
+        $pddRow->execute([$d9['document_id']]);
+        $pddData = $pddRow->fetch();
+        $isDeferred = strtolower(trim($pddData['status_name'] ?? '')) === 'deferred';
+        check('9.1: Document successfully set to Deferred status', $isDeferred);
+
+        // Now change from Deferred to On Process (simulating dropdown selection)
+        doPreDecision($pdo, $d9['document_id'], $preDecisionStatuses['On Process'], 'Resuming processing', $userA);
+
+        // Verify the status changed to On Process
+        $pddRow->execute([$d9['document_id']]);
+        $pddData = $pddRow->fetch();
+        $isOnProcess = strtolower(trim($pddData['status_name'] ?? '')) === 'on process';
+        check('9.2: Can change from Deferred to On Process via pre-decision form', $isOnProcess);
+
+        // Test from Lay on the Table status as well
+        if (isset($preDecisionStatuses['Lay on the Table'])) {
+            doPreDecision($pdo, $d9['document_id'], $preDecisionStatuses['Lay on the Table'], 'Lay on table remarks', $userA);
+            $pddRow->execute([$d9['document_id']]);
+            $pddData = $pddRow->fetch();
+            $isLayOnTable = strtolower(trim($pddData['status_name'] ?? '')) === 'lay on the table';
+            check('9.3: Document set to Lay on the Table', $isLayOnTable);
+
+            // Change from Lay on the Table to On Process
+            doPreDecision($pdo, $d9['document_id'], $preDecisionStatuses['On Process'], 'Resuming from lay on table', $userA);
+            $pddRow->execute([$d9['document_id']]);
+            $pddData = $pddRow->fetch();
+            $isOnProcess = strtolower(trim($pddData['status_name'] ?? '')) === 'on process';
+            check('9.4: Can change from Lay on the Table to On Process via pre-decision form', $isOnProcess);
+        }
+    } else {
+        echo "  [SKIP] Deferred or On Process status not available for testing." . PHP_EOL;
     }
 
 } finally {

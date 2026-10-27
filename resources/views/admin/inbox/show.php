@@ -686,7 +686,8 @@ ob_start();
                                 </p>
                             </div>
 
-                            <!-- Communication category (NOTED only) -------->
+                            <!-- Communication category (Communication documents only) -->
+                            <?php if ($isCommunication): ?>
                             <div id="commCategorySection" class="mb-4 hidden">
                                 <label for="communication_category_id"
                                        class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
@@ -702,6 +703,7 @@ ob_start();
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            <?php endif; ?>
 
                             <!-- Action buttons (Accept intentionally absent) -->
                             <div class="space-y-2">
@@ -733,25 +735,16 @@ ob_start();
                                     Route to Committee
                                 </button>
 
-                                <!-- Noted (Communication only) -->
-                                <?php if ($isCommunication): ?>
-                                    <button type="button" data-action="noted"
-                                            class="action-btn w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                                        </svg>
-                                        Mark as Noted
-                                    </button>
-                                <?php else: ?>
-                                    <button type="button" disabled
-                                            title="Only available for Communication documents"
-                                            class="w-full inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-400">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                                        </svg>
-                                        Noted (Communication only)
-                                    </button>
-                                <?php endif; ?>
+                                <!-- Noted (available for every document type;
+                                     Communication Category applies only to
+                                     Communication documents) -->
+                                <button type="button" data-action="noted"
+                                        class="action-btn w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                    </svg>
+                                    Mark as Noted
+                                </button>
 
                                 <!-- Decline -->
                                 <button type="button" data-action="decline"
@@ -928,7 +921,7 @@ document.addEventListener('DOMContentLoaded', function () {
         'route_sp_secretary': 'Route this document to SP Secretary?',
         'route_plenary':      'Route this document to Plenary?',
         'route_committee':    'Route this document to Committee?',
-        'noted':              'Mark this document as Noted? A communication category is required.',
+        'noted':              'Mark this document as Noted?' + (<?= $isCommunication ? 'true' : 'false' ?> ? ' A communication category is required.' : ''),
     };
 
     let pendingAction = null;
@@ -960,11 +953,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     function updateFieldVisibility(action) {
-        if (!commSection) return;
-        if (action === 'noted') {
-            commSection.classList.remove('hidden');
-        } else {
-            commSection.classList.add('hidden');
+        // Category section only exists for Communication documents.
+        if (commSection) {
+            if (action === 'noted') {
+                commSection.classList.remove('hidden');
+            } else {
+                commSection.classList.add('hidden');
+            }
         }
         if (action === 'decline') {
             if (remarksHint) remarksHint.classList.remove('hidden');

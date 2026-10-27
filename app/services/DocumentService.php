@@ -20,8 +20,23 @@ class DocumentService
 {
     protected PDO $pdo;
 
-    public function __construct()
+    /**
+     * @param PDO|null $pdo Connection owned by the caller. Pass it whenever the
+     *                      caller also opens a transaction: writing through a
+     *                      second, independently-created connection would place
+     *                      these rows OUTSIDE that transaction, so a rollback
+     *                      would leave orphans behind and the caller's own
+     *                      connection could not read the rows back inside the
+     *                      transaction's REPEATABLE READ snapshot.
+     *                      When omitted the service opens its own connection.
+     */
+    public function __construct(?PDO $pdo = null)
     {
+        if ($pdo !== null) {
+            $this->pdo = $pdo;
+            return;
+        }
+
         $database = new Database();
         $this->pdo = $database->connect();
     }
@@ -350,16 +365,27 @@ class DocumentService
                 }
             }
 
-            // 5. Verify document type is Communication when Noted is selected
+            // 5. Resolve the document type name. The Noted action is available
+            //    for every document type, but only Communication documents
+            //    require (and persist) a communication category. Every other
+            //    type must not carry one — enforced here, not only in the UI.
+            $docTypeCheck = $this->pdo->prepare(
+                "SELECT name FROM document_types WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+            );
+            $docTypeCheck->execute([$data['document_type_id']]);
+            $docTypeName        = (string) ($docTypeCheck->fetchColumn() ?: '');
+            $isCommunicationDoc = stripos($docTypeName, 'communication') !== false;
+
             if ($isNoted) {
-                $docTypeCheck = $this->pdo->prepare(
-                    "SELECT name FROM document_types WHERE id = ? AND name = 'Communication' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
-                );
-                $docTypeCheck->execute([$data['document_type_id']]);
-                if (!$docTypeCheck->fetch()) {
-                    throw new RuntimeException(
-                        "The NOTED routing option is only available for Communication document types."
-                    );
+                if ($isCommunicationDoc) {
+                    if ($communicationCategoryId <= 0) {
+                        throw new RuntimeException(
+                            "A communication category is required when marking a Communication document as Noted."
+                        );
+                    }
+                } else {
+                    // Non-Communication documents do not accept a communication category.
+                    $communicationCategoryId = 0;
                 }
             }
 
@@ -507,10 +533,10 @@ class DocumentService
             //     in the target role's inbox — NOT in the Admin Inbox.
             if ($isForwardRouted) {
                 // Update document phase/status to reflect immediate forward routing.
-                // Use "Under Processing" status (id=6) to signal it is in transit.
+                // Use "On Process" status (id=6) to signal it is in transit.
                 $forwardStatusRow = $this->pdo->query(
                     "SELECT id FROM document_statuses
-                      WHERE name = 'Under Processing' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+                      WHERE name = 'On Process' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
                 )->fetch();
                 $forwardStatusId = $forwardStatusRow ? (int) $forwardStatusRow['id'] : $statusId;
 
@@ -579,9 +605,15 @@ class DocumentService
                 'user_agent' => client_user_agent(),
             ];
 
-            // 10b. Noted routing: add ADMIN→ADMIN route, event, and assignment
-            if ($isNoted && $communicationCategoryId > 0) {
-                // Update document: set communication_category_id, current_phase=ADMIN, current_status_id=Noted
+            // 10b. Noted routing: add ADMIN→ADMIN route, assignment, and event.
+            //      Available for every document type. Communication documents
+            //      persist their category; all other types persist NULL.
+            if ($isNoted) {
+                $notedCategoryName = $isCommunicationDoc
+                    ? $this->getCommunicationCategoryName($communicationCategoryId)
+                    : null;
+
+                // Update document: current_phase=ADMIN, current_status_id=Noted
                 $updateDoc = $this->pdo->prepare("
                     UPDATE documents
                     SET communication_category_id = ?,
@@ -590,7 +622,12 @@ class DocumentService
                         updated_by                = ?
                     WHERE id = ?
                 ");
-                $updateDoc->execute([$communicationCategoryId, $notedStatusId, $userId, $documentId]);
+                $updateDoc->execute([
+                    $isCommunicationDoc ? $communicationCategoryId : null,
+                    $notedStatusId,
+                    $userId,
+                    $documentId,
+                ]);
 
                 // Route record: ADMIN → ADMIN with Noted
                 // This is the pattern AdminCommunicationsController queries for.
@@ -605,7 +642,9 @@ class DocumentService
                     $routingOptionId,
                     $userId,
                     $adminRoleId,
-                    'Marked as Noted — Communication category: ' . $this->getCommunicationCategoryName($communicationCategoryId),
+                    $notedCategoryName !== null
+                        ? 'Marked as Noted — Communication category: ' . $notedCategoryName
+                        : 'Marked as Noted.',
                 ]);
 
                 // Assignment for Admin role — decision=NOTED
@@ -618,16 +657,25 @@ class DocumentService
                 ");
                 $insertAssign2->execute([$documentId, $adminRoleId, $userId]);
 
-                // Workflow event: DOCUMENT_NOTED
+                // Workflow event: DOCUMENT_NOTED — the single event for the
+                // Noted action (the routing branch below skips Noted to avoid
+                // emitting a duplicate DOCUMENT_NOTED row).
                 $insertEvent->execute([
                     $documentId,
                     'DOCUMENT_NOTED',
                     'ADMIN',
                     $userId,
                     $notedStatusId,
-                    'Document marked as Noted (Communication category) by Admin during receipt',
+                    $notedCategoryName !== null
+                        ? 'Document marked as Noted (Communication category) by Admin during receipt'
+                        : 'Document marked as Noted by Admin during receipt',
                     json_encode(
-                        array_merge($baseMetadata, ['communication_category_id' => $communicationCategoryId]),
+                        array_merge(
+                            $baseMetadata,
+                            $notedCategoryName !== null
+                                ? ['communication_category_id' => $communicationCategoryId]
+                                : []
+                        ),
                         JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
                     ),
                 ]);
@@ -648,21 +696,11 @@ class DocumentService
             ]);
 
             // Route event: ROUTED_TO_SP_SECRETARY / ROUTED_TO_PLENARY /
-            //             ROUTED_TO_COMMITTEE / ROUTED_TO_ADMIN
-            if ($isNoted) {
-                $insertEvent->execute([
-                    $documentId,
-                    'DOCUMENT_NOTED',
-                    'ADMIN',
-                    $userId,
-                    $notedStatusId,
-                    'Document noted as Communication and stored in Admin Communications',
-                    json_encode(
-                        array_merge($baseMetadata, ['routed_to_role_id' => $adminRoleId]),
-                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-                    ),
-                ]);
-            } elseif ($isForwardRouted) {
+            //             ROUTED_TO_COMMITTEE / ROUTED_TO_ADMIN.
+            //             Noted documents already recorded DOCUMENT_NOTED in
+            //             step 10b, so they are excluded here to avoid a
+            //             duplicate workflow event.
+            if ($isForwardRouted) {
                 $insertEvent->execute([
                     $documentId,
                     $forwardEventType,
@@ -675,7 +713,7 @@ class DocumentService
                         JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
                     ),
                 ]);
-            } else {
+            } elseif (!$isNoted) {
                 $insertEvent->execute([
                     $documentId,
                     'ROUTED_TO_ADMIN',
@@ -705,14 +743,23 @@ class DocumentService
             // Post-commit: notify appropriate users.
             try {
                 if ($isNoted) {
+                    // Communication documents land in Admin Communications;
+                    // every other Noted document is terminal and points to the
+                    // document detail page instead.
                     $this->notifyRoleUsers(
                         $adminRoleId,
                         $documentId,
                         $userId,
                         'DOCUMENT_ASSIGNED',
-                        "New Communication Document: {$trackingNumber}",
-                        "A communication document ({$trackingNumber}) has been received and marked as Noted. It is now available in Admin Communications.",
-                        BASE_URL . "/admin/communications"
+                        $isCommunicationDoc
+                            ? "New Communication Document: {$trackingNumber}"
+                            : "Document Noted: {$trackingNumber}",
+                        $isCommunicationDoc
+                            ? "A communication document ({$trackingNumber}) has been received and marked as Noted. It is now available in Admin Communications."
+                            : "Document ({$trackingNumber}) has been received and marked as Noted.",
+                        $isCommunicationDoc
+                            ? BASE_URL . "/admin/communications"
+                            : BASE_URL . "/admin/inbox/show?id={$documentId}"
                     );
                 } elseif ($isForwardRouted) {
                     $this->notifyRoleUsers(
@@ -753,7 +800,8 @@ class DocumentService
                 'routing_option'   => $isNoted ? 'Noted' : null,
             ], "Document received: {$trackingNumber}" . ($isNoted ? ' [Noted]' : ''));
 
-            system_log('INFO', "Document received and routed to " . ($isNoted ? 'Admin Communications' : 'Admin') . ": {$trackingNumber}", [
+            $notedDestination = $isCommunicationDoc ? 'Admin Communications' : 'Admin (Noted)';
+            system_log('INFO', "Document received and routed to " . ($isNoted ? $notedDestination : 'Admin') . ": {$trackingNumber}", [
                 'document_id'    => $documentId,
                 'tracking_number' => $trackingNumber,
                 'user_id'        => $userId,
@@ -1000,7 +1048,21 @@ class DocumentService
         $stmt->execute([$year]);
         $row = $stmt->fetch();
 
-        $next = ((int) $row['last_sequence']) + 1;
+        $trackingSeqLast = (int) $row['last_sequence'];
+
+        // Also check the actual max sequence from documents table to handle
+        // any sync issues between the tables (e.g., manual insertions)
+        $stmt2 = $this->pdo->prepare(
+            "SELECT COALESCE(MAX(tracking_sequence), 0) as max_seq
+               FROM documents
+              WHERE tracking_year = ?"
+        );
+        $stmt2->execute([$year]);
+        $maxRow = $stmt2->fetch();
+        $docMaxSeq = (int) ($maxRow['max_seq'] ?? 0);
+
+        // Use the higher of the two values to prevent duplicates
+        $next = max($trackingSeqLast, $docMaxSeq) + 1;
 
         $upd = $this->pdo->prepare(
             "UPDATE document_tracking_sequences SET last_sequence = ? WHERE tracking_year = ?"
@@ -1147,7 +1209,10 @@ class DocumentService
      * @param  string  $phase
      * @param  string  $attachmentType
      * @return array[] Collected file-upload log entries; pass to
-     *                 flushFileUploadLogs() after commit.
+     *                 flushFileUploadLogs() after commit. Each entry also
+     *                 carries the new document_attachments.id under
+     *                 'attachment_id' so callers can link the rows without
+     *                 re-reading them.
      */
     public function insertStagedAttachments(
         array  $staged,
@@ -1185,6 +1250,7 @@ class DocumentService
             ]);
 
             $pendingLogs[] = [
+                'attachment_id' => (int) $this->pdo->lastInsertId(),
                 'file_name'    => $s['original_name'],
                 'file_size'    => $s['file_size'],
                 'mime_type'    => $s['mime_type'],

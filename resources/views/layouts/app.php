@@ -97,6 +97,8 @@ $pageTitle = $pageTitle ?? APP_SHORT_NAME;
         </div>
     </div>
 
+    <?= $pageModals ?? '' ?>
+
     <script src="<?= BASE_URL ?>/public/assets/js/app.js"></script>
 
 </body>

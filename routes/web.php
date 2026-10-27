@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 return [
 
@@ -1835,6 +1835,21 @@ return [
     ],
 
     // -------------------------------------------------------------------------
+    // Plenary Referred to Committee (tracking view for documents referred at
+    // First Reading). The "Proceed to 2nd Reading" action reuses the existing
+    // plenary/second-reading/advance-from-committee endpoint below ï¿½ no new
+    // POST route is added, so the committee-return gate stays the single source
+    // of truth for the transition into Second Reading.
+    // -------------------------------------------------------------------------
+
+    'plenary/referred-to-committee' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'referredToCommitteeIndex',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
     // Plenary Second Reading
     // -------------------------------------------------------------------------
 
@@ -1901,4 +1916,118 @@ return [
         'action'     => 'statusList',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
-];
+
+    // =========================================================================
+    // Communications Process Flow ï¿½ SP Secretary Comm Inbox
+    // =========================================================================
+
+    'spsec/comm-inbox' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecCommInboxController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'spsec/comm-inbox/show' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecCommInboxController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'spsec/comm-inbox/send-to-fr' => [
+        'method'     => 'POST',
+        'controller' => 'Spsec/SpsecCommInboxController',
+        'action'     => 'sendToFirstReading',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // =========================================================================
+    // Communications Process Flow ï¿½ SP Secretary Comm First Reading
+    // =========================================================================
+
+    'spsec/comm-first-reading' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecCommFirstReadingController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'spsec/comm-first-reading/show' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecCommFirstReadingController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'spsec/comm-first-reading/store' => [
+        'method'     => 'POST',
+        'controller' => 'Spsec/SpsecCommFirstReadingController',
+        'action'     => 'store',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // =========================================================================
+    // Communications Process Flow ï¿½ Plenary Communications
+    // =========================================================================
+
+    'plenary/communications' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryCommController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/communications/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryCommController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // =========================================================================
+    // Communications Process Flow ï¿½ Committee adopt report for Comm
+    // =========================================================================
+
+    'committee/reports/adopt-comm' => [
+        'method'     => 'POST',
+        'controller' => 'Committee/CommitteeReportsController',
+        'action'     => 'adoptComm',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // =========================================================================
+    // Communications Process Flow - Plenary Comm First Reading
+    // =========================================================================
+
+    'plenary/comm-first-reading' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'commFirstReadingIndex',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/comm-first-reading/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'commFirstReadingShow',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/comm-first-reading/store' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'commFirstReadingStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // =========================================================================
+    // Communications Process Flow - Plenary Adopt Committee Report for Comm
+    // =========================================================================
+
+    'plenary/referred-to-committee/adopt-comm' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'adoptCommStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],];

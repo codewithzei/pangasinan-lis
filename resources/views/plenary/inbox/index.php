@@ -8,9 +8,10 @@
  *   $totalPages       int
  *   $total            int
  *   $search           string
- *   $currentView      string   'inbox' | 'accepted'
+ *   $currentView      string   'inbox' | 'accepted' | outcome slug
  *   $pendingCount     int
  *   $acceptedCount    int
+ *   $tabCounts        array    badge count per view slug
  *   $success          string|null
  *   $error            string|null
  *   $errors           array
@@ -24,6 +25,7 @@ $search        = $search        ?? '';
 $currentView   = $currentView   ?? 'inbox';
 $pendingCount  = $pendingCount  ?? 0;
 $acceptedCount = $acceptedCount ?? 0;
+$tabCounts     = $tabCounts     ?? [];
 $errors        = $errors        ?? [];
 
 ob_start();
@@ -42,6 +44,16 @@ function plenaryInboxPhaseLabel(string $phase): string
     };
 }
 
+// Status-based outcome tabs (slug => label). "On Process" is deliberately not
+// a tab — those documents continue through the existing Accepted flow.
+$outcomeTabs = [
+    'deferred'         => 'Deferred',
+    'lay-on-the-table' => 'Lay on the Table',
+    'noted'            => 'Noted',
+    'remanded'         => 'Remanded',
+    'withdrawn'        => 'Withdrawn',
+];
+
 $viewTitles = [
     'inbox'    => [
         'title'    => 'Inbox',
@@ -52,8 +64,15 @@ $viewTitles = [
         'subtitle' => 'Documents you have accepted and are currently processing',
     ],
 ];
+foreach ($outcomeTabs as $slug => $label) {
+    $viewTitles[$slug] = [
+        'title'    => $label,
+        'subtitle' => 'Documents you accepted whose Plenary pre-decision outcome is "' . $label . '"',
+    ];
+}
 $pageTitle    = $viewTitles[$currentView]['title']    ?? 'Plenary Inbox';
 $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
+$isOutcomeView = isset($outcomeTabs[$currentView]);
 ?>
 
 <div class="space-y-6">
@@ -140,7 +159,7 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
     <!-- Navigation Tabs ------------------------------------------------------>
     <section>
         <div class="border-b border-gray-200">
-            <nav class="-mb-px flex gap-6">
+            <nav class="-mb-px flex flex-wrap gap-6">
                 <a href="<?= BASE_URL ?>/plenary/inbox?view=inbox<?= $search ? '&search=' . urlencode($search) : '' ?>"
                    class="<?= $currentView === 'inbox'
                        ? 'border-primary text-primary'
@@ -165,6 +184,21 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                         </span>
                     <?php endif; ?>
                 </a>
+                <?php foreach ($outcomeTabs as $slug => $label): ?>
+                    <?php $outcomeCount = (int) ($tabCounts[$slug] ?? 0); ?>
+                    <a href="<?= BASE_URL ?>/plenary/inbox?view=<?= urlencode($slug) ?><?= $search ? '&search=' . urlencode($search) : '' ?>"
+                       class="<?= $currentView === $slug
+                           ? 'border-primary text-primary'
+                           : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>
+                              whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
+                        <?= htmlspecialchars($label) ?>
+                        <?php if ($outcomeCount > 0): ?>
+                            <span class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                                <?= $outcomeCount ?>
+                            </span>
+                        <?php endif; ?>
+                    </a>
+                <?php endforeach; ?>
             </nav>
         </div>
     </section>
@@ -215,9 +249,6 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                         <th class="px-6 py-3 font-medium">Tracking Number</th>
                         <th class="px-6 py-3 font-medium">Subject Matter / Document Type</th>
                         <th class="px-6 py-3 font-medium">Status</th>
-                        <?php if ($currentView === 'accepted'): ?>
-                            <th class="px-6 py-3 font-medium">Plenary Status</th>
-                        <?php endif; ?>
                         <th class="px-6 py-3 font-medium">Phase</th>
                         <th class="px-6 py-3 font-medium">Date Received</th>
                         <?php if ($currentView !== 'inbox'): ?>
@@ -230,7 +261,7 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                 <tbody class="divide-y divide-gray-100">
                     <?php if (empty($assignments)): ?>
                         <tr>
-                            <td colspan="<?= $currentView === 'inbox' ? '6' : '9' ?>" class="px-6 py-16 text-center">
+                            <td colspan="<?= $currentView === 'inbox' ? '5' : '7' ?>" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
@@ -239,9 +270,15 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                 </div>
                                 <p class="mt-4 text-sm font-medium text-gray-700">No documents found.</p>
                                 <p class="mt-1 text-xs text-gray-500">
-                                    <?= $currentView === 'inbox'
-                                        ? 'All documents have been processed or none have been routed to Plenary yet.'
-                                        : 'No accepted documents yet.' ?>
+                                    <?php
+                                    if ($currentView === 'inbox') {
+                                        echo 'All documents have been processed or none have been routed to Plenary yet.';
+                                    } elseif ($isOutcomeView) {
+                                        echo 'No documents with this outcome yet.';
+                                    } else {
+                                        echo 'No accepted documents yet.';
+                                    }
+                                    ?>
                                 </p>
                             </td>
                         </tr>
@@ -287,21 +324,6 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                         <?= htmlspecialchars($row['status'] ?? 'Unknown') ?>
                                     </span>
                                 </td>
-                                <?php if ($currentView === 'accepted'): ?>
-                                    <td class="px-6 py-4">
-                                        <?php if (!empty($row['plenary_status_name'])): ?>
-                                            <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5
-                                                         text-xs font-semibold"
-                                                  style="background-color: <?= htmlspecialchars($plStatusBadgeColor) ?>1a;
-                                                         color: <?= htmlspecialchars($plStatusBadgeColor) ?>;
-                                                         border-color: <?= htmlspecialchars($plStatusBadgeColor) ?>40;">
-                                                <?= htmlspecialchars($row['plenary_status_name']) ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="text-xs italic text-gray-400">—</span>
-                                        <?php endif; ?>
-                                    </td>
-                                <?php endif; ?>
                                 <td class="px-6 py-4">
                                     <span class="inline-flex items-center rounded-lg bg-gray-50 border border-gray-200
                                                  px-2.5 py-1 text-xs font-medium text-gray-700">
@@ -355,7 +377,9 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7
                                                      -1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
-                                        <?= $currentView === 'inbox' ? 'Process' : 'View / Edit' ?>
+                                        <?= $currentView === 'inbox'
+                                            ? 'Process'
+                                            : ($currentView === 'accepted' ? 'View / Edit' : 'View') ?>
                                     </a>
                                 </td>
                             </tr>

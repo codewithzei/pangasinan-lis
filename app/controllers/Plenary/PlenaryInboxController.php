@@ -8,7 +8,7 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *
  * Handles the Plenary inbox: listing pending assignments, viewing document
  * detail, claiming (Accept) a document, recording a pre-decision status with
- * remarks, and (when the status is "Under Processing") filling in Plenary
+ * remarks, and (when the status is "On Process") filling in Plenary
  * processing metadata (Proposed No., Subject Matter, Authors/Co-Authors,
  * Committees in Charge, Target First Reading Date, Session Type).
  *
@@ -41,12 +41,36 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *   - Lay on the Table
  *   - Noted
  *   - Remanded
- *   - Under Processing
+ *   - On Process
  *   - Withdrawn
  *
- * Only "Under Processing" unlocks the full Plenary processing form (Proposed
+ * Only "On Process" unlocks the full Plenary processing form (Proposed
  * No., Subject Matter override, Authors/Co-Authors, Committees, Target Date,
  * Session Type).
+ *
+ * OUTCOME TABS:
+ *   Besides "Inbox" (pending) and "Accepted" (being processed), the inbox
+ *   exposes one tab per non-processing pre-decision outcome:
+ *     Deferred, Lay on the Table, Noted, Remanded, Withdrawn.
+ *   "On Process" (formerly "Under Processing") is deliberately NOT a tab —
+ *   those documents continue through the existing Accepted processing flow.
+ *   Tab membership is driven by plenary_document_details.status_id and scoped
+ *   to the signed-in user's accepted assignments (ownership preserved).
+ *
+ *   - Deferred        → standby; the owner must submit remarks + one or more
+ *                       compliance files to resume processing (see
+ *                       self::ACTION_SUBMIT_COMPLIANCE).
+ *   - Lay on the Table→ non-terminal; the owner can still change the
+ *                       pre-decision status and continue processing.
+ *   - Noted / Remanded / Withdrawn
+ *                     → terminal; no further Plenary processing actions.
+ *
+ * TERMINAL OUTCOMES:
+ *   Once a document's pre-decision status is Noted, Remanded or Withdrawn the
+ *   controller refuses every further Plenary mutation (pre_decision,
+ *   save_processing, submit_compliance, return_to_admin) while retaining the
+ *   document row, its assignments and its full history.
+ *
  *
  * PROPOSED NUMBER FORMAT:
  *   No authoritative numbering format exists in the project schema
@@ -77,8 +101,47 @@ class PlenaryInboxController
         'accept',
         'pre_decision',
         'save_processing',
+        'submit_compliance',
         'return_to_admin',
     ];
+
+    /** Action key that resumes a Deferred document back into processing. */
+    public const ACTION_SUBMIT_COMPLIANCE = 'submit_compliance';
+
+    /**
+     * Status-based outcome tabs.
+     *
+     * key   = the ?view= slug used in the URL.
+     * value = the exact document_statuses.name the tab filters on.
+     *
+     * "On Process" is intentionally absent: those documents continue through
+     * the existing Accepted processing flow instead of getting their own tab.
+     */
+    private const OUTCOME_TABS = [
+        'deferred'         => 'Deferred',
+        'lay-on-the-table' => 'Lay on the Table',
+        'noted'            => 'Noted',
+        'remanded'         => 'Remanded',
+        'withdrawn'        => 'Withdrawn',
+    ];
+
+    /**
+     * Pre-decision outcomes that are terminal: once set, no further Plenary
+     * processing action is permitted for the document.
+     */
+    private const TERMINAL_STATUSES = ['noted', 'remanded', 'withdrawn'];
+
+    /**
+     * Scalar-friendly SQL fragment listing the outcome status ids.
+     * Used to keep outcome documents out of the generic Accepted list so the
+     * inbox partitions cleanly by pre-decision status.
+     */
+    private const OUTCOME_STATUS_IDS_SQL = "
+        SELECT id FROM document_statuses
+        WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','Withdrawn')
+          AND is_active  = 1
+          AND is_deleted = 0
+    ";
 
     /**
      * Document type names that are EXEMPT from the Proposed Number requirement.
@@ -89,6 +152,38 @@ class PlenaryInboxController
         'administrative case',
         'complaint',
     ];
+
+    /**
+     * SQL condition that keeps the Accepted tab limited to documents that are
+     * still awaiting Plenary processing.
+     *
+     * Once the Plenary processing details are saved the document moves to the
+     * "Awaiting First Reading" status (and later gains a plenary_readings row),
+     * so it must leave the Accepted list.  The ACCEPTED assignment row itself is
+     * intentionally left untouched (completed_at stays NULL) because the First
+     * Reading / Second Reading ownership checks in PlenaryReadingController
+     * rely on it (see ::isOwnedByUser()).
+     *
+     * Additionally, documents that have moved to another phase (e.g., FINALIZED
+     * or COMMITTEE) must not appear in the Accepted tab. The current_phase
+     * check ensures this.
+     *
+     * Requires the query to join `documents d` and `document_assignments da`.
+     * Used verbatim by both the Accepted list query and the accepted count so
+     * the badge and the list can never drift apart.
+     */
+    private const ACCEPTED_STILL_PROCESSING = "
+        d.current_status_id NOT IN (
+            SELECT id FROM document_statuses
+            WHERE name = 'Awaiting First Reading'
+              AND is_active  = 1
+              AND is_deleted = 0
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM plenary_readings pr WHERE pr.document_id = da.document_id
+        )
+        AND d.current_phase = 'PLENARY'
+    ";
 
     // =========================================================================
     // Constructor
@@ -116,9 +211,11 @@ class PlenaryInboxController
         $plenaryRoleId = $this->requirePlenaryRoleId();
 
         $view = trim($_GET['view'] ?? 'inbox');
-        if (!in_array($view, ['inbox', 'accepted'], true)) {
+        $validViews = array_merge(['inbox', 'accepted'], array_keys(self::OUTCOME_TABS));
+        if (!in_array($view, $validViews, true)) {
             $view = 'inbox';
         }
+        $isOutcomeView = isset(self::OUTCOME_TABS[$view]);
 
         $search  = trim($_GET['search'] ?? '');
         $page    = max(1, (int) ($_GET['page'] ?? 1));
@@ -134,12 +231,34 @@ class PlenaryInboxController
             $where[] = '(da.assigned_to_user_id IS NULL OR da.assigned_to_user_id = ?)';
             $where[] = 'da.accepted_by IS NULL';
             $params[] = $userId;
+        } elseif ($isOutcomeView) {
+            // Outcome tabs list the documents this user accepted whose current
+            // pre-decision status matches the tab. Ownership is preserved: only
+            // the accepting Plenary user sees them.
+            $where[] = "da.decision = 'ACCEPTED'";
+            $where[] = 'da.completed_at IS NULL';
+            $where[] = '(da.accepted_by = ? OR da.assigned_to_user_id = ?)';
+            $params[] = $userId;
+            $params[] = $userId;
+            $where[]  = 'pdd.status_id = (
+                SELECT id FROM document_statuses
+                WHERE name = ? AND is_active = 1 AND is_deleted = 0
+                LIMIT 1
+            )';
+            $params[] = self::OUTCOME_TABS[$view];
         } else {
             $where[] = "da.decision = 'ACCEPTED'";
             $where[] = 'da.completed_at IS NULL';
             $where[] = '(da.accepted_by = ? OR da.assigned_to_user_id = ?)';
             $params[] = $userId;
             $params[] = $userId;
+            // Documents that already moved on to First Reading (or beyond) are
+            // no longer "being processed" in this inbox — hide them here while
+            // leaving the ACCEPTED assignment open for ownership checks.
+            $where[] = '(' . self::ACCEPTED_STILL_PROCESSING . ')';
+            // Outcome documents live in their own tabs; keep them out of the
+            // generic Accepted list so every document is listed exactly once.
+            $where[] = '(pdd.status_id IS NULL OR pdd.status_id NOT IN (' . self::OUTCOME_STATUS_IDS_SQL . '))';
         }
 
         if ($search !== '') {
@@ -150,14 +269,23 @@ class PlenaryInboxController
 
         $whereClause = implode(' AND ', $where);
 
-        // Count for stats cards
-        [$pendingCount, $acceptedCount] = $this->fetchCounts($plenaryRoleId, $userId);
+        // Counts for the stats cards and every tab badge. They are derived from
+        // the same ownership-scoped predicates as the list queries so the badges
+        // and the lists can never drift apart.
+        $tabCounts     = $this->fetchTabCounts($plenaryRoleId, $userId);
+        $pendingCount  = $tabCounts['inbox'];
+        $acceptedCount = $tabCounts['accepted'];
 
         // Total for current view
+        // NOTE: plenary_document_details is LEFT-joined in every branch so that
+        // the pdd.status_id predicates used by the outcome and accepted filters
+        // are always resolvable, including on the inbox (PENDING) tab where the
+        // join produces no match and is harmlessly unused.
         $countSql   = "
             SELECT COUNT(*) AS cnt
             FROM document_assignments da
             INNER JOIN documents d ON d.id = da.document_id
+            LEFT  JOIN plenary_document_details pdd ON pdd.document_id = d.id
             WHERE {$whereClause}
         ";
         $countStmt  = $this->pdo->prepare($countSql);
@@ -166,15 +294,15 @@ class PlenaryInboxController
         $totalPages = $total > 0 ? (int) ceil($total / $perPage) : 1;
         $page       = min($page, $totalPages);
 
-        // Accepted-by info for Accepted tab
-        $acceptedSelect = $view === 'accepted'
+        // Accepted-by info for every non-inbox view (Accepted + outcome tabs)
+        $acceptedSelect = $view !== 'inbox'
             ? ", ab.username AS accepted_by_username,
                CONCAT_WS(' ',
                    NULLIF(aui.first_name, ''),
                    NULLIF(aui.last_name, '')
                ) AS accepted_by_name"
             : '';
-        $acceptedJoin = $view === 'accepted'
+        $acceptedJoin = $view !== 'inbox'
             ? "LEFT JOIN user_accounts ab  ON ab.id  = da.accepted_by
                LEFT JOIN user_info     aui ON aui.user_account_id = da.accepted_by"
             : '';
@@ -193,17 +321,13 @@ class PlenaryInboxController
                 ds.name            AS status,
                 ds.badge_color     AS status_badge_color,
                 dt.name            AS document_type_name,
-                dt.badge_color     AS document_type_badge_color,
-                pdd.status_id      AS plenary_status_id,
-                pds.name           AS plenary_status_name,
-                pds.badge_color    AS plenary_status_badge_color
+                dt.badge_color     AS document_type_badge_color
                 {$acceptedSelect}
             FROM document_assignments da
             INNER JOIN documents        d   ON d.id  = da.document_id
+            LEFT  JOIN plenary_document_details pdd ON pdd.document_id = d.id
             LEFT  JOIN document_statuses ds  ON ds.id = d.current_status_id
             LEFT  JOIN document_types    dt  ON dt.id = d.document_type_id
-            LEFT  JOIN plenary_document_details pdd ON pdd.document_id = d.id
-            LEFT  JOIN document_statuses pds ON pds.id = pdd.status_id
             {$acceptedJoin}
             WHERE {$whereClause}
             ORDER BY da.id DESC
@@ -342,6 +466,9 @@ class PlenaryInboxController
         $documentTypeName       = strtolower(trim($document['document_type_name'] ?? ''));
         $proposedNumberExempt   = $this->isProposedNumberExempt($documentTypeName);
 
+        // Communications use a reduced Plenary processing form (see the view).
+        $isCommunication        = $this->isCommunicationType($documentTypeName);
+
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
 
         $success = flash_get('success');
@@ -401,6 +528,38 @@ class PlenaryInboxController
         if (!in_array($action, self::VALID_ACTIONS, true)) {
             flash_set('error', 'Invalid action specified.');
             redirect('plenary/inbox/show?id=' . $documentId);
+        }
+
+        // ---------------------------------------------------------------------
+        // Compliance submission: validate and stage the uploads BEFORE the DB
+        // transaction so filesystem I/O stays outside the lock window. Existing
+        // attachments and history are untouched — new files are appended.
+        // ---------------------------------------------------------------------
+        $stagedComplianceFiles = [];
+        if ($action === self::ACTION_SUBMIT_COMPLIANCE) {
+            $complianceFiles = $_FILES['compliance_files'] ?? ['name' => ['']];
+
+            $uploadErrors = $this->docService->validateFileUploads($complianceFiles, true);
+            if ($remarks === '') {
+                $uploadErrors[] = 'Remarks are required when submitting compliance updates.';
+            }
+
+            if (!empty($uploadErrors)) {
+                flash_set('errors', $uploadErrors);
+                old_set($_POST);
+                redirect('plenary/inbox/show?id=' . $documentId);
+            }
+
+            try {
+                $stagedComplianceFiles = $this->docService->stageFileUploads($complianceFiles, $documentId);
+            } catch (Throwable $stageErr) {
+                system_log('ERROR', 'Plenary compliance file staging failed', [
+                    'error'       => $stageErr->getMessage(),
+                    'document_id' => $documentId,
+                ]);
+                flash_set('error', 'Failed to store compliance files: ' . $stageErr->getMessage());
+                redirect('plenary/inbox/show?id=' . $documentId);
+            }
         }
 
         $plenaryRoleId = $this->requirePlenaryRoleId();
@@ -485,12 +644,36 @@ class PlenaryInboxController
                         $auditData = $this->doSaveProcessing($documentId, $assignmentId, $document, $userId, $currentStatusId);
                         break;
 
+                    case 'submit_compliance':
+                        $auditData = $this->doSubmitCompliance(
+                            $documentId,
+                            $assignmentId,
+                            $document,
+                            $userId,
+                            $currentStatusId,
+                            $stagedComplianceFiles
+                        );
+                        break;
+
                     case 'return_to_admin':
                         $auditData = $this->doReturnToAdmin($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
                         break;
                 }
 
                 $this->pdo->commit();
+
+                // Flush deferred file-upload audit logs now that the transaction
+                // has committed (never while a transaction is still open).
+                if (!empty($auditData['pendingFileLogs'])) {
+                    try {
+                        $this->docService->flushFileUploadLogs($auditData['pendingFileLogs']);
+                    } catch (Throwable $logErr) {
+                        system_log('WARNING', 'Plenary compliance file-upload log flush failed', [
+                            'error'       => $logErr->getMessage(),
+                            'document_id' => $documentId,
+                        ]);
+                    }
+                }
 
                 // Post-commit audit log (separate static PDO connection)
                 if ($auditData !== null) {
@@ -669,6 +852,8 @@ class PlenaryInboxController
         int   $userId,
         int   $currentStatusId
     ): array {
+        $this->assertNotTerminal($documentId);
+
         $statusId = (int) ($_POST['pre_decision_status_id'] ?? 0);
         $remarks  = trim($_POST['remarks'] ?? '');
 
@@ -681,7 +866,7 @@ class PlenaryInboxController
         $validStatusStmt = $this->pdo->prepare("
             SELECT id, name FROM document_statuses
             WHERE id = ?
-              AND name IN ('Deferred','Lay on the Table','Noted','Remanded','Under Processing','Withdrawn')
+              AND name IN ('Deferred','Lay on the Table','Noted','Remanded','On Process','Withdrawn')
               AND is_active = 1
               AND is_deleted = 0
             LIMIT 1
@@ -716,6 +901,15 @@ class PlenaryInboxController
                 VALUES (?, ?, ?, ?, ?)
             ")->execute([$documentId, $statusId, $remarks ?: null, $userId, $userId]);
         }
+
+        // Synchronize shared document status with Plenary pre-decision status
+        // This ensures other divisions and users see the current status
+        $this->pdo->prepare("
+            UPDATE documents
+            SET current_status_id = ?,
+                updated_by        = ?
+            WHERE id = ?
+        ")->execute([$statusId, $userId, $documentId]);
 
         // Insert document event
         $this->pdo->prepare("
@@ -752,7 +946,7 @@ class PlenaryInboxController
     /**
      * Save the full Plenary processing form.
      *
-     * Only allowed when the current pre-decision status is "Under Processing".
+     * Only allowed when the current pre-decision status is "On Process".
      * Validates all fields server-side, upserts plenary_document_details,
      * replaces document_authors and document_committees in the same transaction.
      */
@@ -763,7 +957,9 @@ class PlenaryInboxController
         int   $userId,
         int   $currentStatusId
     ): array {
-        // ── 1. Verify pre-decision is "Under Processing" ───────────────────
+        $this->assertNotTerminal($documentId);
+
+        // ── 1. Verify pre-decision is "On Process" ───────────────────
         $pddStmt = $this->pdo->prepare("
             SELECT pdd.id, pdd.status_id, ds.name AS status_name
             FROM plenary_document_details pdd
@@ -774,9 +970,9 @@ class PlenaryInboxController
         $pddStmt->execute([$documentId]);
         $pdd = $pddStmt->fetch();
 
-        if (!$pdd || strtolower(trim($pdd['status_name'] ?? '')) !== 'under processing') {
+        if (!$pdd || strtolower(trim($pdd['status_name'] ?? '')) !== 'on process') {
             throw new RuntimeException(
-                'The Plenary processing form can only be saved when the pre-decision status is "Under Processing".'
+                'The Plenary processing form can only be saved when the pre-decision status is "On Process".'
             );
         }
 
@@ -814,17 +1010,18 @@ class PlenaryInboxController
         $documentTypeName = strtolower(trim($dtRow['name'] ?? ''));
 
         $proposedNumberExempt = $this->isProposedNumberExempt($documentTypeName);
+        $isCommunication      = $this->isCommunicationType($documentTypeName);
 
-        if (!$proposedNumberExempt && $proposedNumber === '') {
+        if (!$isCommunication && !$proposedNumberExempt && $proposedNumber === '') {
             $errors[] = 'Proposed Number is required for this document type.';
         }
 
-        if ($proposedNumber !== '' && mb_strlen($proposedNumber) > 50) {
+        if (!$isCommunication && $proposedNumber !== '' && mb_strlen($proposedNumber) > 50) {
             $errors[] = 'Proposed Number must not exceed 50 characters.';
         }
 
         // Check uniqueness of proposed_number (exclude this document)
-        if ($proposedNumber !== '') {
+        if (!$isCommunication && $proposedNumber !== '') {
             $dupStmt = $this->pdo->prepare("
                 SELECT document_id
                 FROM plenary_document_details
@@ -862,47 +1059,54 @@ class PlenaryInboxController
             redirect('plenary/inbox/show?id=' . $documentId);
         }
 
-        // ── 3. Validate author/co-author IDs exist in sp_members ──────────
-        $allMemberIds = array_unique(array_merge(
-            array_values($authorIds),
-            array_values($coAuthorIds)
-        ));
-        if (!empty($allMemberIds)) {
-            $placeholders = implode(',', array_fill(0, count($allMemberIds), '?'));
-            $memberCheck  = $this->pdo->prepare("
-                SELECT sp_member_id FROM sp_members
-                WHERE sp_member_id IN ({$placeholders})
-                  AND is_active = 1 AND is_deleted = 0
-            ");
-            $memberCheck->execute(array_values($allMemberIds));
-            $validMemberIds = array_column($memberCheck->fetchAll(), 'sp_member_id');
-            $invalidAuthors = array_diff(array_values($authorIds), $validMemberIds);
-            $invalidCoAuthors = array_diff(array_values($coAuthorIds), $validMemberIds);
-            if (!empty($invalidAuthors) || !empty($invalidCoAuthors)) {
-                if ($this->pdo->inTransaction()) {
-                    $this->pdo->rollBack();
+        // ── 3. Validate author/co-author/committee IDs ────────────────────
+        // These fields are hidden for Communications, so they are neither
+        // required nor validated for that document type.
+        if (!$isCommunication) {
+            // Validate author/co-author IDs exist in sp_members
+            $allMemberIds = array_unique(array_merge(
+                array_values($authorIds),
+                array_values($coAuthorIds)
+            ));
+            if (!empty($allMemberIds)) {
+                $placeholders = implode(',', array_fill(0, count($allMemberIds), '?'));
+                $memberCheck  = $this->pdo->prepare("
+                    SELECT sp_member_id FROM sp_members
+                    WHERE sp_member_id IN ({$placeholders})
+                      AND is_active = 1 AND is_deleted = 0
+                ");
+                $memberCheck->execute(array_values($allMemberIds));
+                $validMemberIds = array_column($memberCheck->fetchAll(), 'sp_member_id');
+                $invalidAuthors = array_diff(array_values($authorIds), $validMemberIds);
+                $invalidCoAuthors = array_diff(array_values($coAuthorIds), $validMemberIds);
+                if (!empty($invalidAuthors) || !empty($invalidCoAuthors)) {
+                    if ($this->pdo->inTransaction()) {
+                        $this->pdo->rollBack();
+                    }
+                    flash_set('error', 'One or more selected authors or co-authors are invalid.');
+                    old_set($_POST);
+                    redirect('plenary/inbox/show?id=' . $documentId);
                 }
-                flash_set('error', 'One or more selected authors or co-authors are invalid.');
-                redirect('plenary/inbox/show?id=' . $documentId);
             }
-        }
 
-        // Validate committee IDs
-        if (!empty($committeeIds)) {
-            $placeholders = implode(',', array_fill(0, count($committeeIds), '?'));
-            $cmtCheck     = $this->pdo->prepare("
-                SELECT id FROM committees
-                WHERE id IN ({$placeholders})
-                  AND is_active = 1 AND is_deleted = 0
-            ");
-            $cmtCheck->execute(array_values($committeeIds));
-            $validCmtIds = array_column($cmtCheck->fetchAll(), 'id');
-            if (count($validCmtIds) !== count($committeeIds)) {
-                if ($this->pdo->inTransaction()) {
-                    $this->pdo->rollBack();
+            // Validate committee IDs
+            if (!empty($committeeIds)) {
+                $placeholders = implode(',', array_fill(0, count($committeeIds), '?'));
+                $cmtCheck     = $this->pdo->prepare("
+                    SELECT id FROM committees
+                    WHERE id IN ({$placeholders})
+                      AND is_active = 1 AND is_deleted = 0
+                ");
+                $cmtCheck->execute(array_values($committeeIds));
+                $validCmtIds = array_column($cmtCheck->fetchAll(), 'id');
+                if (count($validCmtIds) !== count($committeeIds)) {
+                    if ($this->pdo->inTransaction()) {
+                        $this->pdo->rollBack();
+                    }
+                    flash_set('error', 'One or more selected committees are invalid.');
+                    old_set($_POST);
+                    redirect('plenary/inbox/show?id=' . $documentId);
                 }
-                flash_set('error', 'One or more selected committees are invalid.');
-                redirect('plenary/inbox/show?id=' . $documentId);
             }
         }
 
@@ -923,15 +1127,27 @@ class PlenaryInboxController
                 updated_by                = VALUES(updated_by)
         ")->execute([
             $documentId,
-            $proposedNumber ?: null,
-            $targetDate     ?: null,
-            $sessionType    ?: null,
-            $additionalDetails ?: null,
+            // Communications hide Proposed Number / Session Type / Additional
+            // Details, so those columns are left empty for that document type.
+            $isCommunication ? null : ($proposedNumber    ?: null),
+            $targetDate ?: null,
+            $isCommunication ? null : ($sessionType       ?: null),
+            $isCommunication ? null : ($additionalDetails ?: null),
             null,  // remarks preserved from pre-decision; not overwritten here
-            $pdd['status_id'],  // keep the "Under Processing" status_id
+            $pdd['status_id'],  // keep the "On Process" status_id
             $userId,
             $userId,
         ]);
+
+        // ── 4a. Communications: the Subject Matter field updates the title ─
+        if ($isCommunication) {
+            $this->pdo->prepare("
+                UPDATE documents
+                SET subject_matter = ?,
+                    updated_by     = ?
+                WHERE id = ?
+            ")->execute([$subjectMatter, $userId, $documentId]);
+        }
 
         // ── 4b. Advance document status to "Awaiting First Reading" ───────
         // This moves the document into the First Reading queue.
@@ -949,38 +1165,43 @@ class PlenaryInboxController
             ")->execute([(int) $awaitingFrRow['id'], $userId, $documentId]);
         }
 
-        // ── 5. Replace authors (delete-and-reinsert for clean sort_order) ─
-        $this->pdo->prepare(
-            "DELETE FROM document_authors WHERE document_id = ?"
-        )->execute([$documentId]);
+        // ── 5 & 6. Replace authors and committees ─────────────────────────
+        // Communications do not carry authors, co-authors or committees, so
+        // their existing rows (if any) are preserved untouched.
+        if (!$isCommunication) {
+            // Replace authors (delete-and-reinsert for clean sort_order)
+            $this->pdo->prepare(
+                "DELETE FROM document_authors WHERE document_id = ?"
+            )->execute([$documentId]);
 
-        $insertAuthor = $this->pdo->prepare("
-            INSERT INTO document_authors
-                (document_id, sp_member_id, author_role, sort_order)
-            VALUES (?, ?, ?, ?)
-        ");
-
-        $sortOrder = 0;
-        foreach (array_values($authorIds) as $memberId) {
-            $insertAuthor->execute([$documentId, $memberId, 'AUTHOR', $sortOrder++]);
-        }
-        $sortOrder = 0;
-        foreach (array_values($coAuthorIds) as $memberId) {
-            $insertAuthor->execute([$documentId, $memberId, 'CO_AUTHOR', $sortOrder++]);
-        }
-
-        // ── 6. Replace committees ──────────────────────────────────────────
-        $this->pdo->prepare(
-            "DELETE FROM document_committees WHERE document_id = ?"
-        )->execute([$documentId]);
-
-        if (!empty($committeeIds)) {
-            $insertCmt = $this->pdo->prepare("
-                INSERT INTO document_committees (document_id, committee_id, assigned_by)
-                VALUES (?, ?, ?)
+            $insertAuthor = $this->pdo->prepare("
+                INSERT INTO document_authors
+                    (document_id, sp_member_id, author_role, sort_order)
+                VALUES (?, ?, ?, ?)
             ");
-            foreach (array_values($committeeIds) as $cid) {
-                $insertCmt->execute([$documentId, $cid, $userId]);
+
+            $sortOrder = 0;
+            foreach (array_values($authorIds) as $memberId) {
+                $insertAuthor->execute([$documentId, $memberId, 'AUTHOR', $sortOrder++]);
+            }
+            $sortOrder = 0;
+            foreach (array_values($coAuthorIds) as $memberId) {
+                $insertAuthor->execute([$documentId, $memberId, 'CO_AUTHOR', $sortOrder++]);
+            }
+
+            // Replace committees
+            $this->pdo->prepare(
+                "DELETE FROM document_committees WHERE document_id = ?"
+            )->execute([$documentId]);
+
+            if (!empty($committeeIds)) {
+                $insertCmt = $this->pdo->prepare("
+                    INSERT INTO document_committees (document_id, committee_id, assigned_by)
+                    VALUES (?, ?, ?)
+                ");
+                foreach (array_values($committeeIds) as $cid) {
+                    $insertCmt->execute([$documentId, $cid, $userId]);
+                }
             }
         }
 
@@ -1024,6 +1245,132 @@ class PlenaryInboxController
     }
 
     /**
+     * Submit compliance updates for a Deferred document and return it to
+     * processing.
+     *
+     * A Deferred document is on standby: the owning Plenary user records the
+     * compliance remarks and attaches one or more compliance files, after which
+     * the document's pre-decision status is reset to "On Process" so the normal
+     * processing flow resumes.  Existing attachments, remarks and the full
+     * event history are preserved (new files are appended, never replaced).
+     *
+     * The uploaded files are staged on disk by process() before the transaction
+     * opens; this method only writes the DB rows and the audit trail.
+     *
+     * @param  array[] $stagedFiles  Output of DocumentService::stageFileUploads().
+     */
+    private function doSubmitCompliance(
+        int   $documentId,
+        int   $assignmentId,
+        array $document,
+        int   $userId,
+        int   $currentStatusId,
+        array $stagedFiles
+    ): array {
+        // ── 1. Only a Deferred document may be resumed this way ────────────
+        $currentStatusName = $this->currentPreDecisionStatusName($documentId);
+        if ($currentStatusName === null || strtolower(trim($currentStatusName)) !== 'deferred') {
+            throw new RuntimeException(
+                'Compliance updates can only be submitted while the document is Deferred.'
+            );
+        }
+
+        $remarks = trim($_POST['remarks'] ?? '');
+        if ($remarks === '') {
+            throw new InvalidArgumentException('Remarks are required when submitting compliance updates.');
+        }
+
+        if (empty($stagedFiles)) {
+            throw new InvalidArgumentException('At least one compliance file is required.');
+        }
+
+        // ── 2. Resolve the "On Process" status ─────────────────────────────
+        $onProcessRow = $this->pdo->query("
+            SELECT id FROM document_statuses
+            WHERE name = 'On Process' AND is_active = 1 AND is_deleted = 0
+            LIMIT 1
+        ")->fetch();
+        if (!$onProcessRow) {
+            throw new RuntimeException('The "On Process" status is not configured.');
+        }
+        $onProcessStatusId = (int) $onProcessRow['id'];
+
+        // ── 3. Persist the compliance files (append to existing history) ───
+        $pendingFileLogs = $this->docService->insertStagedAttachments(
+            $stagedFiles,
+            $documentId,
+            $userId,
+            'PLENARY',
+            'COMPLIANCE_DOC'
+        );
+
+        // ── 4. Return the document to processing ──────────────────────────
+        // Reset the pre-decision status to "On Process" and append the new
+        // remarks so previously recorded remarks remain visible.
+        $existingStmt = $this->pdo->prepare(
+            "SELECT remarks FROM plenary_document_details WHERE document_id = ? LIMIT 1"
+        );
+        $existingStmt->execute([$documentId]);
+        $existingRemarks = (string) ($existingStmt->fetchColumn() ?: '');
+
+        $combinedRemarks = $existingRemarks !== ''
+            ? $existingRemarks . "\n\n" . $remarks
+            : $remarks;
+
+        $this->pdo->prepare("
+            UPDATE plenary_document_details
+            SET status_id  = ?,
+                remarks    = ?,
+                updated_by = ?
+            WHERE document_id = ?
+        ")->execute([$onProcessStatusId, $combinedRemarks, $userId, $documentId]);
+
+        // Synchronize shared document status with Plenary pre-decision status
+        // This ensures other divisions and users see the current status
+        $this->pdo->prepare("
+            UPDATE documents
+            SET current_status_id = ?,
+                updated_by        = ?
+            WHERE id = ?
+        ")->execute([$onProcessStatusId, $userId, $documentId]);
+
+        // ── 5. Insert document event (history) ────────────────────────────
+        $this->pdo->prepare("
+            INSERT INTO document_events (
+                document_id, event_type, phase, performed_by,
+                to_status_id, remarks, metadata
+            ) VALUES (?, 'PLENARY_COMPLIANCE_SUBMITTED', 'PLENARY', ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $userId,
+            $onProcessStatusId,
+            $remarks,
+            json_encode([
+                'from_status'      => 'Deferred',
+                'to_status'        => 'On Process',
+                'file_count'       => count($stagedFiles),
+                'compliance_files' => array_column($stagedFiles, 'original_name'),
+                'ip_address'       => client_ip(),
+                'user_agent'       => client_user_agent(),
+            ]),
+        ]);
+
+        return [
+            'log_action'  => 'UPDATE',
+            'new_values'  => [
+                'action'           => 'plenary_compliance_submitted',
+                'document_id'      => $documentId,
+                'status_name'      => 'On Process',
+                'remarks'          => $remarks,
+                'file_count'       => count($stagedFiles),
+                'compliance_files' => array_column($stagedFiles, 'original_name'),
+            ],
+            'description'     => "Plenary compliance submitted for document ID {$documentId}; returned to processing.",
+            'pendingFileLogs' => $pendingFileLogs,
+        ];
+    }
+
+    /**
      * Return the document to Admin.
      *
      * Marks the current Plenary assignment as COMPLETED (decline_reason = remarks),
@@ -1038,6 +1385,8 @@ class PlenaryInboxController
         int    $currentStatusId,
         string $remarks
     ): array {
+        $this->assertNotTerminal($documentId);
+
         if ($remarks === '') {
             throw new InvalidArgumentException('A reason is required when returning to Admin.');
         }
@@ -1171,8 +1520,16 @@ class PlenaryInboxController
         return (int) $row['id'];
     }
 
-    /** Return [pendingCount, acceptedCount] for the stats cards. */
-    private function fetchCounts(int $plenaryRoleId, int $userId): array
+    /**
+     * Return the badge count for every tab, keyed by view slug.
+     *
+     * Each count mirrors the corresponding list filter exactly (same ownership
+     * scoping, same ACCEPTED_STILL_PROCESSING / outcome partitioning) so a tab
+     * badge and its list can never drift apart.
+     *
+     * @return array<string,int> e.g. ['inbox' => 3, 'accepted' => 1, 'deferred' => 2, …]
+     */
+    private function fetchTabCounts(int $plenaryRoleId, int $userId): array
     {
         $pendingRow = $this->pdo->prepare("
             SELECT COUNT(*) AS cnt
@@ -1188,19 +1545,46 @@ class PlenaryInboxController
 
         $acceptedRow = $this->pdo->prepare("
             SELECT COUNT(*) AS cnt
-            FROM document_assignments
-            WHERE assigned_to_role_id = ?
-              AND phase               = 'PLENARY'
-              AND decision            = 'ACCEPTED'
-              AND completed_at        IS NULL
-              AND (accepted_by = ? OR assigned_to_user_id = ?)
+            FROM document_assignments da
+            INNER JOIN documents d ON d.id = da.document_id
+            LEFT  JOIN plenary_document_details pdd ON pdd.document_id = d.id
+            WHERE da.assigned_to_role_id = ?
+              AND da.phase               = 'PLENARY'
+              AND da.decision            = 'ACCEPTED'
+              AND da.completed_at        IS NULL
+              AND (da.accepted_by = ? OR da.assigned_to_user_id = ?)
+              AND (" . self::ACCEPTED_STILL_PROCESSING . ")
+              AND (pdd.status_id IS NULL OR pdd.status_id NOT IN (" . self::OUTCOME_STATUS_IDS_SQL . "))
         ");
         $acceptedRow->execute([$plenaryRoleId, $userId, $userId]);
 
-        return [
-            (int) $pendingRow->fetchColumn(),
-            (int) $acceptedRow->fetchColumn(),
+        $counts = [
+            'inbox'    => (int) $pendingRow->fetchColumn(),
+            'accepted' => (int) $acceptedRow->fetchColumn(),
         ];
+
+        $outcomeStmt = $this->pdo->prepare("
+            SELECT COUNT(*) AS cnt
+            FROM document_assignments da
+            INNER JOIN documents d   ON d.id   = da.document_id
+            INNER JOIN plenary_document_details pdd ON pdd.document_id = d.id
+            INNER JOIN document_statuses pds ON pds.id = pdd.status_id
+            WHERE da.assigned_to_role_id = ?
+              AND da.phase               = 'PLENARY'
+              AND da.decision            = 'ACCEPTED'
+              AND da.completed_at        IS NULL
+              AND (da.accepted_by = ? OR da.assigned_to_user_id = ?)
+              AND pds.name      = ?
+              AND pds.is_active = 1
+              AND pds.is_deleted = 0
+        ");
+
+        foreach (self::OUTCOME_TABS as $slug => $statusName) {
+            $outcomeStmt->execute([$plenaryRoleId, $userId, $userId, $statusName]);
+            $counts[$slug] = (int) $outcomeStmt->fetchColumn();
+        }
+
+        return $counts;
     }
 
     /** Fetch the plenary_document_details row with joined status info. */
@@ -1277,7 +1661,7 @@ class PlenaryInboxController
             FROM document_statuses
             WHERE name IN (
                 'Deferred', 'Lay on the Table', 'Noted',
-                'Remanded', 'Under Processing', 'Withdrawn'
+                'Remanded', 'On Process', 'Withdrawn'
             )
               AND is_active  = 1
               AND is_deleted = 0
@@ -1379,15 +1763,72 @@ class PlenaryInboxController
         return false;
     }
 
+    /**
+     * Determine whether the given document type name is a Communication.
+     * Matching is substring + case-insensitive so that "Communications" also
+     * matches.  Communications are processed through a reduced Plenary form
+     * that only collects the Subject Matter (title) and the Target First
+     * Reading Date.
+     */
+    private function isCommunicationType(string $documentTypeName): bool
+    {
+        return str_contains(strtolower(trim($documentTypeName)), 'communication');
+    }
+
     /** Human-readable action label for flash messages. */
     private function actionLabel(string $action): string
     {
         return match ($action) {
-            'accept'          => 'Document Accepted',
-            'pre_decision'    => 'Pre-Decision Status Saved',
-            'save_processing' => 'Processing Details Saved',
-            'return_to_admin' => 'Returned to Admin',
-            default           => ucfirst(str_replace('_', ' ', $action)),
+            'accept'            => 'Document Accepted',
+            'pre_decision'      => 'Pre-Decision Status Saved',
+            'save_processing'   => 'Processing Details Saved',
+            'submit_compliance' => 'Compliance Submitted — Returned to Processing',
+            'return_to_admin'   => 'Returned to Admin',
+            default             => ucfirst(str_replace('_', ' ', $action)),
         };
+    }
+
+    /**
+     * Return the document's current pre-decision status name, or null when no
+     * plenary_document_details row (or status) exists yet.
+     */
+    private function currentPreDecisionStatusName(int $documentId): ?string
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT ds.name
+            FROM plenary_document_details pdd
+            LEFT JOIN document_statuses ds ON ds.id = pdd.status_id
+            WHERE pdd.document_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$documentId]);
+        $name = $stmt->fetchColumn();
+
+        return $name === false ? null : (string) $name;
+    }
+
+    /** Whether the given pre-decision status is a terminal Plenary outcome. */
+    private function isTerminalStatus(?string $statusName): bool
+    {
+        if ($statusName === null) {
+            return false;
+        }
+
+        return in_array(strtolower(trim($statusName)), self::TERMINAL_STATUSES, true);
+    }
+
+    /**
+     * Guard: refuse any further Plenary mutation once the document carries a
+     * terminal pre-decision outcome (Noted / Remanded / Withdrawn).
+     */
+    private function assertNotTerminal(int $documentId): void
+    {
+        $current = $this->currentPreDecisionStatusName($documentId);
+
+        if ($this->isTerminalStatus($current)) {
+            throw new RuntimeException(
+                "This document has a terminal Plenary outcome ({$current}) and can no longer be processed."
+            );
+        }
     }
 }

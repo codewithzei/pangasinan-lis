@@ -20,6 +20,7 @@
  *   $canAccept             bool
  *   $canProcess            bool
  *   $proposedNumberExempt  bool
+ *   $isCommunication       bool         True when the document type is a Communication
  *   $success               string|null
  *   $error                 string|null
  *   $errors                array
@@ -44,13 +45,31 @@ $errors               = $errors               ?? [];
 $documentId            = (int) ($document['id'] ?? 0);
 $trackingNumber        = $document['tracking_number'] ?? '';
 $proposedNumberExempt  = $proposedNumberExempt ?? false;
+$isCommunication       = $isCommunication ?? false;
 
 if (!isset($canAccept))  { $canAccept  = false; }
 if (!isset($canProcess)) { $canProcess = false; }
 
-// Determine if pre-decision is "Under Processing" to show the processing form
+// Determine if pre-decision is "On Process" to show the processing form
+// Use plenary_details for internal workflow logic, but display shared status
 $currentPreDecisionStatus = strtolower(trim($plenaryDetails['plenary_status_name'] ?? ''));
-$isUnderProcessing = ($currentPreDecisionStatus === 'under processing');
+$isOnProcess = ($currentPreDecisionStatus === 'on process');
+
+// Outcome-specific flags (status-based tabs)
+$isDeferred        = ($currentPreDecisionStatus === 'deferred');
+$isLayOnTheTable   = ($currentPreDecisionStatus === 'lay on the table');
+$isTerminalOutcome = in_array($currentPreDecisionStatus, ['noted', 'remanded', 'withdrawn'], true);
+
+// Use shared document status for display (now synchronized with Plenary status)
+$displayStatusName = $document['status_name'] ?? '';
+$displayStatusBadgeColor = $document['status_badge_color'] ?? '#6B7280';
+
+// Terminal outcomes stop every further Plenary action; only the read-only
+// history remains. Non-terminal outcomes keep the normal forms available.
+$canEditPreDecision   = $canProcess && !$isTerminalOutcome;
+$canSaveProcessing    = $canProcess && $isOnProcess && !$isTerminalOutcome;
+$canSubmitCompliance  = $canProcess && $isDeferred && !$isTerminalOutcome;
+$canReturnToAdmin     = $canProcess && !$isTerminalOutcome;
 
 // Session type labels
 $sessionTypeLabels = [
@@ -244,6 +263,31 @@ ob_start();
     </section>
 
     <!-- ─────────────────────────────────────────────────────────────────────── -->
+    <!-- Terminal outcome notice (Noted / Remanded / Withdrawn)                 -->
+    <!-- ─────────────────────────────────────────────────────────────────────── -->
+    <?php if ($isTerminalOutcome): ?>
+        <section class="rounded-2xl border border-gray-300 bg-gray-100 p-6">
+            <div class="flex items-start gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-200">
+                    <svg class="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </span>
+                <div>
+                    <h2 class="text-base font-semibold text-gray-800">
+                        Status: <?= htmlspecialchars($displayStatusName) ?>
+                    </h2>
+                    <p class="mt-1 text-sm text-gray-600">
+                        This outcome is final. No further Plenary processing actions can be taken. The document
+                        record, its files and its full history are retained below.
+                    </p>
+                </div>
+            </div>
+        </section>
+    <?php endif; ?>
+
+    <!-- ─────────────────────────────────────────────────────────────────────── -->
     <!-- Section 2: Accept Button (shown only when document is claimable)       -->
     <!-- ─────────────────────────────────────────────────────────────────────── -->
     <?php if ($canAccept): ?>
@@ -276,7 +320,7 @@ ob_start();
     <!-- ─────────────────────────────────────────────────────────────────────── -->
     <!-- Section 3: Pre-Decision Form (only for the owning user after accept)   -->
     <!-- ─────────────────────────────────────────────────────────────────────── -->
-    <?php if ($canProcess): ?>
+    <?php if ($canEditPreDecision): ?>
         <section class="rounded-2xl border border-indigo-200 bg-white p-6">
             <div class="mb-4 flex items-center gap-2">
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100">
@@ -289,16 +333,15 @@ ob_start();
             </div>
 
             <?php if ($plenaryDetails): ?>
-                <!-- Current pre-decision status summary -->
+                <!-- Current status summary (shared document status, synchronized with Plenary) -->
                 <div class="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
                     <div class="flex flex-wrap items-center gap-3">
                         <span class="text-xs font-semibold uppercase tracking-wide text-indigo-500">Current Status:</span>
-                        <?php $plBadge = $plenaryDetails['plenary_status_badge_color'] ?? '#6B7280'; ?>
                         <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold"
-                              style="background-color: <?= htmlspecialchars($plBadge) ?>1a;
-                                     color: <?= htmlspecialchars($plBadge) ?>;
-                                     border-color: <?= htmlspecialchars($plBadge) ?>40;">
-                            <?= htmlspecialchars($plenaryDetails['plenary_status_name'] ?? '') ?>
+                              style="background-color: <?= htmlspecialchars($displayStatusBadgeColor) ?>1a;
+                                     color: <?= htmlspecialchars($displayStatusBadgeColor) ?>;
+                                     border-color: <?= htmlspecialchars($displayStatusBadgeColor) ?>40;">
+                            <?= htmlspecialchars($displayStatusName) ?>
                         </span>
                         <?php if (!empty($plenaryDetails['remarks'])): ?>
                             <span class="text-xs text-indigo-600 italic">
@@ -317,11 +360,11 @@ ob_start();
                     <!-- Pre-decision status -->
                     <div>
                         <label for="pre_decision_status_id"
-                               class="block text-sm font-medium text-gray-700">
+                               class="block text-sm font-medium text-gray-700 mb-1">
                             Status <span class="text-red-500">*</span>
                         </label>
                         <select id="pre_decision_status_id" name="pre_decision_status_id" required
-                                class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white py-2 px-3 text-sm
+                                class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
                                        text-gray-800 focus:border-primary focus:outline-none focus:ring-2
                                        focus:ring-primary/20">
                             <option value="">— Select status —</option>
@@ -333,14 +376,19 @@ ob_start();
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <?php if ($isDeferred): ?>
+                            <p class="mt-1 text-xs text-amber-600">
+                                You may also submit compliance updates below to resume processing.
+                            </p>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Remarks -->
                     <div>
                         <label for="predecision_remarks"
-                               class="block text-sm font-medium text-gray-700">Remarks</label>
+                               class="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
                         <textarea id="predecision_remarks" name="remarks" rows="2"
-                                  class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white py-2 px-3 text-sm
+                                  class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
                                          text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
                                          focus:ring-2 focus:ring-primary/20"
                                   placeholder="Optional remarks for this pre-decision status…"><?= htmlspecialchars(
@@ -365,9 +413,81 @@ ob_start();
         </section>
 
         <!-- ─────────────────────────────────────────────────────────────────── -->
-        <!-- Section 4: Plenary Processing Form (Under Processing only)         -->
+        <!-- Section 3b: Compliance Submission (Deferred → resume processing)   -->
         <!-- ─────────────────────────────────────────────────────────────────── -->
-        <?php if ($isUnderProcessing): ?>
+        <?php if ($canSubmitCompliance): ?>
+            <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+                <div class="mb-4 flex items-start gap-2">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+                        <svg class="h-4 w-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <h2 class="text-base font-semibold text-amber-900">Submit Compliance Updates</h2>
+                        <p class="mt-1 text-xs text-amber-700">
+                            This document is <strong>Deferred</strong> and is on standby. Record your compliance
+                            remarks and attach one or more compliance files to return it to processing. Existing
+                            files and remarks are kept in the document history.
+                        </p>
+                    </div>
+                </div>
+
+                <form method="POST" action="<?= BASE_URL ?>/plenary/inbox/process"
+                      enctype="multipart/form-data" class="space-y-4">
+                    <input type="hidden" name="document_id" value="<?= $documentId ?>">
+                    <input type="hidden" name="action"      value="submit_compliance">
+
+                    <div>
+                        <label for="compliance_remarks" class="block text-sm font-medium text-gray-700 mb-1">
+                            Compliance Remarks <span class="text-red-500">*</span>
+                        </label>
+                        <textarea id="compliance_remarks" name="remarks" rows="3" required
+                                  class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
+                                         text-gray-800 placeholder-gray-400 focus:border-amber-400 focus:outline-none
+                                         focus:ring-2 focus:ring-amber-400/20"
+                                  placeholder="Describe the compliance action taken…"><?= htmlspecialchars(
+                            $old['remarks'] ?? ''
+                        ) ?></textarea>
+                    </div>
+
+                    <div>
+                        <label for="compliance_files" class="block text-sm font-medium text-gray-700 mb-1">
+                            Compliance Files <span class="text-red-500">*</span>
+                        </label>
+                        <input type="file" id="compliance_files" name="compliance_files[]" multiple required
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+                               class="block w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
+                                      text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-amber-100
+                                      file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-amber-700
+                                      hover:file:bg-amber-200 focus:border-amber-400 focus:outline-none
+                                      focus:ring-2 focus:ring-amber-400/20">
+                        <p class="mt-1 text-xs text-gray-400">
+                            Attach one or more files (maximum 10, up to 25&nbsp;MB each).
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button type="submit"
+                                class="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5
+                                       text-sm font-semibold text-white hover:bg-amber-700 transition
+                                       focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Submit Compliance &amp; Resume Processing
+                        </button>
+                    </div>
+                </form>
+            </section>
+        <?php endif; ?>
+
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <!-- Section 4: Plenary Processing Form (On Process only)         -->
+        <!-- ─────────────────────────────────────────────────────────────────── -->
+        <?php if ($canSaveProcessing): ?>
             <section class="rounded-2xl border border-violet-200 bg-white p-6">
                 <div class="mb-4 flex items-center gap-2">
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100">
@@ -378,7 +498,7 @@ ob_start();
                     </span>
                     <div>
                         <h2 class="text-base font-semibold text-violet-900">Plenary Processing Details</h2>
-                        <p class="text-xs text-violet-600">Available because status is "Under Processing"</p>
+                        <p class="text-xs text-violet-600">Available because status is "On Process"</p>
                     </div>
                 </div>
 
@@ -392,31 +512,60 @@ ob_start();
                 $currentAuthorIds    = isset($old['author_ids'])    ? array_map('intval', (array)$old['author_ids'])    : array_column($authors,   'sp_member_id');
                 $currentCoAuthorIds  = isset($old['co_author_ids']) ? array_map('intval', (array)$old['co_author_ids']) : array_column($coAuthors, 'sp_member_id');
                 $currentCmtIds       = isset($old['committee_ids']) ? array_map('intval', (array)$old['committee_ids']) : array_column($docCommittees, 'committee_id');
+
+                // Normalise option lists for the searchable multi-select widgets.
+                $spMembersForJs = array_map(static function ($m) {
+                    return [
+                        'sp_member_id' => (int) ($m['sp_member_id'] ?? 0),
+                        'full_name'    => trim(implode(' ', array_filter([
+                            $m['first_name']  ?? '',
+                            $m['middle_name'] ?? '',
+                            $m['last_name']   ?? '',
+                            $m['suffix']      ?? '',
+                        ]))),
+                        'position'     => $m['position'] ?? '',
+                    ];
+                }, $spMembers);
+
+                $committeesForJs = array_map(static function ($c) {
+                    return ['id' => (int) ($c['id'] ?? 0), 'name' => $c['name'] ?? ''];
+                }, $committees);
+
+                $spMembersJson  = json_encode(array_values($spMembersForJs),  JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+                $committeesJson = json_encode(array_values($committeesForJs), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
                 ?>
 
-                <form method="POST" action="<?= BASE_URL ?>/plenary/inbox/process" class="space-y-6">
+                <form method="POST" action="<?= BASE_URL ?>/plenary/inbox/process" class="space-y-6"
+                      data-ms-processing-form>
                     <input type="hidden" name="document_id" value="<?= $documentId ?>">
                     <input type="hidden" name="action"      value="save_processing">
+                    <!-- Selections made in the searchable dropdowns are serialized here on submit. -->
+                    <div data-ms-post hidden></div>
 
                     <!-- Subject Matter -->
                     <div>
-                        <label for="subject_matter" class="block text-sm font-medium text-gray-700">
+                        <label for="subject_matter" class="block text-sm font-medium text-gray-700 mb-1">
                             Subject Matter <span class="text-red-500">*</span>
                         </label>
                         <textarea id="subject_matter" name="subject_matter" rows="3" required
                                   maxlength="5000"
-                                  class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white py-2 px-3 text-sm
+                                  class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
                                          text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
                                          focus:ring-2 focus:ring-primary/20"
                                   placeholder="Subject matter of the document…"><?= htmlspecialchars($currentSubject) ?></textarea>
                         <p class="mt-1 text-xs text-gray-400">
-                            Preserve or update the subject matter as needed for the plenary record.
+                            <?php if ($isCommunication): ?>
+                                This updates the communication's title.
+                            <?php else: ?>
+                                Preserve or update the subject matter as needed for the plenary record.
+                            <?php endif; ?>
                         </p>
                     </div>
 
+                    <?php if (!$isCommunication): ?>
                     <!-- Proposed Number -->
                     <div>
-                        <label for="proposed_number" class="block text-sm font-medium text-gray-700">
+                        <label for="proposed_number" class="block text-sm font-medium text-gray-700 mb-1">
                             Proposed No.
                             <?php if (!$proposedNumberExempt): ?>
                                 <span class="text-red-500">*</span>
@@ -431,7 +580,7 @@ ob_start();
                                maxlength="50"
                                <?= !$proposedNumberExempt ? 'required' : '' ?>
                                placeholder="e.g. SB-2026-001"
-                               class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white py-2 px-3 text-sm
+                               class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
                                       text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
                                       focus:ring-2 focus:ring-primary/20">
                         <p class="mt-1 text-xs text-gray-400">
@@ -446,121 +595,103 @@ ob_start();
                     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         <!-- Authors -->
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
                                 Authors
                                 <span class="text-xs font-normal text-gray-400">(select one or more)</span>
                             </label>
-                            <div class="max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white p-2">
-                                <?php if (empty($spMembers)): ?>
-                                    <p class="p-2 text-xs text-gray-400 italic">No active SP Members found.</p>
-                                <?php else: ?>
-                                    <?php foreach ($spMembers as $member): ?>
-                                        <?php
-                                        $memId   = (int) $member['sp_member_id'];
-                                        $memName = trim(implode(' ', array_filter([
-                                            $member['first_name']  ?? '',
-                                            $member['middle_name'] ?? '',
-                                            $member['last_name']   ?? '',
-                                            $member['suffix']      ?? '',
-                                        ])));
-                                        ?>
-                                        <label class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm
-                                                      cursor-pointer hover:bg-gray-50">
-                                            <input type="checkbox" name="author_ids[]"
-                                                   value="<?= $memId ?>"
-                                                   <?= in_array($memId, $currentAuthorIds, true) ? 'checked' : '' ?>
-                                                   class="h-4 w-4 rounded border-gray-300 text-primary
-                                                          focus:ring-primary">
-                                            <span class="text-gray-800"><?= htmlspecialchars($memName) ?></span>
-                                        </label>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
+                            <p class="mb-2 text-xs text-gray-500">Search and select multiple SP members.</p>
+                            <div class="ar-multi-select" data-list-key="spMembers" data-role="AUTHOR"
+                                 data-selected="<?= htmlspecialchars(json_encode(array_values($currentAuthorIds)), ENT_QUOTES, 'UTF-8') ?>">
+                                <div class="ar-multi-control">
+                                    <div class="ar-multi-chips"></div>
+                                    <input type="text" class="ar-multi-filter"
+                                           placeholder="Search authors…"
+                                           aria-label="Search authors" role="combobox"
+                                           aria-expanded="false" aria-autocomplete="list" autocomplete="off">
+                                    <button type="button" class="ar-multi-toggle" aria-label="Show author options">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                    </button>
+                                </div>
+                                <div class="ar-multi-dropdown hidden" role="listbox" aria-multiselectable="true"><div class="ar-multi-options"></div></div>
+                                <div class="ar-multi-post-fields hidden"></div>
                             </div>
                         </div>
 
                         <!-- Co-Authors -->
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
                                 Co-Authors
                                 <span class="text-xs font-normal text-gray-400">(select zero or more)</span>
                             </label>
-                            <div class="max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white p-2">
-                                <?php if (empty($spMembers)): ?>
-                                    <p class="p-2 text-xs text-gray-400 italic">No active SP Members found.</p>
-                                <?php else: ?>
-                                    <?php foreach ($spMembers as $member): ?>
-                                        <?php
-                                        $memId   = (int) $member['sp_member_id'];
-                                        $memName = trim(implode(' ', array_filter([
-                                            $member['first_name']  ?? '',
-                                            $member['middle_name'] ?? '',
-                                            $member['last_name']   ?? '',
-                                            $member['suffix']      ?? '',
-                                        ])));
-                                        ?>
-                                        <label class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm
-                                                      cursor-pointer hover:bg-gray-50">
-                                            <input type="checkbox" name="co_author_ids[]"
-                                                   value="<?= $memId ?>"
-                                                   <?= in_array($memId, $currentCoAuthorIds, true) ? 'checked' : '' ?>
-                                                   class="h-4 w-4 rounded border-gray-300 text-primary
-                                                          focus:ring-primary">
-                                            <span class="text-gray-800"><?= htmlspecialchars($memName) ?></span>
-                                        </label>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
+                            <p class="mb-2 text-xs text-gray-500">
+                                Search and select multiple SP members. A member already set as an Author cannot be chosen here.
+                            </p>
+                            <div class="ar-multi-select" data-list-key="spMembers" data-role="CO_AUTHOR"
+                                 data-selected="<?= htmlspecialchars(json_encode(array_values($currentCoAuthorIds)), ENT_QUOTES, 'UTF-8') ?>">
+                                <div class="ar-multi-control">
+                                    <div class="ar-multi-chips"></div>
+                                    <input type="text" class="ar-multi-filter"
+                                           placeholder="Search co-authors…"
+                                           aria-label="Search co-authors" role="combobox"
+                                           aria-expanded="false" aria-autocomplete="list" autocomplete="off">
+                                    <button type="button" class="ar-multi-toggle" aria-label="Show co-author options">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                    </button>
+                                </div>
+                                <div class="ar-multi-dropdown hidden" role="listbox" aria-multiselectable="true"><div class="ar-multi-options"></div></div>
+                                <div class="ar-multi-post-fields hidden"></div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Committees in Charge -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
                             Committees in Charge
                             <span class="text-xs font-normal text-gray-400">(select one or more)</span>
                         </label>
-                        <div class="grid grid-cols-1 gap-1 rounded-xl border border-gray-200 bg-white p-3
-                                    max-h-40 overflow-y-auto sm:grid-cols-2">
-                            <?php if (empty($committees)): ?>
-                                <p class="p-2 text-xs text-gray-400 italic">No active Committees found.</p>
-                            <?php else: ?>
-                                <?php foreach ($committees as $cmt): ?>
-                                    <label class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm
-                                                  cursor-pointer hover:bg-gray-50">
-                                        <input type="checkbox" name="committee_ids[]"
-                                               value="<?= (int) $cmt['id'] ?>"
-                                               <?= in_array((int)$cmt['id'], $currentCmtIds, true) ? 'checked' : '' ?>
-                                               class="h-4 w-4 rounded border-gray-300 text-primary
-                                                      focus:ring-primary">
-                                        <span class="text-gray-800"><?= htmlspecialchars($cmt['name']) ?></span>
-                                    </label>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                        <p class="mb-2 text-xs text-gray-500">Search and select multiple committees.</p>
+                        <div class="ar-multi-select" data-list-key="committees"
+                             data-selected="<?= htmlspecialchars(json_encode(array_values($currentCmtIds)), ENT_QUOTES, 'UTF-8') ?>">
+                            <div class="ar-multi-control">
+                                <div class="ar-multi-chips"></div>
+                                <input type="text" class="ar-multi-filter"
+                                       placeholder="Search and select committees…"
+                                       aria-label="Search committees" role="combobox"
+                                       aria-expanded="false" aria-autocomplete="list" autocomplete="off">
+                                <button type="button" class="ar-multi-toggle" aria-label="Show committee options">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                            </div>
+                            <div class="ar-multi-dropdown hidden" role="listbox" aria-multiselectable="true"><div class="ar-multi-options"></div></div>
+                            <div class="ar-multi-post-fields hidden"></div>
                         </div>
                     </div>
+                    <?php endif; // !$isCommunication (Proposed Number + authors + committees) ?>
 
                     <!-- Target First Reading Date + Session Type -->
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-4 <?= $isCommunication ? '' : 'sm:grid-cols-2' ?>">
                         <div>
                             <label for="target_first_reading_date"
-                                   class="block text-sm font-medium text-gray-700">
+                                   class="block text-sm font-medium text-gray-700 mb-1">
                                 Target First Reading Date
                             </label>
                             <input type="date" id="target_first_reading_date"
                                    name="target_first_reading_date"
                                    value="<?= htmlspecialchars($currentTargetDate) ?>"
-                                   class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white py-2 px-3
+                                   class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2
                                           text-sm text-gray-800 focus:border-primary focus:outline-none
                                           focus:ring-2 focus:ring-primary/20">
                         </div>
 
+                        <?php if (!$isCommunication): ?>
                         <div>
                             <label for="session_type"
-                                   class="block text-sm font-medium text-gray-700">
+                                   class="block text-sm font-medium text-gray-700 mb-1">
                                 Session Type
                             </label>
                             <select id="session_type" name="session_type"
-                                    class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white py-2 px-3
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2
                                            text-sm text-gray-800 focus:border-primary focus:outline-none
                                            focus:ring-2 focus:ring-primary/20">
                                 <option value="">— Select session type —</option>
@@ -572,19 +703,22 @@ ob_start();
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Additional Details -->
+                    <?php if (!$isCommunication): ?>
                     <div>
-                        <label for="additional_details" class="block text-sm font-medium text-gray-700">
+                        <label for="additional_details" class="block text-sm font-medium text-gray-700 mb-1">
                             Additional Details
                         </label>
                         <textarea id="additional_details" name="additional_details" rows="3"
-                                  class="mt-1.5 w-full rounded-xl border border-gray-200 bg-white py-2 px-3
+                                  class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2
                                          text-sm text-gray-800 placeholder-gray-400 focus:border-primary
                                          focus:outline-none focus:ring-2 focus:ring-primary/20"
                                   placeholder="Any additional notes or details…"><?= htmlspecialchars($currentAddlDetails) ?></textarea>
                     </div>
+                    <?php endif; ?>
 
                     <div class="flex items-center gap-3 border-t border-gray-100 pt-4">
                         <button type="submit"
@@ -599,6 +733,267 @@ ob_start();
                         </button>
                     </div>
                 </form>
+
+                <style>
+                /* Searchable multi-select — mirrors the archived-records pattern. */
+                .ar-multi-select { position:relative; }
+                .ar-multi-control { display:flex; min-height:2.75rem; flex-wrap:wrap; align-items:center; gap:0.375rem; border:1px solid #e5e7eb; border-radius:0.75rem; background:#fff; padding:0.375rem 0.5rem 0.375rem 0.75rem; }
+                .ar-multi-control:focus-within { border-color:var(--color-primary,#1d4ed8); box-shadow:0 0 0 3px rgba(29,78,216,.12); }
+                .ar-multi-chips { display:contents; }
+                .ar-multi-filter { min-width:10rem; flex:1; border:0; background:transparent; padding:0.25rem 0; color:#1f2937; font-size:0.875rem; outline:none; }
+                .ar-multi-filter::placeholder { color:#9ca3af; }
+                .ar-multi-toggle { display:flex; height:1.75rem; width:1.75rem; flex-shrink:0; align-items:center; justify-content:center; border:0; border-radius:0.5rem; background:transparent; color:#9ca3af; cursor:pointer; }
+                .ar-multi-toggle:hover { background:#f3f4f6; color:#4b5563; }
+                .ar-multi-dropdown { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:210; max-height:15rem; overflow-y:auto; border:1px solid #e5e7eb; border-radius:0.75rem; background:#fff; box-shadow:0 10px 25px -5px rgba(0,0,0,.12),0 4px 10px -3px rgba(0,0,0,.07); }
+                .ar-multi-dropdown.hidden { display:none; }
+                .ar-multi-option { display:flex; width:100%; align-items:center; gap:0.625rem; border:0; background:#fff; padding:0.625rem 0.75rem; text-align:left; color:#374151; font-size:0.875rem; cursor:pointer; }
+                .ar-multi-option:hover,.ar-multi-option.ar-option-focused { background:#eff6ff; color:#1d4ed8; }
+                .ar-multi-option[aria-selected="true"] { background:#eff6ff; color:#1d4ed8; font-weight:600; }
+                .ar-multi-option.ar-option-disabled,.ar-multi-option.ar-option-disabled:hover { background:#f9fafb; color:#9ca3af; cursor:not-allowed; }
+                .ar-multi-option-check { display:flex; height:1rem; width:1rem; flex-shrink:0; align-items:center; justify-content:center; border:1px solid #d1d5db; border-radius:0.25rem; }
+                .ar-multi-option[aria-selected="true"] .ar-multi-option-check { border-color:#1d4ed8; background:#1d4ed8; color:#fff; }
+                .ar-multi-chip { display:inline-flex; max-width:100%; align-items:center; gap:0.25rem; border:1px solid #bfdbfe; border-radius:9999px; background:#eff6ff; padding:0.2rem 0.35rem 0.2rem 0.625rem; color:#1d4ed8; font-size:0.75rem; font-weight:500; }
+                .ar-multi-chip-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+                .ar-multi-chip-remove { display:flex; height:1rem; width:1rem; flex-shrink:0; align-items:center; justify-content:center; border:0; border-radius:50%; background:transparent; color:#60a5fa; cursor:pointer; }
+                .ar-multi-chip-remove:hover { background:#bfdbfe; color:#1d4ed8; }
+                .ar-multi-empty { padding:0.75rem; color:#9ca3af; text-align:center; font-size:0.8125rem; }
+                </style>
+
+                <script>
+                // Searchable multi-select for Authors, Co-Authors and Committees.
+                // Selections are serialized into the original POST field names on submit;
+                // SP members already chosen as Authors are disabled in the Co-Authors list.
+                (function () {
+                'use strict';
+
+                var DATA = {
+                    spMembers:  <?= $spMembersJson ?>,
+                    committees: <?= $committeesJson ?>
+                };
+
+                var widgets = [];
+
+                function initMultiSelect(widget) {
+                    if (widget.dataset.msInited) { return; }
+                    widget.dataset.msInited = '1';
+
+                    var listKey   = widget.dataset.listKey;
+                    var idField   = listKey === 'spMembers' ? 'sp_member_id' : 'id';
+                    var nameField = listKey === 'spMembers' ? 'full_name'    : 'name';
+                    var items     = DATA[listKey] || [];
+                    var role      = widget.dataset.role || '';
+                    var form      = widget.closest('form');
+
+                    var chips    = widget.querySelector('.ar-multi-chips');
+                    var filter   = widget.querySelector('.ar-multi-filter');
+                    var toggle   = widget.querySelector('.ar-multi-toggle');
+                    var dropdown = widget.querySelector('.ar-multi-dropdown');
+                    var options  = widget.querySelector('.ar-multi-options');
+
+                    var selected   = new Set(JSON.parse(widget.dataset.selected || '[]').map(String));
+                    var focusedIdx = -1;
+
+                    function saveSelection() {
+                        widget.dataset.selected = JSON.stringify(Array.from(selected));
+                    }
+
+                    // A member chosen in the opposite role (AUTHOR vs CO_AUTHOR) is locked out.
+                    function assignedToOtherRole(id) {
+                        if (listKey !== 'spMembers' || !role || !form) { return false; }
+                        return Array.prototype.slice
+                            .call(form.querySelectorAll('.ar-multi-select[data-list-key="spMembers"]'))
+                            .some(function (other) {
+                                return other !== widget &&
+                                    other.dataset.role !== role &&
+                                    JSON.parse(other.dataset.selected || '[]').map(String).indexOf(String(id)) !== -1;
+                            });
+                    }
+
+                    // Keep the sibling role's option list in sync after add/remove.
+                    function refreshSiblings() {
+                        widgets.forEach(function (other) {
+                            if (other !== widget && other.dataset.listKey === 'spMembers' && other.__renderOptions) {
+                                other.__renderOptions(other.querySelector('.ar-multi-filter').value);
+                            }
+                        });
+                    }
+
+                    function renderChips() {
+                        chips.replaceChildren();
+                        selected.forEach(function (id) {
+                            var item = items.filter(function (o) { return String(o[idField]) === id; })[0];
+                            if (!item) { return; }
+                            var chip = document.createElement('span');
+                            chip.className = 'ar-multi-chip';
+                            var label = document.createElement('span');
+                            label.className = 'ar-multi-chip-label';
+                            label.textContent = String(item[nameField] || '');
+                            var remove = document.createElement('button');
+                            remove.type = 'button';
+                            remove.className = 'ar-multi-chip-remove';
+                            remove.setAttribute('aria-label', 'Remove ' + String(item[nameField] || 'selection'));
+                            remove.textContent = '\u00d7';
+                            remove.addEventListener('click', function (event) {
+                                event.stopPropagation();
+                                selected.delete(id);
+                                saveSelection();
+                                renderChips();
+                                renderOptions(filter.value);
+                                refreshSiblings();
+                                filter.focus();
+                            });
+                            chip.append(label, remove);
+                            chips.appendChild(chip);
+                        });
+                    }
+
+                    function renderOptions(query) {
+                        var q = String(query || '').trim().toLocaleLowerCase();
+                        options.replaceChildren();
+                        focusedIdx = -1;
+                        var matching = items.filter(function (item) {
+                            return String(item[nameField] || '').toLocaleLowerCase().indexOf(q) !== -1;
+                        });
+                        if (!matching.length) {
+                            var empty = document.createElement('div');
+                            empty.className = 'ar-multi-empty';
+                            empty.textContent = q ? 'No matching options' : 'No options available';
+                            options.appendChild(empty);
+                            return;
+                        }
+                        matching.forEach(function (item) {
+                            var id         = String(item[idField]);
+                            var isSelected = selected.has(id);
+                            var isBlocked  = assignedToOtherRole(id) && !isSelected;
+                            var option = document.createElement('button');
+                            option.type = 'button';
+                            option.className = 'ar-multi-option' + (isBlocked ? ' ar-option-disabled' : '');
+                            option.setAttribute('role', 'option');
+                            option.setAttribute('aria-selected', String(isSelected));
+                            option.disabled = isBlocked;
+                            var check = document.createElement('span');
+                            check.className = 'ar-multi-option-check';
+                            if (isSelected) { check.textContent = '\u2713'; }
+                            var label = document.createElement('span');
+                            label.textContent = String(item[nameField] || '') +
+                                (listKey === 'spMembers' && item.position ? ' \u2014 ' + item.position : '');
+                            option.append(check, label);
+                            option.addEventListener('click', function (event) {
+                                event.stopPropagation();
+                                if (isBlocked || assignedToOtherRole(id)) { return; }
+                                if (selected.has(id)) { selected.delete(id); } else { selected.add(id); }
+                                saveSelection();
+                                renderChips();
+                                renderOptions(filter.value);
+                                refreshSiblings();
+                                filter.focus();
+                            });
+                            options.appendChild(option);
+                        });
+                    }
+
+                    function focusOption(delta) {
+                        var opts = Array.prototype.slice.call(
+                            options.querySelectorAll('.ar-multi-option:not(:disabled)')
+                        );
+                        if (!opts.length) { return; }
+                        if (focusedIdx >= 0 && opts[focusedIdx]) {
+                            opts[focusedIdx].classList.remove('ar-option-focused');
+                        }
+                        focusedIdx += delta;
+                        if (focusedIdx < 0) { focusedIdx = opts.length - 1; }
+                        if (focusedIdx >= opts.length) { focusedIdx = 0; }
+                        opts[focusedIdx].classList.add('ar-option-focused');
+                        opts[focusedIdx].scrollIntoView({ block: 'nearest' });
+                    }
+
+                    function openDropdown() {
+                        dropdown.classList.remove('hidden');
+                        filter.setAttribute('aria-expanded', 'true');
+                        renderOptions(filter.value);
+                    }
+                    function closeDropdown() {
+                        dropdown.classList.add('hidden');
+                        filter.setAttribute('aria-expanded', 'false');
+                    }
+
+                    filter.addEventListener('focus', openDropdown);
+                    filter.addEventListener('input', function () { renderOptions(filter.value); });
+                    filter.addEventListener('keydown', function (event) {
+                        if (event.key === 'Escape') { closeDropdown(); return; }
+                        if (event.key === 'ArrowDown') { event.preventDefault(); focusOption(1); return; }
+                        if (event.key === 'ArrowUp')   { event.preventDefault(); focusOption(-1); return; }
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            var target = focusedIdx >= 0
+                                ? options.querySelectorAll('.ar-multi-option:not(:disabled)')[focusedIdx]
+                                : options.querySelector('.ar-multi-option:not(:disabled)');
+                            if (target) { target.click(); }
+                            return;
+                        }
+                        if (event.key === 'Backspace' && !filter.value && selected.size) {
+                            selected.delete(Array.from(selected).pop());
+                            saveSelection(); renderChips(); renderOptions(''); refreshSiblings();
+                        }
+                    });
+
+                    toggle.addEventListener('click', function (event) {
+                        event.stopPropagation();
+                        if (dropdown.classList.contains('hidden')) { filter.focus(); openDropdown(); }
+                        else { closeDropdown(); }
+                    });
+                    widget.querySelector('.ar-multi-control').addEventListener('click', function (event) {
+                        if (event.target !== toggle && !event.target.closest('.ar-multi-chip-remove')) {
+                            filter.focus();
+                        }
+                    });
+
+                    widget.__renderOptions = renderOptions;
+                    renderChips();
+                    renderOptions('');
+                }
+
+                // Close any open dropdown when clicking outside of it.
+                document.addEventListener('click', function (event) {
+                    document.querySelectorAll('.ar-multi-select .ar-multi-dropdown:not(.hidden)').forEach(function (dropdown) {
+                        var widget = dropdown.closest('.ar-multi-select');
+                        if (!widget.contains(event.target)) {
+                            dropdown.classList.add('hidden');
+                            var f = widget.querySelector('.ar-multi-filter');
+                            if (f) { f.setAttribute('aria-expanded', 'false'); }
+                        }
+                    });
+                });
+
+                // Emit hidden inputs using the field names the backend expects.
+                function serializeMultiSelects(form) {
+                    var post = form.querySelector('[data-ms-post]');
+                    if (!post) { return; }
+                    post.replaceChildren();
+                    form.querySelectorAll('.ar-multi-select').forEach(function (widget) {
+                        var name = widget.dataset.listKey === 'committees'
+                            ? 'committee_ids[]'
+                            : (widget.dataset.role === 'CO_AUTHOR' ? 'co_author_ids[]' : 'author_ids[]');
+                        JSON.parse(widget.dataset.selected || '[]').map(String).forEach(function (id) {
+                            var input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = name;
+                            input.value = id;
+                            post.appendChild(input);
+                        });
+                    });
+                }
+
+                var form = document.querySelector('[data-ms-processing-form]');
+                if (form) {
+                    form.querySelectorAll('.ar-multi-select').forEach(function (widget) {
+                        widgets.push(widget);
+                        initMultiSelect(widget);
+                    });
+                    form.addEventListener('submit', function () { serializeMultiSelects(form); });
+                }
+                })();
+                </script>
             </section>
         <?php else: ?>
             <!-- Processing form is locked — show current data read-only -->
@@ -611,7 +1006,7 @@ ob_start();
                         </svg>
                         <p class="text-sm text-gray-500 italic">
                             Plenary processing form is available only when the pre-decision status is
-                            <strong>"Under Processing"</strong>.
+                            <strong>"On Process"</strong>.
                         </p>
                     </div>
                     <?php require __DIR__ . '/../../partials/plenary-details.php'; ?>
@@ -632,11 +1027,11 @@ ob_start();
                 <input type="hidden" name="document_id" value="<?= $documentId ?>">
                 <input type="hidden" name="action"      value="return_to_admin">
                 <div>
-                    <label for="return_remarks" class="block text-sm font-medium text-red-800">
+                    <label for="return_remarks" class="block text-sm font-medium text-red-800 mb-1">
                         Reason <span class="text-red-500">*</span>
                     </label>
                     <textarea id="return_remarks" name="remarks" rows="2" required
-                              class="mt-1.5 w-full rounded-xl border border-red-200 bg-white py-2 px-3 text-sm
+                              class="w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-sm
                                      text-gray-800 placeholder-gray-400 focus:border-red-400 focus:outline-none
                                      focus:ring-2 focus:ring-red-400/20"
                               placeholder="Reason for returning to Admin…"></textarea>
@@ -655,12 +1050,12 @@ ob_start();
             </form>
         </section>
 
-    <?php endif; /* end $canProcess */ ?>
+    <?php endif; /* end $canEditPreDecision ($canProcess && !terminal) */ ?>
 
     <!-- ─────────────────────────────────────────────────────────────────── -->
     <!-- Section 6: Saved Plenary Details (read-only, shown to all owners)  -->
     <!-- ─────────────────────────────────────────────────────────────────── -->
-    <?php if (!$canProcess && $plenaryDetails): ?>
+    <?php if ((!$canProcess || $isTerminalOutcome) && $plenaryDetails): ?>
         <section class="rounded-2xl border border-indigo-100 bg-indigo-50 p-6">
             <h2 class="mb-4 text-base font-semibold text-indigo-900">Plenary Details (Saved)</h2>
             <?php require __DIR__ . '/../../partials/plenary-details.php'; ?>
@@ -726,15 +1121,18 @@ ob_start();
                         </svg>
                         <div class="flex-1 min-w-0">
                             <div class="text-sm font-medium text-gray-800 truncate">
-                                <?= htmlspecialchars($att['original_filename'] ?? $att['file_path'] ?? '') ?>
+                                <?= htmlspecialchars($att['file_name'] ?? '') ?>
                             </div>
                             <div class="text-xs text-gray-400">
                                 <?= htmlspecialchars($att['uploaded_by_username'] ?? '') ?>
                                 — <?= htmlspecialchars(date('M j, Y g:i A', strtotime($att['created_at']))) ?>
+                                <?php if (!empty($att['attachment_type'])): ?>
+                                    — <span class="font-medium"><?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $att['attachment_type'])))) ?></span>
+                                <?php endif; ?>
                             </div>
                         </div>
-                        <?php if (!empty($att['file_path'])): ?>
-                            <a href="<?= BASE_URL ?>/<?= htmlspecialchars(ltrim($att['file_path'], '/')) ?>"
+                        <?php if (!empty($att['stored_path'])): ?>
+                            <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars(ltrim($att['stored_path'], '/')) ?>"
                                target="_blank" rel="noopener"
                                class="shrink-0 rounded-lg border border-gray-200 px-2.5 py-1 text-xs
                                       font-medium text-gray-600 hover:bg-gray-50 transition">

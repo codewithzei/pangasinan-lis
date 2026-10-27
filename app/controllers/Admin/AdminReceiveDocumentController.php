@@ -105,19 +105,12 @@ class AdminReceiveDocumentController
             }
         }
 
-        // If Noted (id=6) is selected, communication category is required
+        // Noted (id=6) is available for every document type. A communication
+        // category is required only for Communication documents; every other
+        // type must not carry one, so a stray value is discarded here (and
+        // again in DocumentService) rather than persisted.
         if ($routingOptionId === 6) {
-            if ($communicationCategoryId <= 0) {
-                $errors[] = 'Communication Category is required when routing option is Noted.';
-            } else {
-                $validCategories = array_column($this->docService->getCommunicationCategories(), 'id');
-                if (!in_array($communicationCategoryId, array_map('intval', $validCategories), true)) {
-                    $errors[] = 'Invalid communication category selected.';
-                }
-            }
-
-            // Verify document type is Communication
-            $docType = $this->docService->getDocumentTypes();
+            $docType         = $this->docService->getDocumentTypes();
             $selectedDocType = null;
             foreach ($docType as $dt) {
                 if ((int) $dt['id'] === (int) $data['document_type_id']) {
@@ -125,8 +118,22 @@ class AdminReceiveDocumentController
                     break;
                 }
             }
-            if (!$selectedDocType || $selectedDocType['name'] !== 'Communication') {
-                $errors[] = 'The Noted routing option is only available for Communication documents.';
+
+            $isCommunicationDoc = $selectedDocType
+                && stripos((string) $selectedDocType['name'], 'communication') !== false;
+
+            if ($isCommunicationDoc) {
+                if ($communicationCategoryId <= 0) {
+                    $errors[] = 'Communication Category is required when marking a Communication document as Noted.';
+                } else {
+                    $validCategories = array_column($this->docService->getCommunicationCategories(), 'id');
+                    if (!in_array($communicationCategoryId, array_map('intval', $validCategories), true)) {
+                        $errors[] = 'Invalid communication category selected.';
+                    }
+                }
+            } else {
+                // Non-Communication documents do not accept a communication category.
+                $communicationCategoryId = 0;
             }
         }
 
@@ -170,7 +177,18 @@ class AdminReceiveDocumentController
                 'user_id' => $userId,
                 'trace'   => $e->getTraceAsString(),
             ]);
-            flash_set('error', 'Failed to submit document. Please try again.');
+
+            // Provide more specific error message based on the exception
+            $errorMessage = 'Failed to submit document. Please try again.';
+            if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                $errorMessage = 'Failed to submit document due to a tracking number conflict. Please try again.';
+            } elseif (strpos($e->getMessage(), 'constraint') !== false) {
+                $errorMessage = 'Failed to submit document due to a data validation error. Please check your inputs and try again.';
+            } elseif (strpos($e->getMessage(), 'move_uploaded_file') !== false) {
+                $errorMessage = 'Failed to upload file. Please check file permissions and try again.';
+            }
+
+            flash_set('error', $errorMessage);
             redirect('admin/receive-document');
         }
     }

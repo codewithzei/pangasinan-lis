@@ -51,7 +51,7 @@ class DocumentStatusSeeder extends Seeder
                 'updated_at' => date('Y-m-d H:i:s'),
             ],
             [
-                'name' => 'Under Processing',
+                'name' => 'On Process',
                 'description' => 'Currently being processed',
                 'badge_color' => '#3B82F6', // Blue
                 'sort_order' => 6,

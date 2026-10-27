@@ -737,8 +737,14 @@ ob_start();
 
                 <!-- ═══════════════════════════════════════════════════════════
                      SECTION B — ACCEPTED (owned by me): post-accept actions
-                     Return to Admin.
+                       • Communication  → Proceed to Communications + Return
+                       • everything else → Proceed to Endorsement + Return to Admin
                 ════════════════════════════════════════════════════════════ -->
+                <?php
+                $isCommEligibleType = $isCommEligibleType ?? false;
+                $showProceedToComms = $showProceedToComms ?? false;
+                $existingComm       = $existingComm       ?? null;
+                ?>
                 <?php if ($canProcess): ?>
                     <div class="rounded-2xl border border-gray-200 bg-white p-6">
                         <div class="mb-5 flex items-center gap-2">
@@ -778,6 +784,61 @@ ob_start();
                             <!-- Action buttons ---------------------------->
                             <div class="space-y-2">
 
+                            <?php if ($isCommEligibleType): ?>
+                                <?php /* Communication documents: only the Communications
+                                         hand-off and the return to the real origin. */ ?>
+
+                                <?php if ($showProceedToComms): ?>
+                                    <button type="button" data-action="proceed_to_communications"
+                                            class="action-btn w-full inline-flex items-center justify-center gap-2
+                                                   rounded-xl bg-teal-600 px-4 py-2.5 text-sm
+                                                   font-semibold text-white hover:bg-teal-700 transition">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                        </svg>
+                                        Proceed to Communications
+                                    </button>
+                                <?php endif; ?>
+
+                                <!-- Return to Origin — label derived from the actual routing history.
+                                     The server resolves the same origin at POST time via resolveOrigin().
+                                     The destination shown here always matches what the server will use. -->
+                                <?php if ($returnOriginLabel !== null): ?>
+                                    <button type="button" data-action="return_to_origin"
+                                            class="action-btn w-full inline-flex items-center justify-center gap-2
+                                                   rounded-xl border border-red-300 bg-red-50 px-4 py-2.5 text-sm
+                                                   font-semibold text-red-700 hover:bg-red-100 transition">
+                                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                                        </svg>
+                                        Return to <?= htmlspecialchars($returnOriginLabel) ?>
+                                    </button>
+                                    <?php if ($returnOriginSenderName !== null): ?>
+                                        <p class="text-xs text-gray-400 text-center -mt-1">
+                                            Sender: <?= htmlspecialchars($returnOriginSenderName) ?>
+                                        </p>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <!-- Origin cannot be determined — disable the action and explain why. -->
+                                    <button type="button" disabled
+                                            class="w-full inline-flex items-center justify-center gap-2
+                                                   rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm
+                                                   font-semibold text-gray-400 cursor-not-allowed"
+                                            title="<?= htmlspecialchars($returnOriginError ?? 'Origin could not be determined.') ?>">
+                                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                                        </svg>
+                                        Return (origin unknown)
+                                    </button>
+                                    <p class="text-xs text-red-500 leading-snug mt-1">
+                                        <?= htmlspecialchars($returnOriginError ?? 'The originating office could not be determined from the routing history. Contact the System Administrator.') ?>
+                                    </p>
+                                <?php endif; ?>
+
+                            <?php else: ?>
                                 <!-- Proceed to Endorsement (Referred) -->
                                 <button type="button" data-action="endorse"
                                         class="action-btn w-full inline-flex items-center justify-center gap-2
@@ -811,6 +872,7 @@ ob_start();
                                     </svg>
                                     Return to Admin
                                 </button>
+                            <?php endif; ?>
 
                             </div><!-- /action buttons -->
                         </form>
@@ -897,49 +959,12 @@ ob_start();
                 <?php endif; ?>
 
                 <!-- ═══════════════════════════════════════════════════════════
-                     SECTION B3 — Proceed to Communications button
-                     Shown only when:
-                       • Document type is "Communication"
-                       • This user owns the accepted assignment
-                       • No communication record exists yet
-                     Also shows a read-only link when a record already exists.
+                     SECTION B3 — Communication record already logged
+                     The "Proceed to Communications" action lives in SECTION B
+                     (it is the actionable hand-off). This block only provides a
+                     read-only link to the existing Communication record.
                 ════════════════════════════════════════════════════════════ -->
-                <?php
-                $showProceedToComms = $showProceedToComms ?? false;
-                $existingComm       = $existingComm       ?? null;
-                ?>
-                <?php if ($showProceedToComms): ?>
-                    <div class="rounded-2xl border border-teal-200 bg-teal-50 p-6">
-                        <div class="mb-4 flex items-center gap-2">
-                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-100">
-                                <svg class="h-5 w-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0
-                                             002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-teal-600">
-                                    Communications Workflow
-                                </p>
-                                <p class="text-sm font-semibold text-teal-900">Ready to Log</p>
-                            </div>
-                        </div>
-                        <p class="mb-4 text-xs text-teal-700 leading-relaxed">
-                            This document is classified as a Communication. No record has been created yet.
-                            Create one to begin the agenda, hearing, and report workflow.
-                        </p>
-                        <a href="<?= BASE_URL ?>/committee/communications/create?document_id=<?= $documentId ?>"
-                           class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600
-                                  px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M12 4v16m8-8H4"/>
-                            </svg>
-                            Proceed to Communications
-                        </a>
-                    </div>
-                <?php elseif ($existingComm !== null && $canProcess): ?>
+                <?php if ($existingComm !== null && $canProcess): ?>
                     <!-- Communication already exists — show link to record -->
                     <div class="rounded-2xl border border-teal-200 bg-teal-50 p-6">
                         <div class="mb-3 flex items-center gap-2">
@@ -1126,7 +1151,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const actionLabels = {
         'return_to_admin': 'Return this document to Admin? A reason is required.',
         'endorse': 'Proceed to Endorsement? This will mark the document as Referred. Remarks are required and this action cannot be undone.',
+        'proceed_to_communications': 'Proceed to Communications? This will open the Communications workflow for this document and remove it from your Committee Inbox.',
+        'return_to_origin': 'Return this document to the office that sent it to Committee? A reason is required.',
     };
+
+    // Actions that require remarks (enforced again server-side).
+    const remarksRequiredActions = ['return_to_admin', 'endorse', 'return_to_origin'];
 
     let pendingAction = null;
 
@@ -1134,8 +1164,8 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.addEventListener('click', function () {
             pendingAction = this.dataset.action;
 
-            // Client-side guard: both actions require remarks
-            const requiresRemarks = pendingAction === 'return_to_admin' || pendingAction === 'endorse';
+            // Client-side guard: these actions require remarks
+            const requiresRemarks = remarksRequiredActions.indexOf(pendingAction) !== -1;
             if (requiresRemarks && remarksEl && remarksEl.value.trim() === '') {
                 remarksEl.classList.add('border-red-400');
                 if (remarksHelp) remarksHelp.classList.remove('hidden');
@@ -1169,6 +1199,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (pendingAction === 'endorse' && remarksEl && remarksEl.value.trim() === '') {
+                closeModal();
+                remarksEl.classList.add('border-red-400');
+                if (remarksHint) remarksHint.classList.remove('hidden');
+                remarksEl.focus();
+                return;
+            }
+
+            if (pendingAction === 'return_to_origin' && remarksEl && remarksEl.value.trim() === '') {
                 closeModal();
                 remarksEl.classList.add('border-red-400');
                 if (remarksHint) remarksHint.classList.remove('hidden');

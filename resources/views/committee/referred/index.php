@@ -421,22 +421,19 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                     <?php else: ?>
                         <?php foreach ($documents as $doc): ?>
                             <?php
-                            $endorsements   = $doc['endorsements']   ?? [];
-                            $totalOffices   = (int) ($doc['total_offices']   ?? 0);
-                            $submittedCount = (int) ($doc['submitted_count'] ?? 0);
-                            $stColor        = htmlspecialchars($doc['status_badge_color'] ?? '#6B7280');
+                            // Per-office review state, collapsed to the highest
+                            // endorsement number per office by the controller.
+                            $progress      = $doc['progress'] ?? [];
+                            $officeMap     = $progress['offices'] ?? [];
+                            $totalOffices  = (int) ($progress['total'] ?? 0);
+                            // Progress advances on *cleared* (Favorable) offices only.
+                            // An Unfavorable opinion — awaiting its second endorsement
+                            // or moved to Resolve — never advances the indicator.
+                            $clearedCount  = (int) ($progress['cleared'] ?? 0);
+                            $stColor       = htmlspecialchars($doc['status_badge_color'] ?? '#6B7280');
 
-                            // Keep highest endorsement number per office
-                            $officeMap = [];
-                            foreach ($endorsements as $end) {
-                                $oid = (int) $end['opinion_office_id'];
-                                $num = (int) ($end['endorsement_number'] ?? 1);
-                                if (!isset($officeMap[$oid]) || $num > (int) $officeMap[$oid]['endorsement_number']) {
-                                    $officeMap[$oid] = $end;
-                                }
-                            }
-                            $progressPct   = $totalOffices > 0 ? round(($submittedCount / $totalOffices) * 100) : 0;
-                            $allSubmitted  = $totalOffices > 0 && $submittedCount >= $totalOffices;
+                            $progressPct   = $totalOffices > 0 ? round(($clearedCount / $totalOffices) * 100) : 0;
+                            $allCleared    = $totalOffices > 0 && $clearedCount >= $totalOffices;
                             ?>
                             <tr class="hover:bg-gray-50/50 transition align-top">
 
@@ -491,11 +488,23 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                                 $endNum    = (int) ($end['endorsement_number'] ?? 1);
                                                 $endId     = (int) ($end['endorsement_id']     ?? 0);
                                                 $opType    = $end['opinion_type'] ?? null;
+                                                $isCleared = !empty($end['cleared']);
+                                                $awaiting  = !empty($end['awaiting_second_endorsement']);
+                                                $pending   = $end['pending_action'] ?? null;
 
-                                                [$chipBg, $chipText, $resultLabel] = match($opType) {
-                                                    'FAVORABLE'   => ['bg-emerald-50 border-emerald-200', 'text-emerald-700', 'Favorable'],
-                                                    'UNFAVORABLE' => ['bg-red-50 border-red-200',         'text-red-700',     'Unfavorable'],
-                                                    default       => ['bg-gray-50 border-gray-200',        'text-gray-600',    'Pending'],
+                                                // The opinion_statuses row is the source of truth
+                                                // for the label — never a derived free-text value.
+                                                $statusLabel = trim((string) ($end['opinion_status_name'] ?? '')) ?: match($opType) {
+                                                    'FAVORABLE'   => 'Favorable',
+                                                    'UNFAVORABLE' => 'Unfavorable',
+                                                    default       => 'Pending',
+                                                };
+
+                                                [$chipBg, $chipText] = match(true) {
+                                                    $awaiting                => ['bg-amber-50 border-amber-200',    'text-amber-700'],
+                                                    $isCleared               => ['bg-emerald-50 border-emerald-200','text-emerald-700'],
+                                                    $opType === 'UNFAVORABLE' => ['bg-red-50 border-red-200',      'text-red-700'],
+                                                    default                  => ['bg-gray-50 border-gray-200',     'text-gray-600'],
                                                 };
                                             ?>
                                                 <div class="inline-flex items-center gap-1 rounded-lg border
@@ -507,12 +516,18 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                                                      font-bold text-amber-700 leading-tight">#2</span>
                                                     <?php endif; ?>
                                                     <span class="text-gray-300">·</span>
-                                                    <span><?= $resultLabel ?></span>
-                                                    <?php if ($opType === null && $endId > 0): ?>
+                                                    <span><?= htmlspecialchars($statusLabel) ?></span>
+                                                    <?php if ($pending === 'SUBMIT_OPINION' && $endId > 0): ?>
                                                         <span class="text-gray-300">·</span>
                                                         <a href="<?= BASE_URL ?>/committee/referred/opinion?endorsement_id=<?= $endId ?>"
                                                            class="font-medium underline underline-offset-1 hover:opacity-70 transition">
                                                             Submit
+                                                        </a>
+                                                    <?php elseif ($pending === 'SECOND_ENDORSEMENT' && $endId > 0): ?>
+                                                        <span class="text-gray-300">·</span>
+                                                        <a href="<?= BASE_URL ?>/committee/referred/opinion?endorsement_id=<?= $endId ?>"
+                                                           class="font-medium underline underline-offset-1 hover:opacity-70 transition">
+                                                            Review
                                                         </a>
                                                     <?php endif; ?>
                                                 </div>
@@ -525,11 +540,11 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                 <td class="px-6 py-4 text-center">
                                     <div class="flex flex-col items-center gap-1.5">
                                         <span class="text-xs font-medium text-gray-700">
-                                            <?= $submittedCount ?>/<?= $totalOffices ?>
+                                            <?= $clearedCount ?>/<?= $totalOffices ?>
                                         </span>
                                         <div class="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200">
                                             <div class="h-full rounded-full transition-all
-                                                        <?= $allSubmitted ? 'bg-emerald-500' : 'bg-primary' ?>"
+                                                        <?= $allCleared ? 'bg-emerald-500' : 'bg-primary' ?>"
                                                  style="width:<?= $progressPct ?>%"></div>
                                         </div>
                                     </div>

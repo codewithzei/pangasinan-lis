@@ -159,7 +159,17 @@ class RouteDocumentController
                 'trace'      => $e->getTraceAsString(),
             ]);
 
-            flash_set('error', 'Failed to submit document. Please try again.');
+            // Provide more specific error message based on the exception
+            $errorMessage = 'Failed to submit document. Please try again.';
+            if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                $errorMessage = 'Failed to submit document due to a tracking number conflict. Please try again.';
+            } elseif (strpos($e->getMessage(), 'constraint') !== false) {
+                $errorMessage = 'Failed to submit document due to a data validation error. Please check your inputs and try again.';
+            } elseif (strpos($e->getMessage(), 'move_uploaded_file') !== false) {
+                $errorMessage = 'Failed to upload file. Please check file permissions and try again.';
+            }
+
+            flash_set('error', $errorMessage);
             redirect('receiving/receive-document');
         }
     }

@@ -3,19 +3,23 @@
  * Committee — Create Committee Report
  *
  * Variables supplied by CommitteeHearingController::reportShow():
- *   $document          array   Full document row
- *   $hearing           array   committee_hearings row
- *   $agendaCommittees  array   [{id, name}] committees from the agenda
- *   $reportType        string  'COMMITTEE_REPORT' | 'JOINT_COMMITTEE_REPORT' (auto-derived)
- *   $success           string|null
- *   $error             string|null
- *   $errors            array
+ *   $document              array   Full document row
+ *   $hearing               array   committee_hearings row
+ *   $agendaCommittees      array   [{id, name}] all active committees (selectable options)
+ *   $agendaCommitteeIds    array   int[] pre-selected IDs (agenda + document assignments)
+ *   $effectiveCommitteeIds array   int[] resolved selection (old input on validation error, else defaults)
+ *   $reportType            string  'COMMITTEE_REPORT' | 'JOINT_COMMITTEE_REPORT' (auto-derived)
+ *   $success               string|null
+ *   $error                 string|null
+ *   $errors                array
  */
 
-$document         = $document         ?? [];
-$hearing          = $hearing          ?? [];
-$agendaCommittees = $agendaCommittees ?? [];
-$reportType       = $reportType       ?? 'COMMITTEE_REPORT';
+$document              = $document              ?? [];
+$hearing               = $hearing               ?? [];
+$agendaCommittees      = $agendaCommittees      ?? [];
+$agendaCommitteeIds    = $agendaCommitteeIds    ?? [];
+$effectiveCommitteeIds = $effectiveCommitteeIds ?? $agendaCommitteeIds;
+$reportType            = $reportType            ?? 'COMMITTEE_REPORT';
 
 $documentId = (int) ($document['id']   ?? 0);
 $hearingId  = (int) ($hearing['id']    ?? 0);
@@ -24,8 +28,10 @@ $agendaId   = (int) ($hearing['agenda_id'] ?? 0);
 $isJoint      = $reportType === 'JOINT_COMMITTEE_REPORT';
 $reportTypeLabel = $isJoint ? 'Joint Committee Report' : 'Committee Report';
 
-// Repopulate from old input
-$oldCommitteeIds = old_get()['committee_ids'] ?? array_column($agendaCommittees, 'id');
+// Repopulate from old input on validation failure; otherwise keep the
+// pre-selected committees (agenda + document assignments) checked so
+// existing assignments are preserved until the user unchecks them.
+$oldCommitteeIds = array_map('intval', (array) $effectiveCommitteeIds);
 
 ob_start();
 ?>
@@ -135,7 +141,8 @@ ob_start();
                             Committee in Charge <span class="text-red-500">*</span>
                         </p>
                         <p class="text-xs text-gray-400 mb-2" id="committeeDesc">
-                            Pre-populated from the agenda. Selecting multiple committees produces a
+                            Pre-populated with the document's assigned committees.
+                            Selecting multiple committees produces a
                             <strong>Joint Committee Report</strong>.
                         </p>
                         <p id="committeeError" class="mb-2 hidden text-xs font-medium text-red-600">
@@ -143,10 +150,10 @@ ob_start();
                         </p>
                         <?php if (empty($agendaCommittees)): ?>
                             <p class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-                                No committees found for this agenda.
+                                No active committees found. Please contact the system administrator.
                             </p>
                         <?php else: ?>
-                            <div class="rounded-xl border border-gray-200 p-3 space-y-2">
+                            <div class="max-h-52 overflow-y-auto rounded-xl border border-gray-200 p-3 space-y-1">
                                 <?php foreach ($agendaCommittees as $comm): ?>
                                     <?php $isSelected = in_array((int) $comm['id'], array_map('intval', $oldCommitteeIds), true); ?>
                                     <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5

@@ -609,16 +609,21 @@ class SpsecInboxController
                                 BASE_URL . "/admin/inbox/show?id={$notificationData['documentId']}"
                             );
                         }
-                        // Noted notifications — notify the document creator
-                        elseif (isset($notificationData['categoryName'])) {
+                        // Noted notifications — notify the document creator.
+                        // 'isNoted' is set for every document type; 'categoryName'
+                        // is only present for Communication documents.
+                        elseif (!empty($notificationData['isNoted'])) {
                             if ($notificationData['createdBy'] > 0) {
+                                $categorySuffix = !empty($notificationData['categoryName'])
+                                    ? " (Category: {$notificationData['categoryName']})"
+                                    : '';
                                 $this->docService->notifyUser(
                                     $notificationData['createdBy'],
                                     $notificationData['documentId'],
                                     $notificationData['userId'],
                                     'DOCUMENT_FINALIZED',
                                     "Document Noted: {$notificationData['trackingNumber']}",
-                                    "Document {$notificationData['trackingNumber']} has been marked as Noted (Category: {$notificationData['categoryName']}).",
+                                    "Document {$notificationData['trackingNumber']} has been marked as Noted{$categorySuffix}.",
                                     BASE_URL . "/spsec/routed/show?id={$notificationData['documentId']}"
                                 );
                             }
@@ -1258,7 +1263,11 @@ class SpsecInboxController
     }
 
     /**
-     * Mark the document as NOTED (Communication documents only).
+     * Mark the document as NOTED.
+     *
+     * Available for every document type. Communication documents additionally
+     * require a communication category, which is persisted on the document;
+     * for all other document types the category is ignored (never persisted).
      *
      * accepted_by and accepted_at are preserved so history retains who
      * owned the document when it was noted.
@@ -1274,24 +1283,28 @@ class SpsecInboxController
         string $remarks,
         int    $communicationCategoryId
     ): array {
-        // Server-side: verify document is Communication type
-        if (!$this->isCommunicationDocument($document['document_type_name'] ?? '')) {
-            throw new InvalidArgumentException(
-                'The NOTED action is only available for Communication documents.'
-            );
-        }
+        // Communication documents require a category; every other document
+        // type must not carry one. Enforced server-side (not just in the UI).
+        $isCommunication = $this->isCommunicationDocument($document['document_type_name'] ?? '');
+        $categoryName    = null;
 
-        if ($communicationCategoryId <= 0) {
-            throw new InvalidArgumentException('A communication category is required for the NOTED action.');
-        }
-        $catStmt = $this->pdo->prepare(
-            "SELECT id, name FROM communication_categories
-              WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
-        );
-        $catStmt->execute([$communicationCategoryId]);
-        $category = $catStmt->fetch();
-        if (!$category) {
-            throw new InvalidArgumentException('Invalid or inactive communication category selected.');
+        if ($isCommunication) {
+            if ($communicationCategoryId <= 0) {
+                throw new InvalidArgumentException('A communication category is required for the NOTED action.');
+            }
+            $catStmt = $this->pdo->prepare(
+                "SELECT id, name FROM communication_categories
+                  WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+            );
+            $catStmt->execute([$communicationCategoryId]);
+            $category = $catStmt->fetch();
+            if (!$category) {
+                throw new InvalidArgumentException('Invalid or inactive communication category selected.');
+            }
+            $categoryName = $category['name'];
+        } else {
+            // Non-Communication documents do not accept a communication category.
+            $communicationCategoryId = 0;
         }
 
         // Snapshot revision
@@ -1338,7 +1351,12 @@ class SpsecInboxController
                 current_owner_user_id     = NULL,
                 updated_by                = ?
             WHERE id = ?
-        ")->execute([$communicationCategoryId, $notedStatusId, $userId, $documentId]);
+        ")->execute([
+            $isCommunication ? $communicationCategoryId : null,
+            $notedStatusId,
+            $userId,
+            $documentId,
+        ]);
 
         // Mark assignment NOTED — accepted_by/accepted_at preserved
         $stmt = $this->pdo->prepare("
@@ -1382,7 +1400,9 @@ class SpsecInboxController
             $notedRoId,
             $userId,
             $spsecRoleId,
-            'Marked as Noted — Communication category: ' . $category['name'],
+            $categoryName !== null
+                ? 'Marked as Noted — Communication category: ' . $categoryName
+                : 'Marked as Noted.',
         ]);
 
         // Workflow event
@@ -1396,12 +1416,16 @@ class SpsecInboxController
             $userId,
             $currentStatusId,
             $notedStatusId,
-            $remarks ?: "Document noted. Category: {$category['name']}.",
-            json_encode([
-                'communication_category_id'   => $communicationCategoryId,
-                'communication_category_name' => $category['name'],
-                'ip_address'                  => client_ip(),
-            ]),
+            $remarks ?: ($categoryName !== null
+                ? "Document noted. Category: {$categoryName}."
+                : 'Document noted.'),
+            json_encode(array_merge(
+                ['ip_address' => client_ip()],
+                $categoryName !== null ? [
+                    'communication_category_id'   => $communicationCategoryId,
+                    'communication_category_name' => $categoryName,
+                ] : []
+            )),
         ]);
 
         // audit_log() deliberately omitted (open transaction) — process() writes after commit.
@@ -1412,14 +1436,15 @@ class SpsecInboxController
             'documentId'     => $documentId,
             'userId'         => $userId,
             'trackingNumber' => $document['tracking_number'],
-            'categoryName'   => $category['name'],
+            'isNoted'        => true,
+            'categoryName'   => $categoryName,
             'auditData'      => [
                 'action'                      => 'spsec_noted',
                 'assignment_id'               => $assignmentId,
                 'document_id'                 => $documentId,
                 'accepted_by'                 => $userId,
-                'communication_category_id'   => $communicationCategoryId,
-                'communication_category_name' => $category['name'],
+                'communication_category_id'   => $isCommunication ? $communicationCategoryId : null,
+                'communication_category_name' => $categoryName,
             ],
             'auditDescription' => "SP Secretary noted document ID {$documentId}",
         ];

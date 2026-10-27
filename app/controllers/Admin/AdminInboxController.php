@@ -535,9 +535,15 @@ class AdminInboxController
 
                 $assignmentId = (int) $assignment['id'];
 
-                // Plain read — no FOR UPDATE needed
+                // Plain read — no FOR UPDATE needed.
+                // Join document_types so doNoted() can tell Communication
+                // documents (which require a category) from all other types.
                 $docStmt = $this->pdo->prepare("
-                    SELECT * FROM documents WHERE id = ? LIMIT 1
+                    SELECT d.*, dt.name AS document_type_name
+                    FROM documents d
+                    LEFT JOIN document_types dt ON d.document_type_id = dt.id
+                    WHERE d.id = ?
+                    LIMIT 1
                 ");
                 $docStmt->execute([$documentId]);
                 $document = $docStmt->fetch();
@@ -651,16 +657,21 @@ class AdminInboxController
                                 BASE_URL . "/receiving/routed-documents/show?id={$notificationData['documentId']}"
                             );
                         }
-                        // Noted notifications
-                        elseif (isset($notificationData['categoryName'])) {
+                        // Noted notifications — notify the document creator.
+                        // 'isNoted' is set for every document type; 'categoryName'
+                        // is only present for Communication documents.
+                        elseif (!empty($notificationData['isNoted'])) {
                             if ($notificationData['createdBy'] > 0) {
+                                $categorySuffix = !empty($notificationData['categoryName'])
+                                    ? " (Category: {$notificationData['categoryName']})"
+                                    : '';
                                 $this->docService->notifyUser(
                                     $notificationData['createdBy'],
                                     $notificationData['documentId'],
                                     $notificationData['userId'],
                                     'DOCUMENT_FINALIZED',
                                     "Document Noted: {$notificationData['trackingNumber']}",
-                                    "Document {$notificationData['trackingNumber']} has been marked as Noted (Category: {$notificationData['categoryName']}).",
+                                    "Document {$notificationData['trackingNumber']} has been marked as Noted{$categorySuffix}.",
                                     BASE_URL . "/receiving/routed-documents/show?id={$notificationData['documentId']}"
                                 );
                             }
@@ -1298,7 +1309,11 @@ class AdminInboxController
     }
 
     /**
-     * Mark the document as NOTED (Communication documents only).
+     * Mark the document as NOTED.
+     *
+     * Available for every document type. Communication documents additionally
+     * require a communication category, which is persisted on the document;
+     * for all other document types the category is ignored (never persisted).
      *
      * accepted_by and accepted_at are preserved so history retains who
      * owned the document when it was noted.
@@ -1314,24 +1329,28 @@ class AdminInboxController
         string $remarks,
         int    $communicationCategoryId
     ): array {
-        // Server-side: verify document is Communication type
-        if (!$this->isCommunicationDocument($document['document_type_name'] ?? '')) {
-            throw new InvalidArgumentException(
-                'The NOTED action is only available for Communication documents.'
-            );
-        }
+        // Communication documents require a category; every other document
+        // type must not carry one. Enforced server-side (not just in the UI).
+        $isCommunication = $this->isCommunicationDocument($document['document_type_name'] ?? '');
+        $categoryName    = null;
 
-        if ($communicationCategoryId <= 0) {
-            throw new InvalidArgumentException('A communication category is required for the NOTED action.');
-        }
-        $catStmt = $this->pdo->prepare(
-            "SELECT id, name FROM communication_categories
-              WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
-        );
-        $catStmt->execute([$communicationCategoryId]);
-        $category = $catStmt->fetch();
-        if (!$category) {
-            throw new InvalidArgumentException('Invalid or inactive communication category selected.');
+        if ($isCommunication) {
+            if ($communicationCategoryId <= 0) {
+                throw new InvalidArgumentException('A communication category is required for the NOTED action.');
+            }
+            $catStmt = $this->pdo->prepare(
+                "SELECT id, name FROM communication_categories
+                  WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+            );
+            $catStmt->execute([$communicationCategoryId]);
+            $category = $catStmt->fetch();
+            if (!$category) {
+                throw new InvalidArgumentException('Invalid or inactive communication category selected.');
+            }
+            $categoryName = $category['name'];
+        } else {
+            // Non-Communication documents do not accept a communication category.
+            $communicationCategoryId = 0;
         }
 
         // Snapshot
@@ -1377,7 +1396,12 @@ class AdminInboxController
                 current_owner_user_id     = NULL,
                 updated_by                = ?
             WHERE id = ?
-        ")->execute([$communicationCategoryId, $notedStatusId, $userId, $documentId]);
+        ")->execute([
+            $isCommunication ? $communicationCategoryId : null,
+            $notedStatusId,
+            $userId,
+            $documentId,
+        ]);
 
         // Mark NOTED — accepted_by/accepted_at preserved; ownership guard in WHERE
         $stmt = $this->pdo->prepare("
@@ -1404,16 +1428,26 @@ class AdminInboxController
         )->fetch();
         $adminRoleId = $adminRole ? (int) $adminRole['id'] : null;
 
+        // Resolve the 'Noted' routing option so the route record matches the
+        // SP Secretary workflow and the intake (receiveDocument) workflow.
+        $notedRo   = $this->pdo->query(
+            "SELECT id FROM routing_options WHERE name = 'Noted' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+        )->fetch();
+        $notedRoId = $notedRo ? (int) $notedRo['id'] : null;
+
         $this->pdo->prepare("
             INSERT INTO document_routes (
                 document_id, from_phase, to_phase,
-                routed_by, routed_to_role_id, remarks
-            ) VALUES (?, 'ADMIN', 'ADMIN', ?, ?, ?)
+                routing_option_id, routed_by, routed_to_role_id, remarks
+            ) VALUES (?, 'ADMIN', 'ADMIN', ?, ?, ?, ?)
         ")->execute([
             $documentId,
+            $notedRoId,
             $userId,
             $adminRoleId,
-            'Marked as Noted — Communication category: ' . $category['name'],
+            $categoryName !== null
+                ? 'Marked as Noted — Communication category: ' . $categoryName
+                : 'Marked as Noted.',
         ]);
 
         // Workflow event
@@ -1427,12 +1461,16 @@ class AdminInboxController
             $userId,
             $currentStatusId,
             $notedStatusId,
-            $remarks ?: "Document noted. Category: {$category['name']}.",
-            json_encode([
-                'communication_category_id'   => $communicationCategoryId,
-                'communication_category_name' => $category['name'],
-                'ip_address'                  => client_ip(),
-            ]),
+            $remarks ?: ($categoryName !== null
+                ? "Document noted. Category: {$categoryName}."
+                : 'Document noted.'),
+            json_encode(array_merge(
+                ['ip_address' => client_ip()],
+                $categoryName !== null ? [
+                    'communication_category_id'   => $communicationCategoryId,
+                    'communication_category_name' => $categoryName,
+                ] : []
+            )),
         ]);
 
         // audit_log() deliberately omitted (open transaction) — process() writes after commit.
@@ -1443,14 +1481,15 @@ class AdminInboxController
             'documentId'     => $documentId,
             'userId'         => $userId,
             'trackingNumber' => $document['tracking_number'],
-            'categoryName'   => $category['name'],
+            'isNoted'        => true,
+            'categoryName'   => $categoryName,
             'auditData'      => [
                 'action'                      => 'admin_noted',
                 'assignment_id'               => $assignmentId,
                 'document_id'                 => $documentId,
                 'accepted_by'                 => $userId,
-                'communication_category_id'   => $communicationCategoryId,
-                'communication_category_name' => $category['name'],
+                'communication_category_id'   => $isCommunication ? $communicationCategoryId : null,
+                'communication_category_name' => $categoryName,
             ],
             'auditDescription' => "Admin noted document ID {$documentId}",
         ];

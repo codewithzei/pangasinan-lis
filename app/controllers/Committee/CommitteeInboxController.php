@@ -44,6 +44,70 @@ class CommitteeInboxController
         'accept',
         'return_to_admin',
         'endorse',
+        'proceed_to_communications',
+        'return_to_origin',
+    ];
+
+    /** Document type name that owns the Communications sub-workflow. */
+    private const COMMUNICATION_TYPE = 'Communication';
+
+    /** Action keys that may only be used on Communication documents. */
+    private const COMMUNICATION_ONLY_ACTIONS = [
+        'proceed_to_communications',
+        'return_to_origin',
+    ];
+
+    /**
+     * The complete set of actions a Communication document may use.
+     * Anything else (endorse / return_to_admin) is rejected server-side so the
+     * UI restriction cannot be bypassed with a crafted POST.
+     */
+    private const COMMUNICATION_ALLOWED_ACTIONS = [
+        'accept',
+        'proceed_to_communications',
+        'return_to_origin',
+    ];
+
+    /**
+     * Phase → role name map used to resolve where a returned document goes.
+     * A document can only be returned to a phase that has an inbox; the
+     * terminal phases (FINALIZED / FILED) and an internal COMMITTEE handoff
+     * are deliberately excluded so an undeterminable origin fails loudly
+     * instead of silently falling back to Admin.
+     */
+    private const PHASE_ROLE_MAP = [
+        'RECEIVING'    => 'Receiving Staff',
+        'ADMIN'        => 'Admin',
+        'SP_SECRETARY' => 'SP Secretary',
+        'PLENARY'      => 'Plenary',
+    ];
+
+    /** Human-readable phase labels used in remarks / messages. */
+    private const PHASE_LABELS = [
+        'RECEIVING'    => 'Receiving',
+        'ADMIN'        => 'Admin',
+        'SP_SECRETARY' => 'SP Secretary',
+        'PLENARY'      => 'Plenary',
+        'COMMITTEE'    => 'Committee',
+    ];
+
+    /**
+     * Origin phase → document status applied when a document is returned.
+     * Only statuses that exist and that the receiving phase expects are used.
+     */
+    private const RETURN_STATUS_BY_PHASE = [
+        'RECEIVING'    => 'Pending',
+        'ADMIN'        => 'Pending',
+        'SP_SECRETARY' => 'Pending',
+        'PLENARY'      => 'Returned to Plenary',
+    ];
+
+    /** Origin phase → inbox URL used for return notifications. */
+    private const PHASE_INBOX_URL = [
+        'RECEIVING'    => '/receiving/inbox/show?id=',
+        'ADMIN'        => '/admin/inbox/show?id=',
+        'SP_SECRETARY' => '/spsec/inbox/show?id=',
+        'PLENARY'      => '/plenary/inbox/show?id=',
     ];
 
     public function __construct()
@@ -533,6 +597,64 @@ class CommitteeInboxController
             && $isOwnedAcceptedAssignment
             && $existingComm === null;
 
+        // ── Resolve return destination for Communication documents ─────────────
+        // The return button must display exactly where the document will go.
+        // We resolve the origin eagerly here so the view can render a specific
+        // label (e.g. "Return to Plenary") and include the sender's name.
+        //
+        // These variables are only meaningful when $isCommEligibleType is true.
+        // For non-Communication documents the return always goes to Admin and
+        // the existing "Return to Admin" button label is already correct.
+        //
+        // $returnOriginLabel  — human-readable destination label, or null on failure.
+        // $returnOriginPhase  — raw phase constant, or null on failure.
+        // $returnOriginSenderName — attributable sender full name/username, or null.
+        // $returnOriginError  — error message string, or null when resolvable.
+        $returnOriginLabel      = null;
+        $returnOriginPhase      = null;
+        $returnOriginSenderName = null;
+        $returnOriginError      = null;
+
+        if ($isCommEligibleType) {
+            try {
+                [$resolvedPhase, $resolvedUserId] = $this->resolveOrigin($documentId);
+
+                $returnOriginPhase = $resolvedPhase;
+                $returnOriginLabel = self::PHASE_LABELS[$resolvedPhase] ?? $resolvedPhase;
+
+                // Attempt to attribute the specific sender by name.
+                if ($resolvedUserId > 0) {
+                    $senderStmt = $this->pdo->prepare("
+                        SELECT
+                            ua.username,
+                            TRIM(CONCAT(
+                                COALESCE(ui.first_name, ''), ' ',
+                                COALESCE(ui.last_name,  '')
+                            )) AS full_name
+                        FROM user_accounts ua
+                        LEFT JOIN user_info ui ON ui.user_account_id = ua.id
+                        WHERE ua.id        = ?
+                          AND ua.status    = 'active'
+                          AND ua.is_deleted = 0
+                        LIMIT 1
+                    ");
+                    $senderStmt->execute([$resolvedUserId]);
+                    $sender = $senderStmt->fetch();
+
+                    if ($sender) {
+                        $fullName = trim((string) ($sender['full_name'] ?? ''));
+                        $returnOriginSenderName = ($fullName !== '')
+                            ? $fullName
+                            : (string) $sender['username'];
+                    }
+                }
+            } catch (RuntimeException $originEx) {
+                // Origin undeterminable — disable the return action in the view
+                // and surface a clear explanation so the user understands why.
+                $returnOriginError = $originEx->getMessage();
+            }
+        }
+
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
         require __DIR__ . '/../../../resources/views/committee/inbox/show.php';
     }
@@ -565,6 +687,33 @@ class CommitteeInboxController
 
         $committeeRoleId = $this->requireCommitteeRoleId();
 
+        // ── Server-side action restrictions by document type ──────────────────
+        // The view only renders the permitted buttons, but a crafted POST must
+        // be rejected here as well so the restriction can never be bypassed.
+        $typeStmt = $this->pdo->prepare("
+            SELECT dt.name
+            FROM documents d
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
+            WHERE d.id = ?
+            LIMIT 1
+        ");
+        $typeStmt->execute([$documentId]);
+        $documentTypeName = (string) ($typeStmt->fetchColumn() ?: '');
+        $isCommunication  = $documentTypeName === self::COMMUNICATION_TYPE;
+
+        if ($isCommunication && !in_array($action, self::COMMUNICATION_ALLOWED_ACTIONS, true)) {
+            flash_set(
+                'error',
+                'Communication documents can only proceed to the Communications workflow or be returned.'
+            );
+            redirect('committee/inbox/show?id=' . $documentId);
+        }
+
+        if (!$isCommunication && in_array($action, self::COMMUNICATION_ONLY_ACTIONS, true)) {
+            flash_set('error', 'This action is only available for Communication documents.');
+            redirect('committee/inbox/show?id=' . $documentId);
+        }
+
         // Execute with retry for transient database errors
         $maxRetries = 3;
         $retryDelay = 100000; // 100 ms in microseconds
@@ -574,6 +723,7 @@ class CommitteeInboxController
             $storedFilePaths  = [];
             $notificationData = null;
             $endorseAuditData = null;
+            $commData         = null;
 
             try {
                 $this->pdo->beginTransaction();
@@ -648,6 +798,14 @@ class CommitteeInboxController
                     case 'endorse':
                         $endorseAuditData = $this->doEndorseReferred($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
                         break;
+
+                    case 'proceed_to_communications':
+                        $commData = $this->doProceedToCommunications($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
+                        break;
+
+                    case 'return_to_origin':
+                        $notificationData = $this->doReturnToOrigin($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
+                        break;
                 }
 
                 // ── Commit ────────────────────────────────────────────────────
@@ -689,6 +847,15 @@ class CommitteeInboxController
                         $endorseAuditData['auditData'],
                         $endorseAuditData['auditDescription'] ?? null
                     );
+                } elseif ($action === 'proceed_to_communications' && isset($commData)) {
+                    audit_log(
+                        'CREATE',
+                        'CommitteeCommunication',
+                        (string) $commData['commId'],
+                        null,
+                        $commData['auditData'],
+                        $commData['auditDescription'] ?? null
+                    );
                 }
 
                 // ── Post-commit: notifications ────────────────────────────────
@@ -716,6 +883,35 @@ class CommitteeInboxController
                                 "Committee has returned document {$notificationData['trackingNumber']} to Admin. Reason: {$notificationData['remarks']}",
                                 BASE_URL . "/admin/inbox/show?id={$notificationData['documentId']}"
                             );
+                        } elseif (isset($notificationData['originRoleId'])) {
+                            // Returned to the actual origin (Plenary / SP Secretary /
+                            // Admin / Receiving) — notify that office, and the
+                            // specific user who sent it in when known.
+                            $originUrl = BASE_URL . $notificationData['inboxUrl'] . $notificationData['documentId'];
+                            $originMsg = "Committee has returned document {$notificationData['trackingNumber']} "
+                                       . "to {$notificationData['originLabel']}. Reason: {$notificationData['remarks']}";
+
+                            if ((int) $notificationData['originUserId'] > 0) {
+                                $this->docService->notifyUser(
+                                    (int) $notificationData['originUserId'],
+                                    $notificationData['documentId'],
+                                    $notificationData['userId'],
+                                    'DOCUMENT_RETURNED',
+                                    "Document Returned: {$notificationData['trackingNumber']}",
+                                    $originMsg,
+                                    $originUrl
+                                );
+                            }
+
+                            $this->docService->notifyRoleUsers(
+                                (int) $notificationData['originRoleId'],
+                                $notificationData['documentId'],
+                                $notificationData['userId'],
+                                'DOCUMENT_RETURNED',
+                                "Document Returned to {$notificationData['originLabel']}: {$notificationData['trackingNumber']}",
+                                $originMsg,
+                                $originUrl
+                            );
                         }
                     } catch (Throwable $notifyError) {
                         system_log('WARNING', 'Notification delivery failed after successful Committee document processing', [
@@ -733,9 +929,11 @@ class CommitteeInboxController
                 old_clear();
                 if ($action === 'endorse') {
                     redirect('committee/referred');
-                } else {
-                    redirect('committee/inbox');
                 }
+                if ($action === 'proceed_to_communications' && !empty($commData['commId'])) {
+                    redirect('committee/communications/show?id=' . (int) $commData['commId']);
+                }
+                redirect('committee/inbox');
 
             } catch (RuntimeException $e) {
                 if ($this->pdo->inTransaction()) {
@@ -1312,6 +1510,493 @@ class CommitteeInboxController
     }
 
     // =========================================================================
+    // Communication workflow actions
+    // =========================================================================
+
+    /**
+     * Proceed to Communications — hand a Communication document over to the
+     * EXISTING Committee Communications workflow.
+     *
+     * This deliberately reuses committee_communications (and the exact status /
+     * event written by CommitteeCommunicationsController::store()) instead of
+     * opening a parallel workflow. The document is then completed out of the
+     * Committee Inbox while remaining in the COMMITTEE phase, exactly like the
+     * rest of the Communications workflow.
+     *
+     * Atomicity / duplicate protection:
+     *   • Runs inside the caller's transaction — assignment, document status,
+     *     route entry, workflow event and communication record all commit or
+     *     roll back together.
+     *   • committee_communications.document_id is UNIQUE (migration 061).
+     *   • A pre-check rejects the action when a record already exists, and the
+     *     assignment UPDATE is guarded by decision = 'ACCEPTED' AND
+     *     completed_at IS NULL, so a duplicated (double) submission fails
+     *     loudly instead of creating a second record.
+     *
+     * NOTE: audit_log() is deliberately omitted here — runs inside an open
+     * transaction. process() writes the audit entry after commit.
+     *
+     * @return array{commId:int, auditData:array, auditDescription:string}
+     */
+    private function doProceedToCommunications(
+        int    $documentId,
+        int    $assignmentId,
+        array  $assignment,
+        array  $document,
+        int    $userId,
+        int    $currentStatusId,
+        string $remarks
+    ): array {
+        // 1. Duplicate guard — never create a second communication record.
+        $dupStmt = $this->pdo->prepare(
+            "SELECT id FROM committee_communications WHERE document_id = ? LIMIT 1"
+        );
+        $dupStmt->execute([$documentId]);
+        if ($dupStmt->fetch()) {
+            throw new RuntimeException(
+                'A Communication record already exists for this document. Open it from the Committee Communications page instead.'
+            );
+        }
+
+        // 2. Resolve the status the Communications workflow starts with.
+        $inProgressStatus = $this->requireDocumentStatus('Communication In Progress');
+        $commStatusId     = (int) $inProgressStatus['id'];
+
+        // 3. Derive the communication details from the source document.
+        $subject = trim((string) ($document['subject_matter'] ?? ''));
+        if ($subject === '') {
+            $subject = 'Communication — ' . (string) ($document['tracking_number'] ?? '');
+        }
+        $subject = mb_substr($subject, 0, 500);
+
+        $senderDetails = $this->buildSenderDetails($document);
+
+        // 4. Create the communication record (same table/columns as store()).
+        $this->pdo->prepare("
+            INSERT INTO committee_communications (
+                document_id, date_logged, subject, sender_details, notes, assigned_by
+            ) VALUES (?, CURDATE(), ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $subject,
+            $senderDetails,
+            $remarks !== '' ? $remarks : null,
+            $userId,
+        ]);
+        $commId = (int) $this->pdo->lastInsertId();
+
+        // 5. Document status → "Communication In Progress". The phase stays
+        //    COMMITTEE so the Communications workflow continues normally.
+        $this->pdo->prepare(
+            "UPDATE documents SET current_status_id = ?, updated_by = ? WHERE id = ?"
+        )->execute([$commStatusId, $userId, $documentId]);
+
+        // 6. Complete the Committee inbox assignment → removes it from the inbox.
+        $completeStmt = $this->pdo->prepare("
+            UPDATE document_assignments
+            SET decision     = 'COMPLETED',
+                completed_at = NOW(),
+                remarks      = ?
+            WHERE id           = ?
+              AND decision     = 'ACCEPTED'
+              AND completed_at IS NULL
+              AND (accepted_by = ? OR assigned_to_user_id = ?)
+        ");
+        $completeStmt->execute([
+            $remarks !== '' ? $remarks : 'Proceeded to Communications workflow.',
+            $assignmentId,
+            $userId,
+            $userId,
+        ]);
+
+        if ($completeStmt->rowCount() === 0) {
+            throw new RuntimeException(
+                'This assignment has already been processed or you no longer own it. Please refresh the page.'
+            );
+        }
+
+        // 7. Route record — the hand-off from the inbox to the Communications
+        //    workflow is recorded (same phase, as the other Comm steps do).
+        $committeeRoleId = (int) ($assignment['assigned_to_role_id'] ?? 0);
+        $this->pdo->prepare("
+            INSERT INTO document_routes (
+                document_id, from_phase, to_phase,
+                routed_by, routed_to_role_id, remarks
+            ) VALUES (?, 'COMMITTEE', 'COMMITTEE', ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $userId,
+            $committeeRoleId ?: null,
+            'Proceeded to Committee Communications workflow.',
+        ]);
+
+        // 8. Workflow event — identical to the one store() writes.
+        $uStmt = $this->pdo->prepare("SELECT username FROM user_accounts WHERE id = ? LIMIT 1");
+        $uStmt->execute([$userId]);
+        $username = (string) ($uStmt->fetchColumn() ?: '');
+
+        $this->pdo->prepare("
+            INSERT INTO document_events (
+                document_id, event_type, phase, performed_by,
+                from_status_id, to_status_id, remarks, metadata
+            ) VALUES (?, 'COMMITTEE_COMMUNICATION_CREATED', 'COMMITTEE', ?, ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $userId,
+            $currentStatusId ?: null,
+            $commStatusId,
+            "Communication record opened: {$subject}",
+            json_encode([
+                'comm_id'       => $commId,
+                'date_logged'   => date('Y-m-d'),
+                'subject'       => mb_substr($subject, 0, 200),
+                'source'        => 'committee_inbox',
+                'assignment_id' => $assignmentId,
+                'ip_address'    => client_ip(),
+                'user_agent'    => client_user_agent(),
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ]);
+
+        // audit_log() deliberately omitted (open transaction) — process() writes after commit.
+
+        return [
+            'commId'     => $commId,
+            'auditData'  => [
+                'action'                => 'committee_proceeded_to_communications',
+                'comm_id'              => $commId,
+                'document_id'          => $documentId,
+                'assignment_id'        => $assignmentId,
+                'proceeded_by'         => $userId,
+                'proceeded_by_username'=> $username,
+                'status_changed_to'    => 'Communication In Progress (id=' . $commStatusId . ')',
+            ],
+            'auditDescription' => "Committee opened Communication #{$commId} for document ID {$documentId} (user: {$username})",
+        ];
+    }
+
+    /**
+     * Return a Communication document to its ACTUAL origin.
+     *
+     * Unlike doReturnToAdmin() — which always targets Admin — the destination
+     * here is resolved from the document's own inbound routing history
+     * (see resolveOrigin()). Admin is used ONLY when Admin really was the
+     * sender; otherwise the action fails with a clear error instead of
+     * silently mis-routing the document.
+     *
+     * What this does inside the transaction:
+     *   1. Snapshot the document revision.
+     *   2. Mark the Committee assignment DECLINED / completed (preserving
+     *      accepted_by / accepted_at for history).
+     *   3. Insert a fresh PENDING assignment for the origin role (+ user when
+     *      the origin can be attributed to an active account).
+     *   4. Restore documents.current_phase / current_status_id to the origin.
+     *   5. Insert a document_routes record COMMITTEE → origin.
+     *   6. Insert a COMMITTEE_RETURNED_TO_ORIGIN document_event.
+     *
+     * NOTE: audit_log() is deliberately omitted here — runs inside an open
+     * transaction. process() writes the audit entry after commit.
+     *
+     * @return array Notification data sent after commit.
+     */
+    private function doReturnToOrigin(
+        int    $documentId,
+        int    $assignmentId,
+        array  $assignment,
+        array  $document,
+        int    $userId,
+        int    $currentStatusId,
+        string $remarks
+    ): array {
+        if ($remarks === '') {
+            throw new InvalidArgumentException('A reason is required when returning this document.');
+        }
+
+        // 1. Resolve the genuine origin — never assume Admin.
+        [$originPhase, $originUserId] = $this->resolveOrigin($documentId);
+
+        $originRoleName = self::PHASE_ROLE_MAP[$originPhase];
+        $originLabel    = self::PHASE_LABELS[$originPhase] ?? $originPhase;
+
+        $roleStmt = $this->pdo->prepare(
+            "SELECT id FROM roles WHERE name = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+        );
+        $roleStmt->execute([$originRoleName]);
+        $originRoleId = (int) ($roleStmt->fetchColumn() ?: 0);
+
+        if ($originRoleId <= 0) {
+            throw new RuntimeException(
+                "The {$originLabel} role could not be resolved. Unable to return this document."
+            );
+        }
+
+        // 2. Snapshot the revision before the return.
+        $revNum    = $this->docService->nextRevisionNumber($documentId);
+        $changeWhy = 'Document returned to ' . $originLabel . ' by Committee — snapshot before return';
+
+        $this->pdo->prepare("
+            INSERT INTO document_revisions (
+                document_id, revision_number, changed_by, phase,
+                subject_matter, document_type_id, date_received, time_received,
+                source_type_id, source_snapshot, remarks, change_reason
+            ) VALUES (?, ?, ?, 'COMMITTEE', ?, ?, ?, ?, ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $revNum,
+            $userId,
+            $document['subject_matter'],
+            $document['document_type_id'],
+            $document['date_received'],
+            $document['time_received'],
+            $document['source_type_id'],
+            json_encode([
+                'external_office_id'    => $document['external_office_id'],
+                'hospital_id'           => $document['hospital_id'],
+                'municipality_id'       => $document['municipality_id'],
+                'source_name'           => $document['source_name'],
+                'source_contact_number' => $document['source_contact_number'],
+                'source_address'        => $document['source_address'],
+                'source_liaison_name'   => $document['source_liaison_name'],
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            $document['remarks'],
+            $changeWhy,
+        ]);
+
+        // 3. Decline the Committee assignment — accepted_by / accepted_at are
+        //    preserved (NOT cleared) so history retains who had the document.
+        $declineStmt = $this->pdo->prepare("
+            UPDATE document_assignments
+            SET decision       = 'DECLINED',
+                declined_at    = NOW(),
+                completed_at   = NOW(),
+                decline_reason = ?,
+                remarks        = ?
+            WHERE id           = ?
+              AND decision     = 'ACCEPTED'
+              AND completed_at IS NULL
+              AND (accepted_by = ? OR assigned_to_user_id = ?)
+        ");
+        $declineStmt->execute([$remarks, $remarks, $assignmentId, $userId, $userId]);
+
+        if ($declineStmt->rowCount() === 0) {
+            throw new RuntimeException(
+                'This assignment has already been processed or you no longer own it. Please refresh the page.'
+            );
+        }
+
+        // 4. Fresh PENDING assignment in the origin phase.
+        $this->pdo->prepare("
+            INSERT INTO document_assignments (
+                document_id, assigned_to_role_id, phase,
+                assigned_by, decision, received_at,
+                accepted_by, assigned_to_user_id
+            ) VALUES (?, ?, ?, ?, 'PENDING', NOW(), NULL, ?)
+        ")->execute([
+            $documentId,
+            $originRoleId,
+            $originPhase,
+            $userId,
+            $originUserId > 0 ? $originUserId : null,
+        ]);
+
+        // 5. Move the document back to the origin phase / status.
+        $returnStatusName = self::RETURN_STATUS_BY_PHASE[$originPhase] ?? 'Pending';
+        $returnStatus     = $this->requireDocumentStatus($returnStatusName);
+
+        $this->pdo->prepare("
+            UPDATE documents
+            SET current_phase         = ?,
+                current_status_id     = ?,
+                current_owner_user_id = NULL,
+                updated_by            = ?
+            WHERE id = ?
+        ")->execute([$originPhase, (int) $returnStatus['id'], $userId, $documentId]);
+
+        // 6. Route record for the return.
+        $this->pdo->prepare("
+            INSERT INTO document_routes (
+                document_id, from_phase, to_phase, routed_by,
+                routed_to_role_id, routed_to_user_id, remarks
+            ) VALUES (?, 'COMMITTEE', ?, ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $originPhase,
+            $userId,
+            $originRoleId,
+            $originUserId > 0 ? $originUserId : null,
+            'Returned by Committee to ' . $originLabel . ': ' . $remarks,
+        ]);
+
+        // 7. COMMITTEE_RETURNED_TO_ORIGIN event (requires migration 076).
+        $this->pdo->prepare("
+            INSERT INTO document_events (
+                document_id, event_type, phase, performed_by,
+                to_status_id, remarks, metadata
+            ) VALUES (?, 'COMMITTEE_RETURNED_TO_ORIGIN', ?, ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $originPhase,
+            $userId,
+            (int) $returnStatus['id'],
+            'Document returned to ' . $originLabel . ' for re-routing.',
+            json_encode([
+                'return_reason'  => $remarks,
+                'origin_phase'   => $originPhase,
+                'origin_role_id' => $originRoleId,
+                'origin_user_id' => $originUserId > 0 ? $originUserId : null,
+                'assignment_id'  => $assignmentId,
+                'ip_address'     => client_ip(),
+            ]),
+        ]);
+
+        // audit_log() deliberately omitted (open transaction) — process() writes after commit.
+
+        return [
+            'createdBy'      => (int) $document['created_by'],
+            'originRoleId'   => $originRoleId,
+            'originUserId'   => $originUserId,
+            'originPhase'    => $originPhase,
+            'originLabel'    => $originLabel,
+            'inboxUrl'       => self::PHASE_INBOX_URL[$originPhase] ?? '/committee/inbox/show?id=',
+            'documentId'     => $documentId,
+            'userId'         => $userId,
+            'trackingNumber' => $document['tracking_number'],
+            'remarks'        => $remarks,
+            'auditData'      => [
+                'action'         => 'committee_returned_to_origin',
+                'assignment_id'  => $assignmentId,
+                'document_id'    => $documentId,
+                'origin_phase'   => $originPhase,
+                'origin_role_id' => $originRoleId,
+                'origin_user_id' => $originUserId > 0 ? $originUserId : null,
+                'accepted_by'    => $assignment['accepted_by'],
+                'returned_by'    => $userId,
+                'return_reason'  => mb_substr($remarks, 0, 200),
+            ],
+            'auditDescription' => "Committee returned document ID {$documentId} to {$originLabel}",
+        ];
+    }
+
+    /**
+     * Determine the genuine origin of a document sitting in the Committee inbox.
+     *
+     * Resolution order:
+     *   1. The latest inbound document_routes row that brought the document
+     *      INTO Committee from another phase — its from_phase is the origin.
+     *   2. The last document_assignments row whose phase is not COMMITTEE —
+     *      its phase is the origin.
+     *
+     * A user is only attributed when the origin resolves to a real, still-active
+     * account; otherwise the return is role-level. When the origin cannot be
+     * determined a RuntimeException is thrown — the document is NEVER silently
+     * returned to Admin unless Admin really was the sender.
+     *
+     * @return array{0:string,1:int}  [originPhase, originUserId (0 = role-level)]
+     */
+    private function resolveOrigin(int $documentId): array
+    {
+        $phase  = null;
+        $userId = 0;
+
+        // 1. Latest inbound route that brought the document into Committee.
+        $routeStmt = $this->pdo->prepare("
+            SELECT from_phase, routed_by
+            FROM document_routes
+            WHERE document_id = ?
+              AND to_phase    = 'COMMITTEE'
+              AND from_phase <> 'COMMITTEE'
+            ORDER BY created_at DESC, id DESC
+            LIMIT 1
+        ");
+        $routeStmt->execute([$documentId]);
+        $route = $routeStmt->fetch();
+
+        if ($route && isset(self::PHASE_ROLE_MAP[$route['from_phase']])) {
+            $phase  = (string) $route['from_phase'];
+            $userId = (int) ($route['routed_by'] ?? 0);
+        } else {
+            // 2. Fall back to the last non-Committee assignment phase.
+            $assignStmt = $this->pdo->prepare("
+                SELECT phase, accepted_by, assigned_to_user_id
+                FROM document_assignments
+                WHERE document_id = ?
+                  AND phase      <> 'COMMITTEE'
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+            ");
+            $assignStmt->execute([$documentId]);
+            $prev = $assignStmt->fetch();
+
+            if ($prev && isset(self::PHASE_ROLE_MAP[$prev['phase']])) {
+                $phase  = (string) $prev['phase'];
+                $userId = (int) ($prev['assigned_to_user_id'] ?: ($prev['accepted_by'] ?: 0));
+            }
+        }
+
+        if ($phase === null) {
+            throw new RuntimeException(
+                'The originating office for this document could not be determined from its routing history, '
+                . 'so it cannot be returned. Please coordinate with the System Administrator.'
+            );
+        }
+
+        // Only attribute the return to a user who can actually receive it.
+        if ($userId > 0) {
+            $userStmt = $this->pdo->prepare(
+                "SELECT id FROM user_accounts
+                 WHERE id = ? AND status = 'active' AND is_deleted = 0
+                 LIMIT 1"
+            );
+            $userStmt->execute([$userId]);
+            if (!$userStmt->fetch()) {
+                $userId = 0;
+            }
+        }
+
+        return [$phase, $userId];
+    }
+
+    /** Build the sender details shown on the Communication record. */
+    private function buildSenderDetails(array $document): string
+    {
+        $parts = [];
+        foreach (['source_name', 'source_liaison_name', 'source_contact_number', 'source_address'] as $key) {
+            $value = trim((string) ($document[$key] ?? ''));
+            if ($value !== '') {
+                $parts[] = $value;
+            }
+        }
+
+        $details = implode(' — ', $parts);
+        if ($details === '') {
+            $details = 'Origin details not recorded on the source document.';
+        }
+
+        return mb_substr($details, 0, 5000);
+    }
+
+    /** Resolve a document_statuses row by name; throws RuntimeException if missing. */
+    private function requireDocumentStatus(string $name): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT id, name, badge_color
+            FROM document_statuses
+            WHERE name = ? AND is_active = 1 AND is_deleted = 0
+            LIMIT 1
+        ");
+        $stmt->execute([$name]);
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            throw new RuntimeException(
+                "Required document status \"{$name}\" not found. " .
+                'Please run the latest migrations to seed it.'
+            );
+        }
+
+        return $row;
+    }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 
@@ -1333,10 +2018,12 @@ class CommitteeInboxController
     private function actionLabel(string $action): string
     {
         return match ($action) {
-            'accept'          => 'Accepted',
-            'return_to_admin' => 'Returned to Admin',
-            'endorse'         => 'Proceeded to Endorsement (Referred)',
-            default           => $action,
+            'accept'                    => 'Accepted',
+            'return_to_admin'           => 'Returned to Admin',
+            'endorse'                   => 'Proceeded to Endorsement (Referred)',
+            'proceed_to_communications' => 'Proceeded to Communications',
+            'return_to_origin'          => 'Returned to originating office',
+            default                     => $action,
         };
     }
 }

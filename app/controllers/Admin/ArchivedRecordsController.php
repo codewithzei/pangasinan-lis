@@ -57,16 +57,7 @@ class ArchivedRecordsController
         // ── Filters ──────────────────────────────────────────────────────────
         $search      = trim($_GET['search']   ?? '');
         $filterType  = trim($_GET['type']     ?? '');
-        $dateFrom    = trim($_GET['date_from'] ?? '');
-        $dateTo      = trim($_GET['date_to']   ?? '');
-        $isValidDate = static function (string $date): bool {
-            if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $parts)) {
-                return false;
-            }
-            return checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]);
-        };
-        if ($dateFrom !== '' && !$isValidDate($dateFrom)) $dateFrom = '';
-        if ($dateTo !== '' && !$isValidDate($dateTo)) $dateTo = '';
+        $filterYear  = trim($_GET['year']     ?? '');
 
         // ── Pagination ───────────────────────────────────────────────────────
         $page    = max(1, (int) ($_GET['page'] ?? 1));
@@ -119,14 +110,9 @@ class ArchivedRecordsController
             }
         }
 
-        if ($dateFrom !== '') {
-            $where[]  = 'ar.date_approved >= ?';
-            $params[] = $dateFrom;
-        }
-
-        if ($dateTo !== '') {
-            $where[]  = 'ar.date_approved <= ?';
-            $params[] = $dateTo;
+        if ($filterYear !== '' && is_numeric($filterYear)) {
+            $where[]  = 'YEAR(ar.date_approved) = ?';
+            $params[] = (int) $filterYear;
         }
 
         $whereClause = implode(' AND ', $where);
@@ -185,6 +171,11 @@ class ArchivedRecordsController
         $documentTypes = $this->pdo->query(
             "SELECT id, name, badge_color FROM document_types WHERE is_active = 1 AND is_deleted = 0 ORDER BY name ASC"
         )->fetchAll();
+
+        // Available years for filter
+        $years = $this->pdo->query(
+            "SELECT DISTINCT YEAR(date_approved) AS y FROM archived_records WHERE is_deleted = 0 ORDER BY y DESC"
+        )->fetchAll(PDO::FETCH_COLUMN);
 
         // SP members and committees for create modal
         $spMembers = $this->pdo->query(
@@ -712,8 +703,6 @@ class ArchivedRecordsController
         }
 
         // Committees
-        // Custom committee names may be comma-separated — split each entry into
-        // individual records so "Health, Environment" becomes two committee rows.
         $committees = [];
         $commIds    = (array) ($_POST['committee_id'] ?? []);
         $commCustom = (array) ($_POST['committee_custom_name'] ?? []);
@@ -723,18 +712,9 @@ class ArchivedRecordsController
             $parsedCommitteeId = $rawCommitteeId === '' ? null : filter_var($rawCommitteeId, FILTER_VALIDATE_INT);
             $cid = $rawCommitteeId === '' ? null : ($parsedCommitteeId === false ? -1 : (int) $parsedCommitteeId);
             $customName = $toText($commCustom[$i] ?? '');
-
-            if ($cid !== null) {
-                // Selected from list — store as-is
-                $committees[] = ['committee_id' => $cid, 'custom_committee_name' => null];
-            } elseif ($customName !== '') {
-                // Split comma-separated custom names into individual entries
-                $parts = array_filter(array_map('trim', explode(',', $customName)));
-                foreach ($parts as $part) {
-                    if ($part !== '') {
-                        $committees[] = ['committee_id' => null, 'custom_committee_name' => $part];
-                    }
-                }
+            $cname = $customName !== '' ? $customName : null;
+            if ($cid !== null || $cname !== null) {
+                $committees[] = ['committee_id' => $cid, 'custom_committee_name' => $cname];
             }
         }
 
