@@ -1157,6 +1157,59 @@ return [
     ],
 
     // -------------------------------------------------------------------------
+    // Admin Filed Documents Routes
+    // -------------------------------------------------------------------------
+
+    'admin/filed' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminFiledDocumentsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/filed/file' => [
+        'method'     => 'POST',
+        'controller' => 'Admin/AdminFiledDocumentsController',
+        'action'     => 'file',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/filed/source-show' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminFiledDocumentsController',
+        'action'     => 'viewSource',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/filed/source-attachment' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminFiledDocumentsController',
+        'action'     => 'previewSourceAttachment',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/filed/show' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminFiledDocumentsController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/filed/download' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminFiledDocumentsController',
+        'action'     => 'download',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/filed/download-all' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminFiledDocumentsController',
+        'action'     => 'downloadAll',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // -------------------------------------------------------------------------
     // SP Secretary Inbox Routes
     // -------------------------------------------------------------------------
 
@@ -1505,6 +1558,14 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    // Complete / update the case details entered from the Cases page
+    'committee/cases/details' => [
+        'method'     => 'POST',
+        'controller' => 'Committee/CommitteeCasesController',
+        'action'     => 'detailsStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // Set / update the final outcome for a case
     'committee/cases/outcome' => [
         'method'     => 'POST',
@@ -1670,6 +1731,13 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'admin/receive-document/get-eligible-cases' => [
+        'method' => 'GET',
+        'controller' => 'Admin/AdminReceiveDocumentController',
+        'action' => 'getEligibleCasesForMotion',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // -------------------------------------------------------------------------
     // Receiving Routes
     // -------------------------------------------------------------------------
@@ -1692,6 +1760,13 @@ return [
         'method' => 'GET',
         'controller' => 'Receiving/RouteDocumentController',
         'action' => 'getChecklistsByDocumentType',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'receiving/receive-document/get-eligible-cases' => [
+        'method' => 'GET',
+        'controller' => 'Receiving/RouteDocumentController',
+        'action' => 'getEligibleCasesForMotion',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
@@ -1917,6 +1992,13 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'plenary/status-list/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'statusListShow',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // =========================================================================
     // Communications Process Flow ï¿½ SP Secretary Comm Inbox
     // =========================================================================
@@ -1986,6 +2068,24 @@ return [
     ],
 
     // =========================================================================
+    // Petitions Page — Noted Complaints / Administrative Cases
+    // =========================================================================
+
+    'plenary/petitions' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryPetitionsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/petitions/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryPetitionsController',
+        'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    // =========================================================================
     // Communications Process Flow ï¿½ Committee adopt report for Comm
     // =========================================================================
 
@@ -2030,4 +2130,30 @@ return [
         'controller' => 'Plenary/PlenaryReadingController',
         'action'     => 'adoptCommStore',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
-    ],];
+    ],
+
+    // =========================================================================
+    // Complaints / Administrative Cases Process Flow - Plenary Cases First Reading
+    // =========================================================================
+
+    'plenary/cases-first-reading/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'casesFirstReadingShow',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/cases-first-reading/store' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'casesFirstReadingStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/cases-first-reading/adopt-report' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'adoptCasesReportStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+];

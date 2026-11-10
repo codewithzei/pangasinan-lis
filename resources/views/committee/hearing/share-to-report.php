@@ -291,10 +291,10 @@ ob_start();
                     <!-- ── New report panel ─────────────────────────────────── -->
                     <div id="newReportPanel" class="<?= !$isExisting ? '' : 'hidden' ?> space-y-5">
 
-                        <!-- Committee in Charge -->
+                        <!-- Committee Referral -->
                         <div>
                             <p class="block text-sm font-semibold text-gray-700 mb-1">
-                                Committee in Charge
+                                Committee Referral
                                 <span class="text-red-500" aria-hidden="true">*</span>
                             </p>
                             <p class="text-xs text-gray-400 mb-2">

@@ -888,10 +888,19 @@ class CommitteeReferredController
             redirect('committee/referred?tab=ready_for_agenda');
         }
 
-        // Load committees (preselect the one assigned by Plenary via document_committees)
-        $allCommittees = $this->pdo->query(
-            "SELECT id, name FROM committees WHERE is_active = 1 AND is_deleted = 0 ORDER BY name ASC"
-        )->fetchAll();
+        // Keep the Plenary-assigned committee selectable if it has since been deactivated.
+        $committeeStmt = $this->pdo->prepare("
+            SELECT c.id, c.name
+            FROM committees c
+            WHERE (c.is_active = 1 AND c.is_deleted = 0)
+               OR EXISTS (
+                    SELECT 1 FROM document_committees dc
+                    WHERE dc.document_id = ? AND dc.committee_id = c.id
+               )
+            ORDER BY c.name ASC
+        ");
+        $committeeStmt->execute([$documentId]);
+        $allCommittees = $committeeStmt->fetchAll();
 
         $acStmt = $this->pdo->prepare(
             "SELECT committee_id FROM document_committees WHERE document_id = ?"
@@ -1010,9 +1019,18 @@ class CommitteeReferredController
         if (!empty($committeeIds)) {
             $cPh  = implode(',', array_fill(0, count($committeeIds), '?'));
             $cChk = $this->pdo->prepare(
-                "SELECT id FROM committees WHERE id IN ({$cPh}) AND is_active = 1 AND is_deleted = 0"
+                "SELECT c.id FROM committees c
+                 WHERE c.id IN ({$cPh})
+                   AND (
+                        (c.is_active = 1 AND c.is_deleted = 0)
+                        OR EXISTS (
+                            SELECT 1 FROM document_committees dc
+                            WHERE dc.document_id = ?
+                              AND dc.committee_id = c.id
+                        )
+                   )"
             );
-            $cChk->execute($committeeIds);
+            $cChk->execute([...$committeeIds, $documentId]);
             $validCIds = array_column($cChk->fetchAll(), 'id');
             if (count($validCIds) !== count($committeeIds)) {
                 flash_set('error', 'One or more selected committees are invalid.');

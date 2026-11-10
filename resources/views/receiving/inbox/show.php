@@ -9,7 +9,7 @@
  *   $attachments        array   Document attachments
  *   $documentTypes      array   Available document types for dropdown
  *   $sourceTypes        array   Available source types for dropdown
- *   $externalOffices    array   Available external offices
+ *   $externalOffices    array   Available provincial government offices
  *   $hospitals          array   Available hospitals
  *   $municipalities     array   Available municipalities
  *   $spMembers          array   Available SP members
@@ -188,7 +188,7 @@ function normalizeTimeForInput(?string $time): string {
             </div>
             <?php if (!empty($document['external_office_name'])): ?>
             <div>
-                <dt class="text-xs font-medium text-gray-500">External Office</dt>
+                <dt class="text-xs font-medium text-gray-500">Provincial Government Offices</dt>
                 <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['external_office_name']) ?></dd>
             </div>
             <?php elseif (!empty($document['hospital_name'])): ?>
@@ -475,11 +475,31 @@ function normalizeTimeForInput(?string $time): string {
                             <option value="">-- Select Document Type --</option>
                             <?php foreach ($documentTypes as $type): ?>
                                 <option value="<?= htmlspecialchars($type['id'] ?? '') ?>"
+                                        title="<?= htmlspecialchars($type['name'] ?? '') ?>"
                                         <?= oldOrDoc('document_type_id', $old, $document) == ($type['id'] ?? '') ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($type['name'] ?? '') ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <p id="documentTypeFullLabel" class="mt-1 hidden break-words text-sm text-gray-700" aria-live="polite"></p>
+                        <script>
+                            (function () {
+                                const select = document.getElementById('document_type_id');
+                                const fullLabel = document.getElementById('documentTypeFullLabel');
+                                if (!select || !fullLabel) return;
+
+                                const updateDocumentTypeLabel = function () {
+                                    const option = select.selectedOptions[0];
+                                    const label = option && option.value ? option.textContent.trim() : '';
+                                    fullLabel.textContent = label;
+                                    fullLabel.classList.toggle('hidden', label === '');
+                                    select.title = label;
+                                };
+
+                                select.addEventListener('change', updateDocumentTypeLabel);
+                                updateDocumentTypeLabel();
+                            }());
+                        </script>
                         <p class="mt-1 text-xs text-gray-500">Select the type of document</p>
                     </div>
                 </div>
@@ -510,16 +530,16 @@ function normalizeTimeForInput(?string $time): string {
                         </select>
                     </div>
 
-                    <!-- External Office (shown for "External Office" source type) -->
+                    <!-- Provincial Government Offices (shown for "Provincial Government Offices" source type) -->
                     <div id="externalOfficeFields" class="hidden space-y-4">
                         <div>
                             <label for="external_office_id" class="block text-sm font-medium text-gray-700">
-                                External Office
+                                Provincial Government Offices
                             </label>
                             <select name="external_office_id" id="external_office_id"
                                     form="editDocumentForm"
                                     class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
-                                <option value="">-- Select External Office --</option>
+                                <option value="">-- Select Provincial Government Offices --</option>
                                 <?php foreach ($externalOffices as $office): ?>
                                     <option value="<?= htmlspecialchars($office['id'] ?? '') ?>"
                                             <?= oldOrDoc('external_office_id', $old, $document) == ($office['id'] ?? '') ? 'selected' : '' ?>>
@@ -952,7 +972,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('contactFields').classList.remove('hidden');
 
-        if (sourceName === 'External Office') {
+        if (sourceName === 'Provincial Government Offices') {
             document.getElementById('externalOfficeFields').classList.remove('hidden');
             enableSelect(externalOfficeSelect);
 
@@ -1217,6 +1237,12 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <?php endif; // end $isAccepted ?>
+
+<?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'receiving/inbox';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
 
 <?php
 $content   = ob_get_clean();

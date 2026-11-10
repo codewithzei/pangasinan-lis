@@ -115,7 +115,7 @@ ob_start();
                         <th class="px-6 py-3 font-medium">Committees</th>
                         <?php if ($currentFilter === 'approved'): ?>
                             <th class="px-6 py-3 font-medium">Approved No.</th>
-                            <th class="px-6 py-3 font-medium">Date Finalized</th>
+                            <th class="px-6 py-3 font-medium">Date Approved</th>
                         <?php elseif ($currentFilter === 'deferred'): ?>
                             <th class="px-6 py-3 font-medium">Date Deferred</th>
                         <?php elseif ($currentFilter === 'withdrawn'): ?>

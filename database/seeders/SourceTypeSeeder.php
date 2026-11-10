@@ -14,8 +14,8 @@ class SourceTypeSeeder extends Seeder
                 'updated_at' => date('Y-m-d H:i:s'),
             ],
             [
-                'name' => 'External Office',
-                'description' => 'External government offices and agencies',
+                'name' => 'Provincial Government Offices',
+                'description' => 'Provincial government offices and agencies',
                 'sort_order' => 2,
                 'is_active' => 1,
                 'created_at' => date('Y-m-d H:i:s'),

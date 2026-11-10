@@ -13,7 +13,7 @@ class DatabaseSeeder
         DocumentStatusSeeder::class,
         RoutingOptionSeeder::class,
         HospitalSeeder::class,
-        ExternalOfficeSeeder::class,
+        ProvincialGovernmentOfficeSeeder::class,
         SourceTypeSeeder::class,
         CommunicationCategorySeeder::class,
         OpinionOfficeSeeder::class,

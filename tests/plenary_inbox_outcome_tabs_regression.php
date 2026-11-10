@@ -12,7 +12,7 @@
  *     A3  A Noted document shows in the Noted tab.
  *     A4  A Remanded document shows in the Remanded tab.
  *     A5  A Withdrawn document shows in the Withdrawn tab.
- *     A6  An "On Process" document shows in Accepted (not in any outcome tab) —
+ *     A6  An "For Encoding" document shows in Accepted (not in any outcome tab) —
  *         it continues through the existing processing flow.
  *     A7  A document with no plenary_document_details row stays in Accepted.
  *     A8  Ownership: another user never sees the outcome tab rows.
@@ -22,14 +22,14 @@
  *   GROUP B — Deferred compliance resume
  *     B1  Remarks are required to submit compliance.
  *     B2  At least one compliance file is required.
- *     B3  Submitting compliance clears Deferred → moves to Accepted (On Process).
+ *     B3  Submitting compliance clears Deferred → moves to Accepted (For Encoding).
  *     B4  Existing remarks are preserved (appended, not replaced).
  *     B5  A PLENARY_COMPLIANCE_SUBMITTED event is recorded (when migration 069 ran).
  *     B6  Compliance files are appended; existing attachments are preserved.
  *
  *   GROUP C — Lay on the Table stays processable
  *     C1  It is not a terminal outcome.
- *     C2  The owner can move it to "On Process" and it then shows in Accepted.
+ *     C2  The owner can move it to "For Encoding" and it then shows in Accepted.
  *
  *   GROUP D — Terminal outcomes
  *     D1  Noted / Remanded / Withdrawn are terminal.
@@ -364,7 +364,7 @@ try {
     // Pre-decision statuses (seeded by migration 065 / 069).
     $rows = $pdo->query("
         SELECT id, name FROM document_statuses
-        WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','On Process','Withdrawn')
+        WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','For Encoding','Withdrawn')
           AND is_active=1 AND is_deleted=0
     ")->fetchAll(PDO::FETCH_ASSOC);
     $status = [];
@@ -373,7 +373,7 @@ try {
     }
 
     $missing = array_diff(
-        ['Deferred', 'Lay on the Table', 'Noted', 'Remanded', 'On Process', 'Withdrawn'],
+        ['Deferred', 'Lay on the Table', 'Noted', 'Remanded', 'For Encoding', 'Withdrawn'],
         array_keys($status)
     );
     if (!empty($missing)) {
@@ -398,9 +398,9 @@ try {
         $docs[$slug]      = $d;
     }
 
-    // On Process + a document with no pdd row (both stay in Accepted).
-    $dOnProcess = createAcceptedDoc($pdo, $lookups, $userA, 'Doc for On Process ' . uniqid());
-    setPreDecision($pdo, $dOnProcess['document_id'], $status['On Process'], 'processing', $userA);
+    // For Encoding + a document with no pdd row (both stay in Accepted).
+    $dOnProcess = createAcceptedDoc($pdo, $lookups, $userA, 'Doc for For Encoding ' . uniqid());
+    setPreDecision($pdo, $dOnProcess['document_id'], $status['For Encoding'], 'processing', $userA);
 
     $dNoDetails = createAcceptedDoc($pdo, $lookups, $userA, 'Doc with no plenary details ' . uniqid());
 
@@ -414,12 +414,12 @@ try {
     foreach (OUTCOME_TABS as $slug => $statusName) {
         check("A.{$slug}b: outcome document is NOT in the Accepted tab", !in_array($docs[$slug]['document_id'], $accepted, true));
     }
-    check('A6: On Process document stays in Accepted (existing flow)', in_array($dOnProcess['document_id'], $accepted, true));
+    check('A6: For Encoding document stays in Accepted (existing flow)', in_array($dOnProcess['document_id'], $accepted, true));
     check('A7: Document without plenary details stays in Accepted', in_array($dNoDetails['document_id'], $accepted, true));
 
     foreach (OUTCOME_TABS as $slug => $statusName) {
         $list = outcomeTabList($pdo, $plenaryRoleId, $userA, $statusName);
-        check("A.{$slug}c: On Process document is NOT in the '{$statusName}' tab", !in_array($dOnProcess['document_id'], $list, true));
+        check("A.{$slug}c: For Encoding document is NOT in the '{$statusName}' tab", !in_array($dOnProcess['document_id'], $list, true));
     }
 
     // Ownership: another user sees none of userA's outcome rows.
@@ -466,10 +466,10 @@ try {
 
     // B3/B4/B6: submit with two files.
     $newFiles = ['compliance_1.pdf', 'compliance_2.pdf'];
-    submitCompliance($pdo, $bDocId, $status['On Process'], 'Compliance action taken.', $newFiles, $userA);
+    submitCompliance($pdo, $bDocId, $status['For Encoding'], 'Compliance action taken.', $newFiles, $userA);
 
     $row = $pdo->query("SELECT status_id, remarks FROM plenary_document_details WHERE document_id={$bDocId}")->fetch();
-    check('B3: compliance submission resets status to On Process', (int) $row['status_id'] === $status['On Process']);
+    check('B3: compliance submission resets status to For Encoding', (int) $row['status_id'] === $status['For Encoding']);
 
     $deferredAfter = outcomeTabList($pdo, $plenaryRoleId, $userA, 'Deferred');
     check('B3b: document leaves the Deferred tab after resuming', !in_array($bDocId, $deferredAfter, true));
@@ -514,8 +514,8 @@ try {
     check('C1: Lay on the Table is not terminal', !isTerminalStatus('Lay on the Table'));
     check('C1b: terminal guard permits actions on Lay on the Table', notTerminal($pdo, $cDocId));
 
-    // Continue processing: owner moves it to On Process → appears in Accepted.
-    setPreDecision($pdo, $cDocId, $status['On Process'], 'Resumed from Lay on the Table.', $userA);
+    // Continue processing: owner moves it to For Encoding → appears in Accepted.
+    setPreDecision($pdo, $cDocId, $status['For Encoding'], 'Resumed from Lay on the Table.', $userA);
     $lotAfter    = outcomeTabList($pdo, $plenaryRoleId, $userA, 'Lay on the Table');
     $acceptedLot = acceptedList($pdo, $plenaryRoleId, $userA);
     check('C2: it leaves the Lay on the Table tab once continued', !in_array($cDocId, $lotAfter, true));
@@ -531,7 +531,7 @@ try {
     check('D1c: Withdrawn is terminal', isTerminalStatus('Withdrawn'));
     check('D1d: Deferred is NOT terminal',      !isTerminalStatus('Deferred'));
     check('D1e: Lay on the Table is NOT terminal', !isTerminalStatus('Lay on the Table'));
-    check('D1f: On Process is NOT terminal',    !isTerminalStatus('On Process'));
+    check('D1f: For Encoding is NOT terminal',    !isTerminalStatus('For Encoding'));
 
     foreach (['noted' => 'Noted', 'remanded' => 'Remanded', 'withdrawn' => 'Withdrawn'] as $slug => $statusName) {
         $docId  = $docs[$slug]['document_id'];
@@ -549,7 +549,7 @@ try {
 
         // D4: cannot be moved back into processing (guard prevents the write).
         if (notTerminal($pdo, $docId)) {
-            setPreDecision($pdo, $docId, $status['On Process'], 'illegal', $userA);
+            setPreDecision($pdo, $docId, $status['For Encoding'], 'illegal', $userA);
         }
         $statusNow = $pdo->query("
             SELECT ds.name FROM plenary_document_details pdd
@@ -566,11 +566,11 @@ try {
 
     // Create a document that will be finalized
     $eFinalized = createAcceptedDoc($pdo, $lookups, $userA, 'Doc to be finalized ' . uniqid());
-    setPreDecision($pdo, $eFinalized['document_id'], $status['On Process'], 'Will be finalized', $userA);
+    setPreDecision($pdo, $eFinalized['document_id'], $status['For Encoding'], 'Will be finalized', $userA);
 
     // Create a document that will be referred to Committee
     $eCommittee = createAcceptedDoc($pdo, $lookups, $userA, 'Doc to be referred to Committee ' . uniqid());
-    setPreDecision($pdo, $eCommittee['document_id'], $status['On Process'], 'Will be referred', $userA);
+    setPreDecision($pdo, $eCommittee['document_id'], $status['For Encoding'], 'Will be referred', $userA);
 
     // Verify they initially appear in Accepted (still PLENARY phase)
     $acceptedBefore = acceptedList($pdo, $plenaryRoleId, $userA);
@@ -603,7 +603,7 @@ try {
 
     // Verify a document still in PLENARY phase still appears
     $eStillPlenary = createAcceptedDoc($pdo, $lookups, $userA, 'Doc still in PLENARY phase ' . uniqid());
-    setPreDecision($pdo, $eStillPlenary['document_id'], $status['On Process'], 'Still processing', $userA);
+    setPreDecision($pdo, $eStillPlenary['document_id'], $status['For Encoding'], 'Still processing', $userA);
     $acceptedAfterPlenary = acceptedList($pdo, $plenaryRoleId, $userA);
     check('E3: document still in PLENARY phase appears in Accepted tab', in_array($eStillPlenary['document_id'], $acceptedAfterPlenary, true));
 

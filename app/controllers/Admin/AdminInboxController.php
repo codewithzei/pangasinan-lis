@@ -162,7 +162,7 @@ class AdminInboxController
             LEFT  JOIN document_statuses ds            ON d.current_status_id      = ds.id
             LEFT  JOIN document_types    dt            ON d.document_type_id       = dt.id
             LEFT  JOIN source_types      st            ON d.source_type_id         = st.id
-            LEFT  JOIN external_offices  eo            ON d.external_office_id     = eo.id
+            LEFT  JOIN provincial_government_offices  eo            ON d.external_office_id     = eo.id
             LEFT  JOIN hospitals          h            ON d.hospital_id            = h.id
             LEFT  JOIN municities         m            ON d.municipality_id        = m.id
             LEFT  JOIN user_accounts     accepted_user ON da.accepted_by           = accepted_user.id
@@ -250,7 +250,7 @@ class AdminInboxController
             LEFT  JOIN document_types    dt ON d.document_type_id    = dt.id
             LEFT  JOIN document_statuses ds ON d.current_status_id   = ds.id
             LEFT  JOIN source_types      st ON d.source_type_id      = st.id
-            LEFT  JOIN external_offices  eo ON d.external_office_id  = eo.id
+            LEFT  JOIN provincial_government_offices  eo ON d.external_office_id  = eo.id
             LEFT  JOIN hospitals          h ON d.hospital_id          = h.id
             LEFT  JOIN municities         m ON d.municipality_id      = m.id
             LEFT  JOIN communication_categories cc ON d.communication_category_id = cc.id
@@ -435,6 +435,18 @@ class AdminInboxController
         // Post-accept processing actions are available only once this user
         // owns an ACCEPTED assignment.
         $canProcess = $isOwnedAcceptedAssignment;
+
+        // ── Motion for Reconsideration data ───────────────────────────────────
+        $mfrLink        = null;
+        $relatedMotions = [];
+        require_once __DIR__ . '/../../services/DocumentService.php';
+        $docService  = new DocumentService($this->pdo);
+        $docTypeName = $document['document_type_name'] ?? '';
+        if ($docTypeName === DocumentService::mfrTypeName()) {
+            $mfrLink = $docService->getMotionLink($documentId);
+        } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
+            $relatedMotions = $docService->getRelatedMotions($documentId);
+        }
 
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
         require __DIR__ . '/../../../resources/views/admin/inbox/show.php';

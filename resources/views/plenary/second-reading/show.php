@@ -136,11 +136,19 @@ ob_start();
                 <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Authorship</h2>
                 <?php if (!empty($authors)): ?>
                 <div><p class="text-xs text-gray-400 mb-1">Authors</p>
-                    <ul class="space-y-1"><?php foreach ($authors as $a): ?><li class="text-sm text-gray-800"><?= htmlspecialchars($a['full_name']) ?></li><?php endforeach; ?></ul>
+                    <?php if (!empty($authors[0]['is_all_selected'])): ?>
+                        <p class="text-sm text-gray-800">ALL</p>
+                    <?php else: ?>
+                        <ol class="list-decimal space-y-1 pl-5"><?php foreach ($authors as $a): ?><li class="text-sm text-gray-800"><?= htmlspecialchars($a['full_name']) ?></li><?php endforeach; ?></ol>
+                    <?php endif; ?>
                 </div><?php endif; ?>
                 <?php if (!empty($coAuthors)): ?>
                 <div><p class="text-xs text-gray-400 mb-1">Co-Authors</p>
-                    <ul class="space-y-1"><?php foreach ($coAuthors as $a): ?><li class="text-sm text-gray-800"><?= htmlspecialchars($a['full_name']) ?></li><?php endforeach; ?></ul>
+                    <?php if (!empty($coAuthors[0]['is_all_selected'])): ?>
+                        <p class="text-sm text-gray-800">ALL</p>
+                    <?php else: ?>
+                        <ol class="list-decimal space-y-1 pl-5"><?php foreach ($coAuthors as $a): ?><li class="text-sm text-gray-800"><?= htmlspecialchars($a['full_name']) ?></li><?php endforeach; ?></ol>
+                    <?php endif; ?>
                 </div><?php endif; ?>
             </div>
             <?php endif; ?>
@@ -164,7 +172,7 @@ ob_start();
             <!-- Committees -->
             <?php if (!empty($docCommittees)): ?>
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-2">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Committees in Charge</h2>
+                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Committee Referral</h2>
                 <ul class="space-y-1"><?php foreach ($docCommittees as $dc): ?>
                     <li><span class="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"><?= htmlspecialchars($dc['committee_name']) ?></span></li>
                 <?php endforeach; ?></ul>
@@ -180,7 +188,23 @@ ob_start();
                         <div><p class="text-xs text-emerald-700">Approved No.</p><p class="text-sm font-bold text-emerald-900"><?= htmlspecialchars($secondReadingDetails['approved_no']) ?></p></div>
                     <?php endif; ?>
                     <?php if (!empty($secondReadingDetails['date_finalized'])): ?>
-                        <div><p class="text-xs text-emerald-700">Date Finalized</p><p class="text-sm text-emerald-800"><?= htmlspecialchars(date('F j, Y', strtotime($secondReadingDetails['date_finalized']))) ?></p></div>
+                        <div><p class="text-xs text-emerald-700">Date Approved</p><p class="text-sm text-emerald-800"><?= htmlspecialchars(date('F j, Y', strtotime($secondReadingDetails['date_finalized']))) ?></p></div>
+                    <?php endif; ?>
+                    <?php if (!empty($secondReadingDetails['approval_files'])): ?>
+                        <div>
+                            <p class="text-xs text-emerald-700">Approval Attachments</p>
+                            <ul class="mt-1 space-y-1">
+                                <?php foreach ($secondReadingDetails['approval_files'] as $file): ?>
+                                    <li>
+                                        <a href="<?= BASE_URL ?>/<?= htmlspecialchars(ltrim($file['file_path'], '/')) ?>"
+                                           target="_blank" rel="noopener noreferrer"
+                                           class="text-sm text-primary underline">
+                                            <?= htmlspecialchars($file['original_filename']) ?>
+                                        </a>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
                     <?php endif; ?>
                 <?php elseif ($secondReading['action'] === 'WITHDRAWN'): ?>
                     <?php if (!empty($secondReadingDetails['date_withdrawn'])): ?>
@@ -219,8 +243,8 @@ ob_start();
                             <div class="space-y-3">
                                 <?php
                                 $srActions = [
-                                    ['value' => 'APPROVED',                       'label' => 'Approved on Second Reading',                     'desc'  => 'Approve the document; enter the Approved Number and Date Finalized.'],
-                                    ['value' => 'REFERRED_TO_COMMITTEE_SECOND',   'label' => 'Return / Refer to Committee',                     'desc'  => 'Refer back to Committee; document returns here after Committee workflow completes.'],
+                                    ['value' => 'APPROVED',                       'label' => 'Approved on Second Reading',                     'desc'  => 'Approve the document; enter the Resolution/Ordinance No. and Date Approved.'],
+                                    ['value' => 'REFERRED_TO_COMMITTEE_SECOND',   'label' => 'Referred back to Committee',                       'desc'  => 'Return the document to Committee; it will come back here after the Committee workflow completes.'],
                                     ['value' => 'DEFERRED',                       'label' => 'Defer',                                           'desc'  => 'Defer the document; status becomes "Second Reading Deferred".'],
                                     ['value' => 'WITHDRAWN',                      'label' => 'Withdraw',                                        'desc'  => 'Withdraw the document from the Second Reading workflow.'],
                                 ];
@@ -242,23 +266,39 @@ ob_start();
                         <div id="srApprovedSection" class="hidden space-y-4 rounded-xl bg-gray-50 border border-gray-200 p-4">
                             <h3 class="text-sm font-semibold text-gray-700">Approval Details</h3>
                             <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1" for="approved_no">Approved Number <span class="text-red-500">*</span></label>
+                                <label class="block text-xs font-medium text-gray-600 mb-1" for="approved_no">Resolution/Ordinance No. <span class="text-red-500">*</span></label>
                                 <input type="text" id="approved_no" name="approved_no"
                                        value="<?= htmlspecialchars($old['approved_no'] ?? '') ?>"
-                                       placeholder="e.g. Resolution No. 001-2026"
+                                       placeholder="e.g. SP Res. No. 001-2026 or SP Ordinance No. 001-2026"
                                        class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1" for="date_finalized">Date Finalized <span class="text-red-500">*</span></label>
+                                <label class="block text-xs font-medium text-gray-600 mb-1" for="date_finalized">Date Approved <span class="text-red-500">*</span></label>
                                 <input type="date" id="date_finalized" name="date_finalized"
                                        value="<?= htmlspecialchars($old['date_finalized'] ?? '') ?>"
                                        class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1" for="approved_subject_matter">Subject Matter (Approved) — leave blank to use original</label>
+                                <label class="block text-xs font-medium text-gray-600 mb-1" for="approved_subject_matter">Subject Matter (Approved)</label>
                                 <textarea id="approved_subject_matter" name="approved_subject_matter" rows="3"
-                                          placeholder="Leave blank to use original subject matter…"
-                                          class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"><?= htmlspecialchars($old['approved_subject_matter'] ?? '') ?></textarea>
+                                          placeholder="Enter the approved subject matter…"
+                                          class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"><?= htmlspecialchars($old['approved_subject_matter'] ?? $document['subject_matter'] ?? '') ?></textarea>
+                            </div>
+                            <div data-approval-file-upload data-required-when-radio="second_reading_action:APPROVED">
+                                <label class="mb-1 block text-xs font-medium text-gray-600">
+                                    Approval Attachments <span class="text-red-500">*</span>
+                                </label>
+                                <input type="file" name="approval_files[]" multiple
+                                       data-approval-file-input
+                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+                                       class="sr-only">
+                                <div data-approval-file-zone role="button" tabindex="0"
+                                     class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-white px-5 py-5 text-center hover:border-primary hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary/40">
+                                    <p class="text-sm font-medium text-gray-700">Drag &amp; drop files here, or browse</p>
+                                    <p class="mt-1 text-xs text-gray-400">Required · up to 10 files · max 25 MB each</p>
+                                </div>
+                                <ul data-approval-file-list class="mt-2 hidden space-y-2" aria-live="polite"></ul>
+                                <p data-approval-file-error class="mt-1 hidden text-xs text-red-600" role="alert"></p>
                             </div>
                         </div>
 

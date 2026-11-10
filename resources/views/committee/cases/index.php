@@ -167,7 +167,10 @@ ob_start();
                                 $docTypeBadge  = $case['document_type_badge_color'] ?? '#2563EB';
                                 $statusBadge   = $case['status_badge_color']        ?? '#6B7280';
                                 $docketDate    = $case['created_at'] ? date('M d, Y', strtotime($case['created_at'])) : '—';
-                                $caseType      = htmlspecialchars($case['nature_of_case'] ?? '—');
+                                $detailsPending = (bool) ($case['details_pending'] ?? false);
+                                $caseType      = $detailsPending
+                                    ? '—'
+                                    : htmlspecialchars($case['nature_of_case'] ?? '—');
                                 $actionCount   = (int) ($case['action_count'] ?? 0);
                             ?>
                             <tr class="hover:bg-gray-50 transition">
@@ -197,7 +200,14 @@ ob_start();
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 text-gray-600">
-                                    <?= $caseType ?>
+                                    <?php if ($detailsPending): ?>
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5
+                                                     text-xs font-medium text-amber-700 ring-1 ring-amber-100">
+                                            Details pending
+                                        </span>
+                                    <?php else: ?>
+                                        <?= $caseType ?>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="px-6 py-4">
                                     <span class="inline-flex items-center gap-1 text-xs text-gray-500">
@@ -272,6 +282,10 @@ ob_start();
     </section>
 
 </div>
+
+<!-- No modal JavaScript needed: "Proceed to Cases" now navigates to the
+     Cases page only. Case details and processing are entered via the
+     View Details link → committee/cases/show?id=… -->
 
 <?php
 $content = ob_get_clean();

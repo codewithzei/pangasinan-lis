@@ -254,7 +254,7 @@ class AdminCommunicationsController
             LEFT JOIN document_types           dt      ON d.document_type_id          = dt.id
             LEFT JOIN document_statuses        ds      ON d.current_status_id         = ds.id
             LEFT JOIN source_types             st      ON d.source_type_id            = st.id
-            LEFT JOIN external_offices         eo      ON d.external_office_id        = eo.id
+            LEFT JOIN provincial_government_offices         eo      ON d.external_office_id        = eo.id
             LEFT JOIN hospitals                h       ON d.hospital_id               = h.id
             LEFT JOIN municities               m       ON d.municipality_id           = m.id
             LEFT JOIN communication_categories cc      ON d.communication_category_id = cc.id

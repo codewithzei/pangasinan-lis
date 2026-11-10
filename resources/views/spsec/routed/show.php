@@ -207,7 +207,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
                     <?php if (!empty($document['external_office_name'])): ?>
                     <div>
-                        <p class="text-xs font-medium text-gray-500">External Office</p>
+                        <p class="text-xs font-medium text-gray-500">Provincial Government Offices</p>
                         <p class="mt-1 text-sm text-gray-900">
                             <?= htmlspecialchars($document['external_office_name']) ?>
                             <?php if (!empty($document['external_office_abbr'])): ?>
@@ -667,6 +667,12 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
     </div><!-- /grid -->
 
 </div>
+
+<?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'spsec/inbox';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
 
 <?php
 $content = ob_get_clean();

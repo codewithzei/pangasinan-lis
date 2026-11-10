@@ -205,10 +205,10 @@ if ($userRoleId !== null) {
             </nav>
         </div>
 
-        <div class="mb-7">
+        <!-- <div class="mb-7">
             <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">System Archive</p>
             <nav class="space-y-1">
-                <a href="<?= BASE_URL ?>/admin/archived-records" class="<?= $navBase ?> <?= isActiveNav('admin/archived-records', $currentRoute) ?>">
+                <a href="<?= BASE_URL ?>/admin/archive" class="<?= $navBase ?> <?= isActiveNav('admin/archive', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                               d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
@@ -216,7 +216,7 @@ if ($userRoleId !== null) {
                     Archive
                 </a>
             </nav>
-        </div>
+        </div> -->
         <?php endif; ?>
 
         <?php if (is_role('SP Secretary')): ?>
@@ -299,6 +299,13 @@ if ($userRoleId !== null) {
                               d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
                     </svg>
                     Communications
+                </a>
+                <a href="<?= BASE_URL ?>/plenary/petitions" class="<?= $navBase ?> <?= isActiveNav('plenary/petitions', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    Petitions
                 </a>
             </nav>
         </div>
@@ -495,7 +502,7 @@ if ($userRoleId !== null) {
             <nav class="space-y-1">
                 <a href="<?= BASE_URL ?>/master/external-offices" class="<?= $navBase ?> <?= isActiveNav('master/external-offices', $currentRoute) ?>">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-building-icon lucide-building"><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M12 6h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M16 6h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/><path d="M8 6h.01"/><path d="M9 22v-3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><rect x="4" y="2" width="16" height="20" rx="2"/></svg>
-                    External Offices
+                    Provincial Government Offices
                 </a>
                 <a href="<?= BASE_URL ?>/master/hospitals" class="<?= $navBase ?> <?= isActiveNav('master/hospitals', $currentRoute) ?>">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hospital-icon lucide-hospital"><path d="M12 7v4"/><path d="M14 21v-3a2 2 0 0 0-4 0v3"/><path d="M14 9h-4"/><path d="M18 11h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2"/><path d="M18 21V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16"/></svg>

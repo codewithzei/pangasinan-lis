@@ -286,7 +286,8 @@ class ArchivedRecordsController
         $documentTypes = $documentTypesStmt->fetchAll();
 
         $spMembersStmt = $this->pdo->prepare(
-            "SELECT sm.sp_member_id, CONCAT_WS(' ', sm.first_name, sm.last_name) AS full_name, sm.position
+            "SELECT sm.sp_member_id, CONCAT_WS(' ', sm.first_name, sm.last_name) AS full_name, sm.position,
+                    sm.is_active, sm.is_deleted
              FROM sp_members sm
              WHERE (sm.is_active = 1 AND sm.is_deleted = 0)
                 OR EXISTS (SELECT 1 FROM archived_records_authors ara
@@ -295,7 +296,6 @@ class ArchivedRecordsController
         );
         $spMembersStmt->execute([$id]);
         $spMembers = $spMembersStmt->fetchAll();
-
         $committeesStmt = $this->pdo->prepare(
             "SELECT c.id, c.name
              FROM committees c
@@ -867,23 +867,59 @@ class ArchivedRecordsController
     /** Insert authors for a record */
     private function saveAuthors(int $recordId, array $authors): void
     {
-        if (empty($authors)) {
-            return;
+        if (!empty($authors)) {
+            $stmt = $this->pdo->prepare("
+                INSERT INTO archived_records_authors
+                    (archived_record_id, sp_member_id, custom_author_name, author_role, sort_order)
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            foreach ($authors as $i => $author) {
+                $stmt->execute([
+                    $recordId,
+                    $author['sp_member_id'],
+                    $author['custom_author_name'],
+                    $author['role'],
+                    $i,
+                ]);
+            }
         }
-        $stmt = $this->pdo->prepare("
-            INSERT INTO archived_records_authors
-                (archived_record_id, sp_member_id, custom_author_name, author_role, sort_order)
-            VALUES (?, ?, ?, ?, ?)
-        ");
-        foreach ($authors as $i => $author) {
-            $stmt->execute([
-                $recordId,
-                $author['sp_member_id'],
-                $author['custom_author_name'],
-                $author['role'],
-                $i,
-            ]);
-        }
+
+        $activeMemberIds = array_map(
+            'intval',
+            $this->pdo->query("
+                SELECT sp_member_id
+                FROM sp_members
+                WHERE is_active = 1 AND is_deleted = 0
+            ")->fetchAll(PDO::FETCH_COLUMN)
+        );
+        $authorIds = array_map(
+            'intval',
+            array_column(
+                array_filter($authors, static fn(array $author): bool =>
+                    $author['role'] === 'AUTHOR' && $author['sp_member_id'] !== null
+                ),
+                'sp_member_id'
+            )
+        );
+        $coAuthorIds = array_map(
+            'intval',
+            array_column(
+                array_filter($authors, static fn(array $author): bool =>
+                    $author['role'] === 'CO_AUTHOR' && $author['sp_member_id'] !== null
+                ),
+                'sp_member_id'
+            )
+        );
+        $authorsAll = !empty($activeMemberIds)
+            && empty(array_diff($activeMemberIds, $authorIds)) ? 1 : 0;
+        $coAuthorsAll = !empty($activeMemberIds)
+            && empty(array_diff($activeMemberIds, $coAuthorIds)) ? 1 : 0;
+
+        $this->pdo->prepare("
+            UPDATE archived_records
+            SET authors_all = ?, co_authors_all = ?
+            WHERE id = ?
+        ")->execute([$authorsAll, $coAuthorsAll, $recordId]);
     }
 
     /** Insert committees for a record */

@@ -105,6 +105,23 @@ class DocumentService
             }
         }
 
+        // Motion for Reconsideration requires a reference to a finalized case.
+        if ($data['document_type_id'] > 0) {
+            $docTypeStmt = $this->pdo->prepare(
+                "SELECT name FROM document_types WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+            );
+            $docTypeStmt->execute([$data['document_type_id']]);
+            $docTypeName = (string) ($docTypeStmt->fetchColumn() ?: '');
+
+            if ($docTypeName === self::mfrTypeName()) {
+                $refId     = (int) ($data['referenced_document_id'] ?? 0);
+                $refResult = $this->validateMotionReference($refId);
+                if (!$refResult['valid']) {
+                    $errors[] = $refResult['error'];
+                }
+            }
+        }
+
         return $errors;
     }
 
@@ -116,17 +133,17 @@ class DocumentService
         $errors = [];
 
         switch ($sourceTypeName) {
-            case 'External Office':
+            case 'Provincial Government Offices':
                 if (empty($data['external_office_id'])) {
                     $errors[] = 'External office is required for this source type.';
                 } else {
                     $stmt = $this->pdo->prepare(
-                        "SELECT id FROM external_offices
+                        "SELECT id FROM provincial_government_offices
                           WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
                     );
                     $stmt->execute([$data['external_office_id']]);
                     if (!$stmt->fetch()) {
-                        $errors[] = 'Invalid external office selected.';
+                        $errors[] = 'Invalid provincial government office selected.';
                     }
                 }
                 break;
@@ -171,7 +188,9 @@ class DocumentService
                 if (empty($data['source_name'])) {
                     $errors[] = 'Client name is required for this source type.';
                 }
-                if (!empty($data['municipality_id'])) {
+                if (empty($data['municipality_id'])) {
+                    $errors[] = 'Municipality / City is required for this source type.';
+                } else {
                     $stmt = $this->pdo->prepare(
                         "SELECT id FROM municities
                           WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
@@ -480,6 +499,31 @@ class DocumentService
             // below, outside the try/catch transaction block).
             $pendingFileLogs = $this->takePendingFileLogs();
 
+            // 7b. Motion for Reconsideration — persist the case link.
+            //     The referenced_document_id was already validated in
+            //     validateSubmission(); we re-fetch the document type name here
+            //     inside the transaction to ensure consistency.
+            $mfrReferencedDocumentId = (int) ($data['referenced_document_id'] ?? 0);
+            if ($mfrReferencedDocumentId > 0 && $docTypeName === self::mfrTypeName()) {
+                $this->linkMotionToCase($documentId, $mfrReferencedDocumentId, $userId);
+
+                // Workflow event: MFR_LINKED
+                $this->pdo->prepare("
+                    INSERT INTO document_events (
+                        document_id, event_type, phase, performed_by,
+                        remarks, metadata
+                    ) VALUES (?, 'MFR_LINKED', 'RECEIVING', ?, ?, ?)
+                ")->execute([
+                    $documentId,
+                    $userId,
+                    "Motion for Reconsideration linked to document ID {$mfrReferencedDocumentId}.",
+                    json_encode([
+                        'referenced_document_id' => $mfrReferencedDocumentId,
+                        'ip_address'             => client_ip(),
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ]);
+            }
+
             // 8. Determine if a non-Noted forward routing option was selected.
             //    Routing options: 3=SP Secretary, 4=Plenary, 5=Committee, 6=Noted.
             //    When Admin selects one of 3–5 during direct intake the document
@@ -533,10 +577,10 @@ class DocumentService
             //     in the target role's inbox — NOT in the Admin Inbox.
             if ($isForwardRouted) {
                 // Update document phase/status to reflect immediate forward routing.
-                // Use "On Process" status (id=6) to signal it is in transit.
+                // Use "For Encoding" status to signal it is in transit.
                 $forwardStatusRow = $this->pdo->query(
                     "SELECT id FROM document_statuses
-                      WHERE name = 'On Process' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+                      WHERE name = 'For Encoding' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
                 )->fetch();
                 $forwardStatusId = $forwardStatusRow ? (int) $forwardStatusRow['id'] : $statusId;
 
@@ -902,7 +946,7 @@ class DocumentService
     public function getExternalOffices(): array
     {
         return $this->pdo->query(
-            "SELECT id, name, abbreviation FROM external_offices
+            "SELECT id, name, abbreviation FROM provincial_government_offices
               WHERE is_active = 1 AND is_deleted = 0 ORDER BY name ASC"
         )->fetchAll();
     }
@@ -1396,5 +1440,267 @@ class DocumentService
     {
         $t = DateTime::createFromFormat('H:i', $time);
         return $t && $t->format('H:i') === $time;
+    }
+
+    // =========================================================================
+    // Motion for Reconsideration helpers
+    // =========================================================================
+
+    /**
+     * Return the document_types.name string for "Motion for Reconsideration".
+     * Centralised so only this constant needs to change if the name ever does.
+     */
+    public static function mfrTypeName(): string
+    {
+        return 'Motion for Reconsideration';
+    }
+
+    /**
+     * Return the document type names that may be referenced by an MFR.
+     *
+     * @return string[]
+     */
+    public static function mfrEligibleReferenceTypeNames(): array
+    {
+        return ['Administrative Cases', 'Complaint'];
+    }
+
+    /**
+     * Return the finalized statuses whose documents are eligible to be
+     * referenced by a Motion for Reconsideration.
+     *
+     * Eligible = Complaint or Administrative Cases documents that have been
+     * finalized by Plenary (status name starts with "Plenary Cases: Finalized"
+     * or current_phase = 'FINALIZED').
+     *
+     * @return array  Array of document rows with id, tracking_number,
+     *                subject_matter, document_type_name, docket_number,
+     *                committee_case_id, status, finalized_at
+     */
+    public function getEligibleCasesForMotion(string $search = ''): array
+    {
+        $eligibleTypeNames = self::mfrEligibleReferenceTypeNames();
+        $ph = implode(',', array_fill(0, count($eligibleTypeNames), '?'));
+
+        $search = trim($search);
+        $params = $eligibleTypeNames;
+
+        $searchClause = '';
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $searchClause = "
+              AND (
+                  d.tracking_number LIKE ?
+                  OR d.subject_matter LIKE ?
+                  OR cc.docket_number LIKE ?
+              )";
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+        }
+
+        $stmt = $this->pdo->prepare("
+            SELECT
+                d.id,
+                d.tracking_number,
+                d.subject_matter,
+                dt.name             AS document_type_name,
+                ds.name             AS status_name,
+                d.finalized_at,
+                cc.id               AS committee_case_id,
+                cc.docket_number,
+                cc.nature_of_case,
+                cc.complainant_details,
+                cc.respondents,
+                cc.date_assigned
+            FROM documents d
+            INNER JOIN document_types    dt ON dt.id = d.document_type_id
+                                           AND dt.is_deleted = 0
+            INNER JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT  JOIN committee_cases   cc ON cc.document_id = d.id
+            WHERE dt.name IN ({$ph})
+              AND d.current_phase = 'FINALIZED'
+              {$searchClause}
+            ORDER BY d.tracking_number ASC
+            LIMIT 50
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Server-side validation for the Motion for Reconsideration reference.
+     *
+     * Checks:
+     *   1. The referenced_document_id is a positive integer.
+     *   2. The referenced document exists.
+     *   3. The referenced document's type is Complaint or Administrative Cases.
+     *   4. The referenced document's phase is FINALIZED.
+     *
+     * @param  int   $referencedDocumentId
+     * @return array{valid: bool, error: string, document: array|null}
+     */
+    public function validateMotionReference(int $referencedDocumentId): array
+    {
+        if ($referencedDocumentId <= 0) {
+            return [
+                'valid'    => false,
+                'error'    => 'A reference to the original Complaint or Administrative Case is required.',
+                'document' => null,
+            ];
+        }
+
+        $eligibleTypeNames = self::mfrEligibleReferenceTypeNames();
+        $ph = implode(',', array_fill(0, count($eligibleTypeNames), '?'));
+
+        $stmt = $this->pdo->prepare("
+            SELECT
+                d.id,
+                d.tracking_number,
+                d.subject_matter,
+                d.current_phase,
+                dt.name AS document_type_name
+            FROM documents d
+            INNER JOIN document_types dt ON dt.id = d.document_type_id AND dt.is_deleted = 0
+            WHERE d.id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$referencedDocumentId]);
+        $doc = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$doc) {
+            return [
+                'valid'    => false,
+                'error'    => 'The selected reference document does not exist.',
+                'document' => null,
+            ];
+        }
+
+        if (!in_array($doc['document_type_name'], $eligibleTypeNames, true)) {
+            return [
+                'valid'    => false,
+                'error'    => 'The selected reference document must be a Complaint or Administrative Case.',
+                'document' => $doc,
+            ];
+        }
+
+        if ($doc['current_phase'] !== 'FINALIZED') {
+            return [
+                'valid'    => false,
+                'error'    => 'The selected reference document has not been finalized by Plenary. Only finalized cases may be referenced.',
+                'document' => $doc,
+            ];
+        }
+
+        return [
+            'valid'    => true,
+            'error'    => '',
+            'document' => $doc,
+        ];
+    }
+
+    /**
+     * Persist the motion_reconsideration_links row.
+     * Must be called inside an active transaction.
+     *
+     * @param  int $mfrDocumentId        The newly-created MFR document ID.
+     * @param  int $referencedDocumentId The finalized case being challenged.
+     * @param  int $linkedBy             User ID of the receiving staff.
+     * @return int                       The new link row ID.
+     */
+    public function linkMotionToCase(
+        int $mfrDocumentId,
+        int $referencedDocumentId,
+        int $linkedBy
+    ): int {
+        $stmt = $this->pdo->prepare("
+            INSERT INTO motion_reconsideration_links
+                (mfr_document_id, referenced_document_id, linked_by, linked_at)
+            VALUES (?, ?, ?, NOW())
+        ");
+        $stmt->execute([$mfrDocumentId, $referencedDocumentId, $linkedBy]);
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    /**
+     * Retrieve the motion_reconsideration_links row for a given MFR document.
+     *
+     * @param  int        $mfrDocumentId
+     * @return array|null
+     */
+    public function getMotionLink(int $mfrDocumentId): ?array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT
+                mrl.*,
+                d.id               AS ref_id,
+                d.tracking_number  AS ref_tracking_number,
+                d.subject_matter   AS ref_subject_matter,
+                d.current_phase    AS ref_phase,
+                d.finalized_at     AS ref_finalized_at,
+                dt.name            AS ref_document_type_name,
+                dt.badge_color     AS ref_document_type_badge_color,
+                ds.name            AS ref_status,
+                ds.badge_color     AS ref_status_badge_color,
+                cc.id              AS ref_case_id,
+                cc.docket_number   AS ref_docket_number,
+                cc.nature_of_case  AS ref_nature_of_case,
+                cc.complainant_details AS ref_complainant_details,
+                cc.respondents     AS ref_respondents,
+                cc.date_assigned   AS ref_date_assigned,
+                pcfr.decision      AS ref_pcfr_decision,
+                pcfr.reading_date  AS ref_pcfr_reading_date,
+                pca.id             AS ref_adoption_id,
+                pca.resolution_number AS ref_resolution_number,
+                pca.proposed_number   AS ref_proposed_number,
+                pca.adopted_at        AS ref_adopted_at
+            FROM motion_reconsideration_links mrl
+            INNER JOIN documents        d    ON d.id    = mrl.referenced_document_id
+            LEFT  JOIN document_types   dt   ON dt.id   = d.document_type_id
+            LEFT  JOIN document_statuses ds  ON ds.id   = d.current_status_id
+            LEFT  JOIN committee_cases  cc   ON cc.document_id = d.id
+            LEFT  JOIN plenary_cases_first_reading pcfr ON pcfr.document_id = d.id
+            LEFT  JOIN plenary_cases_adoptions     pca  ON pca.document_id  = d.id
+            WHERE mrl.mfr_document_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$mfrDocumentId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
+     * Retrieve all Motion for Reconsideration links for a given original case
+     * document, including basic info about each MFR document.
+     *
+     * @param  int   $referencedDocumentId  The original case document ID.
+     * @return array
+     */
+    public function getRelatedMotions(int $referencedDocumentId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT
+                mrl.id              AS link_id,
+                mrl.linked_at,
+                mrl.mfr_document_id,
+                d.tracking_number   AS mfr_tracking_number,
+                d.subject_matter    AS mfr_subject_matter,
+                d.date_received     AS mfr_date_received,
+                d.current_phase     AS mfr_phase,
+                dt.name             AS mfr_document_type_name,
+                dt.badge_color      AS mfr_document_type_badge_color,
+                ds.name             AS mfr_status,
+                ds.badge_color      AS mfr_status_badge_color,
+                lb.username         AS linked_by_username
+            FROM motion_reconsideration_links mrl
+            INNER JOIN documents        d    ON d.id   = mrl.mfr_document_id
+            LEFT  JOIN document_types   dt   ON dt.id  = d.document_type_id
+            LEFT  JOIN document_statuses ds  ON ds.id  = d.current_status_id
+            LEFT  JOIN user_accounts    lb   ON lb.id  = mrl.linked_by
+            WHERE mrl.referenced_document_id = ?
+            ORDER BY mrl.linked_at DESC, mrl.id DESC
+        ");
+        $stmt->execute([$referencedDocumentId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }

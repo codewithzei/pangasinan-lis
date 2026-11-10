@@ -16,10 +16,17 @@ $actions             = $actions             ?? [];
 $attachmentsByAction = $attachmentsByAction ?? [];
 $finalizedByName     = $finalizedByName     ?? null;
 $linkedReport        = $linkedReport        ?? null;
+$success             = $success             ?? null;
+$error               = $error               ?? null;
+$errors              = $errors              ?? [];
+$old                 = $old                 ?? [];
 
 $caseId       = (int)   ($case['id']              ?? 0);
 $docketNumber = (string)($case['docket_number']   ?? '');
 $documentId   = (int)   ($case['document_id']     ?? 0);
+$caseDetailsComplete = trim($docketNumber) !== ''
+    && trim((string) ($case['nature_of_case'] ?? '')) !== ''
+    && trim((string) ($case['respondents'] ?? '')) !== '';
 
 // Respondents: split comma-separated string for display.
 $respondentsRaw  = (string)($case['respondents'] ?? '');
@@ -89,15 +96,111 @@ ob_start();
                 Committee / Cases / Details
             </p>
             <h1 class="font-mono text-xl font-bold text-gray-900">
-                <?= htmlspecialchars($docketNumber) ?>
+                <?= htmlspecialchars($caseDetailsComplete ? $docketNumber : 'Case Details Required') ?>
             </h1>
         </div>
     </div>
+
+    <?php if (!empty($success)): ?>
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            <?= htmlspecialchars($success) ?>
+        </div>
+    <?php endif; ?>
+    <?php if (!empty($error)): ?>
+        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <?= htmlspecialchars($error) ?>
+        </div>
+    <?php endif; ?>
+    <?php if (!empty($errors)): ?>
+        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <ul class="list-disc list-inside space-y-1">
+                <?php foreach ($errors as $validationError): ?>
+                    <li><?= htmlspecialchars($validationError) ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
 
         <!-- Left: case info + timeline (2/3) --------------------------------->
         <div class="space-y-6 xl:col-span-2">
+
+            <?php if (!$caseDetailsComplete): ?>
+                <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+                    <div class="mb-4">
+                        <h2 class="text-base font-semibold text-amber-900">Complete Case Details</h2>
+                        <p class="mt-1 text-sm text-amber-800">
+                            Save the docket number, nature of case, complainant details, and respondents before adding proceedings or setting an outcome.
+                        </p>
+                    </div>
+
+                    <form method="POST" action="<?= BASE_URL ?>/committee/cases/details" class="space-y-4">
+                        <input type="hidden" name="case_id" value="<?= $caseId ?>">
+
+                        <div>
+                            <label for="docket_number" class="block text-sm font-medium text-gray-700">
+                                Docket Number <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" id="docket_number" name="docket_number" required maxlength="100"
+                                   value="<?= htmlspecialchars($old['docket_number'] ?? $docketNumber) ?>"
+                                   placeholder="e.g. DKT-2026-0001"
+                                   class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label for="date_assigned" class="block text-sm font-medium text-gray-700">
+                                    Date Assigned <span class="text-red-500">*</span>
+                                </label>
+                                <input type="date" id="date_assigned" name="date_assigned" required
+                                       value="<?= htmlspecialchars($old['date_assigned'] ?? ($case['date_assigned'] ?? date('Y-m-d'))) ?>"
+                                       class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                            </div>
+                            <div>
+                                <label for="complainant_municipality" class="block text-sm font-medium text-gray-700">
+                                    Complainant Municipality / City
+                                </label>
+                                <input type="text" id="complainant_municipality" name="complainant_municipality" maxlength="255"
+                                       value="<?= htmlspecialchars($old['complainant_municipality'] ?? ($case['complainant_municipality'] ?? '')) ?>"
+                                       class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="nature_of_case" class="block text-sm font-medium text-gray-700">
+                                Nature of Case <span class="text-red-500">*</span>
+                            </label>
+                            <textarea id="nature_of_case" name="nature_of_case" rows="3" required maxlength="10000"
+                                      class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"><?= htmlspecialchars($old['nature_of_case'] ?? ($case['nature_of_case'] ?? '')) ?></textarea>
+                        </div>
+
+                        <div>
+                            <label for="complainant_details" class="block text-sm font-medium text-gray-700">
+                                Complainant Details <span class="text-red-500">*</span>
+                            </label>
+                            <textarea id="complainant_details" name="complainant_details" rows="3" required maxlength="5000"
+                                      class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"><?= htmlspecialchars($old['complainant_details'] ?? ($case['complainant_details'] ?? '')) ?></textarea>
+                        </div>
+
+                        <div>
+                            <label for="respondents" class="block text-sm font-medium text-gray-700">
+                                Respondents <span class="text-red-500">*</span>
+                            </label>
+                            <textarea id="respondents" name="respondents" rows="3" required maxlength="5000"
+                                      placeholder="Enter respondent names, separated by commas."
+                                      class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"><?= htmlspecialchars($old['respondents'] ?? ($case['respondents'] ?? '')) ?></textarea>
+                        </div>
+
+                        <div class="flex justify-end border-t border-amber-200 pt-4">
+                            <button type="submit"
+                                    class="inline-flex items-center gap-2 rounded-xl bg-amber-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 transition">
+                                Save Case Details
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            <?php endif; ?>
 
             <!-- Case summary card -------------------------------------------->
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
@@ -241,16 +344,24 @@ ob_start();
                     </div>
                     <!-- Add Action button -->
                     <button type="button" id="addActionBtn"
+                            <?= !$caseDetailsComplete ? 'disabled' : '' ?>
                             onclick="openActionModal()"
                             class="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2
-                                   text-sm font-semibold text-white hover:bg-purple-700 transition">
+                                text-sm font-semibold text-white hover:bg-purple-700 transition
+                                disabled:cursor-not-allowed disabled:opacity-40">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M12 4v16m8-8H4"/>
                         </svg>
-                        Add Action
+                        <?= $caseDetailsComplete ? 'Add Action' : 'Complete Case Details First' ?>
                     </button>
                 </div>
+
+                <?php if (!$caseDetailsComplete): ?>
+                    <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        Save the required case details above to enable proceedings.
+                    </div>
+                <?php endif; ?>
 
                 <?php if (empty($actions)): ?>
                     <!-- Empty state -->
@@ -547,7 +658,13 @@ ob_start();
                 <?php else: ?>
                     <!-- ── Not yet finalized — show the form ──────────────── -->
 
-                    <?php if ($actionCount === 0): ?>
+                            <?php if (!$caseDetailsComplete): ?>
+                                <div class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 mb-4">
+                                    <p class="text-sm text-amber-800">
+                                        Complete and save the required case details before setting a final outcome.
+                                    </p>
+                                </div>
+                            <?php elseif ($actionCount === 0): ?>
                         <!-- Blocked: no timeline actions yet -->
                         <div class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 mb-4">
                             <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-500" fill="none"
@@ -615,7 +732,7 @@ ob_start();
                             <!-- Confirm button -->
                             <button type="button"
                                     id="confirmOutcomeBtn"
-                                    <?= $actionCount === 0 ? 'disabled' : '' ?>
+                                    <?= $actionCount === 0 || !$caseDetailsComplete ? 'disabled' : '' ?>
                                     class="inline-flex w-full items-center justify-center gap-2
                                            rounded-xl px-4 py-2.5 text-sm font-semibold text-white
                                            bg-purple-600 hover:bg-purple-700 transition
@@ -707,7 +824,7 @@ ob_start();
                         <?php endif; ?>
                         <?php if (!empty($case['external_office_name'])): ?>
                             <div>
-                                <dt class="text-xs text-gray-400">External Office</dt>
+                                <dt class="text-xs text-gray-400">Provincial Government Offices</dt>
                                 <dd class="text-sm text-gray-700">
                                     <?= htmlspecialchars($case['external_office_name']) ?>
                                 </dd>
@@ -1269,6 +1386,12 @@ openActionModal();
 }());
 </script>
 <?php endif; ?>
+
+<?php
+// MFR relationship links — Cases show related MFRs; use committee/inbox for document detail links
+$mfrDetailRoute = 'committee/inbox';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
 
 <?php
 $content = ob_get_clean();

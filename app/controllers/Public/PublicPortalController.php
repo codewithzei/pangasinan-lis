@@ -412,20 +412,44 @@ class PublicPortalController
         // Sanitize filename for Content-Disposition header
         $safeFilename = preg_replace('/[^a-zA-Z0-9._-]/', '_', $attachment['file_name']);
         
-        // Log download (no user_id since this is public)
-        log_file_download(
-            $attachment['file_name'],
-            'ArchivedRecordAttachment',
-            (string)$id,
-            $attachment['file_path']
-        );
-        
+        // Inline mode is used only by the attachment preview; downloads remain the default.
+        $inlinePreview = ($_GET['mode'] ?? '') === 'inline';
+        if (!$inlinePreview) {
+            log_file_download(
+                $attachment['file_name'],
+                'ArchivedRecordAttachment',
+                (string)$id,
+                $attachment['file_path']
+            );
+        }
+        $extension = strtolower(pathinfo((string) $attachment['file_name'], PATHINFO_EXTENSION));
+        $inlineMimeTypes = [
+            'pdf'  => 'application/pdf',
+            'png'  => 'image/png',
+            'jpg'  => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'gif'  => 'image/gif',
+            'webp' => 'image/webp',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ];
+        if ($inlinePreview && !isset($inlineMimeTypes[$extension])) {
+            http_response_code(415);
+            die('Inline preview is not available for this file type.');
+        }
+        $disposition = $inlinePreview ? 'inline' : 'attachment';
+        $safeMimeType = $inlinePreview
+            ? $inlineMimeTypes[$extension]
+            : (preg_match(
+                '/\A[a-zA-Z0-9][a-zA-Z0-9.+-]*\/[a-zA-Z0-9][a-zA-Z0-9.+-]*\z/',
+                (string) $attachment['mime_type']
+            ) ? $attachment['mime_type'] : 'application/octet-stream');
+
         // Send file with security headers
-        header('Content-Type: ' . $attachment['mime_type']);
-        header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
+        header('Content-Type: ' . $safeMimeType);
+        header('Content-Disposition: ' . $disposition . '; filename="' . $safeFilename . '"');
         header('Content-Length: ' . $attachment['file_size']);
         header('X-Content-Type-Options: nosniff');
-        header('X-Frame-Options: DENY');
+        header('X-Frame-Options: ' . ($inlinePreview ? 'SAMEORIGIN' : 'DENY'));
         readfile($filePath);
         exit;
     }

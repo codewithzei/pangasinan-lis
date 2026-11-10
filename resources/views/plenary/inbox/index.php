@@ -44,7 +44,7 @@ function plenaryInboxPhaseLabel(string $phase): string
     };
 }
 
-// Status-based outcome tabs (slug => label). "On Process" is deliberately not
+// Status-based outcome tabs (slug => label). "For Encoding" is deliberately not
 // a tab — those documents continue through the existing Accepted flow.
 $outcomeTabs = [
     'deferred'         => 'Deferred',

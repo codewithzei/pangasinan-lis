@@ -3,7 +3,7 @@ ob_start();
 
 $success = $success ?? null;
 $error = $error ?? null;
-$pageTitle = $pageTitle ?? 'External Offices Management';
+$pageTitle = $pageTitle ?? 'Provincial Government Offices Management';
 $pageSubtitle = $pageSubtitle ?? '';
 $totalExternalOffices = $totalExternalOffices ?? 0;
 $activeExternalOffices = $activeExternalOffices ?? 0;
@@ -23,7 +23,7 @@ $accent = $accent ?? 'primary';
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div class="max-w-3xl">
-                    <p class="text-sm font-medium text-blue-100">EXTERNAL OFFICES MASTER DATA</p>
+                    <p class="text-sm font-medium text-blue-100">PROVINCIAL GOVERNMENT OFFICES MASTER DATA</p>
                     <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                         <?= htmlspecialchars($pageTitle) ?>
                     </h1>
@@ -37,7 +37,7 @@ $accent = $accent ?? 'primary';
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
-                        New External Office
+                        Add Provincial Government Office
                     </button>
                 </div>
             </div>
@@ -51,7 +51,7 @@ $accent = $accent ?? 'primary';
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Total External Offices</p>
+                        <p class="text-sm text-gray-500">Total Provincial Government Offices</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalExternalOffices) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
@@ -65,7 +65,7 @@ $accent = $accent ?? 'primary';
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Active External Offices</p>
+                        <p class="text-sm text-gray-500">Active Provincial Government Offices</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($activeExternalOffices) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
@@ -82,7 +82,7 @@ $accent = $accent ?? 'primary';
             <div class="rounded-2xl border border-gray-200 bg-white p-5">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Inactive External Offices</p>
+                        <p class="text-sm text-gray-500">Inactive Provincial Government Offices</p>
                         <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($inactiveExternalOffices) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-500">
@@ -102,7 +102,7 @@ $accent = $accent ?? 'primary';
     <section class="rounded-2xl border border-gray-200 bg-white">
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <h2 class="font-semibold text-gray-900">External Offices List</h2>
+                <h2 class="font-semibold text-gray-900">Provincial Government Offices List</h2>
                 <p class="mt-1 text-xs text-gray-500">
                     <?= $totalRows ?> record<?= $totalRows !== 1 ? 's' : '' ?> found
                 </p>
@@ -138,7 +138,7 @@ $accent = $accent ?? 'primary';
             <table class="w-full text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="px-6 py-3 font-medium">External Office</th>
+                        <th class="px-6 py-3 font-medium">Provincial Government Offices</th>
                         <th class="px-6 py-3 font-medium">Abbreviation</th>
                         <th class="px-6 py-3 font-medium">Sort</th>
                         <th class="px-6 py-3 font-medium">Status</th>
@@ -152,14 +152,14 @@ $accent = $accent ?? 'primary';
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-building-icon lucide-building"><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M12 6h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M16 6h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/><path d="M8 6h.01"/><path d="M9 22v-3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><rect x="4" y="2" width="16" height="20" rx="2"/></svg>
                                 </div>
-                                <p class="mt-4 text-sm font-medium text-gray-700">No external offices found.</p>
-                                <p class="mt-1 text-xs text-gray-500">Create your first external office to populate dropdowns.</p>
+                                <p class="mt-4 text-sm font-medium text-gray-700">No provincial government offices found.</p>
+                                <p class="mt-1 text-xs text-gray-500">Create your first provincial government office to populate dropdowns.</p>
                                 <button type="button" onclick="openExternalOfficeModal()"
                                     class="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition">
                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                     </svg>
-                                    Create External Office
+                                    Create Provincial Government Office
                                 </button>
                             </td>
                         </tr>
@@ -290,15 +290,15 @@ $accent = $accent ?? 'primary';
 
 </div>
 
-<!-- External Office Create/Edit Modal -->
+<!-- Provincial Government Offices Create/Edit Modal -->
 <div id="externalOfficeModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" role="dialog" aria-modal="true">
     <div id="externalOfficeModalPanel" class="relative w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100 transform scale-95 opacity-0 transition-all duration-200 max-h-[90vh] overflow-y-auto">
         <form id="externalOfficeForm" method="POST" action="<?= BASE_URL ?>/master/external-offices/store">
             <input type="hidden" name="id" id="externalOfficeId" value="">
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
                 <div>
-                    <h3 id="externalOfficeModalTitle" class="text-lg font-semibold text-gray-900">Create New External Office</h3>
-                    <p class="mt-0.5 text-xs text-gray-500">Fill in the external office details below.</p>
+                    <h3 id="externalOfficeModalTitle" class="text-lg font-semibold text-gray-900">Create Provincial Government Office</h3>
+                    <p class="mt-0.5 text-xs text-gray-500">Fill in the provincial government office details below.</p>
                 </div>
                 <button type="button" onclick="closeExternalOfficeModal()" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -310,7 +310,7 @@ $accent = $accent ?? 'primary';
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div class="sm:col-span-2">
                         <label class="mb-1.5 block text-xs font-semibold text-gray-700">
-                            External Office Name <span class="text-red-500">*</span>
+                            Provincial Government Office Name <span class="text-red-500">*</span>
                         </label>
                         <input type="text" name="name" id="externalOfficeName" value="<?= old('name') ?>"
                             class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -341,7 +341,7 @@ $accent = $accent ?? 'primary';
                                 class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
                             <div>
                                 <label for="isActive" class="cursor-pointer text-sm font-medium text-gray-800">Set as active</label>
-                                <p class="text-[11px] text-gray-500 mt-0.5">Active external offices appear in selection dropdowns.</p>
+                                <p class="text-[11px] text-gray-500 mt-0.5">Active provincial government offices appear in selection dropdowns.</p>
                             </div>
                         </div>
                     </div>
@@ -505,7 +505,7 @@ function showToast(message, type = 'success') {
     }, 4500);
 }
 
-// External Office Modal
+// Provincial Government Offices Modal
 let externalOfficeModalOpen = false;
 function resetExternalOfficeForm() {
     const form = document.getElementById('externalOfficeForm');
@@ -516,7 +516,7 @@ function resetExternalOfficeForm() {
     document.getElementById('sortOrder').value = '0';
     document.getElementById('isActive').checked = true;
     form.action = '<?= BASE_URL ?>/master/external-offices/store';
-    document.getElementById('externalOfficeModalTitle').textContent = 'Create New External Office';
+    document.getElementById('externalOfficeModalTitle').textContent = 'Create Provincial Government Office';
     document.getElementById('externalOfficeSubmitBtn').innerHTML = `
         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -577,7 +577,7 @@ async function editExternalOffice(id) {
         document.getElementById('sortOrder').value = eo.sort_order ?? 0;
         document.getElementById('isActive').checked = !!eo.is_active;
         document.getElementById('externalOfficeForm').action = '<?= BASE_URL ?>/master/external-offices/update';
-        document.getElementById('externalOfficeModalTitle').textContent = 'Edit External Office';
+        document.getElementById('externalOfficeModalTitle').textContent = 'Edit Provincial Government Office';
         document.getElementById('externalOfficeSubmitBtn').innerHTML = `
             <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -595,7 +595,7 @@ async function editExternalOffice(id) {
             pn.classList.add('scale-100', 'opacity-100');
         });
     } catch (e) {
-        showToast('Failed to load external office data.', 'error');
+        showToast('Failed to load provincial government office data.', 'error');
     }
 }
 
@@ -658,7 +658,7 @@ document.getElementById('confirmModal')?.addEventListener('click', function(e) {
 
 async function deleteExternalOffice(id, name) {
     openConfirmModal({
-        title: 'Delete External Office',
+        title: 'Delete Provincial Government Offices',
         message: `Are you sure you want to delete <strong class="text-gray-800">${name}</strong>?<br><span class="text-xs text-gray-500">This action soft-deletes the record and hides it from dropdowns.</span>`,
         confirmText: 'Delete',
         type: 'danger',
@@ -678,7 +678,7 @@ async function deleteExternalOffice(id, name) {
 async function toggleStatus(id, name) {
     openConfirmModal({
         title: 'Toggle Status',
-        message: `This will toggle the active status of <strong class="text-gray-800">${name}</strong>.<br><span class="text-xs text-gray-500">Inactive external offices are hidden from selection dropdowns.</span>`,
+        message: `This will toggle the active status of <strong class="text-gray-800">${name}</strong>.<br><span class="text-xs text-gray-500">Inactive provincial government offices are hidden from selection dropdowns.</span>`,
         confirmText: 'Proceed',
         type: 'info',
         onConfirm: async () => {

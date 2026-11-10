@@ -46,19 +46,22 @@ $documentId            = (int) ($document['id'] ?? 0);
 $trackingNumber        = $document['tracking_number'] ?? '';
 $proposedNumberExempt  = $proposedNumberExempt ?? false;
 $isCommunication       = $isCommunication ?? false;
+// Complaints / Administrative Cases skip the full processing details form.
+$isCases               = $isCases ?? false;
 
 if (!isset($canAccept))  { $canAccept  = false; }
 if (!isset($canProcess)) { $canProcess = false; }
 
-// Determine if pre-decision is "On Process" to show the processing form
+// Determine if pre-decision is "For Encoding" to show the processing form
 // Use plenary_details for internal workflow logic, but display shared status
 $currentPreDecisionStatus = strtolower(trim($plenaryDetails['plenary_status_name'] ?? ''));
-$isOnProcess = ($currentPreDecisionStatus === 'on process');
+$isOnProcess = ($currentPreDecisionStatus === 'for encoding');
 
 // Outcome-specific flags (status-based tabs)
 $isDeferred        = ($currentPreDecisionStatus === 'deferred');
 $isLayOnTheTable   = ($currentPreDecisionStatus === 'lay on the table');
 $isTerminalOutcome = in_array($currentPreDecisionStatus, ['noted', 'remanded', 'withdrawn'], true);
+$hasRecordedPreDecision = !empty($plenaryDetails['status_id']);
 
 // Use shared document status for display (now synchronized with Plenary status)
 $displayStatusName = $document['status_name'] ?? '';
@@ -343,6 +346,9 @@ ob_start();
                                      border-color: <?= htmlspecialchars($displayStatusBadgeColor) ?>40;">
                             <?= htmlspecialchars($displayStatusName) ?>
                         </span>
+                        <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                            Already recorded
+                        </span>
                         <?php if (!empty($plenaryDetails['remarks'])): ?>
                             <span class="text-xs text-indigo-600 italic">
                                 "<?= htmlspecialchars(mb_strimwidth($plenaryDetails['remarks'], 0, 80, '…')) ?>"
@@ -352,6 +358,11 @@ ob_start();
                 </div>
             <?php endif; ?>
 
+            <?php if ($hasRecordedPreDecision): ?>
+                <p class="text-sm text-gray-600">
+                    This pre-decision status has already been recorded and cannot be changed.
+                </p>
+            <?php else: ?>
             <form method="POST" action="<?= BASE_URL ?>/plenary/inbox/process" class="space-y-4">
                 <input type="hidden" name="document_id" value="<?= $documentId ?>">
                 <input type="hidden" name="action"      value="pre_decision">
@@ -410,6 +421,7 @@ ob_start();
                     </button>
                 </div>
             </form>
+            <?php endif; ?>
         </section>
 
         <!-- ─────────────────────────────────────────────────────────────────── -->
@@ -485,9 +497,47 @@ ob_start();
         <?php endif; ?>
 
         <!-- ─────────────────────────────────────────────────────────────────── -->
-        <!-- Section 4: Plenary Processing Form (On Process only)         -->
+        <!-- Section 4: Plenary Processing Form (For Encoding only)         -->
         <!-- ─────────────────────────────────────────────────────────────────── -->
         <?php if ($canSaveProcessing): ?>
+            <?php if ($isCases): ?>
+            <!-- ── Cases fast-path: no details needed, just advance to FR ── -->
+            <section class="rounded-2xl border border-indigo-200 bg-indigo-50 p-6" aria-label="Send to First Reading">
+                <div class="mb-4 flex items-start gap-2">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100">
+                        <svg class="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <h2 class="text-base font-semibold text-indigo-900">Send to First Reading — Petitions</h2>
+                        <p class="mt-1 text-xs text-indigo-700 leading-5">
+                            Complaints and Administrative Cases do not require Proposed Number, Authors,
+                            Committees, or Session Type at this stage.
+                            Clicking <strong>Send to First Reading</strong> will advance this document
+                            directly to the <strong>First Reading → Petitions</strong> queue.
+                        </p>
+                    </div>
+                </div>
+                <form method="POST" action="<?= BASE_URL ?>/plenary/inbox/process" class="space-y-4">
+                    <input type="hidden" name="document_id" value="<?= $documentId ?>">
+                    <input type="hidden" name="action"      value="save_processing">
+                    <div class="flex items-center gap-3 pt-1">
+                        <button type="submit"
+                                class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5
+                                       text-sm font-semibold text-white hover:bg-indigo-700 transition
+                                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                            </svg>
+                            Send to First Reading
+                        </button>
+                    </div>
+                </form>
+            </section>
+            <?php else: ?>
             <section class="rounded-2xl border border-violet-200 bg-white p-6">
                 <div class="mb-4 flex items-center gap-2">
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100">
@@ -498,7 +548,7 @@ ob_start();
                     </span>
                     <div>
                         <h2 class="text-base font-semibold text-violet-900">Plenary Processing Details</h2>
-                        <p class="text-xs text-violet-600">Available because status is "On Process"</p>
+                        <p class="text-xs text-violet-600">Available because status is "For Encoding"</p>
                     </div>
                 </div>
 
@@ -524,11 +574,16 @@ ob_start();
                             $m['suffix']      ?? '',
                         ]))),
                         'position'     => $m['position'] ?? '',
+                        'is_selectable' => !empty($m['is_active']) && empty($m['is_deleted']),
                     ];
                 }, $spMembers);
 
                 $committeesForJs = array_map(static function ($c) {
-                    return ['id' => (int) ($c['id'] ?? 0), 'name' => $c['name'] ?? ''];
+                    return [
+                        'id' => (int) ($c['id'] ?? 0),
+                        'name' => $c['name'] ?? '',
+                        'is_selectable' => !empty($c['is_active']) && empty($c['is_deleted']),
+                    ];
                 }, $committees);
 
                 $spMembersJson  = json_encode(array_values($spMembersForJs),  JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
@@ -602,6 +657,9 @@ ob_start();
                             <p class="mb-2 text-xs text-gray-500">Search and select multiple SP members.</p>
                             <div class="ar-multi-select" data-list-key="spMembers" data-role="AUTHOR"
                                  data-selected="<?= htmlspecialchars(json_encode(array_values($currentAuthorIds)), ENT_QUOTES, 'UTF-8') ?>">
+                                <button type="button" class="ar-select-all mb-2 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+                                    Select all members
+                                </button>
                                 <div class="ar-multi-control">
                                     <div class="ar-multi-chips"></div>
                                     <input type="text" class="ar-multi-filter"
@@ -628,6 +686,9 @@ ob_start();
                             </p>
                             <div class="ar-multi-select" data-list-key="spMembers" data-role="CO_AUTHOR"
                                  data-selected="<?= htmlspecialchars(json_encode(array_values($currentCoAuthorIds)), ENT_QUOTES, 'UTF-8') ?>">
+                                <button type="button" class="ar-select-all mb-2 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+                                    Select all members
+                                </button>
                                 <div class="ar-multi-control">
                                     <div class="ar-multi-chips"></div>
                                     <input type="text" class="ar-multi-filter"
@@ -644,10 +705,10 @@ ob_start();
                         </div>
                     </div>
 
-                    <!-- Committees in Charge -->
+                    <!-- Committee Referral -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Committees in Charge
+                            Committee Referral
                             <span class="text-xs font-normal text-gray-400">(select one or more)</span>
                         </label>
                         <p class="mb-2 text-xs text-gray-500">Search and select multiple committees.</p>
@@ -797,6 +858,17 @@ ob_start();
                         widget.dataset.selected = JSON.stringify(Array.from(selected));
                     }
 
+                    function renderSelectAllButton() {
+                        var selectAll = widget.querySelector('.ar-select-all');
+                        if (!selectAll) { return; }
+                        var selectableItems = items.filter(function (item) { return item.is_selectable !== false; });
+                        var allSelected = selectableItems.length > 0 && selectableItems.every(function (item) {
+                            return selected.has(String(item[idField]));
+                        });
+                        selectAll.textContent = allSelected ? 'Clear all' : 'Select all members';
+                        selectAll.setAttribute('aria-pressed', String(allSelected));
+                    }
+
                     // A member chosen in the opposite role (AUTHOR vs CO_AUTHOR) is locked out.
                     function assignedToOtherRole(id) {
                         if (listKey !== 'spMembers' || !role || !form) { return false; }
@@ -859,12 +931,14 @@ ob_start();
                             empty.className = 'ar-multi-empty';
                             empty.textContent = q ? 'No matching options' : 'No options available';
                             options.appendChild(empty);
+                            renderSelectAllButton();
                             return;
                         }
                         matching.forEach(function (item) {
                             var id         = String(item[idField]);
                             var isSelected = selected.has(id);
-                            var isBlocked  = assignedToOtherRole(id) && !isSelected;
+                            var isUnavailable = item.is_selectable === false && !isSelected;
+                            var isBlocked  = (assignedToOtherRole(id) && !isSelected) || isUnavailable;
                             var option = document.createElement('button');
                             option.type = 'button';
                             option.className = 'ar-multi-option' + (isBlocked ? ' ar-option-disabled' : '');
@@ -885,11 +959,13 @@ ob_start();
                                 saveSelection();
                                 renderChips();
                                 renderOptions(filter.value);
+                                renderSelectAllButton();
                                 refreshSiblings();
                                 filter.focus();
                             });
                             options.appendChild(option);
                         });
+                        renderSelectAllButton();
                     }
 
                     function focusOption(delta) {
@@ -919,6 +995,28 @@ ob_start();
 
                     filter.addEventListener('focus', openDropdown);
                     filter.addEventListener('input', function () { renderOptions(filter.value); });
+                    var selectAll = widget.querySelector('.ar-select-all');
+                    if (selectAll) {
+                        selectAll.addEventListener('click', function () {
+                            var allIds = items.filter(function (item) {
+                                return item.is_selectable !== false;
+                            }).map(function (item) { return String(item[idField]); });
+                            var blockedIds = allIds.filter(assignedToOtherRole);
+                            if (blockedIds.length > 0) {
+                                window.alert('Remove the selections in the other role before selecting all members here.');
+                                return;
+                            }
+                            if (allIds.length > 0 && allIds.every(function (id) { return selected.has(id); })) {
+                                selected.clear();
+                            } else {
+                                allIds.forEach(function (id) { selected.add(id); });
+                            }
+                            saveSelection();
+                            renderChips();
+                            renderOptions(filter.value);
+                            refreshSiblings();
+                        });
+                    }
                     filter.addEventListener('keydown', function (event) {
                         if (event.key === 'Escape') { closeDropdown(); return; }
                         if (event.key === 'ArrowDown') { event.preventDefault(); focusOption(1); return; }
@@ -951,6 +1049,7 @@ ob_start();
                     widget.__renderOptions = renderOptions;
                     renderChips();
                     renderOptions('');
+                    renderSelectAllButton();
                 }
 
                 // Close any open dropdown when clicking outside of it.
@@ -995,6 +1094,7 @@ ob_start();
                 })();
                 </script>
             </section>
+            <?php endif; // $isCases — end of Cases fast-path vs full-form branch ?>
         <?php else: ?>
             <!-- Processing form is locked — show current data read-only -->
             <?php if ($plenaryDetails): ?>
@@ -1006,7 +1106,7 @@ ob_start();
                         </svg>
                         <p class="text-sm text-gray-500 italic">
                             Plenary processing form is available only when the pre-decision status is
-                            <strong>"On Process"</strong>.
+                            <strong>"For Encoding"</strong>.
                         </p>
                     </div>
                     <?php require __DIR__ . '/../../partials/plenary-details.php'; ?>
@@ -1067,9 +1167,15 @@ ob_start();
                         <div>
                             <dt class="text-xs font-semibold uppercase tracking-wide text-indigo-400">Authors</dt>
                             <dd class="mt-2 space-y-1">
-                                <?php foreach ($authors as $a): ?>
-                                    <div class="text-sm text-indigo-900"><?= htmlspecialchars($a['full_name'] ?? '') ?></div>
-                                <?php endforeach; ?>
+                                <?php if (!empty($authors[0]['is_all_selected'])): ?>
+                                    <div class="text-sm text-indigo-900">ALL</div>
+                                <?php else: ?>
+                                    <ol class="list-decimal space-y-1 pl-5">
+                                        <?php foreach ($authors as $a): ?>
+                                            <li class="text-sm text-indigo-900"><?= htmlspecialchars($a['full_name'] ?? '') ?></li>
+                                        <?php endforeach; ?>
+                                    </ol>
+                                <?php endif; ?>
                             </dd>
                         </div>
                     <?php endif; ?>
@@ -1077,9 +1183,15 @@ ob_start();
                         <div>
                             <dt class="text-xs font-semibold uppercase tracking-wide text-indigo-400">Co-Authors</dt>
                             <dd class="mt-2 space-y-1">
-                                <?php foreach ($coAuthors as $a): ?>
-                                    <div class="text-sm text-indigo-900"><?= htmlspecialchars($a['full_name'] ?? '') ?></div>
-                                <?php endforeach; ?>
+                                <?php if (!empty($coAuthors[0]['is_all_selected'])): ?>
+                                    <div class="text-sm text-indigo-900">ALL</div>
+                                <?php else: ?>
+                                    <ol class="list-decimal space-y-1 pl-5">
+                                        <?php foreach ($coAuthors as $a): ?>
+                                            <li class="text-sm text-indigo-900"><?= htmlspecialchars($a['full_name'] ?? '') ?></li>
+                                        <?php endforeach; ?>
+                                    </ol>
+                                <?php endif; ?>
                             </dd>
                         </div>
                     <?php endif; ?>
@@ -1089,7 +1201,7 @@ ob_start();
             <!-- Committees (read-only) -->
             <?php if (!empty($docCommittees)): ?>
                 <div class="mt-4">
-                    <dt class="text-xs font-semibold uppercase tracking-wide text-indigo-400">Committees in Charge</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-indigo-400">Committee Referral</dt>
                     <dd class="mt-2 flex flex-wrap gap-2">
                         <?php foreach ($docCommittees as $dc): ?>
                             <span class="inline-flex items-center rounded-lg bg-indigo-100 px-2.5 py-1
@@ -1222,6 +1334,12 @@ ob_start();
     <?php endif; ?>
 
 </div>
+
+<?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'plenary/inbox';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
 
 <?php
 $content = ob_get_clean();

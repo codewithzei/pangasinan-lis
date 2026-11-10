@@ -171,14 +171,14 @@ try {
     check("Shared status has valid badge color", !empty($sharedStatus['badge_color']));
     echo PHP_EOL;
 
-    echo "Test 4: Status change to On Process synchronizes correctly" . PHP_EOL;
+    echo "Test 4: Status change to For Encoding synchronizes correctly" . PHP_EOL;
 
-    $onProcessStatus = $pdo->query("SELECT id FROM document_statuses WHERE name = 'On Process' LIMIT 1")->fetch();
+    $onProcessStatus = $pdo->query("SELECT id FROM document_statuses WHERE name = 'For Encoding' LIMIT 1")->fetch();
     if (!$onProcessStatus) {
-        throw new RuntimeException("On Process status not found");
+        throw new RuntimeException("For Encoding status not found");
     }
 
-    // Update to On Process
+    // Update to For Encoding
     $pdo->prepare("
         UPDATE plenary_document_details
         SET status_id = ?, updated_by = ?
@@ -195,12 +195,12 @@ try {
     $docRow = $pdo->query("SELECT current_status_id FROM documents WHERE id = {$docId}")->fetch();
     $pddRow = $pdo->query("SELECT status_id FROM plenary_document_details WHERE document_id = {$docId}")->fetch();
 
-    check("documents.current_status_id updated to On Process", $docRow['current_status_id'] == $onProcessStatus['id']);
-    check("plenary_document_details.status_id is On Process", $pddRow['status_id'] == $onProcessStatus['id']);
+    check("documents.current_status_id updated to For Encoding", $docRow['current_status_id'] == $onProcessStatus['id']);
+    check("plenary_document_details.status_id is For Encoding", $pddRow['status_id'] == $onProcessStatus['id']);
     check("Both statuses remain synchronized", $docRow['current_status_id'] == $pddRow['status_id']);
     echo PHP_EOL;
 
-    echo "Test 5: Compliance submission (Deferred → On Process) synchronizes" . PHP_EOL;
+    echo "Test 5: Compliance submission (Deferred → For Encoding) synchronizes" . PHP_EOL;
 
     // Reset to Deferred
     $pdo->prepare("
@@ -215,7 +215,7 @@ try {
         WHERE id = ?
     ")->execute([$deferredStatus['id'], $userId, $docId]);
 
-    // Simulate compliance submission (return to On Process)
+    // Simulate compliance submission (return to For Encoding)
     $pdo->prepare("
         UPDATE plenary_document_details
         SET status_id = ?, updated_by = ?
@@ -232,8 +232,8 @@ try {
     $docRow = $pdo->query("SELECT current_status_id FROM documents WHERE id = {$docId}")->fetch();
     $pddRow = $pdo->query("SELECT status_id FROM plenary_document_details WHERE document_id = {$docId}")->fetch();
 
-    check("documents.current_status_id is On Process after compliance", $docRow['current_status_id'] == $onProcessStatus['id']);
-    check("plenary_document_details.status_id is On Process after compliance", $pddRow['status_id'] == $onProcessStatus['id']);
+    check("documents.current_status_id is For Encoding after compliance", $docRow['current_status_id'] == $onProcessStatus['id']);
+    check("plenary_document_details.status_id is For Encoding after compliance", $pddRow['status_id'] == $onProcessStatus['id']);
     echo PHP_EOL;
 
     echo "Test 6: Terminal status (Noted) synchronizes" . PHP_EOL;

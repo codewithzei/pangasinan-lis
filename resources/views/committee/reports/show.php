@@ -133,11 +133,11 @@ ob_start();
                 </div>
             </div>
 
-            <!-- Committees in charge -->
+            <!-- Committee referral -->
             <?php if (!empty($reportCommittees)): ?>
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-2">
                 <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Committee<?= count($reportCommittees) > 1 ? 's' : '' ?> in Charge
+                    Committee Referral
                 </h2>
                 <ul class="space-y-1">
                     <?php foreach ($reportCommittees as $comm): ?>

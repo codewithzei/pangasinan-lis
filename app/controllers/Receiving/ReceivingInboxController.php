@@ -134,7 +134,7 @@ class ReceivingInboxController
                 LEFT  JOIN document_statuses ds ON d.current_status_id = ds.id
                 LEFT  JOIN document_types    dt ON d.document_type_id  = dt.id
                 LEFT  JOIN source_types      st ON d.source_type_id    = st.id
-                LEFT  JOIN external_offices  eo ON d.external_office_id = eo.id
+                LEFT  JOIN provincial_government_offices  eo ON d.external_office_id = eo.id
                 LEFT  JOIN hospitals          h ON d.hospital_id        = h.id
                 LEFT  JOIN municities         m ON d.municipality_id    = m.id
                 LEFT  JOIN (
@@ -184,7 +184,7 @@ class ReceivingInboxController
                 LEFT  JOIN document_statuses ds ON d.current_status_id = ds.id
                 LEFT  JOIN document_types    dt ON d.document_type_id  = dt.id
                 LEFT  JOIN source_types      st ON d.source_type_id    = st.id
-                LEFT  JOIN external_offices  eo ON d.external_office_id = eo.id
+                LEFT  JOIN provincial_government_offices  eo ON d.external_office_id = eo.id
                 LEFT  JOIN hospitals          h ON d.hospital_id        = h.id
                 LEFT  JOIN municities         m ON d.municipality_id    = m.id
                 LEFT  JOIN user_accounts ua_accepted ON da.accepted_by = ua_accepted.id
@@ -356,7 +356,7 @@ class ReceivingInboxController
             LEFT  JOIN document_types    dt ON d.document_type_id    = dt.id
             LEFT  JOIN document_statuses ds ON d.current_status_id   = ds.id
             LEFT  JOIN source_types      st ON d.source_type_id      = st.id
-            LEFT  JOIN external_offices  eo ON d.external_office_id  = eo.id
+            LEFT  JOIN provincial_government_offices  eo ON d.external_office_id  = eo.id
             LEFT  JOIN hospitals          h ON d.hospital_id          = h.id
             LEFT  JOIN municities         m ON d.municipality_id      = m.id
             LEFT  JOIN user_accounts   creator ON d.created_by       = creator.id
@@ -447,10 +447,10 @@ class ReceivingInboxController
         ");
         $sourceTypes = $sourceTypesStmt->fetchAll();
 
-        // Fetch external offices
+        // Fetch provincial government offices
         $externalOfficesStmt = $this->pdo->query("
             SELECT id, name, abbreviation
-            FROM external_offices
+            FROM provincial_government_offices
             WHERE is_active = 1 AND is_deleted = 0
             ORDER BY name ASC
         ");
@@ -484,6 +484,16 @@ class ReceivingInboxController
         $spMembers = $spMembersStmt->fetchAll();
 
         $old     = old_get();
+
+        // ── Motion for Reconsideration data ───────────────────────────────────
+        $mfrLink        = null;
+        $relatedMotions = [];
+        $docTypeName    = $document['document_type_name'] ?? '';
+        if ($docTypeName === DocumentService::mfrTypeName()) {
+            $mfrLink = $this->docService->getMotionLink($documentId);
+        } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
+            $relatedMotions = $this->docService->getRelatedMotions($documentId);
+        }
 
         $pageTitle = $isAccepted ? 'Edit Returned Document' : 'View Returned Document';
         require __DIR__ . '/../../../resources/views/receiving/inbox/show.php';
@@ -569,7 +579,7 @@ class ReceivingInboxController
         // reaching the UPDATE query even when the frontend failed to clear them.
         //
         // Rules:
-        //   External Office → keep external_office_id
+        //   Provincial Government Offices → keep external_office_id
         //                      clear hospital_id, municipality_id, sp_member_id, source_name
         //   Hospital        → keep hospital_id
         //                      clear external_office_id, municipality_id, sp_member_id, source_name
@@ -592,7 +602,7 @@ class ReceivingInboxController
         }
 
         switch ($sourceTypeName) {
-            case 'External Office':
+            case 'Provincial Government Offices':
                 $data['hospital_id']      = null;
                 $data['municipality_id']  = null;
                 $data['sp_member_id']     = null;

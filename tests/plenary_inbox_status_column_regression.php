@@ -32,7 +32,7 @@
  *        - no "Unknown column 'pdd.status_id'" error is raised, and
  *        - the status-based filtering is correct (a Deferred doc shows in the
  *          deferred outcome tab and is excluded from the accepted tab; an
- *          On Process doc stays in accepted and is excluded from outcome tabs;
+ *          For Encoding doc stays in accepted and is excluded from outcome tabs;
  *          ownership scoping still hides other users' rows).
  *
  * Strategy: wrap all DB work in a transaction and ROLLBACK at the end.
@@ -321,7 +321,7 @@ try {
     // Pre-decision statuses (seeded by migrations 065 / 069).
     $rows = $pdo->query("
         SELECT id, name FROM document_statuses
-        WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','On Process','Withdrawn')
+        WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','For Encoding','Withdrawn')
           AND is_active=1 AND is_deleted=0
     ")->fetchAll(PDO::FETCH_ASSOC);
     $status = [];
@@ -329,7 +329,7 @@ try {
         $status[$r['name']] = (int) $r['id'];
     }
     $missing = array_diff(
-        ['Deferred', 'Lay on the Table', 'Noted', 'Remanded', 'On Process', 'Withdrawn'],
+        ['Deferred', 'Lay on the Table', 'Noted', 'Remanded', 'For Encoding', 'Withdrawn'],
         array_keys($status)
     );
     if (!empty($missing)) {
@@ -372,13 +372,13 @@ try {
         return $docId;
     };
 
-    // Documents in every outcome status + one On Process + one with no pdd row.
+    // Documents in every outcome status + one For Encoding + one with no pdd row.
     $docDeferred   = $createAccepted($userA, $status['Deferred']);
     $docLayTable   = $createAccepted($userA, $status['Lay on the Table']);
     $docNoted      = $createAccepted($userA, $status['Noted']);
     $docRemanded   = $createAccepted($userA, $status['Remanded']);
     $docWithdrawn  = $createAccepted($userA, $status['Withdrawn']);
-    $docOnProcess  = $createAccepted($userA, $status['On Process']);
+    $docOnProcess  = $createAccepted($userA, $status['For Encoding']);
 
     // Document with no plenary_document_details row (no pre-decision yet):
     $seq++;
@@ -443,13 +443,13 @@ try {
         }
     }
 
-    // ── F4: On Process doc stays in accepted, not in any outcome tab
+    // ── F4: For Encoding doc stays in accepted, not in any outcome tab
     foreach (array_keys(OUTCOME_TABS) as $slug) {
         $otherList = listForView($pdo, $plenaryRoleId, $userA, $slug);
-        check("F4.{$slug}: On Process doc is NOT in the '{$slug}' tab", !in_array($docOnProcess, $otherList, true));
+        check("F4.{$slug}: For Encoding doc is NOT in the '{$slug}' tab", !in_array($docOnProcess, $otherList, true));
     }
     $acc2 = listForView($pdo, $plenaryRoleId, $userA, 'accepted');
-    check('F4b: On Process doc stays in accepted', in_array($docOnProcess, $acc2, true));
+    check('F4b: For Encoding doc stays in accepted', in_array($docOnProcess, $acc2, true));
 
     // ── F5: doc with no pdd row stays in accepted (pdd.status_id IS NULL branch)
     check('F5: doc with no plenary_document_details stays in accepted', in_array($docNoPdd, $acc2, true));

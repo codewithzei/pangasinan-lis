@@ -307,31 +307,6 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                         </a>
 
                                         <?php if ($isOwner): ?>
-                                            <!-- Route to Plenary -->
-                                            <form method="POST" action="<?= BASE_URL ?>/spsec/inbox/process"
-                                                  onsubmit="return confirm('Route document <?= htmlspecialchars($row['tracking_number']) ?> to Plenary?');">
-                                                <input type="hidden" name="document_id" value="<?= (int) $row['document_id'] ?>">
-                                                <input type="hidden" name="action"      value="route_plenary">
-                                                <button type="submit"
-                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 transition"
-                                                        title="Route to Plenary">
-                                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                                    </svg>
-                                                    Plenary
-                                                </button>
-                                            </form>
-
-                                            <!-- Route to Committee (links to detail page for committee selection) -->
-                                            <a href="<?= BASE_URL ?>/spsec/inbox/show?id=<?= (int) $row['document_id'] ?>#route-committee"
-                                               class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 transition"
-                                               title="Route to Committee">
-                                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 100-8 4 4 0 000 8z"/>
-                                                </svg>
-                                                Committee
-                                            </a>
-
                                             <?php
                                             // Noted only for Communication documents
                                             $isCommunication = stripos($row['document_type_name'] ?? '', 'communication') !== false;

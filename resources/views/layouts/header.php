@@ -145,5 +145,45 @@ $toastErrors = flash_get('errors', []);
                 setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 5000);
             }
         });
+
+        const now = new Date();
+        const dateParts = new Intl.DateTimeFormat('en', {
+            timeZone: 'Asia/Manila',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).formatToParts(now).reduce(function (parts, part) {
+            parts[part.type] = part.value;
+            return parts;
+        }, {});
+        const currentDate = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+        const timeParts = new Intl.DateTimeFormat('en', {
+            timeZone: 'Asia/Manila',
+            hour: '2-digit',
+            minute: '2-digit',
+            hourCycle: 'h23',
+        }).formatToParts(now).reduce(function (parts, part) {
+            parts[part.type] = part.value;
+            return parts;
+        }, {});
+        const currentTime = `${timeParts.hour}:${timeParts.minute}`;
+        const currentDateTime = `${currentDate}T${currentTime}`;
+
+        document.querySelectorAll('input[type="date"], input[type="time"], input[type="datetime-local"]')
+            .forEach(function (input) {
+                if (!input.value && input.name !== 'date_from' && input.name !== 'date_to') {
+                    if (input.type === 'date') input.value = currentDate;
+                    if (input.type === 'time') input.value = currentTime;
+                    if (input.type === 'datetime-local') input.value = currentDateTime;
+                }
+                input.classList.add('cursor-pointer');
+            });
+    });
+
+    document.addEventListener('click', function (event) {
+        const input = event.target.closest('input[type="date"], input[type="time"], input[type="datetime-local"]');
+        if (input && typeof input.showPicker === 'function') {
+            input.showPicker();
+        }
     });
 </script>

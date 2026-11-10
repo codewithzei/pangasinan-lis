@@ -227,6 +227,11 @@ $pageTitle = $pageTitle ?? 'Public Portal';
     </footer>
 
     <!-- Mobile Menu Toggle Script -->
+    <?php require __DIR__ . '/attachment-preview-modal.php'; ?>
+
+    <script src="<?= BASE_URL ?>/public/assets/js/document-attachment-preview.js"
+            data-base-url="<?= htmlspecialchars(BASE_URL) ?>"></script>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const mobileMenuBtn = document.getElementById('mobileMenuBtn');

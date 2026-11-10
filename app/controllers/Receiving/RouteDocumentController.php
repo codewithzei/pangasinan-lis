@@ -49,6 +49,14 @@ class RouteDocumentController
         $spMembers       = $this->docService->getSpMembers();
         $municities      = $this->docService->getMunicities();
 
+        // Determine which document type IDs trigger the MFR reference field.
+        $mfrTypeNames = [];
+        foreach ($documentTypes as $dt) {
+            if ($dt['name'] === DocumentService::mfrTypeName()) {
+                $mfrTypeNames[] = (int) $dt['id'];
+            }
+        }
+
         $pageTitle    = 'Receive Document';
         $pageSubtitle = 'Receive and route incoming documents to Admin';
 
@@ -89,6 +97,10 @@ class RouteDocumentController
             'source_contact_number' => trim($_POST['source_contact_number']   ?? ''),
             'source_address'        => trim($_POST['source_address']          ?? ''),
             'source_liaison_name'   => trim($_POST['source_liaison_name']     ?? ''),
+            // Motion for Reconsideration: reference to the original case.
+            'referenced_document_id' => !empty($_POST['referenced_document_id'])
+                ? (int) $_POST['referenced_document_id']
+                : 0,
         ];
 
         // Include checklist items inside $data so DocumentService can persist them.
@@ -194,6 +206,32 @@ class RouteDocumentController
             echo json_encode(['success' => true, 'checklists' => $checklists]);
         } catch (Throwable $e) {
             echo json_encode(['success' => false, 'checklists' => [], 'error' => 'Failed to fetch checklists']);
+        }
+        exit;
+    }
+
+    // =========================================================================
+    // GET  receiving/receive-document/get-eligible-cases  (AJAX)
+    // Returns Complaint / Administrative Cases documents finalized by Plenary,
+    // eligible for referencing by a Motion for Reconsideration.
+    // =========================================================================
+
+    public function getEligibleCasesForMotion(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = auth_id();
+        if ($userId === null) {
+            echo json_encode(['success' => false, 'cases' => [], 'error' => 'Unauthorized']);
+            exit;
+        }
+
+        try {
+            $search = trim((string) ($_GET['q'] ?? ''));
+            $cases  = $this->docService->getEligibleCasesForMotion($search);
+            echo json_encode(['success' => true, 'cases' => $cases]);
+        } catch (Throwable $e) {
+            echo json_encode(['success' => false, 'cases' => [], 'error' => 'Failed to fetch eligible cases']);
         }
         exit;
     }

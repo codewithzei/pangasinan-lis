@@ -1,5 +1,7 @@
 <?php
 
+date_default_timezone_set('Asia/Manila');
+
 define('APP_NAME', 'Pangasinan Legislative Information System');
 define('APP_SHORT_NAME', 'Pangasinan Legis+');
 

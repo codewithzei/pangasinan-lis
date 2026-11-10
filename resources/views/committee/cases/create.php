@@ -107,7 +107,7 @@ ob_start();
                     <?php endif; ?>
                     <?php if (!empty($document['external_office_name'])): ?>
                         <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">External Office</dt>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Provincial Government Offices</dt>
                             <dd class="mt-1 text-sm text-gray-800">
                                 <?= htmlspecialchars($document['external_office_name']) ?>
                                 <?php if (!empty($document['external_office_abbr'])): ?>
@@ -139,29 +139,25 @@ ob_start();
                 <div class="rounded-2xl border border-gray-200 bg-white p-6 space-y-5">
                     <h2 class="text-base font-semibold text-gray-900">Case Details</h2>
 
-                    <!-- Docket No. (read-only preview) ----------------------->
+                    <!-- Docket No. (manual entry) ---------------------------->
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                            Docket No.
-                            <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-normal
-                                         text-gray-500 normal-case tracking-normal">
-                                Auto-generated
-                            </span>
+                        <label for="docket_number"
+                               class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                            Docket No. <span class="text-red-500">*</span>
                         </label>
-                        <div class="flex items-center gap-3">
-                            <input type="text"
-                                   value="<?= htmlspecialchars($docketPreview) ?>"
-                                   readonly
-                                   class="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2
-                                          font-mono text-sm font-bold text-gray-700 cursor-not-allowed select-all">
-                            <span class="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs
-                                         font-medium text-amber-700">
-                                Preview — final number assigned on submit
-                            </span>
-                        </div>
+                        <input type="text"
+                               id="docket_number"
+                               name="docket_number"
+                               value="<?= casesCreateOld($old, 'docket_number') ?>"
+                               required
+                               maxlength="100"
+                               placeholder="e.g. DKT-2026-0001"
+                               autocomplete="off"
+                               class="block w-full rounded-xl border border-gray-300 px-3 py-2
+                                      font-mono text-sm focus:border-primary focus:ring-1 focus:ring-primary">
                         <p class="mt-1.5 text-xs text-gray-400">
-                            The docket number is generated automatically by the server. Under high load it may
-                            differ slightly from this preview, but will always follow the DKT-YYYY-NNNN format.
+                            Enter the docket number as recorded in your committee records.
+                            It must be unique — the system will reject a number already in use.
                         </p>
                     </div>
 
@@ -280,7 +276,7 @@ ob_start();
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            Create Case &amp; Assign Docket
+                            Create Case &amp; Save Docket
                         </button>
                     </div>
 
@@ -305,12 +301,12 @@ ob_start();
                         <p class="text-sm font-semibold text-purple-900">Docket Number</p>
                     </div>
                     <p class="text-xs text-purple-700 leading-relaxed">
-                        The docket number is assigned automatically by the server using a
-                        locked per-year sequence. The preview above is informational — the
-                        actual number is locked in at the moment of submission.
+                        Enter the docket number exactly as it appears in your committee
+                        records. The number must be unique — the system will show an error
+                        if it is already assigned to another case.
                     </p>
                     <p class="mt-2 text-xs font-semibold text-purple-800">
-                        Format: <span class="font-mono">DKT-YYYY-NNNN</span>
+                        Common format: <span class="font-mono">DKT-YYYY-NNNN</span>
                     </p>
                 </div>
 
@@ -336,7 +332,8 @@ ob_start();
                     <p class="mb-3 text-sm font-semibold text-gray-800">What happens next?</p>
                     <ol class="space-y-2">
                         <?php foreach ([
-                            'A docket number is generated and locked.',
+                            'Enter the docket number from your committee records.',
+                            'Fill in case details and submit the form.',
                             'You are redirected to the case details page.',
                             'Use Add Action to build the case timeline.',
                             'Attach supporting documents to each action.',

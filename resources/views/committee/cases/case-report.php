@@ -23,7 +23,7 @@ $documentId  = (int) ($case['document_id']  ?? 0);
 $docketNumber = (string) ($case['docket_number'] ?? '');
 
 // Repopulate from old input on validation failure
-$oldCommitteeIds = !empty($old['committee_ids'])
+$oldCommitteeIds = isset($old['committee_ids'])
     ? array_map('intval', (array) $old['committee_ids'])
     : $assignedCommitteeIds;
 
@@ -159,10 +159,10 @@ ob_start();
                         </p>
                     </div>
 
-                    <!-- Committee in Charge --------------------------------->
+                    <!-- Committee Referral --------------------------------->
                     <div>
                         <p class="block text-sm font-semibold text-gray-700 mb-1">
-                            Committee in Charge <span class="text-red-500">*</span>
+                            Committee Referral <span class="text-red-500">*</span>
                         </p>
                         <p class="text-xs text-gray-400 mb-2">
                             Selecting multiple committees produces a

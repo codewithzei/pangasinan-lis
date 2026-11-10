@@ -97,35 +97,41 @@ function slDecisionLabel(string $decision): string {
         </div>
     </section>
 
-    <!-- Tabs + List -->
-    <section class="rounded-2xl border border-gray-200 bg-white">
-        <!-- Tabs -->
-        <div class="flex items-center gap-1 border-b border-gray-100 px-6 pt-4">
-            <?php
-            $tabs = [
-                'legislative'    => ['label' => 'Legislative Documents', 'count' => $tabCounts['legislative']],
-                'communications' => ['label' => 'Communications',        'count' => $tabCounts['communications']],
-            ];
-            foreach ($tabs as $tabKey => $tabInfo):
-                $isActive = ($tab === $tabKey);
-            ?>
-            <a href="<?= slTabUrl($tabKey, $search) ?>"
-               class="flex items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-sm font-medium transition
-                      <?= $isActive ? 'border-b-2 border-primary text-primary bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50' ?>">
-                <?= htmlspecialchars($tabInfo['label']) ?>
-                <span class="rounded-full px-1.5 py-0.5 text-xs font-semibold
-                             <?= $isActive ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600' ?>">
-                    <?= number_format($tabInfo['count']) ?>
-                </span>
-            </a>
-            <?php endforeach; ?>
+    <!-- Tabs -->
+    <section>
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex flex-wrap gap-6" aria-label="Finalized documents tabs">
+                <?php
+                $tabs = [
+                    'legislative'    => ['label' => 'Legislative Documents', 'count' => $tabCounts['legislative']],
+                    'communications' => ['label' => 'Communications',        'count' => $tabCounts['communications']],
+                    'petitions'      => ['label' => 'Petitions',             'count' => $tabCounts['petitions'] ?? 0],
+                ];
+                foreach ($tabs as $tabKey => $tabInfo):
+                    $isActive = ($tab === $tabKey);
+                ?>
+                <a href="<?= slTabUrl($tabKey, $search) ?>"
+                   class="<?= $isActive ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>
+                          whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
+                    <?= htmlspecialchars($tabInfo['label']) ?>
+                    <span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold
+                                 <?= $isActive ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700' ?>">
+                        <?= number_format($tabInfo['count']) ?>
+                    </span>
+                </a>
+                <?php endforeach; ?>
+            </nav>
         </div>
+    </section>
+
+    <!-- List -->
+    <section class="rounded-2xl border border-gray-200 bg-white">
 
         <!-- Search bar -->
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <h2 class="font-semibold text-gray-900">
-                    <?= $tab === 'communications' ? 'Finalized Communications' : 'Finalized Documents' ?>
+                    <?= $tab === 'communications' ? 'Finalized Communications' : ($tab === 'petitions' ? 'Finalized Petitions' : 'Finalized Documents') ?>
                 </h2>
                 <p class="mt-1 text-xs text-gray-500"><?= $total ?> record<?= $total !== 1 ? 's' : '' ?></p>
             </div>
@@ -168,12 +174,13 @@ function slDecisionLabel(string $decision): string {
                         <th class="px-6 py-3 font-medium">Resolution No.</th>
                         <th class="px-6 py-3 font-medium">Finalized</th>
                         <th class="px-6 py-3 font-medium">Files</th>
+                        <th class="px-6 py-3 font-medium text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php if (empty($communicationDocuments)): ?>
                         <tr>
-                            <td colspan="8" class="px-6 py-16 text-center">
+                            <td colspan="9" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -199,7 +206,16 @@ function slDecisionLabel(string $decision): string {
                                     <div class="text-xs text-gray-500"><?= htmlspecialchars(date('M j, Y', strtotime($row['date_received']))) ?></div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <p class="max-w-xs line-clamp-2 text-gray-800"><?= htmlspecialchars($row['subject_matter']) ?></p>
+                                    <?php $approvedSubject = $row['adoption_approved_subject_matter'] ?: $row['fr_approved_subject_matter']; ?>
+                                    <p class="max-w-xs line-clamp-2 text-gray-800">
+                                        <?= htmlspecialchars($approvedSubject ?: $row['subject_matter']) ?>
+                                    </p>
+                                    <?php if (!empty($approvedSubject)
+                                        && $approvedSubject !== $row['subject_matter']): ?>
+                                        <p class="mt-1 max-w-xs line-clamp-2 text-xs text-gray-500">
+                                            Original: <?= htmlspecialchars($row['subject_matter']) ?>
+                                        </p>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="px-6 py-4">
                                     <?php if ($isAdopted): ?>
@@ -253,6 +269,18 @@ function slDecisionLabel(string $decision): string {
                                         <span class="text-xs italic text-gray-400">—</span>
                                     <?php endif; ?>
                                 </td>
+                                <td class="px-6 py-4 text-right whitespace-nowrap">
+                                    <a href="<?= BASE_URL ?>/plenary/status-list/show?id=<?= (int) $row['document_id'] ?>"
+                                       class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white
+                                              px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary
+                                              hover:bg-blue-50 hover:text-primary transition">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                        </svg>
+                                        View
+                                    </a>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -260,9 +288,120 @@ function slDecisionLabel(string $decision): string {
             </table>
         </div>
 
-        <?php else: ?>
-        <!-- ── Legislative Documents Table ──────────────────────────────── -->
+        <?php elseif ($tab === 'petitions'): ?>
+        <!-- ── Petitions Table (Complaints / Administrative Cases) ──────── -->
         <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+                    <tr>
+                        <th class="px-6 py-3 font-medium">Tracking Number</th>
+                        <th class="px-6 py-3 font-medium">Subject Matter</th>
+                        <th class="px-6 py-3 font-medium">Type</th>
+                        <th class="px-6 py-3 font-medium">Decision</th>
+                        <th class="px-6 py-3 font-medium">Committee(s)</th>
+                        <th class="px-6 py-3 font-medium">Resolution No.</th>
+                        <th class="px-6 py-3 font-medium">Date Approved</th>
+                        <th class="px-6 py-3 font-medium text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <?php if (empty($petitionsDocuments ?? [])): ?>
+                        <tr>
+                            <td colspan="8" class="px-6 py-16 text-center">
+                                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
+                                    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <p class="mt-4 text-sm font-medium text-gray-700">No finalized Petitions yet.</p>
+                                <p class="mt-1 text-xs text-gray-500">Petitions finalized via Adopted Committee Report will appear here. Noted petitions are on the <a href="<?= BASE_URL ?>/plenary/petitions" class="text-primary underline">Petitions page</a>.</p>
+                            </td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($petitionsDocuments as $row):
+                            $typeColor   = $row['document_type_badge_color'] ?? '#2563EB';
+                            $statusColor = $row['status_badge_color'] ?? '#6B7280';
+                            $frDecision  = $row['fr_decision'] ?? '';
+                            $resolutionNo = !empty($row['adoption_resolution_number'])
+                                ? $row['adoption_resolution_number'] : '';
+                        ?>
+                        <tr class="hover:bg-gray-50/50 transition">
+                            <td class="px-6 py-4">
+                                <div class="font-medium text-gray-900"><?= htmlspecialchars($row['tracking_number']) ?></div>
+                                <div class="text-xs text-gray-500">
+                                    <?= htmlspecialchars(date('M j, Y', strtotime($row['date_received']))) ?>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 max-w-xs">
+                                <p class="line-clamp-2 font-medium text-gray-900"><?= htmlspecialchars($row['adoption_approved_subject_matter'] ?: $row['subject_matter']) ?></p>
+                                <?php if (!empty($row['adoption_approved_subject_matter'])
+                                    && $row['adoption_approved_subject_matter'] !== $row['subject_matter']): ?>
+                                    <p class="mt-1 line-clamp-2 text-xs text-gray-500">Original: <?= htmlspecialchars($row['subject_matter']) ?></p>
+                                <?php endif; ?>
+                            </td>
+                            <td class="px-6 py-4">
+                                <?php if (!empty($row['document_type_name'])): ?>
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                                          style="background-color:<?= htmlspecialchars($typeColor) ?>1a;color:<?= htmlspecialchars($typeColor) ?>;">
+                                        <?= htmlspecialchars($row['document_type_name']) ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-xs italic text-gray-400">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-700">
+                                <?php if ($frDecision === 'REFER_TO_COMMITTEE'): ?>
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                                        Adopted Committee Report
+                                    </span>
+                                <?php elseif ($frDecision === 'NOTED'): ?>
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                        Noted
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-xs italic text-gray-400">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-700">
+                                <?= !empty($row['committee_names'])
+                                    ? '<span class="text-gray-800">' . htmlspecialchars($row['committee_names']) . '</span>'
+                                    : '<span class="text-xs italic text-gray-400">—</span>' ?>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-700">
+                                <?= $resolutionNo !== ''
+                                    ? '<span class="font-medium">' . htmlspecialchars($resolutionNo) . '</span>'
+                                    : '<span class="text-xs italic text-gray-400">—</span>' ?>
+                                <?php if (!empty($row['adoption_proposed_number'])): ?>
+                                    <div class="text-xs text-gray-400">Proposed: <?= htmlspecialchars($row['adoption_proposed_number']) ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-700">
+                                <?php if (!empty($row['finalized_at'])): ?>
+                                    <?= htmlspecialchars(date('M j, Y', strtotime($row['finalized_at']))) ?>
+                                <?php elseif (!empty($row['adopted_at'])): ?>
+                                    <?= htmlspecialchars(date('M j, Y', strtotime($row['adopted_at']))) ?>
+                                <?php else: ?>
+                                    <span class="text-xs italic text-gray-400">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <a href="<?= BASE_URL ?>/plenary/status-list/show?id=<?= (int) $row['document_id'] ?>"
+                                   class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    View
+                                </a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php else: ?>
+        <!-- ── Legislative Documents Table ──────────────────────────────── -->        <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
@@ -274,13 +413,14 @@ function slDecisionLabel(string $decision): string {
                         <th class="px-6 py-3 font-medium">Committees</th>
                         <th class="px-6 py-3 font-medium">1st Reading</th>
                         <th class="px-6 py-3 font-medium">2nd Reading</th>
-                        <th class="px-6 py-3 font-medium">Date Finalized</th>
+                        <th class="px-6 py-3 font-medium">Date Approved</th>
+                        <th class="px-6 py-3 font-medium text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php if (empty($documents)): ?>
                         <tr>
-                            <td colspan="9" class="px-6 py-16 text-center">
+                            <td colspan="10" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -348,6 +488,18 @@ function slDecisionLabel(string $decision): string {
                                     <?= !empty($row['date_finalized'])
                                         ? htmlspecialchars(date('M j, Y', strtotime($row['date_finalized'])))
                                         : '<span class="italic text-gray-400">—</span>' ?>
+                                </td>
+                                <td class="px-6 py-4 text-right whitespace-nowrap">
+                                    <a href="<?= BASE_URL ?>/plenary/status-list/show?id=<?= (int) $row['document_id'] ?>"
+                                       class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white
+                                              px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary
+                                              hover:bg-blue-50 hover:text-primary transition">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                        </svg>
+                                        View
+                                    </a>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

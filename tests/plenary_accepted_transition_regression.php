@@ -14,7 +14,7 @@
  *          target date format, session type ENUM).
  *
  *   GROUP B — Accepted tab → First Reading transition
- *     B1  An ACCEPTED document still "On Process" appears in the Accepted
+ *     B1  An ACCEPTED document still "For Encoding" appears in the Accepted
  *         list and in the accepted count.
  *     B2  Once its status becomes "Awaiting First Reading" it leaves both the
  *         Accepted list and the accepted count.
@@ -330,7 +330,7 @@ try {
     // ── A "still processing" status (anything but Awaiting First Reading) ─
     $processingRow = $pdo->query(
         "SELECT id FROM document_statuses
-         WHERE name = 'On Process' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+         WHERE name = 'For Encoding' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
     )->fetch();
     if ($processingRow) {
         $processingStatusId = (int) $processingRow['id'];

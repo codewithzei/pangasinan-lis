@@ -261,7 +261,7 @@ ob_start();
                     </div>
                     <?php if (!empty($document['external_office_name'])): ?>
                         <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">External Office</dt>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Provincial Government Offices</dt>
                             <dd class="mt-1 text-sm text-gray-800">
                                 <?= htmlspecialchars($document['external_office_name']) ?>
                                 <?php if (!empty($document['external_office_abbr'])): ?>
@@ -841,6 +841,12 @@ ob_start();
             </div>
         </div>
     </div>
+
+<?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'admin/inbox';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
 
 </div><!-- /space-y-6 -->
 

@@ -21,6 +21,8 @@ $plenaryDetails = $plenaryDetails ?? null;
 $committees     = $committees     ?? [];
 $categories     = $categories     ?? [];
 $events         = $events         ?? [];
+$success        = $success        ?? null;
+$error          = $error          ?? null;
 $errors         = $errors         ?? [];
 $old            = $old            ?? [];
 $canAct         = $canAct         ?? false;
@@ -50,10 +52,10 @@ ob_start();
     </div>
 
     <?php if (!empty($success ?? null)): ?>
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars($success) ?></div>
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars((string) $success) ?></div>
     <?php endif; ?>
     <?php if (!empty($error ?? null)): ?>
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><?= htmlspecialchars($error) ?></div>
+        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><?= htmlspecialchars((string) $error) ?></div>
     <?php endif; ?>
     <?php if (!empty($errors)): ?>
         <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -157,8 +159,8 @@ ob_start();
                             $selectedDecision = $old['comm_fr_decision'] ?? '';
                             $decisions = [
                                 'NOTED'              => ['label' => 'Noted', 'color' => 'emerald', 'desc' => 'Noted; Communication appears on Plenary Communications page.'],
-                                'APPROVED'           => ['label' => 'Approved for Resolution under Other Matters', 'color' => 'blue', 'desc' => 'Requires Resolution Number and resolution files. Finalizes the Communication.'],
-                                'REFER_TO_COMMITTEE' => ['label' => 'Refer to Committee', 'color' => 'violet', 'desc' => 'Hand off to Committee using the existing referral workflow.'],
+                                'APPROVED'           => ['label' => 'Approved for Resolution under Other Matters', 'color' => 'blue', 'desc' => 'Record the approved subject matter, Resolution/Ordinance No., and resolution files.'],
+                                'REFER_TO_COMMITTEE' => ['label' => 'Referred to Committee', 'color' => 'violet', 'desc' => 'Hand off to Committee using the existing referral workflow.'],
                             ];
                             foreach ($decisions as $val => $info):
                                 $checked = ($selectedDecision === $val) ? 'checked' : '';
@@ -210,17 +212,31 @@ ob_start();
                         </div>
                     </div>
 
-                    <!-- APPROVED: Resolution Number + Proposed Number + Files -->
+                    <!-- APPROVED: subject matter, Resolution/Ordinance Number, Proposed Number + Files -->
                     <div id="section-approved" class="hidden space-y-4">
+                        <div>
+                            <label for="approved_subject_matter" class="block text-sm font-medium text-gray-700 mb-1">
+                                Subject Matter <span class="text-red-500">*</span>
+                            </label>
+                            <textarea id="approved_subject_matter" name="approved_subject_matter" rows="3"
+                                      maxlength="5000"
+                                      placeholder="Subject matter to be recorded for the approved resolution…"
+                                      class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
+                                             text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
+                                             focus:ring-2 focus:ring-primary/20"><?= htmlspecialchars($old['approved_subject_matter'] ?? $subjectMatter) ?></textarea>
+                            <p class="mt-1 text-xs text-gray-400">
+                                The current subject matter is prefilled. Updating it here keeps the original document subject matter in the record.
+                            </p>
+                        </div>
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
                                 <label for="resolution_number" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Resolution Number <span class="text-red-500">*</span>
+                                    Resolution/Ordinance No. <span class="text-red-500">*</span>
                                 </label>
                                 <input type="text" id="resolution_number" name="resolution_number"
                                        value="<?= htmlspecialchars($old['resolution_number'] ?? '') ?>"
                                        maxlength="100"
-                                       placeholder="e.g. SP Res. No. 2026-001"
+                                       placeholder="e.g. SP Res. No. 2026-001 or SP Ordinance No. 2026-001"
                                        class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
                                               text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
                                               focus:ring-2 focus:ring-primary/20">
@@ -315,7 +331,7 @@ ob_start();
                                     <?php
                                     $selectedCids = isset($old['committee_ids'])
                                         ? array_map('intval', (array) $old['committee_ids'])
-                                        : [];
+                                        : array_map('intval', array_column($docCommittees ?? [], 'committee_id'));
                                     foreach ($committees as $committee):
                                         $checked = in_array((int) $committee['id'], $selectedCids, true) ? 'checked' : '';
                                     ?>
@@ -354,7 +370,7 @@ ob_start();
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            Record First Reading Decision
+                            Record First Reading Action
                         </button>
                         <a href="<?= BASE_URL ?>/plenary/first-reading"
                            class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium
@@ -386,6 +402,7 @@ ob_start();
         'APPROVED':           document.getElementById('section-approved'),
         'REFER_TO_COMMITTEE': document.getElementById('section-refer'),
     };
+    var resolutionFileInput = document.getElementById('resolution_files');
 
     function updateDecision(value) {
         Object.keys(sections).forEach(function (key) {
@@ -409,6 +426,14 @@ ob_start();
                 dot.classList.toggle('opacity-0', !isSelected);
             }
         });
+        var approvedSubjectMatter = document.getElementById('approved_subject_matter');
+        if (approvedSubjectMatter) {
+            approvedSubjectMatter.required = value === 'APPROVED';
+        }
+        if (resolutionFileInput) {
+            resolutionFileInput.required = value === 'APPROVED';
+            resolutionFileInput.setAttribute('aria-required', value === 'APPROVED' ? 'true' : 'false');
+        }
     }
 
     window.updateDecision = updateDecision;
@@ -572,8 +597,6 @@ ob_start();
     fileInput.addEventListener('change', function () {
         if (fileInput.files.length > 0) {
             addFiles(fileInput.files);
-            // Reset so the same file can be re-selected after removal
-            fileInput.value = '';
         }
     });
 
@@ -602,7 +625,13 @@ ob_start();
     // Prevent the form from submitting when no files have been selected for APPROVED
     document.getElementById('comm-fr-form').addEventListener('submit', function (e) {
         var decision = document.querySelector('input[name="comm_fr_decision"]:checked');
-        if (decision && decision.value === 'APPROVED' && dt.files.length === 0) {
+        // Keep the actual multipart form input synchronized with the accumulated file list.
+        if (dt.files.length === 0 && fileInput.files.length > 0) {
+            addFiles(fileInput.files);
+        }
+        fileInput.files = dt.files;
+
+        if (decision && decision.value === 'APPROVED' && fileInput.files.length === 0) {
             e.preventDefault();
             showError('Please attach at least one resolution file before submitting.');
             dropZone.focus();
@@ -611,6 +640,12 @@ ob_start();
 
 }());
 </script>
+
+<?php
+// MFR relationship links — Comm First Reading shows the original case link when this is an MFR
+$mfrDetailRoute = 'plenary/comm-first-reading';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
 
 <?php
 $content = ob_get_clean();

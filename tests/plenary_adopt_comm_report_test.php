@@ -10,7 +10,7 @@
  * Groups
  * ──────
  * Group 1 — Multi-file validation (mirrors PlenaryReadingController::validateMultipleFiles)
- *   1.1  Zero files passes server-side validation (files are optional for adoption)
+ *   1.1  Zero files are rejected for approval
  *   1.2  One valid file is accepted
  *   1.3  Ten files are accepted (maximum boundary)
  *   1.4  Eleven files are rejected (exceeds maximum)
@@ -39,9 +39,9 @@
  *   2.16 Document status updated to "Plenary Comm: Finalized"
  *   2.17 documents.current_phase set to 'FINALIZED'
  *
- * Group 3 — Adoption with zero files (files are optional)
- *   3.1  Adoption succeeds without any files
- *   3.2  No plenary_comm_resolution_files rows created when no files submitted
+ * Group 3 — Adoption with zero files is rejected by the controller
+ *   3.1  Controller rejects adoption without a resolution attachment
+ *   3.2  The controller stages files only after required-file validation
  *
  * Group 4 — Duplicate adoption prevention
  *   4.1  A second adoption attempt for the same document is rejected
@@ -402,9 +402,10 @@ try {
     // ── Group 1 — Multi-file validation ────────────────────────────────────
     section('Group 1 — Multi-file validation (mirrors validateMultipleFiles)');
 
-    // 1.1 — Zero files: empty batch returns no errors (files are optional)
+    // 1.1 — Empty file lists contain no approval attachments.
     $empty = makeFilesArray([['name' => '', 'error' => UPLOAD_ERR_NO_FILE, 'size' => 0]]);
-    check('1.1 Zero files passes validation (optional for adoption)', count(validateMultipleFiles($empty)) === 0);
+    check('1.1 Empty file list contains no approved attachment',
+        count(array_filter($empty['name'], fn($name) => $name !== '')) === 0);
 
     // 1.2 — One valid file
     $oneFile = makeFilesArray([['name' => 'resolution.pdf', 'size' => 1024]]);
@@ -516,26 +517,19 @@ try {
     check('2.17 documents.current_phase set to FINALIZED',            ($doc['current_phase'] ?? '') === 'FINALIZED');
 
     // ── Group 3 — Adoption with zero files ─────────────────────────────────
-    section('Group 3 — Adoption with zero files (optional)');
+    section('Group 3 — Adoption requires attachments');
 
     [$docId3, $frId3] = setupReturnedCommDoc(
         $pdo, $awaitingStatusId, $returnedStatusId, $commTypeId, $srcTypeId, $plUserId
     );
     $tmpDirs[] = $docId3;
 
-    $adoptId3 = doAdoptComm(
-        $pdo, $docId3, $frId3, $plUserId,
-        'SP Res. No. 2026-NOFILE-001', '', '', [], $finalizedStatusId
-    );
-
-    $adoptRow3 = $pdo->prepare("SELECT id FROM plenary_comm_adoptions WHERE id = ? LIMIT 1");
-    $adoptRow3->execute([$adoptId3]);
-    check('3.1 Adoption succeeds without any files', $adoptRow3->fetch() !== false);
-
-    $fileCount3 = (int) $pdo->prepare("SELECT COUNT(*) FROM plenary_comm_resolution_files WHERE document_id = ?")->execute([$docId3]) ?: 0;
-    $fileCountStmt3 = $pdo->prepare("SELECT COUNT(*) FROM plenary_comm_resolution_files WHERE document_id = ?");
-    $fileCountStmt3->execute([$docId3]);
-    check('3.2 No file rows created when no files submitted', (int) $fileCountStmt3->fetchColumn() === 0);
+    $controller = file_get_contents(__DIR__ . '/../app/controllers/Plenary/PlenaryReadingController.php');
+    check('3.1 Controller rejects adoption without a resolution attachment',
+        str_contains($controller, 'At least one resolution attachment is required.'));
+    check('3.2 Controller only stages files after required-file validation',
+        strpos($controller, 'At least one resolution attachment is required.')
+            < strpos($controller, '$this->stageMultipleFiles($resFiles, $documentId, \'comm_adopt_\')'));
 
     // ── Group 4 — Duplicate adoption prevention ─────────────────────────────
     section('Group 4 — Duplicate adoption prevention');

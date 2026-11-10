@@ -119,15 +119,121 @@ ob_start();
                             <option value="">-- Select Document Type --</option>
                             <?php foreach ($documentTypes as $type): ?>
                                 <option value="<?= (int) $type['id'] ?>"
+                                        title="<?= htmlspecialchars($type['name'] ?? '') ?>"
                                         <?= old('document_type_id') == $type['id'] ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($type['name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <p id="documentTypeFullLabel" class="mt-1 hidden break-words text-sm text-gray-700" aria-live="polite"></p>
+                        <script>
+                            (function () {
+                                const select = document.getElementById('document_type_id');
+                                const fullLabel = document.getElementById('documentTypeFullLabel');
+                                if (!select || !fullLabel) return;
+
+                                const updateDocumentTypeLabel = function () {
+                                    const option = select.selectedOptions[0];
+                                    const label = option && option.value ? option.textContent.trim() : '';
+                                    fullLabel.textContent = label;
+                                    fullLabel.classList.toggle('hidden', label === '');
+                                    select.title = label;
+                                };
+
+                                select.addEventListener('change', updateDocumentTypeLabel);
+                                updateDocumentTypeLabel();
+                            }());
+                        </script>
                         <p class="mt-1 text-xs text-gray-500">Select the type of document</p>
                     </div>
                 </div>
             </section>
+
+            <!-- Motion for Reconsideration — Reference Case ----------------->
+            <?php
+            // Expose the MFR type IDs already computed in the controller as a
+            // comma-separated string used by the inline <script> below.
+            $mfrTypeIdList = isset($mfrTypeIds) ? implode(',', array_map('intval', $mfrTypeIds)) : '';
+            ?>
+            <section id="mfrReferenceSection" class="rounded-2xl border border-amber-200 bg-amber-50 p-6 hidden">
+                <h2 class="text-lg font-semibold text-gray-900">
+                    Reference Case
+                    <span class="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Required for Motion for Reconsideration</span>
+                </h2>
+                <p class="mt-1 text-sm text-gray-600">
+                    A Motion for Reconsideration must reference the original Complaint or Administrative Case
+                    that has been finalized by Plenary. Search by tracking number, docket number, or subject matter.
+                </p>
+
+                <!-- Hidden field submitted with the form -->
+                <input type="hidden" name="referenced_document_id" id="referenced_document_id"
+                       value="<?= htmlspecialchars(old('referenced_document_id', '')) ?>">
+
+                <div class="mt-4 space-y-3">
+
+                    <!-- Search input -->
+                    <div class="relative">
+                        <label for="mfrCaseSearch" class="block text-sm font-medium text-gray-700">
+                            Search original case <span class="text-red-500" id="mfrSearchRequired">*</span>
+                        </label>
+                        <div class="relative mt-1">
+                            <input type="text" id="mfrCaseSearch" autocomplete="off"
+                                   placeholder="Type tracking number, docket, or subject…"
+                                   class="block w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                                   aria-label="Search reference case" aria-autocomplete="list" aria-controls="mfrDropdown">
+                            <svg class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+                            </svg>
+                            <svg id="mfrSearchSpinner" class="absolute right-3 top-2.5 h-4 w-4 text-amber-500 animate-spin hidden" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
+                        <ul id="mfrDropdown"
+                            class="absolute z-20 mt-1 hidden w-full overflow-auto rounded-xl border border-amber-200 bg-white shadow-lg max-h-72 text-sm"
+                            role="listbox">
+                        </ul>
+                    </div>
+
+                    <p class="text-xs text-gray-500">Only finalized Complaint and Administrative Case documents are listed.</p>
+
+                    <!-- Preview of selected case -->
+                    <div id="mfrCasePreview" class="hidden rounded-xl border border-amber-200 bg-white p-4 text-sm space-y-2">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-gray-800" id="mfrPreviewTracking"></p>
+                                <p class="text-gray-600 text-xs mt-0.5" id="mfrPreviewSubject"></p>
+                            </div>
+                            <button type="button" id="mfrClearBtn"
+                                    class="flex-shrink-0 rounded-lg p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+                                    title="Clear selection" aria-label="Clear selected case">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700" id="mfrPreviewType"></span>
+                            <span class="inline-flex items-center rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700" id="mfrPreviewStatus"></span>
+                        </div>
+                        <div id="mfrPreviewDocket" class="hidden text-xs text-gray-500">
+                            Docket: <span class="font-medium text-gray-700" id="mfrPreviewDocketNum"></span>
+                        </div>
+                    </div>
+
+                    <!-- No results notice -->
+                    <div id="mfrNoResults" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-3 text-center text-xs text-gray-500">
+                        No finalized cases match your search. Try a different tracking number, docket, or subject.
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Store MFR type IDs and AJAX URL for JS -->
+            <script>
+                window.__mfrTypeIds   = [<?= $mfrTypeIdList ?>];
+                window.__mfrSearchUrl = '<?= BASE_URL ?>/admin/receive-document/get-eligible-cases';
+            </script>
 
             <!-- Routing Option ---------------------------------------------->
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
@@ -236,15 +342,15 @@ ob_start();
                         </select>
                     </div>
 
-                    <!-- External Office Fields -->
+                    <!-- Provincial Government Offices Fields -->
                     <div id="externalOfficeFields" class="hidden space-y-4">
                         <div>
                             <label for="external_office_id" class="block text-sm font-medium text-gray-700">
-                                External Office <span class="text-red-500">*</span>
+                                Provincial Government Offices <span class="text-red-500">*</span>
                             </label>
                             <select name="external_office_id" id="external_office_id"
                                     class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
-                                <option value="">-- Select External Office --</option>
+                                <option value="">-- Select Provincial Government Offices --</option>
                                 <?php foreach ($externalOffices as $office): ?>
                                     <option value="<?= (int) $office['id'] ?>"
                                             <?= old('external_office_id') == $office['id'] ? 'selected' : '' ?>>
@@ -325,7 +431,7 @@ ob_start();
                     <!-- Municipality Field (for Client) -->
                     <div id="municipalityField" class="hidden">
                         <label for="municipality_id" class="block text-sm font-medium text-gray-700">
-                            Municipality / City
+                            Municipality / City <span class="text-red-500">*</span>
                         </label>
                         <select name="municipality_id" id="municipality_id"
                                 class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
@@ -444,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (!sourceTypeSelect || !documentTypeSelect || !attachmentsInput || !fileList || !submitBtn || !form) return;
 
-    // Document type change handler — Load checklists
+    // Document type change handler — Load checklists + MFR section
     documentTypeSelect.addEventListener('change', function() {
         const documentTypeId = this.value;
         const checklistSection = document.getElementById('checklistSection');
@@ -454,8 +560,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!documentTypeId) {
             checklistSection.classList.add('hidden');
+            hideMfrSection();
             syncCommCategory();
             return;
+        }
+
+        // Show / hide MFR reference section
+        const mfrTypeIds = window.__mfrTypeIds || [];
+        if (mfrTypeIds.includes(parseInt(documentTypeId, 10))) {
+            showMfrSection();
+        } else {
+            hideMfrSection();
         }
 
         // Show loading state
@@ -560,6 +675,178 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialise on page load (handles repopulation after a validation error)
     syncCommCategory();
 
+    // =========================================================================
+    // Motion for Reconsideration — live search helpers
+    // =========================================================================
+
+    function showMfrSection() {
+        const section = document.getElementById('mfrReferenceSection');
+        if (!section) return;
+        section.classList.remove('hidden');
+
+        const oldVal = <?= json_encode(old('referenced_document_id', '')) ?>;
+        if (oldVal) {
+            fetch(window.__mfrSearchUrl + '?q=' + encodeURIComponent(oldVal))
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && Array.isArray(data.cases)) {
+                        const match = data.cases.find(c => String(c.id) === String(oldVal));
+                        if (match) selectMfrCase(match);
+                    }
+                })
+                .catch(() => {});
+        }
+    }
+
+    function hideMfrSection() {
+        const section = document.getElementById('mfrReferenceSection');
+        if (!section) return;
+        section.classList.add('hidden');
+        clearMfrSelection();
+    }
+
+    function clearMfrSelection() {
+        const hiddenInput = document.getElementById('referenced_document_id');
+        const searchInput = document.getElementById('mfrCaseSearch');
+        const preview     = document.getElementById('mfrCasePreview');
+        const noResults   = document.getElementById('mfrNoResults');
+        const dropdown    = document.getElementById('mfrDropdown');
+        if (hiddenInput) { hiddenInput.value = ''; }
+        if (searchInput) { searchInput.value = ''; }
+        if (preview)     { preview.classList.add('hidden'); }
+        if (noResults)   { noResults.classList.add('hidden'); }
+        if (dropdown)    { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; }
+    }
+
+    function selectMfrCase(c) {
+        const hiddenInput = document.getElementById('referenced_document_id');
+        const searchInput = document.getElementById('mfrCaseSearch');
+        const preview     = document.getElementById('mfrCasePreview');
+        const dropdown    = document.getElementById('mfrDropdown');
+
+        if (hiddenInput) hiddenInput.value = c.id;
+        if (searchInput) searchInput.value = c.tracking_number || '';
+        if (dropdown)    { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; }
+
+        document.getElementById('mfrPreviewTracking').textContent = c.tracking_number    || '';
+        document.getElementById('mfrPreviewSubject').textContent  = c.subject_matter     || '';
+        document.getElementById('mfrPreviewType').textContent     = c.document_type_name || '';
+        document.getElementById('mfrPreviewStatus').textContent   = c.status_name        || '';
+
+        const docketEl  = document.getElementById('mfrPreviewDocket');
+        const docketNum = document.getElementById('mfrPreviewDocketNum');
+        if (c.docket_number) {
+            docketNum.textContent = c.docket_number;
+            docketEl.classList.remove('hidden');
+        } else {
+            docketEl.classList.add('hidden');
+        }
+        if (preview) preview.classList.remove('hidden');
+    }
+
+    (function initMfrSearch() {
+        const searchInput = document.getElementById('mfrCaseSearch');
+        const dropdown    = document.getElementById('mfrDropdown');
+        const spinner     = document.getElementById('mfrSearchSpinner');
+        const noResults   = document.getElementById('mfrNoResults');
+        const clearBtn    = document.getElementById('mfrClearBtn');
+
+        if (!searchInput || !dropdown) return;
+
+        let _debounceTimer = null;
+
+        searchInput.addEventListener('input', function () {
+            const q = this.value.trim();
+            clearTimeout(_debounceTimer);
+            noResults.classList.add('hidden');
+            dropdown.classList.add('hidden');
+            dropdown.innerHTML = '';
+
+            if (q.length < 2) return;
+
+            _debounceTimer = setTimeout(() => {
+                spinner.classList.remove('hidden');
+                fetch(window.__mfrSearchUrl + '?q=' + encodeURIComponent(q))
+                    .then(r => r.json())
+                    .then(data => {
+                        spinner.classList.add('hidden');
+                        const cases = (data.success && Array.isArray(data.cases)) ? data.cases : [];
+                        if (cases.length === 0) {
+                            noResults.classList.remove('hidden');
+                            return;
+                        }
+                        cases.forEach(c => {
+                            const li = document.createElement('li');
+                            li.setAttribute('role', 'option');
+                            li.className = 'cursor-pointer px-4 py-3 hover:bg-amber-50 border-b border-gray-100 last:border-0';
+                            const docketBit = c.docket_number
+                                ? `<span class="ml-2 text-gray-400">DKT: ${escapeHtml(c.docket_number)}</span>` : '';
+                            li.innerHTML = `
+                                <p class="font-semibold text-gray-800 text-xs">${escapeHtml(c.tracking_number || '')}${docketBit}</p>
+                                <p class="text-gray-500 text-xs mt-0.5 truncate">${escapeHtml((c.subject_matter || '').substring(0, 100))}</p>
+                                <span class="inline-block mt-0.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">${escapeHtml(c.document_type_name || '')}</span>
+                            `;
+                            li.addEventListener('mousedown', function (e) {
+                                e.preventDefault();
+                                selectMfrCase(c);
+                                noResults.classList.add('hidden');
+                            });
+                            dropdown.appendChild(li);
+                        });
+                        dropdown.classList.remove('hidden');
+                    })
+                    .catch(() => { spinner.classList.add('hidden'); });
+            }, 280);
+        });
+
+        searchInput.addEventListener('blur', function () {
+            setTimeout(() => {
+                dropdown.classList.add('hidden');
+                dropdown.innerHTML = '';
+            }, 200);
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                clearMfrSelection();
+                searchInput.focus();
+            });
+        }
+
+        searchInput.addEventListener('keydown', function (e) {
+            const items = dropdown.querySelectorAll('li');
+            if (!items.length) return;
+            const focused = dropdown.querySelector('li.bg-amber-100');
+            let idx = -1;
+            items.forEach((el, i) => { if (el === focused) idx = i; });
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (focused) focused.classList.remove('bg-amber-100');
+                const next = items[idx + 1] || items[0];
+                next.classList.add('bg-amber-100');
+                next.scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (focused) focused.classList.remove('bg-amber-100');
+                const prev = items[idx - 1] || items[items.length - 1];
+                prev.classList.add('bg-amber-100');
+                prev.scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'Enter' && focused) {
+                e.preventDefault();
+                focused.dispatchEvent(new Event('mousedown'));
+            } else if (e.key === 'Escape') {
+                dropdown.classList.add('hidden');
+                dropdown.innerHTML = '';
+            }
+        });
+    })();
+
+    // Trigger document type change on page load if old value exists (error repopulation)
+    if (documentTypeSelect.value) {
+        documentTypeSelect.dispatchEvent(new Event('change'));
+    }
+
     // Source type change handler — identical behaviour to Receiving form
     sourceTypeSelect.addEventListener('change', function () {
         const sourceName = this.options[this.selectedIndex]?.getAttribute('data-source-name') ?? '';
@@ -577,14 +864,16 @@ document.addEventListener('DOMContentLoaded', function () {
         const spEl         = document.getElementById('sp_member_id');
         const agencyEl     = document.getElementById('source_name_agency');
         const clientEl     = document.getElementById('source_name_client');
+        const municipalityEl = document.getElementById('municipality_id');
 
         [extOffice, hospEl, spEl].forEach(el => { if (el) el.removeAttribute('required'); });
+        if (municipalityEl) municipalityEl.removeAttribute('required');
         [agencyEl, clientEl].forEach(el => {
             if (el) { el.removeAttribute('required'); el.disabled = true; }
         });
 
         switch (sourceName) {
-            case 'External Office':
+            case 'Provincial Government Offices':
                 document.getElementById('externalOfficeFields').classList.remove('hidden');
                 document.getElementById('contactFields').classList.remove('hidden');
                 if (extOffice) extOffice.setAttribute('required', 'required');
@@ -609,6 +898,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('municipalityField').classList.remove('hidden');
                 document.getElementById('contactFields').classList.remove('hidden');
                 if (clientEl) { clientEl.setAttribute('required', 'required'); clientEl.disabled = false; }
+                if (municipalityEl) municipalityEl.setAttribute('required', 'required');
                 break;
         }
     });
@@ -678,6 +968,22 @@ document.addEventListener('DOMContentLoaded', function () {
             e.preventDefault();
             alert('Please complete all required checklist items:\n\n' + uncheckedRequired.join('\n'));
             return false;
+        }
+
+        // Validate MFR reference field when section is visible
+        const mfrSection     = document.getElementById('mfrReferenceSection');
+        const mfrHiddenInput = document.getElementById('referenced_document_id');
+        if (mfrSection && !mfrSection.classList.contains('hidden')) {
+            if (!mfrHiddenInput || !mfrHiddenInput.value) {
+                e.preventDefault();
+                const searchInput = document.getElementById('mfrCaseSearch');
+                if (searchInput) {
+                    searchInput.classList.add('border-red-400', 'ring-1', 'ring-red-400');
+                    searchInput.focus();
+                }
+                alert('Please search for and select the original Complaint or Administrative Case before submitting.');
+                return false;
+            }
         }
 
         submitBtn.disabled = true;

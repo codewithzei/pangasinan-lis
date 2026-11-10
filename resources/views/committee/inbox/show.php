@@ -303,7 +303,7 @@ ob_start();
                     </div>
                     <?php if (!empty($document['external_office_name'])): ?>
                         <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">External Office</dt>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Provincial Government Offices</dt>
                             <dd class="mt-1 text-sm text-gray-800">
                                 <?= htmlspecialchars($document['external_office_name']) ?>
                                 <?php if (!empty($document['external_office_abbr'])): ?>
@@ -737,8 +737,9 @@ ob_start();
 
                 <!-- ═══════════════════════════════════════════════════════════
                      SECTION B — ACCEPTED (owned by me): post-accept actions
-                       • Communication  → Proceed to Communications + Return
-                       • everything else → Proceed to Endorsement + Return to Admin
+                       • Communication      → Proceed to Communications + Return to Origin
+                       • Administrative Cases / Complaint → Proceed to Cases + Return to Admin
+                       • everything else    → Proceed to Endorsement + Return to Admin
                 ════════════════════════════════════════════════════════════ -->
                 <?php
                 $isCommEligibleType = $isCommEligibleType ?? false;
@@ -785,8 +786,7 @@ ob_start();
                             <div class="space-y-2">
 
                             <?php if ($isCommEligibleType): ?>
-                                <?php /* Communication documents: only the Communications
-                                         hand-off and the return to the real origin. */ ?>
+                                <?php /* Communication documents: Communications hand-off + return to origin. */ ?>
 
                                 <?php if ($showProceedToComms): ?>
                                     <button type="button" data-action="proceed_to_communications"
@@ -838,7 +838,70 @@ ob_start();
                                     </p>
                                 <?php endif; ?>
 
+                            <?php elseif ($isCaseEligibleType): ?>
+                                <?php /* Administrative Cases / Complaint documents:
+                                         Cases workflow link + Return to Admin.
+                                         Endorsement is never available for these types. */ ?>
+
+                                <?php if ($showProceedToCases): ?>
+                                    <!-- Proceed to Cases — dockets the document and moves it to the
+                                         Committee Cases page, where the case details are entered.
+                                         This never opens the standalone Create Case page. -->
+                                    <button type="button" data-action="proceed_to_cases"
+                                            class="action-btn w-full inline-flex items-center justify-center gap-2
+                                                   rounded-xl bg-purple-600 px-4 py-2.5 text-sm
+                                                   font-semibold text-white hover:bg-purple-700 transition">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6
+                                                     2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0
+                                                     16V5m0 16H9m3 0h3"/>
+                                        </svg>
+                                        Proceed to Cases
+                                    </button>
+                                <?php elseif ($existingCase !== null): ?>
+                                    <!-- Case already docketed — show link to the existing record -->
+                                    <a href="<?= BASE_URL ?>/committee/cases/show?id=<?= (int) $existingCase['id'] ?>"
+                                       class="w-full inline-flex items-center justify-center gap-2 rounded-xl
+                                              border border-purple-300 bg-purple-50 px-4 py-2.5 text-sm
+                                              font-semibold text-purple-700 hover:bg-purple-100 transition">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943
+                                                     9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                        </svg>
+                                        View Case (<?= htmlspecialchars($existingCase['docket_number']) ?>)
+                                    </a>
+                                <?php endif; ?>
+
+                                <!-- Divider -->
+                                <div class="relative my-2">
+                                    <div class="absolute inset-0 flex items-center">
+                                        <div class="w-full border-t border-gray-100"></div>
+                                    </div>
+                                    <div class="relative flex justify-center">
+                                        <span class="bg-white px-2 text-xs text-gray-400">or</span>
+                                    </div>
+                                </div>
+
+                                <!-- Return to Admin -->
+                                <button type="button" data-action="return_to_admin"
+                                        class="action-btn w-full inline-flex items-center justify-center gap-2
+                                               rounded-xl border border-red-300 bg-red-50 px-4 py-2.5 text-sm
+                                               font-semibold text-red-700 hover:bg-red-100 transition">
+                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                                    </svg>
+                                    Return to Admin
+                                </button>
+
                             <?php else: ?>
+                                <?php /* All other document types (ordinances, resolutions, etc.):
+                                         Proceed to Endorsement + Return to Admin. */ ?>
+
                                 <!-- Proceed to Endorsement (Referred) -->
                                 <button type="button" data-action="endorse"
                                         class="action-btn w-full inline-flex items-center justify-center gap-2
@@ -881,46 +944,14 @@ ob_start();
                 <?php endif; ?>
 
                 <!-- ═══════════════════════════════════════════════════════════
-                     SECTION B2 — Proceed to Cases button
-                     Shown only when:
-                       • Document type is Administrative Cases or Complaint
-                       • This user owns the accepted assignment
-                       • No case record exists yet
-                     Also shows a read-only link when a case already exists.
+                     SECTION B2 — Cases: case already docketed (read-only info)
+                     The "Proceed to Cases" action lives in SECTION B's Cases
+                     branch.  This block only provides a read-only detail card
+                     when a case record already exists and the user is not in
+                     the active processing state (e.g. document is PENDING).
                 ════════════════════════════════════════════════════════════ -->
-                <?php if ($showProceedToCases): ?>
-                    <div class="rounded-2xl border border-purple-200 bg-purple-50 p-6">
-                        <div class="mb-4 flex items-center gap-2">
-                            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100">
-                                <svg class="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                          d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3
-                                             1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0
-                                             16H9m3 0h3"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-purple-600">
-                                    Cases Workflow
-                                </p>
-                                <p class="text-sm font-semibold text-purple-900">Ready to Docket</p>
-                            </div>
-                        </div>
-                        <p class="mb-4 text-xs text-purple-700 leading-relaxed">
-                            This document type is eligible for case docketing. No case record has been created yet.
-                        </p>
-                        <a href="<?= BASE_URL ?>/committee/cases/create?document_id=<?= $documentId ?>"
-                           class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600
-                                  px-4 py-2.5 text-sm font-semibold text-white hover:bg-purple-700 transition">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M12 4v16m8-8H4"/>
-                            </svg>
-                            Proceed to Cases
-                        </a>
-                    </div>
-                <?php elseif ($existingCase !== null && $canProcess): ?>
-                    <!-- Case already exists — show link to case details -->
+                <?php if ($existingCase !== null && !$canProcess): ?>
+                    <!-- Case docketed — read-only view for non-processing users -->
                     <div class="rounded-2xl border border-purple-200 bg-purple-50 p-6">
                         <div class="mb-3 flex items-center gap-2">
                             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100">
@@ -1152,6 +1183,7 @@ document.addEventListener('DOMContentLoaded', function () {
         'return_to_admin': 'Return this document to Admin? A reason is required.',
         'endorse': 'Proceed to Endorsement? This will mark the document as Referred. Remarks are required and this action cannot be undone.',
         'proceed_to_communications': 'Proceed to Communications? This will open the Communications workflow for this document and remove it from your Committee Inbox.',
+        'proceed_to_cases': 'Proceed to Cases? This will docket the document and move it to the Committee Cases page, where you enter the case details. It is removed from your Committee Inbox.',
         'return_to_origin': 'Return this document to the office that sent it to Committee? A reason is required.',
     };
 
@@ -1278,6 +1310,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+
+<?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'committee/inbox';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
 
 <?php
 $content = ob_get_clean();

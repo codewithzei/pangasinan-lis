@@ -147,7 +147,7 @@ ob_start();
                         <!-- Decision radio buttons -->
                         <div>
                             <p class="block text-sm font-medium text-gray-700 mb-2">
-                                First Reading Decision <span class="text-red-500">*</span>
+                                First Reading Action <span class="text-red-500">*</span>
                             </p>
                             <div class="space-y-3">
 
@@ -169,7 +169,7 @@ ob_start();
                                            class="mt-0.5 h-4 w-4 accent-violet-600">
                                     <div>
                                         <p class="text-sm font-semibold text-gray-900">Referred</p>
-                                        <p class="text-xs text-gray-500 mt-0.5">Refer to one or more committees for review. The communication enters the existing committee workflow.</p>
+                                        <p class="text-xs text-gray-500 mt-0.5">Referred to one or more committees for review. The communication enters the existing committee workflow.</p>
                                     </div>
                                 </label>
 
@@ -246,13 +246,22 @@ ob_start();
                                            class="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
                                 </div>
                             </div>
-                            <div>
+                            <div data-approval-file-upload data-required-when-radio="decision:APPROVED">
                                 <label class="block text-sm font-medium text-blue-800 mb-1">
                                     Resolution Files <span class="text-red-500">*</span>
                                     <span class="text-xs font-normal text-blue-500 ml-1">(PDF, DOCX, XLS, images — max 25 MB each, up to 10 files)</span>
                                 </label>
-                                <input type="file" name="resolution_files[]" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
-                                       class="block w-full text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-100 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-blue-700 hover:file:bg-blue-200 transition">
+                                <input type="file" name="resolution_files[]" multiple
+                                       data-approval-file-input
+                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+                                       class="sr-only">
+                                <div data-approval-file-zone role="button" tabindex="0"
+                                     class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-blue-200 bg-white px-5 py-5 text-center hover:border-blue-500 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                                    <p class="text-sm font-medium text-gray-700">Drag &amp; drop files here, or browse</p>
+                                    <p class="mt-1 text-xs text-gray-400">Required · up to 10 files · max 25 MB each</p>
+                                </div>
+                                <ul data-approval-file-list class="mt-2 hidden space-y-2" aria-live="polite"></ul>
+                                <p data-approval-file-error class="mt-1 hidden text-xs text-red-600" role="alert"></p>
                             </div>
                         </div>
 

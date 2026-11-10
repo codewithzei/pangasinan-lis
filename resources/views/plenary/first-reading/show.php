@@ -120,21 +120,29 @@ ob_start();
                 <?php if (!empty($authors)): ?>
                 <div>
                     <p class="text-xs text-gray-400 mb-1">Authors</p>
-                    <ul class="space-y-1">
-                        <?php foreach ($authors as $a): ?>
-                            <li class="text-sm text-gray-800"><?= htmlspecialchars($a['full_name']) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
+                    <?php if (!empty($authors[0]['is_all_selected'])): ?>
+                        <p class="text-sm text-gray-800">ALL</p>
+                    <?php else: ?>
+                        <ol class="list-decimal space-y-1 pl-5">
+                            <?php foreach ($authors as $a): ?>
+                                <li class="text-sm text-gray-800"><?= htmlspecialchars($a['full_name']) ?></li>
+                            <?php endforeach; ?>
+                        </ol>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
                 <?php if (!empty($coAuthors)): ?>
                 <div>
                     <p class="text-xs text-gray-400 mb-1">Co-Authors</p>
-                    <ul class="space-y-1">
-                        <?php foreach ($coAuthors as $a): ?>
-                            <li class="text-sm text-gray-800"><?= htmlspecialchars($a['full_name']) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
+                    <?php if (!empty($coAuthors[0]['is_all_selected'])): ?>
+                        <p class="text-sm text-gray-800">ALL</p>
+                    <?php else: ?>
+                        <ol class="list-decimal space-y-1 pl-5">
+                            <?php foreach ($coAuthors as $a): ?>
+                                <li class="text-sm text-gray-800"><?= htmlspecialchars($a['full_name']) ?></li>
+                            <?php endforeach; ?>
+                        </ol>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
             </div>
@@ -143,7 +151,7 @@ ob_start();
             <!-- Current committees -->
             <?php if (!empty($docCommittees)): ?>
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Committees in Charge</h2>
+                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Committee Referral</h2>
                 <ul class="space-y-1">
                     <?php foreach ($docCommittees as $dc): ?>
                         <li class="text-sm text-gray-800">
@@ -183,7 +191,7 @@ ob_start();
                                            <?= ($old['first_reading_action'] ?? '') === 'REFERRED_TO_COMMITTEE' ? 'checked' : '' ?>
                                            class="mt-0.5 h-4 w-4 accent-primary" id="action_refer">
                                     <div>
-                                        <p class="text-sm font-medium text-gray-900">Refer to Committee</p>
+                                        <p class="text-sm font-medium text-gray-900">Referred to Committee</p>
                                         <p class="text-xs text-gray-500 mt-0.5">Route this document to one or more Committees for review before Second Reading.</p>
                                     </div>
                                 </label>
@@ -192,7 +200,7 @@ ob_start();
                                            <?= ($old['first_reading_action'] ?? '') === 'ADOPTED_SUSPENDED_RULES' ? 'checked' : '' ?>
                                            class="mt-0.5 h-4 w-4 accent-primary" id="action_adopt">
                                     <div>
-                                        <p class="text-sm font-medium text-gray-900">Adopted and Approved for Second Reading under Suspended Rules</p>
+                                        <p class="text-sm font-medium text-gray-900">Approved for Second Reading under Suspended Rules</p>
                                         <p class="text-xs text-gray-500 mt-0.5">Skip Committee referral and move directly to the Second Reading queue.</p>
                                     </div>
                                 </label>
@@ -207,7 +215,7 @@ ob_start();
                                 <?php foreach ($committees as $c): ?>
                                     <label class="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-50 cursor-pointer">
                                         <input type="checkbox" name="committee_ids[]" value="<?= (int) $c['id'] ?>"
-                                               <?= in_array((int) $c['id'], array_map('intval', $existingCommitteeIds ?: ($old['committee_ids'] ?? [])), true) ? 'checked' : '' ?>
+                                               <?= in_array((int) $c['id'], array_map('intval', isset($old['committee_ids']) ? (array) $old['committee_ids'] : $existingCommitteeIds), true) ? 'checked' : '' ?>
                                                class="h-4 w-4 accent-primary rounded">
                                         <span class="text-sm text-gray-800"><?= htmlspecialchars($c['name']) ?></span>
                                     </label>

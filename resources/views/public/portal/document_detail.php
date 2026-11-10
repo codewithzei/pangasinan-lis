@@ -1,3 +1,24 @@
+<?php
+$publicTimeline = [
+    [
+        'title' => 'Document Approved',
+        'date' => $document['date_approved'] ?? null,
+    ],
+    [
+        'title' => 'Added to Public Records',
+        'date' => $document['created_at'] ?? null,
+    ],
+];
+$publicTimeline = array_values(array_filter(
+    $publicTimeline,
+    static fn(array $item): bool => !empty($item['date'])
+));
+usort(
+    $publicTimeline,
+    static fn(array $a, array $b): int => strtotime((string) $a['date']) <=> strtotime((string) $b['date'])
+);
+?>
+
 <!-- Page Header -->
 <section class="bg-gradient-to-r from-green-600 to-green-700 text-white py-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -95,6 +116,30 @@
                     </div>
                     
                 </div>
+            </div>
+
+            <!-- Public record history: only milestones available on the archived record -->
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-green-600"></i>
+                    Document History
+                </h3>
+                <?php if (empty($publicTimeline)): ?>
+                    <p class="text-sm italic text-gray-500">No history dates are available for this record.</p>
+                <?php else: ?>
+                    <ol class="relative space-y-5 border-l border-green-200 pl-6">
+                        <?php foreach ($publicTimeline as $item): ?>
+                            <li class="relative">
+                                <span class="absolute -left-[31px] top-1 h-3 w-3 rounded-full border-2 border-white bg-green-600"></span>
+                                <p class="font-semibold text-gray-900"><?= htmlspecialchars($item['title']) ?></p>
+                                <time class="mt-1 block text-sm text-gray-600"
+                                      datetime="<?= htmlspecialchars(date('Y-m-d', strtotime((string) $item['date']))) ?>">
+                                    <?= htmlspecialchars(date('F d, Y', strtotime((string) $item['date']))) ?>
+                                </time>
+                            </li>
+                        <?php endforeach; ?>
+                    </ol>
+                <?php endif; ?>
             </div>
             
             <!-- Description Section -->
@@ -200,8 +245,11 @@
                     </h3>
                     <div class="space-y-2">
                         <?php foreach ($attachments as $attachment): ?>
-                            <a 
-                                href="<?= BASE_URL ?>/public/portal/download-attachment?id=<?= $attachment['id'] ?>" 
+                            <a
+                                href="<?= BASE_URL ?>/public/portal/download-attachment?id=<?= (int) $attachment['id'] ?>"
+                                data-attachment-preview
+                                data-preview-url="<?= BASE_URL ?>/public/portal/download-attachment?id=<?= (int) $attachment['id'] ?>&amp;mode=inline"
+                                data-preview-name="<?= htmlspecialchars($attachment['file_name']) ?>"
                                 class="flex items-center gap-4 p-4 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors group">
                                 
                                 <!-- File Icon -->
@@ -251,10 +299,10 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Download Icon -->
+                                <!-- Preview Icon -->
                                 <div class="flex-shrink-0">
                                     <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-600 text-white group-hover:bg-primary-hover transition-colors">
-                                        <i class="fa-solid fa-download"></i>
+                                        <i class="fa-solid fa-eye"></i>
                                     </div>
                                 </div>
                                 

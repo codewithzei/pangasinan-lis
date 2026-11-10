@@ -222,14 +222,29 @@ try {
         $pdo->prepare("
             INSERT INTO plenary_comm_first_reading
                 (document_id, decision, reading_date, remarks,
-                 proposed_number, resolution_number,
+                 proposed_number, resolution_number, approved_subject_matter,
                  performed_by, finalized_at, finalized_by)
             VALUES (?, 'APPROVED', CURDATE(), NULL,
-                    NULL, 'RES-2026-001',
+                    NULL, 'RES-2026-001', '[TEST] Approved subject matter',
                     NULL, NOW(), NULL)
         ")->execute([$docId]);
         $insertedFrId = (int) $pdo->lastInsertId();
         pass('F1: INSERT into plenary_comm_first_reading (APPROVED) succeeds');
+
+        $subjectStmt = $pdo->prepare("
+            SELECT pcfr.approved_subject_matter, d.subject_matter AS original_subject_matter
+            FROM plenary_comm_first_reading pcfr
+            INNER JOIN documents d ON d.id = pcfr.document_id
+            WHERE pcfr.id = ?
+        ");
+        $subjectStmt->execute([$insertedFrId]);
+        $subjectRow = $subjectStmt->fetch(PDO::FETCH_ASSOC);
+        check(
+            'F1b: Approved subject matter is stored without replacing the original',
+            $subjectRow !== false
+                && $subjectRow['approved_subject_matter'] === '[TEST] Approved subject matter'
+                && $subjectRow['original_subject_matter'] === '[TEST] Plenary Comm FR Approved regression fixture'
+        );
     } catch (PDOException $e) {
         fail('F1: INSERT into plenary_comm_first_reading (APPROVED) failed', $e->getMessage());
     }

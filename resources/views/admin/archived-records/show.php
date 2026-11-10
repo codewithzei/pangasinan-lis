@@ -34,6 +34,10 @@ $tagList = [];
 if (!empty($record['tags'])) {
     $tagList = array_filter(array_map('trim', explode(',', $record['tags'])));
 }
+$isAllArchiveRole = static function (string $role) use ($record): bool {
+    $flag = $role === 'AUTHOR' ? 'authors_all' : 'co_authors_all';
+    return !empty($record[$flag]);
+};
 
 // Helper: human-readable file size
 function arFormatFileSize(int $bytes): string {
@@ -191,14 +195,22 @@ function arFileIcon(string $mime): string {
                         <?php if (!empty($mainAuthors)): ?>
                         <div>
                             <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Authors / Sponsors</p>
+                            <?php $allAuthorsSelected = $isAllArchiveRole('AUTHOR'); ?>
+                            <?php if ($allAuthorsSelected): ?>
+                                <p class="mb-2 text-sm font-semibold text-gray-800">ALL</p>
+                            <?php endif; ?>
                             <div class="space-y-2">
-                                <?php foreach ($mainAuthors as $author): ?>
+                                <?php foreach (array_values($mainAuthors) as $rank => $author): ?>
+                                    <?php if ($allAuthorsSelected && !empty($author['sp_member_id'])) continue; ?>
                                     <?php
                                     $name = $author['member_full_name'] ?: $author['custom_author_name'];
                                     $pos  = $author['member_position'] ?? null;
                                     $isCustom = !$author['sp_member_id'];
                                     ?>
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-gray-500">
+                                            <?= $rank + 1 ?>
+                                        </span>
                                         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full
                                                     bg-primary/10 text-sm font-bold text-primary">
                                             <?= strtoupper(mb_substr($name, 0, 1)) ?>
@@ -222,14 +234,22 @@ function arFileIcon(string $mime): string {
                         <?php if (!empty($coAuthors)): ?>
                         <div>
                             <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Co-authors / Co-sponsors</p>
+                            <?php $allCoAuthorsSelected = $isAllArchiveRole('CO_AUTHOR'); ?>
+                            <?php if ($allCoAuthorsSelected): ?>
+                                <p class="mb-2 text-sm font-semibold text-gray-800">ALL</p>
+                            <?php endif; ?>
                             <div class="space-y-2">
-                                <?php foreach ($coAuthors as $author): ?>
+                                <?php foreach (array_values($coAuthors) as $rank => $author): ?>
+                                    <?php if ($allCoAuthorsSelected && !empty($author['sp_member_id'])) continue; ?>
                                     <?php
                                     $name = $author['member_full_name'] ?: $author['custom_author_name'];
                                     $pos  = $author['member_position'] ?? null;
                                     $isCustom = !$author['sp_member_id'];
                                     ?>
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-gray-500">
+                                            <?= $rank + 1 ?>
+                                        </span>
                                         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full
                                                     bg-indigo-50 text-sm font-bold text-indigo-500">
                                             <?= strtoupper(mb_substr($name, 0, 1)) ?>
@@ -579,6 +599,14 @@ function arFileIcon(string $mime): string {
                                 class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-primary hover:bg-blue-50">
                             + Add person
                         </button>
+                        <button type="button" onclick="selectAllArchiveMembers('editAuthorsList', 'AUTHOR', 'editAuthorEntryTemplate')"
+                                class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-primary hover:bg-blue-50">
+                            Select all authors
+                        </button>
+                        <button type="button" onclick="selectAllArchiveMembers('editAuthorsList', 'CO_AUTHOR', 'editAuthorEntryTemplate')"
+                                class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-primary hover:bg-blue-50">
+                            Select all co-authors
+                        </button>
                     </div>
                     <div id="editAuthorsList" class="space-y-3">
                         <?php foreach ($editAuthors as $author): ?>
@@ -590,7 +618,7 @@ function arFileIcon(string $mime): string {
                             <select name="author_sp_member_id[]" aria-label="Select existing person" class="entry-master rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
                                 <option value="">Select existing person…</option>
                                 <?php foreach ($spMembers as $member): ?>
-                                    <option value="<?= (int) $member['sp_member_id'] ?>" <?= (string) ($author['sp_member_id'] ?? '') === (string) $member['sp_member_id'] ? 'selected' : '' ?>><?= htmlspecialchars($member['full_name']) ?><?= !empty($member['position']) ? ' — ' . htmlspecialchars($member['position']) : '' ?></option>
+                                    <option value="<?= (int) $member['sp_member_id'] ?>" data-active="<?= !empty($member['is_active']) && empty($member['is_deleted']) ? 'true' : 'false' ?>" <?= (string) ($author['sp_member_id'] ?? '') === (string) $member['sp_member_id'] ? 'selected' : '' ?>><?= htmlspecialchars($member['full_name']) ?><?= !empty($member['position']) ? ' — ' . htmlspecialchars($member['position']) : '' ?></option>
                                 <?php endforeach; ?>
                             </select>
                             <input type="text" name="author_custom_name[]" aria-label="Custom person name" maxlength="200" placeholder="Or enter custom name"
@@ -670,7 +698,7 @@ function arFileIcon(string $mime): string {
         <select name="author_role[]" aria-label="Person role" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"><option value="AUTHOR">Author / Sponsor</option><option value="CO_AUTHOR">Co-author / Co-sponsor</option></select>
         <select name="author_sp_member_id[]" aria-label="Select existing person" class="entry-master rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
             <option value="">Select existing person…</option>
-            <?php foreach ($spMembers as $member): ?><option value="<?= (int) $member['sp_member_id'] ?>"><?= htmlspecialchars($member['full_name']) ?><?= !empty($member['position']) ? ' — ' . htmlspecialchars($member['position']) : '' ?></option><?php endforeach; ?>
+            <?php foreach ($spMembers as $member): ?><option value="<?= (int) $member['sp_member_id'] ?>" data-active="<?= !empty($member['is_active']) && empty($member['is_deleted']) ? 'true' : 'false' ?>"><?= htmlspecialchars($member['full_name']) ?><?= !empty($member['position']) ? ' — ' . htmlspecialchars($member['position']) : '' ?></option><?php endforeach; ?>
         </select>
         <input type="text" name="author_custom_name[]" aria-label="Custom person name" maxlength="200" placeholder="Or enter custom name" class="entry-custom rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
         <button type="button" onclick="removeArchiveEntry(this)" aria-label="Remove person" class="rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50">Remove</button>
@@ -882,6 +910,79 @@ function addArchiveEntry(containerId, templateId) {
     document.getElementById(containerId).appendChild(fragment);
 }
 
+function initArchiveAuthorOrdering(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.__authorRank = 0;
+    container.querySelectorAll('.person-entry').forEach((entry) => {
+        const member = entry.querySelector('[name="author_sp_member_id[]"]');
+        entry.dataset.authorRank = member && member.value ? String(++container.__authorRank) : '';
+    });
+    container.addEventListener('change', (event) => {
+        if (event.target.name === 'author_sp_member_id[]' && event.target.value) {
+            event.target.closest('.person-entry').dataset.authorRank = String(++container.__authorRank);
+        }
+    });
+    const form = container.closest('form');
+    if (form) {
+        form.addEventListener('submit', () => {
+            const entries = Array.from(container.querySelectorAll('.person-entry'));
+            entries.sort((a, b) => {
+                const roleOrder = (a.querySelector('[name="author_role[]"]').value === 'AUTHOR' ? 0 : 1)
+                    - (b.querySelector('[name="author_role[]"]').value === 'AUTHOR' ? 0 : 1);
+                if (roleOrder) return roleOrder;
+                const rankA = Number(a.dataset.authorRank || Number.MAX_SAFE_INTEGER);
+                const rankB = Number(b.dataset.authorRank || Number.MAX_SAFE_INTEGER);
+                return rankA - rankB;
+            });
+            entries.forEach((entry) => container.appendChild(entry));
+        });
+    }
+}
+
+function selectAllArchiveMembers(containerId, role, templateId) {
+    const container = document.getElementById(containerId);
+    const firstSelect = container && container.querySelector('[name="author_sp_member_id[]"]');
+    if (!container || !firstSelect) return;
+
+    const memberIds = Array.from(firstSelect.options)
+    .filter((option) => option.value !== '' && option.dataset.active !== 'false')
+    .map((option) => option.value)
+    const conflicts = Array.from(container.querySelectorAll('.person-entry')).some((entry) => {
+        const member = entry.querySelector('[name="author_sp_member_id[]"]');
+        const entryRole = entry.querySelector('[name="author_role[]"]');
+        return member.value && memberIds.includes(member.value) && entryRole.value !== role;
+    });
+    if (conflicts) {
+        window.alert('Remove the selections in the other role before selecting all members here.');
+        return;
+    }
+
+    const selected = new Set(
+        Array.from(container.querySelectorAll('.person-entry'))
+            .filter((entry) => entry.querySelector('[name="author_role[]"]').value === role)
+            .map((entry) => entry.querySelector('[name="author_sp_member_id[]"]').value)
+            .filter(Boolean)
+    );
+    const missingIds = memberIds.filter((id) => !selected.has(id));
+    const emptyEntries = Array.from(container.querySelectorAll('.person-entry'))
+        .filter((entry) => !entry.querySelector('[name="author_sp_member_id[]"]').value
+            && !entry.querySelector('[name="author_custom_name[]"]').value.trim());
+
+    missingIds.forEach((id) => {
+        let entry = emptyEntries.shift();
+        if (!entry) {
+            addArchiveEntry(containerId, templateId);
+            entry = container.lastElementChild;
+        }
+        entry.querySelector('[name="author_role[]"]').value = role;
+        entry.querySelector('[name="author_sp_member_id[]"]').value = id;
+        entry.dataset.authorRank = String(++container.__authorRank);
+    });
+}
+
+initArchiveAuthorOrdering('editAuthorsList');
+
 function removeArchiveEntry(button) {
     const entry = button.closest('.person-entry, .committee-entry');
     const list = entry.parentElement;
@@ -937,4 +1038,3 @@ function handleCustomTypeChange(prefix) {
     else if (custom.value) { sel.disabled = true; }
 })();
 </script>
-

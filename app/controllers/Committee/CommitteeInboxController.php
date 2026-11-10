@@ -45,11 +45,30 @@ class CommitteeInboxController
         'return_to_admin',
         'endorse',
         'proceed_to_communications',
+        'proceed_to_cases',
         'return_to_origin',
     ];
 
     /** Document type name that owns the Communications sub-workflow. */
     private const COMMUNICATION_TYPE = 'Communication';
+
+    /**
+     * Document type names that also follow the Communications sub-workflow.
+     * Motion for Reconsideration documents follow the same Committee path as
+     * Communications (proceed_to_communications, return_to_origin) while
+     * retaining their linked finalized Complaint / Administrative Cases record.
+     */
+    private const COMMUNICATION_LIKE_TYPES = [
+        'Communication',
+        'Motion for Reconsideration',
+    ];
+
+    /**
+     * Document type names that route through the Cases sub-workflow.
+     * These types may never be endorsed (Proceed to Endorsement is hidden and
+     * server-blocked for them).
+     */
+    private const CASES_TYPES = ['Administrative Cases', 'Complaint'];
 
     /** Action keys that may only be used on Communication documents. */
     private const COMMUNICATION_ONLY_ACTIONS = [
@@ -66,6 +85,21 @@ class CommitteeInboxController
         'accept',
         'proceed_to_communications',
         'return_to_origin',
+    ];
+
+    /**
+     * The complete set of actions an Administrative Cases / Complaint document
+     * may use.  Endorsement (endorse) is explicitly excluded — these document
+     * types are never endorsable.
+     *
+     * 'proceed_to_cases' dockets the document and hands it to the Committee
+     * Cases workflow; the remaining case details (nature of case, respondents,
+     * complainant) are entered from the Committee Cases page itself.
+     */
+    private const CASES_ALLOWED_ACTIONS = [
+        'accept',
+        'return_to_admin',
+        'proceed_to_cases',
     ];
 
     /**
@@ -177,10 +211,10 @@ class CommitteeInboxController
             $params[] = $userId;
             $params[] = $userId;
             // Exclude documents that have already been processed into their
-            // respective workflow (Cases or Communications).
+            // respective workflow (Cases or Communications/MFR).
             $where[] = "(
                 (SELECT dt_inner.name FROM document_types dt_inner WHERE dt_inner.id = d.document_type_id LIMIT 1)
-                    NOT IN ('Complaint', 'Administrative Cases', 'Communication')
+                    NOT IN ('Complaint', 'Administrative Cases', 'Communication', 'Motion for Reconsideration')
                 OR (
                     (SELECT dt_inner.name FROM document_types dt_inner WHERE dt_inner.id = d.document_type_id LIMIT 1)
                         IN ('Complaint', 'Administrative Cases')
@@ -191,7 +225,7 @@ class CommitteeInboxController
                 )
                 OR (
                     (SELECT dt_inner.name FROM document_types dt_inner WHERE dt_inner.id = d.document_type_id LIMIT 1)
-                        = 'Communication'
+                        IN ('Communication', 'Motion for Reconsideration')
                     AND NOT EXISTS (
                         SELECT 1 FROM committee_communications ccomm
                         WHERE ccomm.document_id = da.document_id
@@ -251,7 +285,7 @@ class CommitteeInboxController
             LEFT  JOIN document_statuses ds            ON d.current_status_id      = ds.id
             LEFT  JOIN document_types    dt            ON d.document_type_id       = dt.id
             LEFT  JOIN source_types      st            ON d.source_type_id         = st.id
-            LEFT  JOIN external_offices  eo            ON d.external_office_id     = eo.id
+            LEFT  JOIN provincial_government_offices  eo            ON d.external_office_id     = eo.id
             LEFT  JOIN hospitals          h            ON d.hospital_id            = h.id
             LEFT  JOIN municities         m            ON d.municipality_id        = m.id
             LEFT  JOIN document_committees dc          ON d.id                     = dc.document_id
@@ -374,7 +408,7 @@ class CommitteeInboxController
             LEFT  JOIN document_types    dt ON d.document_type_id    = dt.id
             LEFT  JOIN document_statuses ds ON d.current_status_id   = ds.id
             LEFT  JOIN source_types      st ON d.source_type_id      = st.id
-            LEFT  JOIN external_offices  eo ON d.external_office_id  = eo.id
+            LEFT  JOIN provincial_government_offices  eo ON d.external_office_id  = eo.id
             LEFT  JOIN hospitals          h ON d.hospital_id          = h.id
             LEFT  JOIN municities         m ON d.municipality_id      = m.id
             LEFT  JOIN communication_categories cc ON d.communication_category_id = cc.id
@@ -575,9 +609,12 @@ class CommitteeInboxController
             && $existingCase === null;
 
         // ── Committee Communications: check eligibility + existence ───────────
-        // Eligible document type for the Communications workflow.
-        $commEligibleType   = 'Communication';
-        $isCommEligibleType = ($document['document_type_name'] ?? '') === $commEligibleType;
+        // Eligible document types for the Communications workflow.
+        $isCommEligibleType = in_array(
+            $document['document_type_name'] ?? '',
+            self::COMMUNICATION_LIKE_TYPES,
+            true
+        );
 
         // Check if a communication record already exists for this document.
         $existingComm = null;
@@ -655,6 +692,18 @@ class CommitteeInboxController
             }
         }
 
+        // ── Motion for Reconsideration: load the linked finalized case ────────
+        // Show the linked Complaint / Administrative Cases document on the
+        // detail page so the committee user has full context.
+        $mfrLink        = null;
+        $relatedMotions = [];
+        $docTypeName    = $document['document_type_name'] ?? '';
+        if ($docTypeName === DocumentService::mfrTypeName()) {
+            $mfrLink = $this->docService->getMotionLink($documentId);
+        } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
+            $relatedMotions = $this->docService->getRelatedMotions($documentId);
+        }
+
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
         require __DIR__ . '/../../../resources/views/committee/inbox/show.php';
     }
@@ -699,7 +748,8 @@ class CommitteeInboxController
         ");
         $typeStmt->execute([$documentId]);
         $documentTypeName = (string) ($typeStmt->fetchColumn() ?: '');
-        $isCommunication  = $documentTypeName === self::COMMUNICATION_TYPE;
+        $isCommunication  = in_array($documentTypeName, self::COMMUNICATION_LIKE_TYPES, true);
+        $isCasesType      = in_array($documentTypeName, self::CASES_TYPES, true);
 
         if ($isCommunication && !in_array($action, self::COMMUNICATION_ALLOWED_ACTIONS, true)) {
             flash_set(
@@ -714,6 +764,17 @@ class CommitteeInboxController
             redirect('committee/inbox/show?id=' . $documentId);
         }
 
+        // Administrative Cases and Complaint documents cannot be endorsed.
+        // They proceed to the Cases workflow via a direct link, and may only
+        // be returned to Admin from this inbox.
+        if ($isCasesType && !in_array($action, self::CASES_ALLOWED_ACTIONS, true)) {
+            flash_set(
+                'error',
+                'Administrative Cases and Complaint documents cannot be endorsed. Use the Cases workflow instead.'
+            );
+            redirect('committee/inbox/show?id=' . $documentId);
+        }
+
         // Execute with retry for transient database errors
         $maxRetries = 3;
         $retryDelay = 100000; // 100 ms in microseconds
@@ -724,6 +785,7 @@ class CommitteeInboxController
             $notificationData = null;
             $endorseAuditData = null;
             $commData         = null;
+            $caseData         = null;
 
             try {
                 $this->pdo->beginTransaction();
@@ -803,6 +865,10 @@ class CommitteeInboxController
                         $commData = $this->doProceedToCommunications($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
                         break;
 
+                    case 'proceed_to_cases':
+                        $caseData = $this->doProceedToCases($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
+                        break;
+
                     case 'return_to_origin':
                         $notificationData = $this->doReturnToOrigin($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
                         break;
@@ -855,6 +921,15 @@ class CommitteeInboxController
                         null,
                         $commData['auditData'],
                         $commData['auditDescription'] ?? null
+                    );
+                } elseif ($action === 'proceed_to_cases' && isset($caseData)) {
+                    audit_log(
+                        'CREATE',
+                        'CommitteeCase',
+                        (string) $caseData['caseId'],
+                        null,
+                        $caseData['auditData'],
+                        $caseData['auditDescription'] ?? null
                     );
                 }
 
@@ -932,6 +1007,12 @@ class CommitteeInboxController
                 }
                 if ($action === 'proceed_to_communications' && !empty($commData['commId'])) {
                     redirect('committee/communications/show?id=' . (int) $commData['commId']);
+                }
+                // Proceed to Cases lands on the Case Details page so the user can
+                // enter the docket number, nature of case, and respondents straight away.
+                if ($action === 'proceed_to_cases' && !empty($caseData['caseId'])) {
+                    flash_set('success', 'Document moved to Committee Cases. Please enter the docket number and case details to continue.');
+                    redirect('committee/cases/show?id=' . (int) $caseData['caseId']);
                 }
                 redirect('committee/inbox');
 
@@ -1675,6 +1756,192 @@ class CommitteeInboxController
     }
 
     /**
+     * Proceed to Cases — docket a Complaint / Administrative Cases document and
+     * hand it to the Committee Cases workflow.
+     *
+    * The case record is created with a NULL docket_number, blank nature_of_case,
+     * and blank respondents. The committee user fills in all case details (including
+     * the docket number) from the Committee Cases show page (Case Details Required
+     * section) before they can add proceedings or set a final outcome.
+     *
+     * Steps (all inside the caller's transaction):
+     *   1. Type guard — only Complaint / Administrative Cases documents.
+     *   2. Duplicate guard — one case record per document.
+    *   3. Insert the committee_cases row (all details blank; docket_number = NULL).
+     *   4. Document status → "Case Docketed" (falls back to the current status
+     *      when that status has not been seeded).
+     *   5. Complete the Committee assignment → removes it from the Inbox.
+     *   6. Record the COMMITTEE → COMMITTEE route and the workflow event.
+     *
+     * NOTE: audit_log() is deliberately omitted here — runs inside an open
+     * transaction. process() writes the audit entry after commit.
+     *
+     * @return array{caseId:int, docketNumber:string, auditData:array, auditDescription:string}
+     */
+    private function doProceedToCases(
+        int    $documentId,
+        int    $assignmentId,
+        array  $assignment,
+        array  $document,
+        int    $userId,
+        int    $currentStatusId,
+        string $remarks
+    ): array {
+        // 1. Type guard — never docket a non-cases document through this path.
+        $typeStmt = $this->pdo->prepare("
+            SELECT dt.name
+            FROM documents d
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
+            WHERE d.id = ?
+            LIMIT 1
+        ");
+        $typeStmt->execute([$documentId]);
+        $documentTypeName = (string) ($typeStmt->fetchColumn() ?: '');
+
+        if (!in_array($documentTypeName, self::CASES_TYPES, true)) {
+            throw new RuntimeException(
+                'Only Complaint and Administrative Cases documents may proceed to the Cases workflow.'
+            );
+        }
+
+        // 2. Duplicate guard — never create a second case record.
+        $dupStmt = $this->pdo->prepare(
+            "SELECT id FROM committee_cases WHERE document_id = ? LIMIT 1"
+        );
+        $dupStmt->execute([$documentId]);
+        if ($dupStmt->fetch()) {
+            throw new RuntimeException(
+                'A case record already exists for this document. Open it from the Committee Cases page instead.'
+            );
+        }
+
+        // 3. Create the case record with a NULL docket_number placeholder.
+        //    The committee user will supply the actual docket number from the
+        //    Case Details Required section of the Committee Cases show page
+        //    (CommitteeCasesController::detailsStore()).  Nature of case /
+        //    complainant / respondents are also left blank on purpose.
+        $this->pdo->prepare("
+            INSERT INTO committee_cases (
+                document_id, docket_year, docket_sequence, docket_number,
+                date_assigned, nature_of_case, complainant_details,
+                complainant_municipality, respondents, assigned_by
+            ) VALUES (?, NULL, NULL, NULL, CURDATE(), '', '', NULL, '', ?)
+        ")->execute([
+            $documentId,
+            $userId,
+        ]);
+
+        $caseId = (int) $this->pdo->lastInsertId();
+
+        // Docket number is blank; the user will fill it in from the Cases page.
+        $docketNumber = '';
+
+        // 5. Document status → "Case Docketed". If that status has not been
+        //    seeded the current status is kept — the Committee Inbox still
+        //    excludes the document because a committee_cases row now exists.
+        $docketedStatusStmt = $this->pdo->prepare("
+            SELECT id FROM document_statuses
+            WHERE name = 'Case Docketed' AND is_active = 1 AND is_deleted = 0
+            LIMIT 1
+        ");
+        $docketedStatusStmt->execute();
+        $docketedStatusId = (int) $docketedStatusStmt->fetchColumn();
+
+        $caseStatusId = $docketedStatusId > 0 ? $docketedStatusId : $currentStatusId;
+
+        if ($caseStatusId > 0) {
+            $this->pdo->prepare(
+                "UPDATE documents SET current_status_id = ?, updated_by = ? WHERE id = ?"
+            )->execute([$caseStatusId, $userId, $documentId]);
+        }
+
+        // 6. Complete the Committee inbox assignment → removes it from the inbox.
+        $completeStmt = $this->pdo->prepare("
+            UPDATE document_assignments
+            SET decision     = 'COMPLETED',
+                completed_at = NOW(),
+                remarks      = ?
+            WHERE id           = ?
+              AND decision     = 'ACCEPTED'
+              AND completed_at IS NULL
+              AND (accepted_by = ? OR assigned_to_user_id = ?)
+        ");
+        $completeStmt->execute([
+            $remarks !== '' ? $remarks : 'Proceeded to Committee Cases workflow.',
+            $assignmentId,
+            $userId,
+            $userId,
+        ]);
+
+        if ($completeStmt->rowCount() === 0) {
+            throw new RuntimeException(
+                'This assignment has already been processed or you no longer own it. Please refresh the page.'
+            );
+        }
+
+        // 7. Route record — the hand-off from the inbox to the Cases workflow.
+        $committeeRoleId = (int) ($assignment['assigned_to_role_id'] ?? 0);
+        $this->pdo->prepare("
+            INSERT INTO document_routes (
+                document_id, from_phase, to_phase,
+                routed_by, routed_to_role_id, remarks
+            ) VALUES (?, 'COMMITTEE', 'COMMITTEE', ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $userId,
+            $committeeRoleId ?: null,
+            'Proceeded to Committee Cases workflow.',
+        ]);
+
+        // 8. Workflow event — same event type the Cases docketing writes, so the
+        //    document timeline stays consistent with cases created before this
+        //    change. The docket_number is NULL at this point; it will be filled
+        //    in by the committee user from the Case Details Required section.
+        $uStmt = $this->pdo->prepare("SELECT username FROM user_accounts WHERE id = ? LIMIT 1");
+        $uStmt->execute([$userId]);
+        $username = (string) ($uStmt->fetchColumn() ?: '');
+
+        $this->pdo->prepare("
+            INSERT INTO document_events (
+                document_id, event_type, phase, performed_by,
+                from_status_id, to_status_id, remarks, metadata
+            ) VALUES (?, 'COMMITTEE_CASE_CREATED', 'COMMITTEE', ?, ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $userId,
+            $currentStatusId ?: null,
+            $caseStatusId ?: null,
+            'Proceeded to Committee Cases. Docket number to be assigned.',
+            json_encode([
+                'case_id'       => $caseId,
+                'docket_number' => $docketNumber,
+                'source'        => 'committee_inbox',
+                'assignment_id' => $assignmentId,
+                'ip_address'    => client_ip(),
+                'user_agent'    => client_user_agent(),
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ]);
+
+        // audit_log() deliberately omitted (open transaction) — process() writes after commit.
+
+        return [
+            'caseId'       => $caseId,
+            'docketNumber' => '',   // blank — user enters docket number from the Cases page
+            'auditData'    => [
+                'action'                => 'committee_proceeded_to_cases',
+                'case_id'               => $caseId,
+                'document_id'           => $documentId,
+                'assignment_id'         => $assignmentId,
+                'docket_number'         => '',   // to be filled in by the user
+                'proceeded_by'          => $userId,
+                'proceeded_by_username' => $username,
+                'status_changed_to'     => 'Case Docketed (id=' . $caseStatusId . ')',
+            ],
+            'auditDescription' => "Committee proceeded to cases for document ID {$documentId} (user: {$username}). Docket number to be assigned.",
+        ];
+    }
+
+    /**
      * Return a Communication document to its ACTUAL origin.
      *
      * Unlike doReturnToAdmin() — which always targets Admin — the destination
@@ -2022,6 +2289,7 @@ class CommitteeInboxController
             'return_to_admin'           => 'Returned to Admin',
             'endorse'                   => 'Proceeded to Endorsement (Referred)',
             'proceed_to_communications' => 'Proceeded to Communications',
+            'proceed_to_cases'          => 'Proceeded to Cases',
             'return_to_origin'          => 'Returned to originating office',
             default                     => $action,
         };

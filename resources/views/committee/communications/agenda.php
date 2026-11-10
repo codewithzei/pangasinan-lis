@@ -191,7 +191,7 @@ ob_start();
 
                 <!-- Committees card ----------------------------------------->
                 <div class="rounded-2xl border border-gray-200 bg-white p-6">
-                    <h2 class="mb-1 text-base font-semibold text-gray-900">Committees in Charge</h2>
+                    <h2 class="mb-1 text-base font-semibold text-gray-900">Committee Referral</h2>
                     <p class="mb-4 text-xs text-gray-400">Select at least one committee.</p>
                     <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <?php foreach ($allCommittees as $committee): ?>

@@ -255,10 +255,21 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <?php if ($canAdvance): ?>
-                                        <?php if (!empty($row['is_plenary_comm_referred'])): ?>
+                                        <?php if (!empty($row['is_plenary_cases_referred'])): ?>
+                                            <!-- Cases/Petitions returned from Committee: Adopt Committee Report -->
+                                            <button type="button"
+                                                    onclick="openAdoptCasesModal(<?= (int) $row['document_id'] ?>, '<?= htmlspecialchars(addslashes($row['tracking_number'])) ?>', <?= json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)"
+                                                    class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+                                                    aria-label="Adopt Committee Report for <?= htmlspecialchars($row['tracking_number']) ?>">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
+                                                Adopted Committee Report
+                                            </button>
+                                        <?php elseif (!empty($row['is_plenary_comm_referred'])): ?>
                                             <!-- Communication returned from Committee: Adopt Committee Report -->
                                             <button type="button"
-                                                    onclick="openAdoptModal(<?= (int) $row['document_id'] ?>, '<?= htmlspecialchars(addslashes($row['tracking_number'])) ?>')"
+                                                    onclick="openAdoptModal(<?= (int) $row['document_id'] ?>, '<?= htmlspecialchars(addslashes($row['tracking_number'])) ?>', <?= json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)"
                                                     class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -274,7 +285,7 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
                                                     </svg>
-                                                    Proceed to 2nd Reading
+                                                    Adopted and Approved for 2nd Reading
                                                 </button>
                                             </form>
                                         <?php endif; ?>
@@ -375,11 +386,11 @@ ob_start();
                 <div>
                     <label for="adopt-resolution-number"
                            class="block text-sm font-medium text-gray-700 mb-1">
-                        Approved Resolution Number <span class="text-red-500">*</span>
+                        Resolution/Ordinance No. <span class="text-red-500">*</span>
                     </label>
                     <input type="text" id="adopt-resolution-number" name="resolution_number"
                            maxlength="100" required
-                           placeholder="e.g. SP Res. No. 2026-001"
+                           placeholder="e.g. SP Res. No. 2026-001 or SP Ordinance No. 2026-001"
                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
                                   text-gray-800 placeholder-gray-400 focus:border-primary
                                   focus:outline-none focus:ring-2 focus:ring-primary/20">
@@ -399,16 +410,27 @@ ob_start();
                 </div>
             </div>
 
+            <div>
+                <label for="adopt-approved-subject-matter" class="block text-sm font-medium text-gray-700 mb-1">
+                    Subject Matter <span class="text-red-500" aria-hidden="true">*</span>
+                </label>
+                <textarea id="adopt-approved-subject-matter" name="approved_subject_matter" rows="3"
+                          maxlength="5000" required
+                          class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
+                                 text-gray-800 placeholder-gray-400 focus:border-primary
+                                 focus:outline-none focus:ring-2 focus:ring-primary/20"></textarea>
+            </div>
+
             <!-- ── Resolution Attachment — drag-and-drop upload area ── -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Resolution Attachment(s)
-                    <span class="text-xs font-normal text-gray-400">(optional)</span>
+                    Resolution Attachment(s) <span class="text-red-500" aria-hidden="true">*</span>
                 </label>
 
                 <!-- Hidden real file input (accumulator) -->
                 <input type="file" id="adopt-resolution-files" name="resolution_files[]"
                        multiple
+                       required
                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
                        class="sr-only"
                        aria-label="Resolution attachment files"
@@ -503,13 +525,14 @@ ob_start();
     var panel    = document.getElementById('adopt-comm-panel');
     var adoptOpen = false;
 
-    window.openAdoptModal = function (documentId, trackingNumber) {
+    window.openAdoptModal = function (documentId, trackingNumber, subjectMatter) {
         if (!modal || adoptOpen) return;
 
         document.getElementById('adopt-document-id').value           = documentId;
         document.getElementById('adopt-tracking-number').textContent = trackingNumber;
         document.getElementById('adopt-resolution-number').value     = '';
         document.getElementById('adopt-proposed-number').value       = '';
+        document.getElementById('adopt-approved-subject-matter').value = subjectMatter || '';
         document.getElementById('adopt-remarks').value               = '';
         adoptResetFiles();
 
@@ -726,6 +749,446 @@ ob_start();
         dragOverlay.classList.add('hidden');
         if (e.dataTransfer.files.length > 0) {
             addAdoptFiles(e.dataTransfer.files);
+        }
+    });
+
+}());
+</script>
+
+<!-- ======================================================================
+     Adopt Cases Committee Report Modal (Petitions / Complaints / Admin Cases)
+     Includes mandatory drag-and-drop attachment upload area.
+     ====================================================================== -->
+<div
+    id="adopt-cases-modal"
+    class="fixed inset-0 z-[100] hidden items-center justify-center"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="adopt-cases-modal-title"
+>
+    <div id="adopt-cases-backdrop"
+         class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0"></div>
+
+    <!-- Panel — max-h + overflow-y-auto so tall content scrolls inside the modal -->
+    <div id="adopt-cases-panel"
+         class="relative z-10 w-full max-w-xl mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100
+                transform scale-95 opacity-0 transition-all duration-200
+                flex flex-col max-h-[90vh]">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 shrink-0">
+            <h2 id="adopt-cases-modal-title" class="text-base font-semibold text-gray-900">
+                Adopted Committee Report
+            </h2>
+            <button type="button" id="adopt-cases-close-btn"
+                    class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+                    aria-label="Close">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Scrollable body -->
+        <form method="POST" action="<?= BASE_URL ?>/plenary/cases-first-reading/adopt-report"
+              enctype="multipart/form-data"
+              class="overflow-y-auto px-6 py-5 space-y-4" id="adopt-cases-form">
+            <input type="hidden" name="document_id" id="adopt-cases-document-id" value="">
+
+            <p class="text-sm text-gray-600">
+                Finalizing committee report adoption for:
+                <span id="adopt-cases-tracking-number" class="font-semibold text-gray-900"></span>
+            </p>
+
+            <div class="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+                Recording the committee report adoption will <strong>finalize</strong> this document
+                and move it to <strong>Finalized Documents → Petitions</strong>.
+            </div>
+
+            <!-- Resolution + Proposed Number -->
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="adopt-cases-resolution-number"
+                           class="block text-sm font-medium text-gray-700 mb-1">
+                        Resolution/Ordinance No. <span class="text-red-500" aria-hidden="true">*</span>
+                    </label>
+                    <input type="text" id="adopt-cases-resolution-number" name="resolution_number"
+                           maxlength="100" required
+                           placeholder="e.g. SP Res. No. 2026-001 or SP Ordinance No. 2026-001"
+                           class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
+                                  text-gray-800 placeholder-gray-400 focus:border-primary
+                                  focus:outline-none focus:ring-2 focus:ring-primary/20"
+                           aria-required="true">
+                </div>
+                <div>
+                    <label for="adopt-cases-proposed-number"
+                           class="block text-sm font-medium text-gray-700 mb-1">
+                        Proposed Number
+                        <span class="text-xs font-normal text-gray-400">(optional)</span>
+                    </label>
+                    <input type="text" id="adopt-cases-proposed-number" name="proposed_number"
+                           maxlength="100"
+                           placeholder="e.g. SP Res. No. 2026-001"
+                           class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
+                                  text-gray-800 placeholder-gray-400 focus:border-primary
+                                  focus:outline-none focus:ring-2 focus:ring-primary/20">
+                </div>
+            </div>
+
+            <div>
+                <label for="adopt-cases-approved-subject-matter"
+                       class="block text-sm font-medium text-gray-700 mb-1">
+                    Subject Matter <span class="text-red-500" aria-hidden="true">*</span>
+                </label>
+                <textarea id="adopt-cases-approved-subject-matter" name="approved_subject_matter"
+                          rows="3" maxlength="5000" required
+                          class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
+                                 text-gray-800 placeholder-gray-400 focus:border-primary
+                                 focus:outline-none focus:ring-2 focus:ring-primary/20"></textarea>
+            </div>
+
+            <!-- ── Required attachment upload ─────────────────────────────── -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Attachment(s) <span class="text-red-500" aria-hidden="true">*</span>
+                </label>
+                <p class="mb-2 text-xs text-gray-500">
+                    Upload the signed committee report or supporting approval documents.
+                </p>
+
+                <!-- Hidden accumulator input -->
+                <input type="file"
+                       id="adopt-cases-files-input"
+                       name="adoption_files[]"
+                       multiple
+                       required
+                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+                       class="sr-only"
+                       aria-label="Committee report attachment files"
+                       tabindex="-1">
+
+                <!-- Drop zone -->
+                <div id="adopt-cases-drop-zone"
+                     role="button"
+                     tabindex="0"
+                     aria-label="Drop committee report files here or click to browse"
+                     class="relative flex flex-col items-center justify-center gap-2
+                            rounded-xl border-2 border-dashed border-gray-300 bg-gray-50
+                            px-6 py-6 text-center transition
+                            hover:border-primary hover:bg-primary/5
+                            focus:outline-none focus:ring-2 focus:ring-primary/40
+                            cursor-pointer">
+
+                    <svg class="h-7 w-7 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+
+                    <p class="text-sm font-medium text-gray-700 pointer-events-none">
+                        Drag &amp; drop files here, or
+                        <span class="text-primary underline-offset-2 hover:underline">browse</span>
+                    </p>
+                    <p class="text-xs text-gray-400 pointer-events-none">
+                        Up to 10 files · max 25 MB each · PDF, DOC, DOCX, XLS, XLSX, JPG, PNG
+                    </p>
+
+                    <div id="adopt-cases-drag-overlay"
+                         class="pointer-events-none absolute inset-0 hidden rounded-xl
+                                border-2 border-primary bg-primary/10"></div>
+                </div>
+
+                <!-- Selected file list -->
+                <ul id="adopt-cases-file-list"
+                    class="hidden mt-3 space-y-2"
+                    aria-label="Selected committee report files"
+                    aria-live="polite"></ul>
+
+                <!-- Validation error message -->
+                <p id="adopt-cases-file-error"
+                   class="hidden mt-1 text-xs text-red-600"
+                   role="alert"></p>
+
+                <p class="mt-1 text-xs text-gray-400">
+                    Supported: PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG, GIF, WEBP
+                </p>
+            </div>
+
+            <!-- Remarks -->
+            <div>
+                <label for="adopt-cases-remarks"
+                       class="block text-sm font-medium text-gray-700 mb-1">
+                    Remarks <span class="text-xs font-normal text-gray-400">(optional)</span>
+                </label>
+                <textarea id="adopt-cases-remarks" name="remarks" rows="2" maxlength="2000"
+                          class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
+                                 text-gray-800 placeholder-gray-400 focus:border-primary
+                                 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          placeholder="Optional remarks…"></textarea>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
+                <button type="button" id="adopt-cases-cancel-btn"
+                        class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium
+                               text-gray-700 hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+                <button type="submit" id="adopt-cases-submit-btn"
+                        class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-sm
+                               font-semibold text-white hover:bg-indigo-700 transition
+                               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Finalize Document
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    // ── Modal open / close ────────────────────────────────────────────────────
+
+    var casesModal    = document.getElementById('adopt-cases-modal');
+    var casesBackdrop = document.getElementById('adopt-cases-backdrop');
+    var casesPanel    = document.getElementById('adopt-cases-panel');
+    var casesOpen     = false;
+
+    window.openAdoptCasesModal = function (documentId, trackingNumber, subjectMatter) {
+        if (!casesModal || casesOpen) { return; }
+
+        document.getElementById('adopt-cases-document-id').value           = documentId;
+        document.getElementById('adopt-cases-tracking-number').textContent = trackingNumber;
+        document.getElementById('adopt-cases-resolution-number').value     = '';
+        document.getElementById('adopt-cases-proposed-number').value       = '';
+        document.getElementById('adopt-cases-approved-subject-matter').value = subjectMatter || '';
+        document.getElementById('adopt-cases-remarks').value               = '';
+        casesResetFiles();
+
+        casesOpen = true;
+        casesModal.classList.remove('hidden');
+        casesModal.classList.add('flex');
+        requestAnimationFrame(function () {
+            casesBackdrop.classList.remove('opacity-0');
+            casesPanel.classList.remove('scale-95', 'opacity-0');
+            casesPanel.classList.add('scale-100', 'opacity-100');
+        });
+        document.getElementById('adopt-cases-resolution-number').focus();
+        document.addEventListener('keydown', handleCasesEsc);
+    };
+
+    window.closeAdoptCasesModal = function () {
+        if (!casesModal || !casesOpen) { return; }
+        casesOpen = false;
+        casesBackdrop.classList.add('opacity-0');
+        casesPanel.classList.remove('scale-100', 'opacity-100');
+        casesPanel.classList.add('scale-95', 'opacity-0');
+        setTimeout(function () {
+            casesModal.classList.remove('flex');
+            casesModal.classList.add('hidden');
+        }, 200);
+        document.removeEventListener('keydown', handleCasesEsc);
+    };
+
+    function handleCasesEsc(e) {
+        if (e.key === 'Escape') { closeAdoptCasesModal(); }
+    }
+
+    casesBackdrop.addEventListener('click', closeAdoptCasesModal);
+    document.getElementById('adopt-cases-close-btn').addEventListener('click', closeAdoptCasesModal);
+    document.getElementById('adopt-cases-cancel-btn').addEventListener('click', closeAdoptCasesModal);
+
+    // ── Drag-and-drop / multi-file upload ─────────────────────────────────────
+
+    var CASES_MAX_FILES    = 10;
+    var CASES_MAX_SIZE_MB  = 25;
+    var CASES_MAX_SIZE     = CASES_MAX_SIZE_MB * 1024 * 1024;
+    var CASES_ALLOWED_EXTS = ['pdf','doc','docx','xls','xlsx','jpg','jpeg','png','gif','webp'];
+
+    var casesFileInput   = document.getElementById('adopt-cases-files-input');
+    var casesDropZone    = document.getElementById('adopt-cases-drop-zone');
+    var casesFileList    = document.getElementById('adopt-cases-file-list');
+    var casesFileError   = document.getElementById('adopt-cases-file-error');
+    var casesDragOverlay = document.getElementById('adopt-cases-drag-overlay');
+
+    // DataTransfer accumulates files across multiple browse / drop sessions
+    var casesDt = new DataTransfer();
+
+    function casesExtOf(name) {
+        return (name.split('.').pop() || '').toLowerCase();
+    }
+
+    function casesFmtSize(bytes) {
+        if (bytes >= 1024 * 1024) { return (bytes / (1024 * 1024)).toFixed(1) + ' MB'; }
+        return Math.round(bytes / 1024) + ' KB';
+    }
+
+    function casesShowFileError(msg) {
+        casesFileError.textContent = msg;
+        casesFileError.classList.remove('hidden');
+    }
+
+    function casesClearFileError() {
+        casesFileError.textContent = '';
+        casesFileError.classList.add('hidden');
+    }
+
+    function casesRenderFileList() {
+        casesFileList.innerHTML = '';
+        if (casesDt.files.length === 0) {
+            casesFileList.classList.add('hidden');
+            return;
+        }
+        casesFileList.classList.remove('hidden');
+
+        Array.from(casesDt.files).forEach(function (file, idx) {
+            var li = document.createElement('li');
+            li.className = 'flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm';
+
+            var left = document.createElement('div');
+            left.className = 'flex items-center gap-2 min-w-0';
+
+            var icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            icon.setAttribute('class', 'h-4 w-4 shrink-0 text-gray-400');
+            icon.setAttribute('fill', 'none');
+            icon.setAttribute('stroke', 'currentColor');
+            icon.setAttribute('viewBox', '0 0 24 24');
+            icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>';
+
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'truncate text-gray-800';
+            nameSpan.textContent = file.name;
+
+            var sizeSpan = document.createElement('span');
+            sizeSpan.className = 'shrink-0 text-xs text-gray-400 ml-1';
+            sizeSpan.textContent = casesFmtSize(file.size);
+
+            left.appendChild(icon);
+            left.appendChild(nameSpan);
+            left.appendChild(sizeSpan);
+
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'shrink-0 rounded-lg p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition';
+            btn.setAttribute('aria-label', 'Remove ' + file.name);
+            btn.innerHTML = '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+            btn.addEventListener('click', function () { casesRemoveFile(idx); });
+
+            li.appendChild(left);
+            li.appendChild(btn);
+            casesFileList.appendChild(li);
+        });
+    }
+
+    function casesRemoveFile(idx) {
+        var updated = new DataTransfer();
+        Array.from(casesDt.files).forEach(function (f, i) {
+            if (i !== idx) { updated.items.add(f); }
+        });
+        casesDt = updated;
+        casesFileInput.files = casesDt.files;
+        casesClearFileError();
+        casesRenderFileList();
+    }
+
+    function casesAddFiles(incoming) {
+        casesClearFileError();
+        var candidates   = Array.from(incoming);
+        var existing     = Array.from(casesDt.files);
+        var existingKeys = new Set(existing.map(function (f) { return f.name + ':' + f.size; }));
+
+        var rejected = [];
+        var accepted = [];
+
+        candidates.forEach(function (file) {
+            var ext = casesExtOf(file.name);
+            var key = file.name + ':' + file.size;
+
+            if (existingKeys.has(key)) { return; } // duplicate — skip silently
+
+            if (!CASES_ALLOWED_EXTS.includes(ext)) {
+                rejected.push('"' + file.name + '" — type not allowed');
+                return;
+            }
+            if (file.size > CASES_MAX_SIZE) {
+                rejected.push('"' + file.name + '" — exceeds ' + CASES_MAX_SIZE_MB + ' MB');
+                return;
+            }
+            if (existing.length + accepted.length >= CASES_MAX_FILES) {
+                rejected.push('"' + file.name + '" — maximum ' + CASES_MAX_FILES + ' files reached');
+                return;
+            }
+            accepted.push(file);
+        });
+
+        accepted.forEach(function (f) {
+            casesDt.items.add(f);
+            existing.push(f);
+        });
+
+        casesFileInput.files = casesDt.files;
+
+        if (rejected.length > 0) {
+            casesShowFileError('Some files were not added: ' + rejected.join('; ') + '.');
+        }
+
+        casesRenderFileList();
+    }
+
+    function casesResetFiles() {
+        casesDt = new DataTransfer();
+        casesFileInput.files = casesDt.files;
+        casesRenderFileList();
+        casesClearFileError();
+    }
+
+    // Click-to-browse
+    casesDropZone.addEventListener('click', function () { casesFileInput.click(); });
+    casesDropZone.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); casesFileInput.click(); }
+    });
+
+    // Native input change (browsed files)
+    casesFileInput.addEventListener('change', function () {
+        if (casesFileInput.files.length > 0) {
+            casesAddFiles(casesFileInput.files);
+            casesFileInput.value = '';
+        }
+    });
+
+    // Drag events
+    casesDropZone.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        casesDropZone.classList.add('border-primary', 'bg-primary/5');
+        casesDragOverlay.classList.remove('hidden');
+    });
+    casesDropZone.addEventListener('dragleave', function (e) {
+        if (!casesDropZone.contains(e.relatedTarget)) {
+            casesDropZone.classList.remove('border-primary', 'bg-primary/5');
+            casesDragOverlay.classList.add('hidden');
+        }
+    });
+    casesDropZone.addEventListener('drop', function (e) {
+        e.preventDefault();
+        casesDropZone.classList.remove('border-primary', 'bg-primary/5');
+        casesDragOverlay.classList.add('hidden');
+        if (e.dataTransfer.files.length > 0) {
+            casesAddFiles(e.dataTransfer.files);
+        }
+    });
+
+    // Form submit guard — only resolution number is required
+    document.getElementById('adopt-cases-form').addEventListener('submit', function (e) {
+        var resNum = document.getElementById('adopt-cases-resolution-number').value.trim();
+        if (resNum === '') {
+            e.preventDefault();
+            document.getElementById('adopt-cases-resolution-number').focus();
         }
     });
 

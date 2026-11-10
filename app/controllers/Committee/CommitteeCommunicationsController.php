@@ -32,7 +32,11 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *
  * ELIGIBLE DOCUMENT TYPE
  * ─────────────────────────────────────────────────────────────────────────────
- *  Only documents with document_types.name = 'Communication' are eligible.
+ *  Documents with document_types.name = 'Communication' or
+ *  'Motion for Reconsideration' are eligible for this workflow.
+ *  Motion for Reconsideration follows the same workflow as Communication while
+ *  retaining its mandatory link to a finalized Complaint / Administrative Cases
+ *  document (motion_reconsideration_links table).
  *
  * WORKFLOW STEPS
  * ─────────────────────────────────────────────────────────────────────────────
@@ -60,8 +64,15 @@ class CommitteeCommunicationsController
     protected PDO             $pdo;
     protected DocumentService $docService;
 
-    /** Document type name eligible for this workflow. */
+    /** Document type names eligible for this (Communications) workflow. */
     private const ELIGIBLE_TYPE = 'Communication';
+
+    /**
+     * Document type names that follow the Communications workflow.
+     * Motion for Reconsideration documents follow the same workflow as
+     * Communications while retaining their linked finalized case record.
+     */
+    private const ELIGIBLE_TYPES = ['Communication', 'Motion for Reconsideration'];
 
     public function __construct()
     {
@@ -442,6 +453,21 @@ class CommitteeCommunicationsController
             $linkedReport = $rStmt->fetch() ?: null;
         }
 
+        // ── Motion for Reconsideration: load the linked finalized case ────────
+        // If this communication record belongs to an MFR document, surface the
+        // linked Complaint / Administrative Cases document so the committee user
+        // always has the original case in view.  Also load any related Motions
+        // when the current document is itself a Case (not typical for the
+        // Communications workflow, but handled for completeness).
+        $mfrLink        = null;
+        $relatedMotions = [];
+        $docTypeName    = $comm['document_type_name'] ?? '';
+        if ($docTypeName === DocumentService::mfrTypeName()) {
+            $mfrLink = $this->docService->getMotionLink($documentId);
+        } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
+            $relatedMotions = $this->docService->getRelatedMotions($documentId);
+        }
+
         $pageTitle = 'Communication — ' . htmlspecialchars($comm['tracking_number'] ?? '');
         require __DIR__ . '/../../../resources/views/committee/communications/show.php';
     }
@@ -475,10 +501,19 @@ class CommitteeCommunicationsController
 
         $documentId = (int) $comm['document_id'];
 
-        // All active committees
-        $allCommittees = $this->pdo->query(
-            "SELECT id, name FROM committees WHERE is_active = 1 AND is_deleted = 0 ORDER BY name ASC"
-        )->fetchAll(PDO::FETCH_ASSOC);
+        // Include previously assigned committees even if they are no longer active.
+        $committeeStmt = $this->pdo->prepare("
+            SELECT c.id, c.name
+            FROM committees c
+            WHERE (c.is_active = 1 AND c.is_deleted = 0)
+               OR EXISTS (
+                    SELECT 1 FROM document_committees dc
+                    WHERE dc.document_id = ? AND dc.committee_id = c.id
+               )
+            ORDER BY c.name ASC
+        ");
+        $committeeStmt->execute([$documentId]);
+        $allCommittees = $committeeStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Pre-select committees already linked to the document
         $acStmt = $this->pdo->prepare(
@@ -583,9 +618,18 @@ class CommitteeCommunicationsController
         // ── Validate committee IDs ────────────────────────────────────────────
         $cPh  = implode(',', array_fill(0, count($committeeIds), '?'));
         $cChk = $this->pdo->prepare(
-            "SELECT id FROM committees WHERE id IN ({$cPh}) AND is_active = 1 AND is_deleted = 0"
+            "SELECT c.id FROM committees c
+             WHERE c.id IN ({$cPh})
+               AND (
+                    (c.is_active = 1 AND c.is_deleted = 0)
+                    OR EXISTS (
+                        SELECT 1 FROM document_committees dc
+                        WHERE dc.document_id = ?
+                          AND dc.committee_id = c.id
+                    )
+               )"
         );
-        $cChk->execute($committeeIds);
+        $cChk->execute([...$committeeIds, $documentId]);
         $validCIds = array_column($cChk->fetchAll(PDO::FETCH_ASSOC), 'id');
 
         if (count($validCIds) !== count($committeeIds)) {
@@ -618,20 +662,68 @@ class CommitteeCommunicationsController
         try {
             $this->pdo->beginTransaction();
 
+            // Serialize agenda submissions for this Communication and guard
+            // against a second request racing past the pre-transaction check.
+            $commLockStmt = $this->pdo->prepare(
+                'SELECT agenda_id FROM committee_communications WHERE id = ? FOR UPDATE'
+            );
+            $commLockStmt->execute([$commId]);
+            $lockedComm = $commLockStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$lockedComm) {
+                throw new RuntimeException('Communication record not found.');
+            }
+            if (!empty($lockedComm['agenda_id'])) {
+                throw new RuntimeException('An agenda has already been scheduled for this communication.');
+            }
+
             // 1. Username
             $uStmt = $this->pdo->prepare("SELECT username FROM user_accounts WHERE id = ? LIMIT 1");
             $uStmt->execute([$userId]);
             $username = (string) ($uStmt->fetchColumn() ?: '');
 
-            // 2. Insert agenda
+            // 2. Create a committee cycle for the Communication agenda.
+            // Communications enter this sub-workflow without passing through
+            // the endorsement cycle that normally creates committee_cycles.
+            $cycleNumberStmt = $this->pdo->prepare("
+                SELECT COALESCE(MAX(cycle_number), 0) + 1
+                FROM committee_cycles
+                WHERE document_id = ?
+                FOR UPDATE
+            ");
+            $cycleNumberStmt->execute([$documentId]);
+            $cycleNumber = (int) $cycleNumberStmt->fetchColumn();
+
             $this->pdo->prepare("
-                INSERT INTO agendas (
-                    document_id, agenda_number, agenda_type,
-                    agenda_date, agenda_time, venue,
-                    created_by, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                INSERT INTO committee_cycles (
+                    document_id, cycle_number, referred_by, accepted_by,
+                    accepted_at, decision, remarks, started_at
+                ) VALUES (?, ?, ?, ?, NOW(), 'ACCEPTED', ?, NOW())
             ")->execute([
                 $documentId,
+                $cycleNumber,
+                $userId,
+                $userId,
+                'Communication workflow agenda cycle.',
+            ]);
+            $cycleId = (int) $this->pdo->lastInsertId();
+
+            $insCycleCommittee = $this->pdo->prepare(
+                'INSERT IGNORE INTO committee_cycle_committees (cycle_id, committee_id) VALUES (?, ?)'
+            );
+            foreach ($validCIds as $cId) {
+                $insCycleCommittee->execute([$cycleId, $cId]);
+            }
+
+            // 3. Insert agenda with its required cycle reference.
+            $this->pdo->prepare("
+                INSERT INTO agendas (
+                    document_id, cycle_id, agenda_number, agenda_type,
+                    agenda_date, agenda_time, venue,
+                    created_by, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ")->execute([
+                $documentId,
+                $cycleId,
                 $agendaNumber,
                 $agendaType,
                 $agendaDate,
@@ -641,7 +733,7 @@ class CommitteeCommunicationsController
             ]);
             $agendaId = (int) $this->pdo->lastInsertId();
 
-            // 3. Link committees to agenda
+            // 4. Link committees to agenda
             $insAC = $this->pdo->prepare(
                 "INSERT IGNORE INTO agenda_committees (agenda_id, committee_id) VALUES (?, ?)"
             );
@@ -649,7 +741,7 @@ class CommitteeCommunicationsController
                 $insAC->execute([$agendaId, $cId]);
             }
 
-            // 4. Link chairpersons to agenda (optional)
+            // 5. Link chairpersons to agenda (optional)
             if (!empty($validChairIds)) {
                 $insAP = $this->pdo->prepare(
                     "INSERT IGNORE INTO agenda_chairpersons (agenda_id, sp_member_id) VALUES (?, ?)"
@@ -659,17 +751,17 @@ class CommitteeCommunicationsController
                 }
             }
 
-            // 5. Update committee_communications.agenda_id
+            // 6. Update committee_communications.agenda_id
             $this->pdo->prepare(
                 "UPDATE committee_communications SET agenda_id = ?, updated_at = NOW() WHERE id = ?"
             )->execute([$agendaId, $commId]);
 
-            // 6. Update document status → "On Going"
+            // 7. Update document status → "On Going"
             $this->pdo->prepare(
                 "UPDATE documents SET current_status_id = ?, updated_by = ? WHERE id = ?"
             )->execute([$onGoingStatus['id'], $userId, $documentId]);
 
-            // 7. Workflow event
+            // 8. Workflow event
             $prevStatusId = (int) ($comm['current_status_id'] ?? 0);
             $this->pdo->prepare("
                 INSERT INTO document_events (
@@ -684,6 +776,7 @@ class CommitteeCommunicationsController
                 "Agenda {$agendaNumber} scheduled for {$agendaDate}." . ($remarksAgenda ? " {$remarksAgenda}" : ''),
                 json_encode([
                     'comm_id'      => $commId,
+                    'cycle_id'     => $cycleId,
                     'agenda_id'    => $agendaId,
                     'agenda_number'=> $agendaNumber,
                     'agenda_type'  => $agendaType,
@@ -694,7 +787,7 @@ class CommitteeCommunicationsController
                 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ]);
 
-            // 8. Route record
+            // 9. Route record
             $committeeRoleId = $this->requireCommitteeRoleId();
             $this->pdo->prepare("
                 INSERT INTO document_routes
@@ -985,10 +1078,19 @@ class CommitteeCommunicationsController
 
         $documentId = (int) $comm['document_id'];
 
-        // All active committees shown as options; pre-select those linked to the agenda.
-        $agendaCommittees = $this->pdo->query(
-            "SELECT id, name FROM committees WHERE is_active = 1 AND is_deleted = 0 ORDER BY name ASC"
-        )->fetchAll(PDO::FETCH_ASSOC);
+        // Include committees already on the agenda even if they are no longer active.
+        $agendaCommitteeStmt = $this->pdo->prepare("
+            SELECT c.id, c.name
+            FROM committees c
+            WHERE (c.is_active = 1 AND c.is_deleted = 0)
+               OR EXISTS (
+                    SELECT 1 FROM agenda_committees ac
+                    WHERE ac.agenda_id = ? AND ac.committee_id = c.id
+               )
+            ORDER BY c.name ASC
+        ");
+        $agendaCommitteeStmt->execute([(int) $comm['agenda_id']]);
+        $agendaCommittees = $agendaCommitteeStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // IDs of committees already on this agenda (used for default pre-selection).
         $acStmt = $this->pdo->prepare(
@@ -1001,7 +1103,7 @@ class CommitteeCommunicationsController
 
         // On validation failure repopulate from old input; otherwise use agenda defaults.
         // $reportType is auto-derived by the view JS and re-verified server-side in reportStore().
-        $effectiveCommitteeIds = !empty($old['committee_ids'])
+        $effectiveCommitteeIds = isset($old['committee_ids'])
             ? array_map('intval', (array) $old['committee_ids'])
             : $agendaCommitteeIds;
 
@@ -1118,9 +1220,18 @@ class CommitteeCommunicationsController
         // ── Validate committee IDs ────────────────────────────────────────────
         $cPh  = implode(',', array_fill(0, count($committeeIds), '?'));
         $cChk = $this->pdo->prepare(
-            "SELECT id FROM committees WHERE id IN ({$cPh}) AND is_active = 1 AND is_deleted = 0"
+            "SELECT c.id FROM committees c
+             WHERE c.id IN ({$cPh})
+               AND (
+                    (c.is_active = 1 AND c.is_deleted = 0)
+                    OR EXISTS (
+                        SELECT 1 FROM agenda_committees ac
+                        WHERE ac.agenda_id = ?
+                          AND ac.committee_id = c.id
+                    )
+               )"
         );
-        $cChk->execute($committeeIds);
+        $cChk->execute([...$committeeIds, $agendaId]);
         $validCIds = array_column($cChk->fetchAll(PDO::FETCH_ASSOC), 'id');
 
         if (count($validCIds) !== count($committeeIds)) {
@@ -1341,7 +1452,7 @@ class CommitteeCommunicationsController
             LEFT JOIN document_types    dt ON dt.id = d.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             LEFT JOIN source_types      st ON st.id = d.source_type_id
-            LEFT JOIN external_offices  eo ON eo.id = d.external_office_id
+            LEFT JOIN provincial_government_offices  eo ON eo.id = d.external_office_id
             LEFT JOIN hospitals          h ON  h.id = d.hospital_id
             LEFT JOIN municities         m ON  m.id = d.municipality_id
             WHERE d.id = ?
@@ -1355,7 +1466,7 @@ class CommitteeCommunicationsController
             redirect('committee/inbox');
         }
 
-        if ($document['document_type_name'] !== self::ELIGIBLE_TYPE) {
+        if (!in_array($document['document_type_name'], self::ELIGIBLE_TYPES, true)) {
             flash_set('error', 'This document type is not eligible for the Communications workflow.');
             redirect('committee/inbox/show?id=' . $documentId);
         }
@@ -1418,7 +1529,7 @@ class CommitteeCommunicationsController
             LEFT  JOIN document_types     dt  ON dt.id = d.document_type_id
             LEFT  JOIN document_statuses  ds  ON ds.id = d.current_status_id
             LEFT  JOIN source_types       st  ON st.id = d.source_type_id
-            LEFT  JOIN external_offices   eo  ON eo.id = d.external_office_id
+            LEFT  JOIN provincial_government_offices   eo  ON eo.id = d.external_office_id
             LEFT  JOIN hospitals           h  ON  h.id = d.hospital_id
             LEFT  JOIN municities          m  ON  m.id = d.municipality_id
             WHERE cc.id = ?

@@ -537,6 +537,14 @@ ob_start();
                                 class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-primary hover:bg-blue-50">
                             + Add person
                         </button>
+                        <button type="button" onclick="selectAllArchiveMembers('createAuthorsList', 'AUTHOR', 'authorEntryTemplate')"
+                                class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-primary hover:bg-blue-50">
+                            Select all authors
+                        </button>
+                        <button type="button" onclick="selectAllArchiveMembers('createAuthorsList', 'CO_AUTHOR', 'authorEntryTemplate')"
+                                class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-primary hover:bg-blue-50">
+                            Select all co-authors
+                        </button>
                     </div>
                     <div id="createAuthorsList" class="space-y-3">
                         <?php foreach ([['AUTHOR', 'Author / Sponsor'], ['CO_AUTHOR', 'Co-author / Co-sponsor']] as [$roleValue, $roleLabel]): ?>
@@ -733,6 +741,79 @@ function addArchiveEntry(containerId, templateId) {
     document.getElementById(containerId).appendChild(fragment);
 }
 
+function initArchiveAuthorOrdering(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.__authorRank = 0;
+    container.querySelectorAll('.person-entry').forEach((entry) => {
+        const member = entry.querySelector('[name="author_sp_member_id[]"]');
+        entry.dataset.authorRank = member && member.value ? String(++container.__authorRank) : '';
+    });
+    container.addEventListener('change', (event) => {
+        if (event.target.name === 'author_sp_member_id[]' && event.target.value) {
+            event.target.closest('.person-entry').dataset.authorRank = String(++container.__authorRank);
+        }
+    });
+    const form = container.closest('form');
+    if (form) {
+        form.addEventListener('submit', () => {
+            const entries = Array.from(container.querySelectorAll('.person-entry'));
+            entries.sort((a, b) => {
+                const roleOrder = (a.querySelector('[name="author_role[]"]').value === 'AUTHOR' ? 0 : 1)
+                    - (b.querySelector('[name="author_role[]"]').value === 'AUTHOR' ? 0 : 1);
+                if (roleOrder) return roleOrder;
+                const rankA = Number(a.dataset.authorRank || Number.MAX_SAFE_INTEGER);
+                const rankB = Number(b.dataset.authorRank || Number.MAX_SAFE_INTEGER);
+                return rankA - rankB;
+            });
+            entries.forEach((entry) => container.appendChild(entry));
+        });
+    }
+}
+
+function selectAllArchiveMembers(containerId, role, templateId) {
+    const container = document.getElementById(containerId);
+    const firstSelect = container && container.querySelector('[name="author_sp_member_id[]"]');
+    if (!container || !firstSelect) return;
+
+    const memberIds = Array.from(firstSelect.options)
+        .map((option) => option.value)
+        .filter((id) => id !== '');
+    const conflicts = Array.from(container.querySelectorAll('.person-entry')).some((entry) => {
+        const member = entry.querySelector('[name="author_sp_member_id[]"]');
+        const entryRole = entry.querySelector('[name="author_role[]"]');
+        return member.value && memberIds.includes(member.value) && entryRole.value !== role;
+    });
+    if (conflicts) {
+        window.alert('Remove the selections in the other role before selecting all members here.');
+        return;
+    }
+
+    const selected = new Set(
+        Array.from(container.querySelectorAll('.person-entry'))
+            .filter((entry) => entry.querySelector('[name="author_role[]"]').value === role)
+            .map((entry) => entry.querySelector('[name="author_sp_member_id[]"]').value)
+            .filter(Boolean)
+    );
+    const missingIds = memberIds.filter((id) => !selected.has(id));
+    const emptyEntries = Array.from(container.querySelectorAll('.person-entry'))
+        .filter((entry) => !entry.querySelector('[name="author_sp_member_id[]"]').value
+            && !entry.querySelector('[name="author_custom_name[]"]').value.trim());
+
+    missingIds.forEach((id) => {
+        let entry = emptyEntries.shift();
+        if (!entry) {
+            addArchiveEntry(containerId, templateId);
+            entry = container.lastElementChild;
+        }
+        entry.querySelector('[name="author_role[]"]').value = role;
+        entry.querySelector('[name="author_sp_member_id[]"]').value = id;
+        entry.dataset.authorRank = String(++container.__authorRank);
+    });
+}
+
+initArchiveAuthorOrdering('createAuthorsList');
+
 function removeArchiveEntry(button) {
     const entries = button.closest('.person-entry, .committee-entry');
     const list = entries.parentElement;
@@ -785,4 +866,3 @@ function handleCustomTypeChange(prefix) {
     }
 }
 </script>
-

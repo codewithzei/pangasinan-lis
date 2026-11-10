@@ -44,6 +44,12 @@ function frIsComm(array $row): bool {
     return stripos($row['document_type_name'] ?? '', 'communication') !== false;
 }
 
+function frIsCases(array $row): bool {
+    $type = strtolower($row['document_type_name'] ?? '');
+    return strpos($type, 'administrative case') !== false
+        || strpos($type, 'complaint') !== false;
+}
+
 function frSessionLabel(string $type): string {
     return match ($type) {
         'REGULAR'        => 'Regular',
@@ -126,33 +132,37 @@ function frSessionLabel(string $type): string {
         </div>
     </section>
 
-    <!-- Document List with Tabs -->
-    <section class="rounded-2xl border border-gray-200 bg-white">
-        <!-- Tabs -->
-        <div class="flex flex-wrap items-center gap-1 border-b border-gray-100 px-6 pt-4">
-            <?php
-            $tabs = [
-                'all'           => ['label' => 'All', 'count' => $tabCounts['all']],
-                'ordinance'     => ['label' => 'Provincial Ordinance', 'count' => $tabCounts['ordinance']],
-                'resolution'    => ['label' => 'Provincial Resolution', 'count' => $tabCounts['resolution']],
-                'communication' => ['label' => 'Communications', 'count' => $tabCounts['communication']],
-            ];
-            foreach ($tabs as $tabKey => $tabInfo):
-                $isActive = ($tab === $tabKey);
-            ?>
-            <a href="<?= frTabUrl($tabKey, $search) ?>"
-               class="flex items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-sm font-medium transition
-                      <?= $isActive
-                          ? 'border-b-2 border-primary text-primary bg-blue-50/50'
-                          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50' ?>">
-                <?= htmlspecialchars($tabInfo['label']) ?>
-                <span class="rounded-full px-1.5 py-0.5 text-xs font-semibold
-                             <?= $isActive ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600' ?>">
-                    <?= number_format($tabInfo['count']) ?>
-                </span>
-            </a>
-            <?php endforeach; ?>
+    <!-- Tabs -->
+    <section>
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex flex-wrap gap-6" aria-label="First reading tabs">
+                <?php
+                $tabs = [
+                    'all'           => ['label' => 'All', 'count' => $tabCounts['all']],
+                    'ordinance'     => ['label' => 'Provincial Ordinance', 'count' => $tabCounts['ordinance']],
+                    'resolution'    => ['label' => 'Provincial Resolution', 'count' => $tabCounts['resolution']],
+                    'communication' => ['label' => 'Communications', 'count' => $tabCounts['communication']],
+                    'petitions'     => ['label' => 'Petitions', 'count' => $tabCounts['petitions'] ?? 0],
+                ];
+                foreach ($tabs as $tabKey => $tabInfo):
+                    $isActive = ($tab === $tabKey);
+                ?>
+                <a href="<?= frTabUrl($tabKey, $search) ?>"
+                   class="<?= $isActive ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>
+                          whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
+                    <?= htmlspecialchars($tabInfo['label']) ?>
+                    <span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold
+                                 <?= $isActive ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700' ?>">
+                        <?= number_format($tabInfo['count']) ?>
+                    </span>
+                </a>
+                <?php endforeach; ?>
+            </nav>
         </div>
+    </section>
+
+    <!-- Document List -->
+    <section class="rounded-2xl border border-gray-200 bg-white">
 
         <!-- Search + filter bar -->
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
@@ -208,10 +218,15 @@ function frSessionLabel(string $type): string {
                         </tr>
                     <?php else: ?>
                         <?php foreach ($documents as $row):
-                            $isComm       = frIsComm($row);
-                            $processRoute = $isComm
-                                ? 'plenary/comm-first-reading/show?id=' . (int) $row['document_id']
-                                : 'plenary/first-reading/show?id='      . (int) $row['document_id'];
+                            $isComm   = frIsComm($row);
+                            $isCases  = frIsCases($row);
+                            if ($isComm) {
+                                $processRoute = 'plenary/comm-first-reading/show?id='   . (int) $row['document_id'];
+                            } elseif ($isCases) {
+                                $processRoute = 'plenary/cases-first-reading/show?id='  . (int) $row['document_id'];
+                            } else {
+                                $processRoute = 'plenary/first-reading/show?id='        . (int) $row['document_id'];
+                            }
                         ?>
                             <tr class="hover:bg-gray-50/50 transition">
                                 <td class="px-6 py-4">

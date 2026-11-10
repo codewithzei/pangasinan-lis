@@ -218,7 +218,7 @@ ob_start();
 
                 <?php if (!empty($agendaCommittees)): ?>
                     <div class="pt-1">
-                        <p class="text-xs font-semibold text-blue-600 mb-1">Committee/ies in Charge</p>
+                        <p class="text-xs font-semibold text-blue-600 mb-1">Committee Referral</p>
                         <ul class="space-y-0.5">
                             <?php foreach ($agendaCommittees as $comm): ?>
                                 <li class="text-xs text-blue-800">• <?= htmlspecialchars($comm['name']) ?></li>

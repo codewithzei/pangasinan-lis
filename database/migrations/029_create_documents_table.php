@@ -64,7 +64,7 @@ class CreateDocumentsTable
             
             -- Foreign Keys
             CONSTRAINT fk_documents_source_type FOREIGN KEY (source_type_id) REFERENCES source_types(id) ON DELETE RESTRICT,
-            CONSTRAINT fk_documents_external_office FOREIGN KEY (external_office_id) REFERENCES external_offices(id) ON DELETE RESTRICT,
+            CONSTRAINT fk_documents_external_office FOREIGN KEY (external_office_id) REFERENCES provincial_government_offices(id) ON DELETE RESTRICT,
             CONSTRAINT fk_documents_hospital FOREIGN KEY (hospital_id) REFERENCES hospitals(id) ON DELETE RESTRICT,
             CONSTRAINT fk_documents_municipality FOREIGN KEY (municipality_id) REFERENCES municities(id) ON DELETE RESTRICT,
             CONSTRAINT fk_documents_current_status FOREIGN KEY (current_status_id) REFERENCES document_statuses(id) ON DELETE RESTRICT,

@@ -292,7 +292,7 @@ class AdminRoutedDocumentController
             LEFT JOIN document_types     dt      ON dt.id  = d.document_type_id
             LEFT JOIN document_statuses  ds      ON ds.id  = d.current_status_id
             LEFT JOIN source_types       st      ON st.id  = d.source_type_id
-            LEFT JOIN external_offices   eo      ON eo.id  = d.external_office_id
+            LEFT JOIN provincial_government_offices   eo      ON eo.id  = d.external_office_id
             LEFT JOIN hospitals          h       ON h.id   = d.hospital_id
             LEFT JOIN municities         m       ON m.id   = d.municipality_id
             LEFT JOIN user_accounts      creator ON creator.id = d.created_by
@@ -369,6 +369,18 @@ class AdminRoutedDocumentController
 
         $pageTitle    = 'Document Details';
         $pageSubtitle = $document['tracking_number'];
+
+        // ── Motion for Reconsideration data ───────────────────────────────────
+        require_once __DIR__ . '/../../services/DocumentService.php';
+        $docService     = new DocumentService($this->pdo);
+        $mfrLink        = null;
+        $relatedMotions = [];
+        $docTypeName    = $document['document_type_name'] ?? '';
+        if ($docTypeName === DocumentService::mfrTypeName()) {
+            $mfrLink = $docService->getMotionLink($documentId);
+        } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
+            $relatedMotions = $docService->getRelatedMotions($documentId);
+        }
 
         require __DIR__ . '/../../../resources/views/admin/routed/show.php';
     }

@@ -1,6 +1,6 @@
 <?php
 
-class ExternalOfficeSeeder extends Seeder
+class ProvincialGovernmentOfficeSeeder extends Seeder
 {
     public function run(): void
     {
@@ -339,8 +339,8 @@ class ExternalOfficeSeeder extends Seeder
             ],
         ];
 
-        $this->insertOrIgnore('external_offices', $offices);
+        $this->insertOrIgnore('provincial_government_offices', $offices);
 
-        echo "  Inserted " . count($offices) . " external offices" . PHP_EOL;
+        echo "  Inserted " . count($offices) . " provincial government offices" . PHP_EOL;
     }
 }

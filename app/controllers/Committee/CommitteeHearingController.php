@@ -172,7 +172,7 @@ class CommitteeHearingController
             LEFT JOIN document_types    dt ON dt.id = d.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             LEFT JOIN source_types      st ON st.id = d.source_type_id
-            LEFT JOIN external_offices  eo ON eo.id = d.external_office_id
+            LEFT JOIN provincial_government_offices  eo ON eo.id = d.external_office_id
             LEFT JOIN hospitals          h ON  h.id = d.hospital_id
             LEFT JOIN municities        mu ON mu.id = d.municipality_id
             WHERE d.id = ?
@@ -648,9 +648,18 @@ class CommitteeHearingController
         // ── Validate committee IDs ────────────────────────────────────────────
         $cPh  = implode(',', array_fill(0, count($committeeIds), '?'));
         $cChk = $this->pdo->prepare(
-            "SELECT id FROM committees WHERE id IN ({$cPh}) AND is_active = 1 AND is_deleted = 0"
+            "SELECT c.id FROM committees c
+             WHERE c.id IN ({$cPh})
+               AND (
+                    (c.is_active = 1 AND c.is_deleted = 0)
+                    OR EXISTS (
+                        SELECT 1 FROM agenda_committees ac
+                        WHERE ac.agenda_id = ?
+                          AND ac.committee_id = c.id
+                    )
+               )"
         );
-        $cChk->execute($committeeIds);
+        $cChk->execute([...$committeeIds, $agendaId]);
         $validCIds = array_column($cChk->fetchAll(), 'id');
         if (count($validCIds) !== count($committeeIds)) {
             flash_set('error', 'One or more selected committees are invalid.');
@@ -1408,8 +1417,6 @@ class CommitteeHearingController
                     ON ac.agenda_id = ag.id
                 INNER JOIN committees c
                     ON c.id = ac.committee_id
-                   AND c.is_active  = 1
-                   AND c.is_deleted = 0
                 WHERE d.id IN ({$dcPh})
                 ORDER BY c.sort_order ASC, c.name ASC
             ");
@@ -1885,11 +1892,23 @@ class CommitteeHearingController
         // ── Branch: new report ────────────────────────────────────────────────
 
         // Validate committee IDs
-        $cPh  = implode(',', array_fill(0, count($committeeIds), '?'));
-        $cChk = $this->pdo->prepare(
-            "SELECT id FROM committees WHERE id IN ({$cPh}) AND is_active = 1 AND is_deleted = 0"
-        );
-        $cChk->execute($committeeIds);
+        $cPh = implode(',', array_fill(0, count($committeeIds), '?'));
+        $agendaIds = array_values(array_unique(array_map('intval', array_column($validDocs, 'agenda_id'))));
+        $agendaPh = implode(',', array_fill(0, count($agendaIds), '?'));
+        $cChk = $this->pdo->prepare("
+            SELECT c.id
+            FROM committees c
+            WHERE c.id IN ({$cPh})
+              AND (
+                    (c.is_active = 1 AND c.is_deleted = 0)
+                    OR EXISTS (
+                        SELECT 1 FROM agenda_committees ac
+                        WHERE ac.committee_id = c.id
+                          AND ac.agenda_id IN ({$agendaPh})
+                    )
+              )
+        ");
+        $cChk->execute(array_merge($committeeIds, $agendaIds));
         $validCIds = array_column($cChk->fetchAll(), 'id');
 
         if (count($validCIds) !== count($committeeIds)) {

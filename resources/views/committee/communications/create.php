@@ -101,7 +101,7 @@ ob_start();
                     <?php endif; ?>
                     <?php if (!empty($document['external_office_name'])): ?>
                         <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">External Office</dt>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Provincial Government Offices</dt>
                             <dd class="mt-1 text-sm text-gray-800">
                                 <?= htmlspecialchars($document['external_office_name']) ?>
                                 <?php if (!empty($document['external_office_abbr'])): ?>

@@ -32,19 +32,24 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *    who created the case record (assigned_by = auth_id()).
  *  • Re-checked server-side on every write; never trusts the client.
  *
- * DOCKET-NUMBER GENERATION
+ * DOCKET-NUMBER ENTRY
  * ─────────────────────────────────────────────────────────────────────────────
- *  Format: DKT-YYYY-NNNN   (e.g. DKT-2026-0001)
- *  Algorithm inside a transaction:
- *    1. INSERT … ON DUPLICATE KEY UPDATE last_sequence = last_sequence
- *       (ensure the year row exists without clobbering the counter).
- *    2. SELECT last_sequence … FOR UPDATE  (exclusive row lock).
- *    3. next = last_sequence + 1
- *    4. UPDATE last_sequence = next.
- *    5. docket_number = sprintf('DKT-%d-%04d', year, next).
- *    6. INSERT committee_cases with the generated number.
- *  UNIQUE constraints on docket_number and (docket_year, docket_sequence)
- *  provide a database-level backstop against any theoretical race.
+ *  The docket number is now entered manually by the committee user when
+ *  creating a case (store()) or when completing pending case details
+ *  (detailsStore()). The system validates:
+ *    • Required (non-empty).
+ *    • Max 100 characters.
+ *    • Unique — checked against committee_cases.docket_number before INSERT
+ *      and again by the UNIQUE KEY uq_docket_number at the database level.
+ *  Duplicate-key violations (MySQL error 1062) produce a clear error message
+ *  that is redisplayed on the form; the user is never silently given a
+ *  different number. No automatic generation occurs anywhere in this controller.
+ *
+ *  Cases docketed via "Proceed to Cases" from the Committee Inbox
+ *  (CommitteeInboxController::doProceedToCases()) are created with an empty
+ *  string as the docket_number placeholder. The committee user must enter the
+ *  docket number from the Case Details Required section of the show page
+ *  (detailsStore()) before proceeding to Summary of Proceedings or Final Outcome.
  *
  * ELIGIBLE DOCUMENT TYPES
  * ─────────────────────────────────────────────────────────────────────────────
@@ -117,17 +122,28 @@ class CommitteeCasesController
             SELECT
                 cc.id,
                 cc.docket_number,
+                cc.date_assigned,
                 cc.complainant_details,
+                cc.complainant_municipality,
                 cc.respondents,
                 cc.nature_of_case,
                 cc.created_at,
                 d.id              AS document_id,
                 d.tracking_number,
                 d.subject_matter,
+                d.source_name,
                 dt.name           AS document_type_name,
                 dt.badge_color    AS document_type_badge_color,
                 ds.name           AS status,
                 ds.badge_color    AS status_badge_color,
+                (
+                    -- A case handed over by Proceed to Cases is docketed with
+                    -- blank identifying details (including docket_number) that
+                    -- are entered from the Cases show page.
+                    COALESCE(TRIM(cc.docket_number), '') = ''
+                    OR TRIM(cc.nature_of_case) = ''
+                    OR TRIM(cc.respondents) = ''
+                )                 AS details_pending,
                 (
                     SELECT COUNT(*)
                     FROM committee_case_actions cca
@@ -153,6 +169,9 @@ class CommitteeCasesController
         ");
         $statsStmt->execute([$userId]);
         $totalCases = (int) $statsStmt->fetch(PDO::FETCH_ASSOC)['total_cases'];
+
+        // (The ?complete= query param was previously used to auto-open a modal.
+        // It is now ignored — case details are entered from the show page.)
 
         $pageTitle = 'Committee Cases';
         require __DIR__ . '/../../../resources/views/committee/cases/index.php';
@@ -180,9 +199,6 @@ class CommitteeCasesController
             flash_set('error', 'A case record already exists for this document.');
             redirect('committee/cases/show?id=' . (int) $existing['id']);
         }
-
-        // Preview the next docket number (informational — not committed here).
-        $docketPreview = $this->previewNextDocketNumber((int) date('Y'));
 
         $old     = old_get();
 
@@ -214,6 +230,7 @@ class CommitteeCasesController
         }
 
         // ── Collect + validate inputs ─────────────────────────────────────────
+        $docketNumber            = trim($_POST['docket_number']            ?? '');
         $dateAssigned            = trim($_POST['date_assigned']            ?? '');
         $natureOfCase            = trim($_POST['nature_of_case']           ?? '');
         $complainantDetails      = trim($_POST['complainant_details']      ?? '');
@@ -221,6 +238,12 @@ class CommitteeCasesController
         $respondents             = trim($_POST['respondents']              ?? '');
 
         $errors = [];
+
+        if ($docketNumber === '') {
+            $errors[] = 'Docket number is required.';
+        } elseif (mb_strlen($docketNumber) > 100) {
+            $errors[] = 'Docket number must not exceed 100 characters.';
+        }
 
         if ($dateAssigned === '') {
             $errors[] = 'Date assigned is required.';
@@ -250,64 +273,35 @@ class CommitteeCasesController
             $errors[] = 'Respondents must not exceed 5 000 characters.';
         }
 
+        // Check for duplicate docket number only when the field itself is valid.
+        if (empty($errors) || ($docketNumber !== '' && mb_strlen($docketNumber) <= 100)) {
+            if ($docketNumber !== '') {
+                $dupCheckStmt = $this->pdo->prepare(
+                    "SELECT id FROM committee_cases WHERE docket_number = ? LIMIT 1"
+                );
+                $dupCheckStmt->execute([$docketNumber]);
+                if ($dupCheckStmt->fetch()) {
+                    $errors[] = "Docket number \"{$docketNumber}\" is already in use. Please enter a different docket number.";
+                }
+            }
+        }
+
         if (!empty($errors)) {
             old_set($_POST);
             flash_set('errors', $errors);
             redirect('committee/cases/create?document_id=' . $documentId);
         }
 
-        // ── Transactional case creation + docket allocation ───────────────────
-        $caseId       = null;
-        $docketNumber = null;
+        // ── Transactional case creation ───────────────────────────────────────
+        $caseId = null;
 
         try {
             $this->pdo->beginTransaction();
 
-            $year = (int) date('Y');
-
-            // 1. Ensure year row exists (idempotent).
-            $this->pdo->prepare("
-                INSERT INTO committee_case_docket_sequences (docket_year, last_sequence)
-                VALUES (?, 0)
-                ON DUPLICATE KEY UPDATE last_sequence = last_sequence
-            ")->execute([$year]);
-
-            // 2. Acquire exclusive row lock for this year.
-            $seqStmt = $this->pdo->prepare("
-                SELECT last_sequence
-                FROM committee_case_docket_sequences
-                WHERE docket_year = ?
-                FOR UPDATE
-            ");
-            $seqStmt->execute([$year]);
-            $seqRow = $seqStmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($seqRow === false) {
-                throw new RuntimeException('Docket sequence row not found after insert.');
-            }
-
-            $nextSeq      = ((int) $seqRow['last_sequence']) + 1;
-            $docketNumber = sprintf('DKT-%d-%04d', $year, $nextSeq);
-
-            // 3. Increment sequence counter.
-            $this->pdo->prepare("
-                UPDATE committee_case_docket_sequences
-                SET last_sequence = ?
-                WHERE docket_year = ?
-            ")->execute([$nextSeq, $year]);
-
-            // 4. Guard: duplicate docket number (belt-and-suspenders).
-            $dupStmt = $this->pdo->prepare("
-                SELECT id FROM committee_cases WHERE docket_number = ? LIMIT 1
-            ");
-            $dupStmt->execute([$docketNumber]);
-            if ($dupStmt->fetch()) {
-                $this->pdo->rollBack();
-                flash_set('error', "Docket number {$docketNumber} already exists. Please try again.");
-                redirect('committee/cases/create?document_id=' . $documentId);
-            }
-
-            // 5. Insert the case record.
+            // Insert the case record. docket_year and docket_sequence are NULL
+            // for manually-entered docket numbers (migration 079 made them
+            // nullable). The UNIQUE constraint on docket_number still guards
+            // against duplicates at the database level.
             $this->pdo->prepare("
                 INSERT INTO committee_cases (
                     document_id,
@@ -320,11 +314,9 @@ class CommitteeCasesController
                     complainant_municipality,
                     respondents,
                     assigned_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
             ")->execute([
                 $documentId,
-                $year,
-                $nextSeq,
                 $docketNumber,
                 $dateAssigned,
                 $natureOfCase,
@@ -336,9 +328,34 @@ class CommitteeCasesController
 
             $caseId = (int) $this->pdo->lastInsertId();
 
-            // 6. Workflow event.
-            $currentStatusId = (int) ($document['current_status_id'] ?? 0);
+            // 6. Advance the document out of the Committee Inbox.
+            //    Docketing always moves a Complaint / Administrative Cases
+            //    document into the Cases workflow, so its status becomes
+            //    "Case Docketed". If that status row is unavailable (migration
+            //    not applied yet) the current status is kept — the Committee
+            //    Inbox still excludes the document because a committee_cases
+            //    row now exists for it.
+            $docketedStatusStmt = $this->pdo->prepare("
+                SELECT id FROM document_statuses
+                WHERE name = 'Case Docketed' AND is_active = 1 AND is_deleted = 0
+                LIMIT 1
+            ");
+            $docketedStatusStmt->execute();
+            $docketedStatusId = (int) $docketedStatusStmt->fetchColumn();
 
+            $newStatusId = $docketedStatusId > 0
+                ? $docketedStatusId
+                : (int) ($document['current_status_id'] ?? 0);
+
+            if ($newStatusId > 0) {
+                $this->pdo->prepare("
+                    UPDATE documents
+                    SET current_status_id = ?, updated_by = ?
+                    WHERE id = ?
+                ")->execute([$newStatusId, $userId, $documentId]);
+            }
+
+            // 7. Workflow event.
             $this->pdo->prepare("
                 INSERT INTO document_events (
                     document_id, event_type, phase, performed_by,
@@ -347,7 +364,7 @@ class CommitteeCasesController
             ")->execute([
                 $documentId,
                 $userId,
-                $currentStatusId ?: null,
+                $newStatusId ?: null,
                 "Case docketed: {$docketNumber}",
                 json_encode([
                     'case_id'      => $caseId,
@@ -368,11 +385,13 @@ class CommitteeCasesController
             $errorInfo = $e->errorInfo[1] ?? null;
             if ($errorInfo === 1062) {
                 system_log('WARNING', 'Duplicate docket number or document_id on committee case insert', [
-                    'document_id' => $documentId,
-                    'user_id'     => $userId,
-                    'error'       => $e->getMessage(),
+                    'document_id'  => $documentId,
+                    'user_id'      => $userId,
+                    'docket_number'=> $docketNumber,
+                    'error'        => $e->getMessage(),
                 ]);
-                flash_set('error', 'A duplicate docket number was detected. This can happen under high concurrency. Please try again.');
+                old_set($_POST);
+                flash_set('errors', ["Docket number \"{$docketNumber}\" is already in use. Please enter a different docket number."]);
                 redirect('committee/cases/create?document_id=' . $documentId);
             }
             system_log('ERROR', 'Committee case store failed (PDO)', [
@@ -412,6 +431,185 @@ class CommitteeCasesController
 
         old_clear();
         flash_set('success', "Case docketed successfully. Docket No.: {$docketNumber}");
+        redirect('committee/cases/show?id=' . $caseId);
+    }
+
+    // =========================================================================
+    // 2b. Complete / update case details  POST committee/cases/details
+    // =========================================================================
+
+    /**
+     * Save the case details for a case that was handed over by the Committee
+     * Inbox "Proceed to Cases" action.
+     *
+     * "Proceed to Cases" dockets the case immediately (so the document leaves
+     * the Inbox and appears on the Cases page) but leaves the identifying
+     * details blank — including the docket number, which is entered here.
+     * This action is the Cases page counterpart of store(): it records the
+     * docket number, nature of case, complainant details, and respondents for
+     * an existing case. It never creates a new case row.
+     */
+    public function detailsStore(): void
+    {
+        $userId = $this->requireAuth();
+        $caseId = (int) ($_POST['case_id'] ?? 0);
+
+        if ($caseId <= 0) {
+            flash_set('error', 'Invalid case ID.');
+            redirect('committee/cases');
+        }
+
+        $case = $this->loadCaseWithDocument($caseId);
+        if ($case === null) {
+            flash_set('error', 'Case not found.');
+            redirect('committee/cases');
+        }
+
+        $this->requireCaseOwnership($case, $userId);
+
+        // ── Collect + validate inputs ─────────────────────────────────────────
+        // The "Proceed to Cases" inbox path inserts a blank docket_number.
+        // The user must supply it here. If the case already has a non-empty
+        // docket_number the user can also update it (correcting a typo in the
+        // placeholder stored by the inbox action). Uniqueness is checked only
+        // when the submitted value differs from the current stored value so
+        // an unchanged round-trip does not report a spurious duplicate.
+        $docketNumber            = trim($_POST['docket_number']            ?? '');
+        $dateAssigned            = trim($_POST['date_assigned']            ?? '');
+        $natureOfCase            = trim($_POST['nature_of_case']           ?? '');
+        $complainantDetails      = trim($_POST['complainant_details']      ?? '');
+        $complainantMunicipality = trim($_POST['complainant_municipality'] ?? '');
+        $respondents             = trim($_POST['respondents']              ?? '');
+
+        $existingDocketNumber = (string) ($case['docket_number'] ?? '');
+
+        $errors = [];
+
+        if ($docketNumber === '') {
+            $errors[] = 'Docket number is required.';
+        } elseif (mb_strlen($docketNumber) > 100) {
+            $errors[] = 'Docket number must not exceed 100 characters.';
+        }
+
+        if ($dateAssigned === '') {
+            $errors[] = 'Date assigned is required.';
+        } elseif (!$this->isValidDate($dateAssigned)) {
+            $errors[] = 'Date assigned is not a valid date.';
+        }
+
+        if ($natureOfCase === '') {
+            $errors[] = 'Nature of case is required.';
+        } elseif (mb_strlen($natureOfCase) > 10000) {
+            $errors[] = 'Nature of case must not exceed 10 000 characters.';
+        }
+
+        if ($complainantDetails === '') {
+            $errors[] = 'Complainant details are required.';
+        } elseif (mb_strlen($complainantDetails) > 5000) {
+            $errors[] = 'Complainant details must not exceed 5 000 characters.';
+        }
+
+        if (mb_strlen($complainantMunicipality) > 255) {
+            $errors[] = 'Complainant municipality must not exceed 255 characters.';
+        }
+
+        if ($respondents === '') {
+            $errors[] = 'Respondents are required.';
+        } elseif (mb_strlen($respondents) > 5000) {
+            $errors[] = 'Respondents must not exceed 5 000 characters.';
+        }
+
+        // Duplicate docket check — only when the value is non-empty, valid,
+        // and differs from the currently stored value for this case.
+        if ($docketNumber !== '' && mb_strlen($docketNumber) <= 100) {
+            if ($docketNumber !== $existingDocketNumber) {
+                $dupCheckStmt = $this->pdo->prepare(
+                    "SELECT id FROM committee_cases WHERE docket_number = ? AND id != ? LIMIT 1"
+                );
+                $dupCheckStmt->execute([$docketNumber, $caseId]);
+                if ($dupCheckStmt->fetch()) {
+                    $errors[] = "Docket number \"{$docketNumber}\" is already in use. Please enter a different docket number.";
+                }
+            }
+        }
+
+        if (!empty($errors)) {
+            old_set($_POST);
+            flash_set('errors', $errors);
+            redirect('committee/cases/show?id=' . $caseId);
+        }
+
+        // ── Persist ───────────────────────────────────────────────────────────
+        try {
+            $this->pdo->beginTransaction();
+
+            $this->pdo->prepare("
+                UPDATE committee_cases
+                SET docket_number            = ?,
+                    date_assigned            = ?,
+                    nature_of_case           = ?,
+                    complainant_details      = ?,
+                    complainant_municipality = ?,
+                    respondents              = ?
+                WHERE id = ?
+            ")->execute([
+                $docketNumber,
+                $dateAssigned,
+                $natureOfCase,
+                $complainantDetails,
+                $complainantMunicipality ?: null,
+                $respondents,
+                $caseId,
+            ]);
+
+            $this->pdo->commit();
+        } catch (PDOException $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            if (($e->errorInfo[1] ?? null) === 1062) {
+                system_log('WARNING', 'Duplicate docket number on committee case details update', [
+                    'case_id'      => $caseId,
+                    'user_id'      => $userId,
+                    'docket_number'=> $docketNumber,
+                    'error'        => $e->getMessage(),
+                ]);
+                old_set($_POST);
+                flash_set('errors', ["Docket number \"{$docketNumber}\" is already in use. Please enter a different docket number."]);
+                redirect('committee/cases/show?id=' . $caseId);
+            }
+            system_log('ERROR', 'Committee case details update failed', [
+                'case_id' => $caseId,
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+            flash_set('error', 'Failed to save case details: ' . $e->getMessage());
+            redirect('committee/cases/show?id=' . $caseId);
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            system_log('ERROR', 'Committee case details update failed', [
+                'case_id' => $caseId,
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+            flash_set('error', 'Failed to save case details: ' . $e->getMessage());
+            redirect('committee/cases/show?id=' . $caseId);
+        }
+
+        // ── Post-commit: audit log ────────────────────────────────────────────
+        audit_log('UPDATE', 'CommitteeCase', (string) $caseId, null, [
+            'case_id'               => $caseId,
+            'document_id'           => (int) ($case['document_id'] ?? 0),
+            'docket_number'         => $docketNumber,
+            'previous_docket_number'=> $existingDocketNumber !== $docketNumber ? $existingDocketNumber : null,
+            'date_assigned'         => $dateAssigned,
+            'updated_by'            => $userId,
+        ], "Committee case details saved for docket {$docketNumber} (user ID {$userId})");
+
+        old_clear();
+        flash_set('success', "Case details saved. Docket No.: {$docketNumber}");
         redirect('committee/cases/show?id=' . $caseId);
     }
 
@@ -511,7 +709,27 @@ class CommitteeCasesController
         $linkedReportStmt->execute([(int) $case['document_id']]);
         $linkedReport = $linkedReportStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
-        $pageTitle = 'Case Details — ' . htmlspecialchars($case['docket_number']);
+        $pageTitle = trim((string) ($case['docket_number'] ?? '')) !== ''
+            ? 'Case Details — ' . htmlspecialchars($case['docket_number'])
+            : 'Case Details Required';
+
+        // ── Motion for Reconsideration data ───────────────────────────────────
+        // Cases documents may have MFRs filed against them.  Load them so the
+        // committee user can see and navigate to related Motions.
+        $mfrLink        = null;
+        $relatedMotions = [];
+        $docTypeName    = $case['document_type_name'] ?? '';
+        if ($docTypeName === DocumentService::mfrTypeName()) {
+            $mfrLink = $this->docService->getMotionLink((int) $case['document_id']);
+        } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
+            $relatedMotions = $this->docService->getRelatedMotions((int) $case['document_id']);
+        }
+
+        $success = flash_get('success');
+        $error   = flash_get('error');
+        $errors  = flash_get('errors', []);
+        $old     = old_get();
+
         require __DIR__ . '/../../../resources/views/committee/cases/show.php';
     }
 
@@ -536,6 +754,15 @@ class CommitteeCasesController
         }
 
         $this->requireCaseOwnership($case, $userId);
+
+        // ── Guard: case details must be complete before recording actions ─────
+        if (trim((string) ($case['nature_of_case'] ?? '')) === ''
+            || trim((string) ($case['respondents'] ?? '')) === ''
+            || trim((string) ($case['docket_number'] ?? '')) === ''
+        ) {
+            flash_set('error', 'Save the required case details (docket number, nature of case, and respondents) before adding proceedings.');
+            redirect('committee/cases/show?id=' . $caseId);
+        }
 
         // ── Collect + validate inputs ─────────────────────────────────────────
         $actionType  = trim($_POST['action_type']  ?? '');
@@ -750,6 +977,15 @@ class CommitteeCasesController
         // ── Ownership: only the creating Committee user may finalize ──────────
         $this->requireCaseOwnership($case, $userId);
 
+        // ── Guard: case details must be complete before setting an outcome ────
+        if (trim((string) ($case['nature_of_case'] ?? '')) === ''
+            || trim((string) ($case['respondents'] ?? '')) === ''
+            || trim((string) ($case['docket_number'] ?? '')) === ''
+        ) {
+            flash_set('error', 'Save the required case details (docket number, nature of case, and respondents) before setting a final outcome.');
+            redirect('committee/cases/show?id=' . $caseId);
+        }
+
         $documentId = (int) $case['document_id'];
 
         // ── Eligible document type ────────────────────────────────────────────
@@ -759,23 +995,20 @@ class CommitteeCasesController
             redirect('committee/cases/show?id=' . $caseId);
         }
 
-        // ── Re-verify assignment ownership server-side ────────────────────────
-        $committeeRoleId = $this->requireCommitteeRoleId();
-        $assignStmt = $this->pdo->prepare("
-            SELECT id FROM document_assignments
-            WHERE document_id         = ?
-              AND assigned_to_role_id = ?
-              AND phase               = 'COMMITTEE'
-              AND decision            = 'ACCEPTED'
-              AND completed_at        IS NULL
-              AND (accepted_by = ? OR assigned_to_user_id = ?)
-            LIMIT 1
-        ");
-        $assignStmt->execute([$documentId, $committeeRoleId, $userId, $userId]);
-        if (!$assignStmt->fetch()) {
-            flash_set('error', 'You do not have an active accepted assignment for this document.');
-            redirect('committee/cases/show?id=' . $caseId);
-        }
+        // NOTE: The previous "active accepted assignment" check was removed here.
+        //
+        // Rationale: "Proceed to Cases" (CommitteeInboxController::doProceedToCases)
+        // marks the Committee inbox assignment COMPLETED before handing the document
+        // to this workflow.  Requiring an active (completed_at IS NULL) ACCEPTED
+        // assignment therefore always blocked the case owner from finalizing their
+        // own case, producing the error "You do not have an active accepted
+        // assignment for this document."
+        //
+        // Authorization is already fully provided by requireCaseOwnership() above:
+        // it compares committee_cases.assigned_by against the authenticated user ID,
+        // which was set to the user who performed "Proceed to Cases" — the only
+        // person who may view, update, or finalize the case.  No additional
+        // assignment re-check is necessary or appropriate at this stage.
 
         // ── Already finalized? Reject without update ──────────────────────────
         if (!empty($case['final_outcome'])) {
@@ -986,10 +1219,19 @@ class CommitteeCasesController
             redirect('committee/cases/show?id=' . $caseId);
         }
 
-        // Load all committees for the multi-select.
-        $allCommittees = $this->pdo->query(
-            "SELECT id, name FROM committees WHERE is_active = 1 AND is_deleted = 0 ORDER BY name ASC"
-        )->fetchAll(PDO::FETCH_ASSOC);
+        // Include committees already assigned to the document even if inactive.
+        $committeeStmt = $this->pdo->prepare("
+            SELECT c.id, c.name
+            FROM committees c
+            WHERE (c.is_active = 1 AND c.is_deleted = 0)
+               OR EXISTS (
+                    SELECT 1 FROM document_committees dc
+                    WHERE dc.document_id = ? AND dc.committee_id = c.id
+               )
+            ORDER BY c.name ASC
+        ");
+        $committeeStmt->execute([$documentId]);
+        $allCommittees = $committeeStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Pre-select committees from document_committees if they exist.
         $acStmt = $this->pdo->prepare(
@@ -1105,9 +1347,18 @@ class CommitteeCasesController
         // ── Validate committee IDs ────────────────────────────────────────────
         $cPh  = implode(',', array_fill(0, count($committeeIds), '?'));
         $cChk = $this->pdo->prepare(
-            "SELECT id FROM committees WHERE id IN ({$cPh}) AND is_active = 1 AND is_deleted = 0"
+            "SELECT c.id FROM committees c
+             WHERE c.id IN ({$cPh})
+               AND (
+                    (c.is_active = 1 AND c.is_deleted = 0)
+                    OR EXISTS (
+                        SELECT 1 FROM document_committees dc
+                        WHERE dc.document_id = ?
+                          AND dc.committee_id = c.id
+                    )
+               )"
         );
-        $cChk->execute($committeeIds);
+        $cChk->execute([...$committeeIds, $documentId]);
         $validCIds = array_column($cChk->fetchAll(PDO::FETCH_ASSOC), 'id');
         if (count($validCIds) !== count($committeeIds)) {
             flash_set('error', 'One or more selected committees are invalid.');
@@ -1329,7 +1580,7 @@ class CommitteeCasesController
             LEFT JOIN document_types    dt ON d.document_type_id   = dt.id
             LEFT JOIN document_statuses ds ON d.current_status_id  = ds.id
             LEFT JOIN source_types      st ON d.source_type_id     = st.id
-            LEFT JOIN external_offices  eo ON d.external_office_id = eo.id
+            LEFT JOIN provincial_government_offices  eo ON d.external_office_id = eo.id
             LEFT JOIN hospitals          h ON d.hospital_id        = h.id
             LEFT JOIN municities         m ON d.municipality_id    = m.id
             WHERE d.id = ?
@@ -1446,7 +1697,7 @@ class CommitteeCasesController
             LEFT  JOIN document_types     dt ON d.document_type_id    = dt.id
             LEFT  JOIN document_statuses  ds ON d.current_status_id   = ds.id
             LEFT  JOIN source_types       st ON d.source_type_id      = st.id
-            LEFT  JOIN external_offices   eo ON d.external_office_id  = eo.id
+            LEFT  JOIN provincial_government_offices   eo ON d.external_office_id  = eo.id
             LEFT  JOIN hospitals           h ON d.hospital_id         = h.id
             LEFT  JOIN municities          m ON d.municipality_id     = m.id
             LEFT  JOIN user_accounts      ua ON cc.assigned_by        = ua.id

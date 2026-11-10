@@ -108,7 +108,7 @@ ob_start();
                 <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Report Type</p>
                 <p class="text-sm font-bold text-gray-900"><?= htmlspecialchars($reportTypeLabel) ?></p>
                 <p class="mt-1 text-xs text-gray-500">
-                    Automatically determined from the number of committees in charge.
+                    Automatically determined from the number of committees selected for referral.
                     <?= $isJoint
                         ? 'Multiple committees selected — Joint Committee Report.'
                         : 'One committee selected — Committee Report.' ?>
@@ -135,10 +135,10 @@ ob_start();
                         </p>
                     </div>
 
-                    <!-- Committee in Charge -->
+                    <!-- Committee Referral -->
                     <div>
                         <p class="block text-sm font-semibold text-gray-700 mb-1">
-                            Committee in Charge <span class="text-red-500">*</span>
+                            Committee Referral <span class="text-red-500">*</span>
                         </p>
                         <p class="text-xs text-gray-400 mb-2" id="committeeDesc">
                             Pre-populated with the document's assigned committees.

@@ -65,18 +65,25 @@ function check(string $label, bool $condition): void
 
 /**
  * Mirror of CommitteeInboxController's server-side action restriction.
- * (COMMUNICATION_ALLOWED_ACTIONS / COMMUNICATION_ONLY_ACTIONS)
+ * (COMMUNICATION_ALLOWED_ACTIONS / COMMUNICATION_ONLY_ACTIONS / CASES_ALLOWED_ACTIONS)
  */
 function action_allowed(string $action, string $documentTypeName): bool
 {
     $communicationAllowed = ['accept', 'proceed_to_communications', 'return_to_origin'];
     $communicationOnly    = ['proceed_to_communications', 'return_to_origin'];
+    $casesAllowed         = ['accept', 'return_to_admin'];
+    $casesTypes           = ['Administrative Cases', 'Complaint'];
     $isCommunication      = $documentTypeName === 'Communication';
+    $isCasesType          = in_array($documentTypeName, $casesTypes, true);
 
     if ($isCommunication && !in_array($action, $communicationAllowed, true)) {
         return false;
     }
     if (!$isCommunication && in_array($action, $communicationOnly, true)) {
+        return false;
+    }
+    // Administrative Cases and Complaint cannot be endorsed.
+    if ($isCasesType && !in_array($action, $casesAllowed, true)) {
         return false;
     }
     return true;
@@ -712,7 +719,7 @@ check('action matrix: Communication + return_to_admin blocked', action_allowed('
 check('action matrix: Communication + proceed allowed',     action_allowed('proceed_to_communications', 'Communication') === true);
 check('action matrix: Communication + return_to_origin allowed', action_allowed('return_to_origin', 'Communication') === true);
 check('action matrix: Communication + accept allowed',      action_allowed('accept', 'Communication') === true);
-check('action matrix: Complaint + endorse allowed',         action_allowed('endorse', 'Complaint') === true);
+check('action matrix: Complaint + endorse blocked',         action_allowed('endorse', 'Complaint') === false);
 check('action matrix: Complaint + return_to_admin allowed', action_allowed('return_to_admin', 'Complaint') === true);
 check('action matrix: Complaint + proceed blocked',         action_allowed('proceed_to_communications', 'Complaint') === false);
 check('action matrix: Complaint + return_to_origin blocked',action_allowed('return_to_origin', 'Complaint') === false);
