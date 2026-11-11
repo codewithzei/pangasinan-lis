@@ -7,6 +7,56 @@ return [
         'title' => 'Home',
     ],
 
+    // Public legislative portal
+    'public/portal' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'index',
+    ],
+    'public/portal/members' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'members',
+    ],
+    'public/portal/documents' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'documents',
+    ],
+    'public/portal/documents/view' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'documentDetail',
+    ],
+    'public/portal/download-attachment' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'downloadAttachment',
+    ],
+    'public/portal/committees' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'committees',
+    ],
+    'public/portal/about' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'about',
+    ],
+    'public/portal/contact' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'contact',
+    ],
+    'public/portal/privacy' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'privacy',
+    ],
+    'public/portal/terms' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'terms',
+    ],
+    'public/portal/accessibility' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'accessibility',
+    ],
+    'public/portal/disclaimer' => [
+        'controller' => 'Public/PublicPortalController',
+        'action' => 'disclaimer',
+    ],
+
     'login' => [
         [
             'method' => 'GET',

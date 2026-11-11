@@ -485,6 +485,8 @@ class ReceivingInboxController
 
         $old     = old_get();
 
+        $documentEvents = $this->docService->getDocumentEvents($documentId);
+
         // ── Motion for Reconsideration data ───────────────────────────────────
         $mfrLink        = null;
         $relatedMotions = [];

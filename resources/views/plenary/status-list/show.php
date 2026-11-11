@@ -509,7 +509,7 @@ ob_start();
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Author(s)</p>
                             <?php if (!empty($authors[0]['is_all_selected'])): ?>
-                                <p class="mt-1 text-sm text-gray-800">ALL</p>
+                                <p class="mt-1 text-sm text-gray-800">All</p>
                             <?php else: ?>
                                 <ol class="mt-1 list-decimal space-y-1 pl-5">
                                     <?php foreach ($authors as $a): ?>
@@ -523,7 +523,7 @@ ob_start();
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Co-Author(s)</p>
                             <?php if (!empty($coAuthors[0]['is_all_selected'])): ?>
-                                <p class="mt-1 text-sm text-gray-800">ALL</p>
+                                <p class="mt-1 text-sm text-gray-800">All</p>
                             <?php else: ?>
                                 <ol class="mt-1 list-decimal space-y-1 pl-5">
                                     <?php foreach ($coAuthors as $a): ?>

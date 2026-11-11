@@ -20,9 +20,9 @@ usort(
 ?>
 
 <!-- Page Header -->
-<section class="bg-gradient-to-r from-green-600 to-green-700 text-white py-12">
+<section class="portal-hero text-white py-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center gap-3 text-green-100 mb-3">
+        <div class="flex items-center gap-3 text-blue-100 mb-3">
             <a href="<?= BASE_URL ?>/public/portal" class="hover:text-white transition-colors">
                 <i class="fa-solid fa-home"></i> Portal
             </a>

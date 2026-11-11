@@ -197,6 +197,7 @@ class SpsecCommInboxController
 
         // Route history (for context)
         $routes = $this->fetchRoutes($documentId);
+        $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
 
         $pageTitle = 'Communication — ' . htmlspecialchars($document['tracking_number'] ?? '');
         $success   = flash_get('success');

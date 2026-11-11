@@ -317,6 +317,8 @@ function _typeLabel(string $type): string
             </section>
             <?php endif; ?>
 
+            <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+
         </div><!-- /main col -->
 
         <!-- ── Sidebar column ───────────────────────────────────────────────── -->

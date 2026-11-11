@@ -1,7 +1,7 @@
 <!-- Page Header -->
-<section class="bg-gradient-to-r from-green-600 to-green-700 text-white py-12">
+<section class="portal-hero text-white py-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center gap-3 text-green-100 mb-3">
+        <div class="flex items-center gap-3 text-blue-100 mb-3">
             <a href="<?= BASE_URL ?>/public/portal" class="hover:text-white transition-colors">
                 <i class="fa-solid fa-home"></i> Portal
             </a>
@@ -9,7 +9,7 @@
             <span>Legislative Records</span>
         </div>
         <h1 class="text-3xl sm:text-4xl font-bold mb-3">Legislative Records</h1>
-        <p class="text-green-100 text-lg max-w-3xl">
+        <p class="text-blue-100 text-lg max-w-3xl">
             Browse and search approved ordinances, resolutions, and other legislative documents 
             enacted by the Sangguniang Panlalawigan.
         </p>
@@ -339,10 +339,10 @@
 <!-- Information Notice -->
 <section class="py-12 bg-white border-t border-gray-200">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="bg-green-50 border border-green-200 rounded-xl p-6">
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-6">
             <div class="flex gap-4">
                 <div class="flex-shrink-0">
-                    <i class="fa-solid fa-circle-info text-2xl text-green-600"></i>
+                    <i class="fa-solid fa-circle-info text-2xl text-blue-700"></i>
                 </div>
                 <div>
                     <h3 class="text-lg font-semibold text-gray-900 mb-2">About Legislative Records</h3>
@@ -351,8 +351,9 @@
                         ordinances, resolutions, and other documents enacted by the Sangguniang Panlalawigan of Pangasinan.
                     </p>
                     <p class="text-sm text-gray-600 mb-3">
-                        All displayed records have been officially approved and are available for public viewing. 
-                        Click on any record to view its full details and download available documents.
+                        Only records explicitly published to the public portal are shown. Publishing makes the record
+                        details and all attached files available for public viewing and download, so attachments should
+                        be reviewed before publication.
                     </p>
                     <p class="text-sm text-gray-600">
                         For certified copies or official requests, please contact the Provincial Capitol Office 

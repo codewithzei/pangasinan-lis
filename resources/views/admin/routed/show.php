@@ -259,6 +259,8 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                 <?php endif; ?>
             </section>
 
+            <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+
             <!-- Routing History -->
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="text-lg font-semibold text-gray-900">Routing History</h2>

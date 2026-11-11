@@ -373,6 +373,7 @@ class AdminRoutedDocumentController
         // ── Motion for Reconsideration data ───────────────────────────────────
         require_once __DIR__ . '/../../services/DocumentService.php';
         $docService     = new DocumentService($this->pdo);
+        $documentEvents = $docService->getDocumentEvents($documentId);
         $mfrLink        = null;
         $relatedMotions = [];
         $docTypeName    = $document['document_type_name'] ?? '';

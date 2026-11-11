@@ -1,7 +1,7 @@
 <!-- Page Header -->
-<section class="bg-gradient-to-r from-purple-600 to-purple-700 text-white py-12">
+<section class="portal-hero text-white py-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center gap-3 text-purple-100 mb-3">
+        <div class="flex items-center gap-3 text-blue-100 mb-3">
             <a href="<?= BASE_URL ?>/public/portal" class="hover:text-white transition-colors">
                 <i class="fa-solid fa-home"></i> Portal
             </a>
@@ -9,7 +9,7 @@
             <span>Committees</span>
         </div>
         <h1 class="text-3xl sm:text-4xl font-bold mb-3">Legislative Committees</h1>
-        <p class="text-purple-100 text-lg max-w-3xl">
+        <p class="text-blue-100 text-lg max-w-3xl">
             Learn about the various committees of the Sangguniang Panlalawigan and their areas 
             of oversight and responsibility in provincial governance.
         </p>

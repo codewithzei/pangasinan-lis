@@ -281,6 +281,17 @@ ob_start();
                                             <?= $attachCount ?> file<?= $attachCount !== 1 ? 's' : '' ?>
                                         </div>
                                     <?php endif; ?>
+                                    <div class="mt-2">
+                                        <?php if (!empty($row['is_public'])): ?>
+                                            <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                                                Published to portal
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                                Not published
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
 
                                 <!-- Subject Matter -->
@@ -525,6 +536,10 @@ ob_start();
                            class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-800
                                   placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                 </div>
+
+                <p class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                    New records are not public by default. Review the record and every attachment before publishing it from its detail page.
+                </p>
 
                 <!-- Authors and co-authors -->
                 <section class="rounded-xl border border-gray-200 p-4 sm:p-5">

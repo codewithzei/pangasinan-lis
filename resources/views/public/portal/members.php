@@ -1,5 +1,5 @@
 <!-- Page Header -->
-<section class="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-12">
+<section class="portal-hero text-white py-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center gap-3 text-primary-100 mb-3">
             <a href="<?= BASE_URL ?>/public/portal" class="hover:text-white transition-colors">

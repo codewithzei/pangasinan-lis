@@ -298,6 +298,8 @@ ob_start();
         </div>
     </div>
 
+    <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+
 </div>
 
 <script>

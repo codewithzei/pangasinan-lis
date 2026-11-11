@@ -110,7 +110,7 @@ ob_start();
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
                 <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">History</h2>
                 <ol class="space-y-3">
-                    <?php foreach (array_slice($events, 0, 8) as $ev): ?>
+                    <?php foreach ($events as $ev): ?>
                     <li class="flex gap-3 text-xs">
                         <div class="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-gray-300"></div>
                         <div>

@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../services/DocumentService.php';
 
 /**
  * AdminFiledDocumentsController
@@ -720,6 +721,8 @@ class AdminFiledDocumentsController
         ");
         $allAttachmentsStmt->execute([$documentId]);
         $allAttachments = $allAttachmentsStmt->fetchAll();
+
+        $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
 
         $pageTitle    = 'Filed Document Details';
         $pageSubtitle = $document['tracking_number'];

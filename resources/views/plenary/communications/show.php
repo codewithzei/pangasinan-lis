@@ -142,6 +142,8 @@ ob_start();
             </div>
             <?php endif; ?>
 
+            <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+
             <!-- Back link -->
             <div class="flex items-center gap-3">
                 <a href="<?= BASE_URL ?>/plenary/communications"

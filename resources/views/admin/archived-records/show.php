@@ -152,6 +152,17 @@ function arFileIcon(string $mime): string {
                         </dd>
                     </div>
 
+                    <div>
+                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Public Portal</dt>
+                        <dd class="mt-1.5">
+                            <?php if (!empty($record['is_public'])): ?>
+                                <span class="inline-flex items-center rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">Published</span>
+                            <?php else: ?>
+                                <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Not published</span>
+                            <?php endif; ?>
+                        </dd>
+                    </div>
+
                 </div>
             </section>
 
@@ -587,6 +598,21 @@ function arFileIcon(string $mime): string {
                            class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-800
                                   placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                 </div>
+
+                <section class="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <label for="edit_is_public" class="flex items-start gap-3">
+                        <input type="checkbox" id="edit_is_public" name="is_public" value="1"
+                               <?= !empty($record['is_public']) ? 'checked' : '' ?>
+                               class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
+                        <span>
+                            <span class="block text-sm font-semibold text-gray-900">Publish to Public Portal</span>
+                            <span class="mt-1 block text-xs leading-relaxed text-gray-700">
+                                Publishing exposes this record's public details and all attached files. Confirm each attachment is approved for public release before saving.
+                                Adding an attachment automatically unpublishes the record until it is reviewed and published again.
+                            </span>
+                        </span>
+                    </label>
+                </section>
 
                 <!-- Existing and custom authors/co-authors -->
                 <section class="rounded-xl border border-gray-200 p-4 sm:p-5">

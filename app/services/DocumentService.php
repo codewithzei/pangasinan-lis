@@ -41,6 +41,32 @@ class DocumentService
         $this->pdo = $database->connect();
     }
 
+    /**
+     * Return the chronological action history for a document.
+     */
+    public function getDocumentEvents(int $documentId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT de.*,
+                   COALESCE(
+                       NULLIF(CONCAT_WS(' ', NULLIF(ui.first_name, ''), NULLIF(ui.last_name, '')), ''),
+                       ua.username
+                   ) AS performed_by_name,
+                   fs.name AS from_status_name,
+                   ts.name AS to_status_name
+            FROM document_events de
+            LEFT JOIN user_accounts ua ON ua.id = de.performed_by
+            LEFT JOIN user_info ui ON ui.user_account_id = de.performed_by
+            LEFT JOIN document_statuses fs ON fs.id = de.from_status_id
+            LEFT JOIN document_statuses ts ON ts.id = de.to_status_id
+            WHERE de.document_id = ?
+            ORDER BY de.created_at ASC, de.id ASC
+        ");
+        $stmt->execute([$documentId]);
+
+        return $stmt->fetchAll();
+    }
+
     // -------------------------------------------------------------------------
     // Validation helpers
     // -------------------------------------------------------------------------

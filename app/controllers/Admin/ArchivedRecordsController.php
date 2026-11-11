@@ -140,6 +140,7 @@ class ArchivedRecordsController
                 ar.subject_matter,
                 ar.tags,
                 ar.is_active,
+                ar.is_public,
                 COALESCE(dt.name, ar.custom_document_type_name) AS document_type_name,
                 dt.badge_color                                   AS document_type_badge_color,
                 ar.document_type_id,
@@ -435,6 +436,10 @@ class ArchivedRecordsController
             flash_set('errors', $fileErrors);
             redirect("admin/archived-records/show?id={$id}");
         }
+        $hasNewAttachments = !empty(array_filter((array) ($uploadedFiles['name'] ?? [])));
+        if ($hasNewAttachments) {
+            $data['is_public'] = 0;
+        }
 
         try {
             $this->pdo->beginTransaction();
@@ -454,6 +459,7 @@ class ArchivedRecordsController
                     tags                      = ?,
                     document_type_id          = ?,
                     custom_document_type_name = ?,
+                    is_public                 = ?,
                     updated_by                = ?,
                     updated_at                = NOW()
                 WHERE id = ?
@@ -466,6 +472,7 @@ class ArchivedRecordsController
                 $data['tags'] ?: null,
                 $data['document_type_id'],
                 $data['custom_document_type_name'],
+                $data['is_public'],
                 $userId,
                 $id,
             ]);
@@ -477,7 +484,7 @@ class ArchivedRecordsController
             $this->saveCommittees($id, $data['committees'] ?? [], $userId);
 
             // New file attachments
-            if (!empty($uploadedFiles['name'][0])) {
+            if ($hasNewAttachments) {
                 $this->processFileUploads($id, $uploadedFiles, $userId);
             }
 
@@ -485,7 +492,12 @@ class ArchivedRecordsController
 
             audit_log('UPDATE', 'archived_records', (string) $id, $oldData, $data, null, $userId);
 
-            flash_set('success', "Archived record {$data['approved_no']} has been updated.");
+            flash_set(
+                'success',
+                $hasNewAttachments
+                    ? "Archived record {$data['approved_no']} has been updated. It is unpublished until the added attachment(s) are reviewed and it is explicitly published again."
+                    : "Archived record {$data['approved_no']} has been updated."
+            );
             redirect("admin/archived-records/show?id={$id}");
 
         } catch (Throwable $e) {
@@ -565,9 +577,14 @@ class ArchivedRecordsController
         }
 
         // Verify record
-        $stmt = $this->pdo->prepare("SELECT id FROM archived_records WHERE id = ? AND is_deleted = 0");
+        $stmt = $this->pdo->prepare("
+            SELECT id, approved_no, is_public
+            FROM archived_records
+            WHERE id = ? AND is_deleted = 0
+        ");
         $stmt->execute([$id]);
-        if (!$stmt->fetch()) {
+        $record = $stmt->fetch();
+        if (!$record) {
             flash_set('error', 'Record not found.');
             redirect('admin/archived-records');
         }
@@ -579,9 +596,21 @@ class ArchivedRecordsController
             redirect("admin/archived-records/show?id={$id}");
         }
 
+        if (empty(array_filter((array) ($uploadedFiles['name'] ?? [])))) {
+            flash_set('error', 'Select at least one attachment to upload.');
+            redirect("admin/archived-records/show?id={$id}");
+        }
+
         try {
+            if (!empty($record['is_public'])) {
+                $this->pdo->prepare(
+                    "UPDATE archived_records SET is_public = 0, updated_by = ?, updated_at = NOW() WHERE id = ?"
+                )->execute([$userId, $id]);
+                audit_log('UPDATE', 'archived_records', (string) $id,
+                    ['is_public' => 1], ['is_public' => 0, 'reason' => 'Attachment added'], null, $userId);
+            }
             $this->processFileUploads($id, $uploadedFiles, $userId);
-            flash_set('success', 'Attachment(s) uploaded successfully.');
+            flash_set('success', 'Attachment(s) uploaded successfully. The record is unpublished until it is reviewed and explicitly published again.');
         } catch (Throwable $e) {
             system_log('ERROR', 'ArchivedRecords::uploadAttachment failed', [
                 'error'   => $e->getMessage(),
@@ -726,6 +755,7 @@ class ArchivedRecordsController
             'tags'                      => $tags,
             'document_type_id'          => $docTypeId,
             'custom_document_type_name' => $customType,
+            'is_public'                 => isset($_POST['is_public']) && $_POST['is_public'] === '1' ? 1 : 0,
             'authors'                   => $authors,
             'committees'                => $committees,
         ];

@@ -108,6 +108,8 @@ function normalizeTimeForInput(?string $time): string {
         </div>
     <?php endif; ?>
 
+    <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+
     <!-- Document Info Card -->
     <section class="rounded-2xl border border-gray-200 bg-white p-6">
         <div class="flex items-center justify-between border-b border-gray-100 pb-4">

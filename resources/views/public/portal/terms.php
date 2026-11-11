@@ -1,7 +1,7 @@
 <!-- Hero Section -->
-<section class="bg-gradient-to-br from-purple-700 to-purple-900 text-white py-16">
+<section class="portal-hero text-white py-16">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center gap-3 text-purple-300 mb-3">
+        <div class="flex items-center gap-3 text-blue-100 mb-3">
             <a href="<?= BASE_URL ?>/public/portal" class="hover:text-white transition-colors">
                 <i class="fa-solid fa-home"></i> Portal
             </a>
@@ -12,7 +12,7 @@
         <h1 class="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
             Terms of Use
         </h1>
-        <p class="text-xl text-purple-300 max-w-3xl">
+        <p class="text-xl text-blue-100 max-w-3xl">
             Conditions for accessing and using this public portal
         </p>
     </div>

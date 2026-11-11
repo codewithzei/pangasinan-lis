@@ -14,9 +14,31 @@ $pageTitle = $pageTitle ?? 'Public Portal';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        /* Custom styles for public portal */
+        /* Shared public portal styles */
         .hero-gradient {
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+            background: linear-gradient(120deg, #163b68 0%, #1d5b96 100%);
+        }
+
+        .portal-hero {
+            background: linear-gradient(120deg, #163b68 0%, #1d5b96 100%);
+        }
+
+        .portal-cta-primary {
+            background: #fff;
+            color: #163b68;
+        }
+
+        .portal-cta-primary:hover {
+            background: #eff6ff;
+        }
+
+        .portal-cta-secondary {
+            background: #0f3154;
+            color: #fff;
+        }
+
+        .portal-cta-secondary:hover {
+            background: #0b2744;
         }
         
         .card-hover {
@@ -29,12 +51,26 @@ $pageTitle = $pageTitle ?? 'Public Portal';
         }
         
         .official-seal {
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            background-image:
+                radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%),
+                linear-gradient(120deg, #163b68 0%, #1d5b96 100%);
+        }
+
+        a:focus-visible,
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible {
+            outline: 3px solid #fbbf24;
+            outline-offset: 3px;
         }
     </style>
 </head>
 
 <body class="font-poppins bg-gray-50 text-gray-800">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-gray-900 focus:shadow-lg">
+        Skip to main content
+    </a>
 
     <!-- Public Navigation Header -->
     <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
@@ -58,7 +94,7 @@ $pageTitle = $pageTitle ?? 'Public Portal';
                 </div>
 
                 <!-- Desktop Navigation -->
-                <nav class="hidden md:flex items-center gap-1">
+                <nav class="hidden md:flex items-center gap-1" aria-label="Main navigation">
                     <a href="<?= BASE_URL ?>/public/portal" 
                        class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary hover:bg-gray-50 rounded-lg transition-colors">
                         <i class="fa-solid fa-home mr-2"></i>Home
@@ -89,8 +125,10 @@ $pageTitle = $pageTitle ?? 'Public Portal';
                 <div class="flex items-center">
                     <button id="mobileMenuBtn" 
                             class="md:hidden inline-flex items-center justify-center p-2 rounded-lg text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary"
-                            aria-expanded="false">
-                        <i class="fa-solid fa-bars text-xl"></i>
+                            aria-expanded="false"
+                            aria-controls="mobileMenu"
+                            aria-label="Open navigation menu">
+                        <i class="fa-solid fa-bars text-xl" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -98,7 +136,7 @@ $pageTitle = $pageTitle ?? 'Public Portal';
 
         <!-- Mobile Navigation Menu -->
         <div id="mobileMenu" class="hidden md:hidden border-t border-gray-200 bg-white">
-            <nav class="max-w-7xl mx-auto px-4 py-3 space-y-1">
+            <nav class="max-w-7xl mx-auto px-4 py-3 space-y-1" aria-label="Mobile navigation">
                 <a href="<?= BASE_URL ?>/public/portal" 
                    class="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
                     <i class="fa-solid fa-home w-5"></i>Home
@@ -128,7 +166,7 @@ $pageTitle = $pageTitle ?? 'Public Portal';
     </header>
 
     <!-- Main Content -->
-    <main class="min-h-screen">
+    <main id="main-content" class="min-h-screen">
         <?= $content ?? '' ?>
     </main>
 
@@ -189,23 +227,17 @@ $pageTitle = $pageTitle ?? 'Public Portal';
                     </ul>
                 </div>
 
-                <!-- Contact Info -->
+                <!-- Public access note -->
                 <div>
-                    <h3 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Contact</h3>
-                    <ul class="space-y-3 text-sm text-gray-400">
-                        <li class="flex items-start gap-2">
-                            <i class="fa-solid fa-location-dot mt-1 text-primary"></i>
-                            <span>Pangasinan Provincial Capitol<br>Lingayen, Pangasinan</span>
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <i class="fa-solid fa-phone text-primary"></i>
-                            <span>(075) 542-5000</span>
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <i class="fa-solid fa-envelope text-primary"></i>
-                            <span>info@pangasinan.gov.ph</span>
-                        </li>
-                    </ul>
+                    <h3 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Public information</h3>
+                    <p class="text-sm text-gray-400 leading-relaxed">
+                        This portal displays public-facing information and archived legislative records explicitly published for public access.
+                        Internal workflow files are not part of the public record listing.
+                    </p>
+                    <a href="<?= BASE_URL ?>/public/portal/contact"
+                       class="inline-flex items-center gap-2 mt-4 text-sm text-white hover:text-blue-200 transition-colors">
+                        Contact the office <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                    </a>
                 </div>
 
             </div>
@@ -241,6 +273,7 @@ $pageTitle = $pageTitle ?? 'Public Portal';
                 mobileMenuBtn.addEventListener('click', function() {
                     const isExpanded = this.getAttribute('aria-expanded') === 'true';
                     this.setAttribute('aria-expanded', !isExpanded);
+                    this.setAttribute('aria-label', isExpanded ? 'Open navigation menu' : 'Close navigation menu');
                     mobileMenu.classList.toggle('hidden');
                 });
             }

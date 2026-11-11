@@ -154,6 +154,7 @@ class SpsecCommFirstReadingController
 
         $inboxItem    = $this->fetchInboxItem($documentId);
         $firstReading = $this->fetchFirstReading($documentId);
+        $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
 
         // Dropdown data
         $categories = $this->pdo->query("

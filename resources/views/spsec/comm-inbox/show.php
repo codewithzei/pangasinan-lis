@@ -210,6 +210,8 @@ ob_start();
             </div>
             <?php endif; ?>
 
+            <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+
         </div>
     </div>
 

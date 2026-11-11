@@ -150,7 +150,7 @@ class PublicPortalController
         $perPage = 20;
         $offset = ($page - 1) * $perPage;
         
-        // Build query for archived records
+        // Only active, non-deleted archived records are available in the public portal.
         $sql = "SELECT 
                     ar.id,
                     ar.approved_no,
@@ -158,11 +158,17 @@ class PublicPortalController
                     ar.subject_matter,
                     ar.description,
                     ar.tags,
-                    dt.name AS document_type_name,
+                    COALESCE(dt.name, ar.custom_document_type_name) AS document_type_name,
                     dt.badge_color AS document_type_color
                 FROM archived_records ar
-                INNER JOIN document_types dt ON ar.document_type_id = dt.id
-                WHERE 1=1";
+                LEFT JOIN document_types dt
+                    ON ar.document_type_id = dt.id
+                   AND dt.is_active = 1
+                   AND dt.is_deleted = 0
+                WHERE ar.is_active = 1
+                  AND ar.is_deleted = 0
+                  AND ar.is_public = 1
+                  AND (ar.document_type_id IS NULL OR dt.id IS NOT NULL)";
         
         $params = [];
         
@@ -214,14 +220,28 @@ class PublicPortalController
             SELECT id, name 
             FROM document_types 
             WHERE is_active = 1 AND is_deleted = 0 
+              AND id IN (
+                  SELECT DISTINCT document_type_id
+                  FROM archived_records
+                  WHERE is_active = 1 AND is_deleted = 0 AND is_public = 1
+                    AND document_type_id IS NOT NULL
+              )
             ORDER BY name ASC
         ");
         $documentTypes = $typesStmt->fetchAll();
         
         // Get available years
         $yearsStmt = $this->pdo->query("
-            SELECT DISTINCT YEAR(date_approved) AS year 
-            FROM archived_records 
+            SELECT DISTINCT YEAR(ar.date_approved) AS year
+            FROM archived_records ar
+            LEFT JOIN document_types dt
+                ON ar.document_type_id = dt.id
+               AND dt.is_active = 1
+               AND dt.is_deleted = 0
+            WHERE ar.is_active = 1
+              AND ar.is_deleted = 0
+              AND ar.is_public = 1
+              AND (ar.document_type_id IS NULL OR dt.id IS NOT NULL)
             ORDER BY year DESC
         ");
         $years = $yearsStmt->fetchAll(PDO::FETCH_COLUMN);
@@ -256,11 +276,18 @@ class PublicPortalController
                 ar.description,
                 ar.tags,
                 ar.created_at,
-                dt.name AS document_type_name,
+                COALESCE(dt.name, ar.custom_document_type_name) AS document_type_name,
                 dt.badge_color AS document_type_color
             FROM archived_records ar
-            INNER JOIN document_types dt ON ar.document_type_id = dt.id
+            LEFT JOIN document_types dt
+                ON ar.document_type_id = dt.id
+               AND dt.is_active = 1
+               AND dt.is_deleted = 0
             WHERE ar.id = ?
+              AND ar.is_active = 1
+              AND ar.is_deleted = 0
+              AND ar.is_public = 1
+              AND (ar.document_type_id IS NULL OR dt.id IS NOT NULL)
         ");
         $stmt->execute([$id]);
         $document = $stmt->fetch();
@@ -301,17 +328,26 @@ class PublicPortalController
         $committeesStmt->execute([$id]);
         $committees = $committeesStmt->fetchAll();
         
-        // Get attachments - all attachments for archived records are considered public
+        // Attachments are available only when their parent record is publicly listed.
         $attachmentsStmt = $this->pdo->prepare("
             SELECT 
-                id,
-                file_name,
-                file_size,
-                mime_type,
-                uploaded_at
-            FROM archived_records_attachments
-            WHERE archived_record_id = ?
-            ORDER BY uploaded_at ASC
+                ara.id,
+                ara.file_name,
+                ara.file_size,
+                ara.mime_type,
+                ara.uploaded_at
+            FROM archived_records_attachments ara
+            INNER JOIN archived_records ar ON ar.id = ara.archived_record_id
+            LEFT JOIN document_types dt
+                ON ar.document_type_id = dt.id
+               AND dt.is_active = 1
+               AND dt.is_deleted = 0
+            WHERE ara.archived_record_id = ?
+              AND ar.is_active = 1
+              AND ar.is_deleted = 0
+              AND ar.is_public = 1
+              AND (ar.document_type_id IS NULL OR dt.id IS NOT NULL)
+            ORDER BY ara.uploaded_at ASC
         ");
         $attachmentsStmt->execute([$id]);
         $attachments = $attachmentsStmt->fetchAll();
@@ -374,7 +410,16 @@ class PublicPortalController
                 ara.file_size,
                 ara.archived_record_id
             FROM archived_records_attachments ara
+            INNER JOIN archived_records ar ON ar.id = ara.archived_record_id
+            LEFT JOIN document_types dt
+                ON ar.document_type_id = dt.id
+               AND dt.is_active = 1
+               AND dt.is_deleted = 0
             WHERE ara.id = ?
+              AND ar.is_active = 1
+              AND ar.is_deleted = 0
+              AND ar.is_public = 1
+              AND (ar.document_type_id IS NULL OR dt.id IS NOT NULL)
         ");
         $stmt->execute([$id]);
         $attachment = $stmt->fetch();
@@ -390,7 +435,11 @@ class PublicPortalController
         $storagePath = realpath(STORAGE_PATH);
         
         // Ensure the file is within the storage directory
-        if ($realPath === false || strpos($realPath, $storagePath) !== 0) {
+        if (
+            $realPath === false
+            || $storagePath === false
+            || !str_starts_with($realPath, $storagePath . DIRECTORY_SEPARATOR)
+        ) {
             http_response_code(403);
             system_log('WARNING', 'Potential directory traversal attempt in public download', [
                 'attachment_id' => $id,
@@ -430,7 +479,6 @@ class PublicPortalController
             'jpeg' => 'image/jpeg',
             'gif'  => 'image/gif',
             'webp' => 'image/webp',
-            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ];
         if ($inlinePreview && !isset($inlineMimeTypes[$extension])) {
             http_response_code(415);
@@ -555,8 +603,16 @@ class PublicPortalController
         
         // Count archived records
         $stmt = $this->pdo->query("
-            SELECT COUNT(*) 
-            FROM archived_records
+            SELECT COUNT(*)
+            FROM archived_records ar
+            LEFT JOIN document_types dt
+                ON ar.document_type_id = dt.id
+               AND dt.is_active = 1
+               AND dt.is_deleted = 0
+            WHERE ar.is_active = 1
+              AND ar.is_deleted = 0
+              AND ar.is_public = 1
+              AND (ar.document_type_id IS NULL OR dt.id IS NOT NULL)
         ");
         $stats['documents_count'] = (int)$stmt->fetchColumn();
         

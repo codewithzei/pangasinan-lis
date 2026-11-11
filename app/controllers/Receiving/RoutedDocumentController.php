@@ -258,6 +258,7 @@ class RoutedDocumentController
 
         require_once __DIR__ . '/../../services/DocumentService.php';
         $docService = new DocumentService($this->pdo);
+        $documentEvents = $docService->getDocumentEvents($documentId);
 
         $docTypeName = $document['document_type_name'] ?? '';
 

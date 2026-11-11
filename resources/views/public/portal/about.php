@@ -1,5 +1,5 @@
 <!-- Hero Section -->
-<section class="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-16">
+<section class="portal-hero text-white py-16">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center gap-3 text-primary-100 mb-3">
             <a href="<?= BASE_URL ?>/public/portal" class="hover:text-white transition-colors">

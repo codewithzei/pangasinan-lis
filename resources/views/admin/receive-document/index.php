@@ -524,6 +524,14 @@ ob_start();
                    class="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 focus:outline-none transition">
                     Cancel
                 </a>
+                <button type="button" id="printTrackingSlip"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-primary px-6 py-3 text-sm font-medium text-primary hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z"/>
+                    </svg>
+                    Receipt / Print
+                </button>
                 <button type="submit" id="submitBtn"
                         class="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none transition">
                     <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -536,6 +544,9 @@ ob_start();
 
         </div>
     </form>
+
+    <?php $receiptDefaultDestination = 'ADMIN'; ?>
+    <?php require __DIR__ . '/../../partials/tracking-slip.php'; ?>
 
 </div>
 

@@ -177,6 +177,8 @@ class PlenaryPetitionsController
         $routeStmt->execute([$documentId]);
         $routes = $routeStmt->fetchAll();
 
+        $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
+
         $pageTitle = 'Petition — ' . htmlspecialchars($document['tracking_number'] ?? '');
         $success   = flash_get('success');
         $error     = flash_get('error');
