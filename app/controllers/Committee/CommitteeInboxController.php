@@ -1435,7 +1435,7 @@ class CommitteeInboxController
      *      completed_at IS NOT NULL already exists for this document).
      *   2. Complete the current ACCEPTED Committee assignment
      *      (decision = COMPLETED, completed_at = NOW()).
-     *   3. Update the document's current_status_id to 8 ('Referred').
+     *   3. Update the document's current_status_id to 'Referred'.
      *      The current_phase stays 'COMMITTEE' — the document remains in the
      *      Committee phase but its status now reflects the endorsed state.
      *   4. Create (or complete) a committee_cycles row to record the cycle.
@@ -1464,6 +1464,8 @@ class CommitteeInboxController
         if ($remarks === '') {
             throw new InvalidArgumentException('Remarks are required when proceeding to endorsement.');
         }
+
+        $referredStatusId = (int) $this->requireDocumentStatus('Referred')['id'];
 
         // 1. Guard: reject if a completed endorsement cycle already exists
         $dupStmt = $this->pdo->prepare("
@@ -1498,13 +1500,13 @@ class CommitteeInboxController
             );
         }
 
-        // 3. Update document status to 8 = 'Referred'
+        // 3. Update document status to Referred
         $this->pdo->prepare("
             UPDATE documents
-            SET current_status_id = 8,
+            SET current_status_id = ?,
                 updated_by        = ?
             WHERE id = ?
-        ")->execute([$userId, $documentId]);
+        ")->execute([$referredStatusId, $userId, $documentId]);
 
         // 4. Create the committee_cycles row
         //    cycle_number = MAX(cycle_number) + 1 for this document (or 1 if none)
@@ -1540,11 +1542,12 @@ class CommitteeInboxController
             INSERT INTO document_events (
                 document_id, event_type, phase, performed_by,
                 from_status_id, to_status_id, remarks, metadata
-            ) VALUES (?, 'COMMITTEE_ENDORSED_REFERRED', 'COMMITTEE', ?, ?, 8, ?, ?)
+            ) VALUES (?, 'COMMITTEE_ENDORSED_REFERRED', 'COMMITTEE', ?, ?, ?, ?, ?)
         ")->execute([
             $documentId,
             $userId,
             $currentStatusId,
+            $referredStatusId,
             $remarks,
             json_encode([
                 'cycle_number'         => $cycleNumber,
@@ -1584,7 +1587,7 @@ class CommitteeInboxController
                 'endorsed_by'    => $userId,
                 'endorsed_by_username' => $username,
                 'remarks'        => mb_substr($remarks, 0, 200),
-                'status_changed_to' => 'Referred (id=8)',
+                'status_changed_to' => "Referred (id={$referredStatusId})",
             ],
             'auditDescription' => "Committee endorsed document ID {$documentId} as Referred (cycle {$cycleNumber}, user: {$username})",
         ];

@@ -2,21 +2,17 @@
 /**
  * Test: Plenary "Referred to Committee" tracking page
  *
- * Verifies the read-only tracking page + the "Proceed to 2nd Reading" flow that
- * reuses the existing advanceFromCommittee endpoint. The page reads the SAME
- * shared document status (documents.current_status_id) every other division
- * uses; no Plenary-only status is introduced.
+ * Verifies referred-document tracking and the Committee Report adoption gate
+ * that either advances an approved document or archives a disapproved report.
  *
  * Cases:
  *  1. A document referred during First Reading appears on the page (In Committee).
  *  2. It remains tracked while the committee process is pending.
- *  3. The return from the committee workflow enables "Proceed to 2nd Reading".
- *  4. The button is unavailable before return and the server-side gate rejects
- *     invalid / repeated transitions.
- *  5. Proceeding updates the shared status and places the document in the
+ *  3. The return from Committee enables an adoption decision.
+ *  4. Adoption is blocked before return and cannot be repeated.
+ *  5. Approval stores the report adoption and places the document in the
  *     existing Second Reading workflow.
- *  6. Unauthorized (non-Plenary) users cannot view or advance documents
- *     (RoleMiddleware prefix-gate, same logic the new route is covered by).
+ *  6. Unauthorized (non-Plenary) users cannot view or adopt documents.
  *
  * Run with: php tests/plenary_referred_to_committee_test.php
  */
@@ -96,6 +92,10 @@ function fetchReferredList(PDO $pdo, string $tab, int $returnedId, int $awaiting
         AND NOT EXISTS (
             SELECT 1 FROM plenary_readings pr2
             WHERE pr2.document_id = d.id AND pr2.reading_number = 2
+        )
+        AND NOT EXISTS (
+            SELECT 1 FROM plenary_committee_report_adoptions pcra
+            WHERE pcra.document_id = d.id
         ) ";
     if ($tab === 'returned') {
         $sql = "SELECT d.id, ds.name AS status FROM documents d
@@ -123,14 +123,16 @@ function fetchSecondReadingPending(PDO $pdo, int $awaitingSecondId): array {
     return $s->fetchAll();
 }
 
-// Replicates the advanceFromCommittee() server-side gate: only documents whose
-// shared status is "Returned to Plenary", with a First Reading referral and no
-// Second Reading row yet, may be advanced. The controller throws otherwise.
+// Replicates eligibility for a new Committee Report adoption: returned,
+// referred documents with no prior adoption or Second Reading row may be decided.
 function canAdvanceGate(PDO $pdo, int $docId, int $returnedId): bool {
     $s = $pdo->prepare("SELECT current_status_id FROM documents WHERE id = ?");
     $s->execute([$docId]);
     $cur = (int) $s->fetchColumn();
     if ($cur !== $returnedId) { return false; }
+    $adoption = $pdo->prepare("SELECT 1 FROM plenary_committee_report_adoptions WHERE document_id = ? LIMIT 1");
+    $adoption->execute([$docId]);
+    if ($adoption->fetch()) { return false; }
     $fr = $pdo->prepare("SELECT 1 FROM plenary_readings
                          WHERE document_id = ? AND reading_number = 1
                            AND action IN ('REFERRED_TO_COMMITTEE','REFERRED_TO_COMMITTEE_SECOND') LIMIT 1");
@@ -209,7 +211,7 @@ function setCommitteeSubStatus(PDO $pdo, int $docId, int $userId, int $statusId)
         ->execute([$statusId, $userId, $docId]);
 }
 
-function simulateReturnToPlenary(PDO $pdo, int $docId, int $userId, int $returnedId, int $committeeRoleId): void {
+function simulateReturnToPlenary(PDO $pdo, int $docId, int $userId, int $returnedId, int $committeeRoleId): int {
     static $returnSeq = 0;
     $returnSeq++;
     $reportNumber = 'RPT-RTC-' . $docId . '-' . $returnSeq;
@@ -247,18 +249,25 @@ function simulateReturnToPlenary(PDO $pdo, int $docId, int $userId, int $returne
     $pdo->prepare("INSERT INTO document_routes (document_id, from_phase, to_phase, routed_by, routed_to_role_id, remarks)
         VALUES (?, 'COMMITTEE', 'PLENARY', ?, ?, 'Committee Report returned to Plenary.')")
         ->execute([$docId, $userId, $committeeRoleId]);
+
+    return $reportId;
 }
 
-function simulateAdvanceFromCommittee(PDO $pdo, int $docId, int $userId, int $awaitingSecondId): void {
+function simulateAdvanceFromCommittee(PDO $pdo, int $docId, int $reportId, int $userId, int $awaitingSecondId): void {
+    $pdo->prepare("
+        INSERT INTO plenary_committee_report_adoptions
+            (document_id, committee_report_id, decision, adopted_by)
+        VALUES (?, ?, 'APPROVED', ?)
+    ")->execute([$docId, $reportId, $userId]);
     $pdo->prepare("UPDATE documents SET current_status_id=?, current_phase='PLENARY', updated_by=? WHERE id=?")
         ->execute([$awaitingSecondId, $userId, $docId]);
     $pdo->prepare("INSERT INTO document_events
         (document_id, event_type, phase, performed_by, to_status_id, remarks, metadata)
-        VALUES (?, 'PLENARY_SECOND_READING_APPROVED', 'PLENARY', ?, ?, ?, ?)")
+        VALUES (?, 'PLENARY_COMMITTEE_REPORT_APPROVED', 'PLENARY', ?, ?, ?, ?)")
         ->execute([
             $docId, $userId, $awaitingSecondId,
-            'Document advanced to Second Reading queue after Committee return.',
-            json_encode(['action' => 'ADVANCE_FROM_COMMITTEE']),
+            'Committee Report adopted and document advanced to Second Reading.',
+            json_encode(['decision' => 'APPROVED', 'committee_report_id' => $reportId]),
         ]);
 }
 
@@ -315,49 +324,46 @@ try {
     check("Still tracked on In Committee tab during committee work", in_array($docId, array_column($inCommittee2, 'id'), true));
     $returned2 = fetchReferredList($pdo, 'returned', $returnedId, $awaitingSecondId);
     check("Not on Returned tab while still in committee", !in_array($docId, array_column($returned2, 'id'), true));
-    check("Proceed gate is closed while still in committee", canAdvanceGate($pdo, $docId, $returnedId) === false);
+    check("Adoption decision is unavailable while still in committee", canAdvanceGate($pdo, $docId, $returnedId) === false);
     $sharedName2 = $pdo->prepare("SELECT ds.name FROM documents d JOIN document_statuses ds ON ds.id=d.current_status_id WHERE d.id=?");
     $sharedName2->execute([$docId]);
     check("Shared status reflects live committee sub-status ('Opinion Requested')", $sharedName2->fetchColumn() === 'Opinion Requested');
     echo PHP_EOL;
 
-    // ── Test 3: committee return enables "Proceed to 2nd Reading" ───────────
-    echo "Test 3: The return from the committee workflow enables Proceed to 2nd Reading" . PHP_EOL;
-    simulateReturnToPlenary($pdo, $docId, $fakeUserId, $returnedId, $committeeRoleId);
+    // ── Test 3: committee return enables adoption decision ─────────────────
+    echo "Test 3: Committee return enables the report adoption decision" . PHP_EOL;
+    $returnedReportId = simulateReturnToPlenary($pdo, $docId, $fakeUserId, $returnedId, $committeeRoleId);
     $returned3 = fetchReferredList($pdo, 'returned', $returnedId, $awaitingSecondId);
     check("Document appears on Returned tab after committee return", in_array($docId, array_column($returned3, 'id'), true));
     $inCommittee3 = fetchReferredList($pdo, 'in_committee', $returnedId, $awaitingSecondId);
     check("Document leaves In Committee tab after return", !in_array($docId, array_column($inCommittee3, 'id'), true));
-    check("Proceed gate is now open (button should be available)", canAdvanceGate($pdo, $docId, $returnedId) === true);
+    check("Adoption decision is available after return", canAdvanceGate($pdo, $docId, $returnedId) === true);
     $sharedName3 = $pdo->prepare("SELECT ds.name FROM documents d JOIN document_statuses ds ON ds.id=d.current_status_id WHERE d.id=?");
     $sharedName3->execute([$docId]);
     check("Shared status is 'Returned to Plenary'", $sharedName3->fetchColumn() === 'Returned to Plenary');
     echo PHP_EOL;
 
     // ── Test 4: button unavailable before return; gate rejects invalid / repeated ─
-    echo "Test 4: Button unavailable before return; server rejects invalid / repeated transitions" . PHP_EOL;
+    echo "Test 4: Adoption is unavailable before return; repeated decisions are rejected" . PHP_EOL;
     // 4a: rewind to "still in committee" and confirm the gate is closed.
     setCommitteeSubStatus($pdo, $docId, $fakeUserId, $opinionId);
-    check("4a. Before return, Proceed gate is closed (button unavailable)", canAdvanceGate($pdo, $docId, $returnedId) === false);
+    check("4a. Before return, adoption decision is unavailable", canAdvanceGate($pdo, $docId, $returnedId) === false);
     // 4b: invalid transition — attempting to advance while status is 'Opinion Requested'.
-    //     The controller's advanceFromCommittee would throw; here we assert the gate
+    //     The controller's adoptCommitteeReportStore would throw; here we assert the gate
     //     that drives that throw, and that the shared status is unchanged.
     $beforeInvalid = (int) $pdo->query("SELECT current_status_id FROM documents WHERE id={$docId}")->fetchColumn();
     $blockedInvalid = !canAdvanceGate($pdo, $docId, $returnedId);
     $afterInvalid = (int) $pdo->query("SELECT current_status_id FROM documents WHERE id={$docId}")->fetchColumn();
     check("4b. Invalid transition rejected by server-side gate", $blockedInvalid === true);
     check("4b. Shared status unchanged after rejected transition", $beforeInvalid === $afterInvalid);
-    // 4c: repeated transition — flip status back to "Returned to Plenary" (reusing
-    //     the single committee report already created in Test 3, since the schema
-    //     enforces one-document→one-report), advance once, then assert a second
-    //     advance attempt is rejected by the server-side gate.
+    // 4c: approve the returned report once, then ensure repeated adoption is blocked.
     setCommitteeSubStatus($pdo, $docId, $fakeUserId, $returnedId);
-    check("4c. Gate reopens when status is again 'Returned to Plenary'", canAdvanceGate($pdo, $docId, $returnedId) === true);
-    simulateAdvanceFromCommittee($pdo, $docId, $fakeUserId, $awaitingSecondId);
+    check("4c. Adoption is available when status is 'Returned to Plenary'", canAdvanceGate($pdo, $docId, $returnedId) === true);
+    simulateAdvanceFromCommittee($pdo, $docId, $returnedReportId, $fakeUserId, $awaitingSecondId);
     $sharedNameAfter = $pdo->prepare("SELECT ds.name FROM documents d JOIN document_statuses ds ON ds.id=d.current_status_id WHERE d.id=?");
     $sharedNameAfter->execute([$docId]);
     check("4c. First successful advance moves shared status to 'Awaiting Second Reading'", $sharedNameAfter->fetchColumn() === 'Awaiting Second Reading');
-    check("4c. Second advance attempt rejected by gate (status no longer 'Returned to Plenary')", canAdvanceGate($pdo, $docId, $returnedId) === false);
+    check("4c. Repeat adoption rejected after the approved decision is stored", canAdvanceGate($pdo, $docId, $returnedId) === false);
     echo PHP_EOL;
 
     // ── Test 5: proceeding updates shared status + enters Second Reading ────
@@ -377,12 +383,12 @@ try {
     $shared5->execute([$docId]);
     check("5. Shared status (read by other divisions) is 'Awaiting Second Reading'", $shared5->fetchColumn() === 'Awaiting Second Reading');
     // History/audit event recorded for the transition.
-    $evCount = (int) $pdo->query("SELECT COUNT(*) FROM document_events WHERE document_id={$docId} AND event_type='PLENARY_SECOND_READING_APPROVED'")->fetchColumn();
-    check("5. Transition recorded in document history (PLENARY_SECOND_READING_APPROVED event)", $evCount >= 1);
+    $evCount = (int) $pdo->query("SELECT COUNT(*) FROM document_events WHERE document_id={$docId} AND event_type='PLENARY_COMMITTEE_REPORT_APPROVED'")->fetchColumn();
+    check("5. Adoption recorded in document history (PLENARY_COMMITTEE_REPORT_APPROVED event)", $evCount >= 1);
     echo PHP_EOL;
 
     // ── Test 6: unauthorized users cannot view or advance documents ─────────
-    echo "Test 6: Unauthorized users cannot view or advance documents (RoleMiddleware gate)" . PHP_EOL;
+    echo "Test 6: Unauthorized users cannot view or adopt reports (RoleMiddleware gate)" . PHP_EOL;
     check("6. Plenary role can view plenary/referred-to-committee", roleAllowedForRoute('plenary/referred-to-committee', 'Plenary') === true);
     check("6. Super Admin role can view plenary/referred-to-committee", roleAllowedForRoute('plenary/referred-to-committee', 'Super Admin') === true);
     check("6. Committee role CANNOT view plenary/referred-to-committee", roleAllowedForRoute('plenary/referred-to-committee', 'Committee') === false);

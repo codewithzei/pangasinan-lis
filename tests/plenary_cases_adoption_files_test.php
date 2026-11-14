@@ -165,13 +165,14 @@ function createReturnedCasesDoc(PDO $pdo, int $returnedId, int $uid, int $dtId):
  * Insert a plenary_cases_adoptions row and return the adoption ID.
  */
 function insertAdoption(PDO $pdo, int $docId, int $frId, int $uid,
-                        string $resNum = 'SP Res. 2026-TEST'): int
+                        string $resNum = 'SP Res. 2026-TEST',
+                        string $finalOutputType = 'RESOLUTION'): int
 {
     $pdo->prepare("
         INSERT INTO plenary_cases_adoptions
-            (document_id, first_reading_id, resolution_number, adopted_by)
-        VALUES (?, ?, ?, ?)
-    ")->execute([$docId, $frId, $resNum, $uid]);
+            (document_id, first_reading_id, resolution_number, final_output_type, adopted_by)
+        VALUES (?, ?, ?, ?, ?)
+    ")->execute([$docId, $frId, $resNum, $finalOutputType, $uid]);
     return (int) $pdo->lastInsertId();
 }
 
@@ -252,6 +253,21 @@ if ($tableExists) {
         check("1.2 Column '{$col}' present", isset($colSet[$col]));
     }
 
+    foreach (['plenary_comm_first_reading', 'plenary_comm_adoptions', 'plenary_cases_adoptions'] as $table) {
+        $typeStmt = $pdo->prepare("
+            SELECT COLUMN_TYPE
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = ?
+              AND COLUMN_NAME = 'final_output_type'
+        ");
+        $typeStmt->execute([$table]);
+        check(
+            "1.2a {$table}.final_output_type supports Resolution and Ordinance",
+            $typeStmt->fetchColumn() === "enum('RESOLUTION','ORDINANCE')"
+        );
+    }
+
     // FK constraints
     $fks = $pdo->query("
         SELECT CONSTRAINT_NAME, REFERENCED_TABLE_NAME
@@ -281,10 +297,25 @@ section('Group 2 — Multiple attachment rows stored and linked');
 $pdo->beginTransaction();
 try {
     ['doc_id' => $docId2, 'fr_id' => $frId2] = createReturnedCasesDoc($pdo, $returnedId, $uid, $dtId);
-    $adoptId2 = insertAdoption($pdo, $docId2, $frId2, $uid);
+    $adoptId2 = insertAdoption($pdo, $docId2, $frId2, $uid, 'SP Res. 2026-TEST', 'ORDINANCE');
     $fileIds  = insertFakeFiles($pdo, $docId2, $adoptId2, $frId2, $uid, 3);
 
     check('2.1 Three file rows inserted', count($fileIds) === 3);
+
+    $adoptionDetails = $pdo->prepare("
+        SELECT pca.final_output_type, d.document_type_id
+        FROM plenary_cases_adoptions pca
+        INNER JOIN documents d ON d.id = pca.document_id
+        WHERE pca.id = ?
+    ");
+    $adoptionDetails->execute([$adoptId2]);
+    $adoptionRow = $adoptionDetails->fetch();
+    check(
+        '2.1a Ordinance output is stored without replacing the original document type',
+        $adoptionRow !== false
+            && $adoptionRow['final_output_type'] === 'ORDINANCE'
+            && (int) $adoptionRow['document_type_id'] === $dtId
+    );
 
     $rows = $pdo->prepare("
         SELECT * FROM plenary_cases_adoption_files
@@ -695,6 +726,8 @@ if (!file_exists($ctrlPath)) {
 
     check('8.12 Cases adoption store uses enctype-aware $_FILES',
           str_contains($ctrl, "\$_FILES['adoption_files']"));
+    check('8.13 Cases adoption stores the selected final output type',
+          str_contains($ctrl, "'final_output_type' => $finalOutputType"));
 }
 
 // =========================================================================

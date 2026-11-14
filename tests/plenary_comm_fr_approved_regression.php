@@ -154,6 +154,23 @@ check(
     'Old FK still present — may block inserts with new column names'
 );
 
+foreach (['plenary_comm_first_reading', 'plenary_comm_adoptions', 'plenary_cases_adoptions'] as $table) {
+    $columnCheck = $pdo->prepare("
+        SELECT COLUMN_TYPE
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = 'final_output_type'
+    ");
+    $columnCheck->execute([$table]);
+    $columnType = $columnCheck->fetchColumn();
+    check(
+        "S6: {$table}.final_output_type supports Resolution and Ordinance",
+        $columnType === "enum('RESOLUTION','ORDINANCE')",
+        $columnType === false ? 'Column missing — migration 093 may not have run' : "Unexpected type: {$columnType}"
+    );
+}
+
 // ============================================================================
 // FUNCTIONAL CHECKS  (F1–F6)
 // All writes are in a single transaction that is ROLLED BACK at the end.
@@ -222,17 +239,19 @@ try {
         $pdo->prepare("
             INSERT INTO plenary_comm_first_reading
                 (document_id, decision, reading_date, remarks,
-                 proposed_number, resolution_number, approved_subject_matter,
+                 proposed_number, resolution_number, final_output_type, approved_subject_matter,
                  performed_by, finalized_at, finalized_by)
             VALUES (?, 'APPROVED', CURDATE(), NULL,
-                    NULL, 'RES-2026-001', '[TEST] Approved subject matter',
+                    NULL, 'RES-2026-001', 'ORDINANCE', '[TEST] Approved subject matter',
                     NULL, NOW(), NULL)
         ")->execute([$docId]);
         $insertedFrId = (int) $pdo->lastInsertId();
         pass('F1: INSERT into plenary_comm_first_reading (APPROVED) succeeds');
 
         $subjectStmt = $pdo->prepare("
-            SELECT pcfr.approved_subject_matter, d.subject_matter AS original_subject_matter
+            SELECT pcfr.approved_subject_matter, pcfr.final_output_type,
+                   d.subject_matter AS original_subject_matter,
+                   d.document_type_id AS original_document_type_id
             FROM plenary_comm_first_reading pcfr
             INNER JOIN documents d ON d.id = pcfr.document_id
             WHERE pcfr.id = ?
@@ -240,10 +259,12 @@ try {
         $subjectStmt->execute([$insertedFrId]);
         $subjectRow = $subjectStmt->fetch(PDO::FETCH_ASSOC);
         check(
-            'F1b: Approved subject matter is stored without replacing the original',
+            'F1b: Final output type is stored without replacing the original document type or subject',
             $subjectRow !== false
+                && $subjectRow['final_output_type'] === 'ORDINANCE'
                 && $subjectRow['approved_subject_matter'] === '[TEST] Approved subject matter'
                 && $subjectRow['original_subject_matter'] === '[TEST] Plenary Comm FR Approved regression fixture'
+                && (int) $subjectRow['original_document_type_id'] === $docTypeId
         );
     } catch (PDOException $e) {
         fail('F1: INSERT into plenary_comm_first_reading (APPROVED) failed', $e->getMessage());
@@ -323,8 +344,8 @@ try {
     try {
         $pdo->prepare("
             INSERT INTO plenary_comm_adoptions
-                (document_id, first_reading_id, resolution_number, adopted_by)
-            VALUES (?, ?, 'RES-2026-002', NULL)
+                (document_id, first_reading_id, resolution_number, final_output_type, adopted_by)
+            VALUES (?, ?, 'RES-2026-002', 'RESOLUTION', NULL)
         ")->execute([$docId2, $frId2]);
         $adoptionId = (int) $pdo->lastInsertId();
 
@@ -345,8 +366,15 @@ try {
         );
         $adoptResRow->execute([$adoptResFileId]);
         $arf = $adoptResRow->fetch();
+        $outputTypeStmt = $pdo->prepare(
+            "SELECT final_output_type FROM plenary_comm_adoptions WHERE id = ?"
+        );
+        $outputTypeStmt->execute([$adoptionId]);
+        $storedOutputType = $outputTypeStmt->fetchColumn();
 
         pass('F4: INSERT into plenary_comm_resolution_files (adoption_id path) succeeds');
+        check('F4a: adopted Communication final output type is stored',
+              $storedOutputType === 'RESOLUTION');
         check(
             'F4b: Inserted adoption file has correct adoption_id and NULL first_reading_id',
             $arf !== false

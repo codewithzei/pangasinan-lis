@@ -377,6 +377,36 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'master/documents' => [
+        [
+            'method' => 'GET',
+            'controller' => 'Master/DocumentRegistryController',
+            'action' => 'index',
+            'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+        ],
+    ],
+
+    'master/documents/edit' => [
+        'method' => 'GET',
+        'controller' => 'Master/DocumentRegistryController',
+        'action' => 'edit',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/documents/update' => [
+        'method' => 'POST',
+        'controller' => 'Master/DocumentRegistryController',
+        'action' => 'update',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'master/documents/update-related' => [
+        'method' => 'POST',
+        'controller' => 'Master/DocumentRegistryController',
+        'action' => 'updateRelated',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'master/document-types' => [
         [
             'method' => 'GET',
@@ -1556,6 +1586,20 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'committee/reports/document-show' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeReportsController',
+        'action'     => 'documentShow',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'committee/reports/attachments' => [
+        'method'     => 'POST',
+        'controller' => 'Committee/CommitteeReportsController',
+        'action'     => 'manageAttachments',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // Return to Plenary action
     'committee/reports/return-to-plenary' => [
         'method'     => 'POST',
@@ -1960,17 +2004,36 @@ return [
     ],
 
     // -------------------------------------------------------------------------
-    // Plenary Referred to Committee (tracking view for documents referred at
-    // First Reading). The "Proceed to 2nd Reading" action reuses the existing
-    // plenary/second-reading/advance-from-committee endpoint below ï¿½ no new
-    // POST route is added, so the committee-return gate stays the single source
-    // of truth for the transition into Second Reading.
+    // Plenary Referred to Committee. Returned reports must be adopted before
+    // an approved document proceeds to Second Reading; disapproved reports are
+    // saved to the Plenary Reports archive.
     // -------------------------------------------------------------------------
 
     'plenary/referred-to-committee' => [
         'method'     => 'GET',
         'controller' => 'Plenary/PlenaryReadingController',
         'action'     => 'referredToCommitteeIndex',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/referred-to-committee/adopt-report' => [
+        'method'     => 'POST',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'adoptCommitteeReportStore',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/reports' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReportsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/reports/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReportsController',
+        'action'     => 'show',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 

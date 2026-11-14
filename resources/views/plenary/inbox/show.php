@@ -1241,6 +1241,9 @@ ob_start();
                                 <?php if (!empty($att['attachment_type'])): ?>
                                     — <span class="font-medium"><?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $att['attachment_type'])))) ?></span>
                                 <?php endif; ?>
+                                <?php if (!empty($att['report_number'])): ?>
+                                    — Committee Report #<?= htmlspecialchars($att['report_number']) ?>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <?php if (!empty($att['stored_path'])): ?>

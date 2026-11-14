@@ -44,10 +44,10 @@ ob_start();
 <div class="space-y-6">
 
     <?php if (!empty($success ?? null)): ?>
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars($success) ?></div>
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status" aria-live="polite"><?= htmlspecialchars($success) ?></div>
     <?php endif; ?>
     <?php if (!empty($error ?? null)): ?>
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><?= htmlspecialchars($error) ?></div>
+        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
     <!-- Header -->

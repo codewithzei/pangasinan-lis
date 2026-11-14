@@ -40,7 +40,7 @@
  *   2.17 documents.current_phase set to 'FINALIZED'
  *
  * Group 3 — Adoption with zero files is rejected by the controller
- *   3.1  Controller rejects adoption without a resolution attachment
+ *   3.1  Controller rejects adoption without a finalized output attachment
  *   3.2  The controller stages files only after required-file validation
  *
  * Group 4 — Duplicate adoption prevention
@@ -525,10 +525,10 @@ try {
     $tmpDirs[] = $docId3;
 
     $controller = file_get_contents(__DIR__ . '/../app/controllers/Plenary/PlenaryReadingController.php');
-    check('3.1 Controller rejects adoption without a resolution attachment',
-        str_contains($controller, 'At least one resolution attachment is required.'));
+    check('3.1 Controller rejects adoption without a finalized output attachment',
+        str_contains($controller, 'At least one finalized output attachment is required.'));
     check('3.2 Controller only stages files after required-file validation',
-        strpos($controller, 'At least one resolution attachment is required.')
+        strpos($controller, 'At least one finalized output attachment is required.')
             < strpos($controller, '$this->stageMultipleFiles($resFiles, $documentId, \'comm_adopt_\')'));
 
     // ── Group 4 — Duplicate adoption prevention ─────────────────────────────

@@ -1260,6 +1260,105 @@ class DocumentService
     }
 
     /**
+     * Stage files under the shared Committee Report upload directory.
+     * These files belong to a report container, not to an individual document.
+     */
+    public function stageCommitteeReportFileUploads(array $files): array
+    {
+        $uploadDir = __DIR__ . '/../../public/uploads/committee-reports/';
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+            throw new RuntimeException('Failed to create Committee Report upload directory.');
+        }
+
+        $staged = [];
+        $fileCount = count($files['name'] ?? []);
+        for ($i = 0; $i < $fileCount; $i++) {
+            if (($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                continue;
+            }
+
+            $originalName = basename($files['name'][$i]);
+            $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+            $storedName = 'committee_report_' . uniqid('', true) . '.' . $extension;
+            $absolutePath = $uploadDir . $storedName;
+            $relativePath = 'uploads/committee-reports/' . $storedName;
+
+            if (!move_uploaded_file($files['tmp_name'][$i], $absolutePath)) {
+                foreach ($staged as $stagedFile) {
+                    if (file_exists($stagedFile['abs_path'])) {
+                        @unlink($stagedFile['abs_path']);
+                    }
+                }
+                throw new RuntimeException("Failed to move uploaded file: {$originalName}");
+            }
+
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeType = finfo_file($finfo, $absolutePath);
+            finfo_close($finfo);
+
+            $staged[] = [
+                'abs_path' => $absolutePath,
+                'relative_path' => $relativePath,
+                'original_name' => $originalName,
+                'mime_type' => $mimeType,
+                'file_size' => (int) filesize($absolutePath),
+            ];
+        }
+
+        return $staged;
+    }
+
+    /** Insert staged files as attachments owned by the shared report. */
+    public function insertStagedCommitteeReportAttachments(array $staged, int $reportId, int $userId): array
+    {
+        if ($staged === []) {
+            return [];
+        }
+
+        $insert = $this->pdo->prepare("
+            INSERT INTO committee_report_attachments
+                (committee_report_id, uploaded_by, file_name, stored_path, mime_type, file_size)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        $pendingLogs = [];
+
+        foreach ($staged as $file) {
+            $insert->execute([
+                $reportId,
+                $userId,
+                $file['original_name'],
+                $file['relative_path'],
+                $file['mime_type'],
+                $file['file_size'],
+            ]);
+            $pendingLogs[] = [
+                'report_id' => $reportId,
+                'file_name' => $file['original_name'],
+                'file_size' => $file['file_size'],
+                'mime_type' => $file['mime_type'],
+                'relative_path' => $file['relative_path'],
+            ];
+        }
+
+        return $pendingLogs;
+    }
+
+    /** Flush report attachment audit logs after the owning transaction commits. */
+    public function flushCommitteeReportFileUploadLogs(array $pendingLogs): void
+    {
+        foreach ($pendingLogs as $entry) {
+            log_file_upload(
+                $entry['file_name'],
+                $entry['file_size'],
+                $entry['mime_type'],
+                'CommitteeReport',
+                (string) $entry['report_id'],
+                $entry['relative_path']
+            );
+        }
+    }
+
+    /**
      * DB ONLY — insert document_attachments rows for files already on disk.
      *
      * Must be called inside an active transaction.

@@ -7,6 +7,9 @@ $routes = $routes ?? [];
 $checklistItems = $checklistItems ?? [];
 $pageTitle = $pageTitle ?? 'Document Details';
 $pageSubtitle = $pageSubtitle ?? '';
+$detailBackUrl = $detailBackUrl ?? BASE_URL . '/receiving/routed-documents';
+$detailBackLabel = $detailBackLabel ?? 'Back to Routed Documents';
+$showMfrRelationship = $showMfrRelationship ?? true;
 
 // Helper function to format phase names
 function formatPhaseName(string $phase): string
@@ -43,7 +46,8 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10">
                 <div class="flex items-center gap-3">
-                    <a href="<?= BASE_URL ?>/receiving/routed-documents" 
+                        <a href="<?= htmlspecialchars($detailBackUrl) ?>"
+                              aria-label="<?= htmlspecialchars($detailBackLabel) ?>"
                        class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
@@ -414,11 +418,13 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
 </div>
 
-<?php
-// MFR relationship sections: delegated to shared partial.
-$mfrDetailRoute = 'receiving/routed-documents';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-?>
+<?php if ($showMfrRelationship): ?>
+    <?php
+    // MFR relationship sections: delegated to shared partial.
+    $mfrDetailRoute = 'receiving/routed-documents';
+    require __DIR__ . '/../../partials/mfr-relationship.php';
+    ?>
+<?php endif; ?>
 
 <?php
 $content = ob_get_clean();

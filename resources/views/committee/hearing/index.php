@@ -56,13 +56,11 @@ function hearingUrl(string $newTab = '', string $newSearch = '', int $newPage = 
     return BASE_URL . '/committee/hearing' . $qs;
 }
 
-// Count eligible (approved, no existing report) docs on this page — used by bulk toolbar
+// Count documents on this page that are not yet part of a shared report.
 $eligibleCount = 0;
-if ($tab === 'approved') {
-    foreach ($documents as $d) {
-        if (($d['hearing_outcome'] ?? null) === 'APPROVED' && empty($d['report_id'])) {
-            $eligibleCount++;
-        }
+foreach ($documents as $d) {
+    if (empty($d['report_id'])) {
+        $eligibleCount++;
     }
 }
 
@@ -157,19 +155,19 @@ ob_start();
             </form>
         </div>
 
-        <!-- Approved-tab bulk-selection toolbar -->
-        <?php if ($tab === 'approved' && !empty($documents)): ?>
-            <div id="approvedToolbar"
-                 class="flex flex-col gap-3 border-b border-emerald-100 bg-emerald-50 px-6 py-3
+         <!-- Shared report selection toolbar -->
+         <?php if (!empty($documents)): ?>
+             <div id="hearingToolbar"
+               class="flex flex-col gap-3 border-b border-emerald-100 bg-emerald-50 px-6 py-3
                         sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-3">
                     <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-emerald-800 select-none
                                   <?= $eligibleCount === 0 ? 'opacity-40 cursor-not-allowed' : '' ?>">
-                        <input type="checkbox" id="selectAllApproved"
+                   <input type="checkbox" id="selectAllDocuments"
                                class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                               aria-label="Select all eligible approved documents on this page"
+                       aria-label="Select all available hearing documents on this page"
                                <?= $eligibleCount === 0 ? 'disabled' : '' ?>>
-                        Select All Eligible
+                   Select All Available
                         <?php if ($eligibleCount > 0): ?>
                             <span class="ml-1 rounded-full bg-emerald-200 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
                                 <?= $eligibleCount ?>
@@ -193,7 +191,7 @@ ob_start();
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
                     </svg>
-                    Share to Committee Report
+                    Add to Shared Committee Report
                 </a>
             </div>
         <?php endif; ?>
@@ -203,9 +201,7 @@ ob_start();
             <table class="w-full text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                        <?php if ($tab === 'approved'): ?>
-                            <th class="px-4 py-3 font-medium w-10"></th>
-                        <?php endif; ?>
+                        <th class="px-4 py-3 font-medium w-10" aria-label="Select document"></th>
                         <th class="px-6 py-3 font-medium">Document</th>
                         <th class="px-6 py-3 font-medium">Outcome / Status</th>
                         <th class="px-6 py-3 font-medium">Subject</th>
@@ -221,7 +217,7 @@ ob_start();
                     <?php if (empty($documents)): ?>
                         <!-- Empty state -->
                         <tr>
-                            <td colspan="<?= $tab === 'approved' ? 9 : 8 ?>"
+                            <td colspan="9"
                                 class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -271,8 +267,8 @@ ob_start();
                             $outcomeDisplay = $outcomeLabel ? ucfirst(strtolower($outcomeLabel)) : null;
                             $isScheduled    = ($outcomeLabel === null);
                             $isApproved     = ($outcomeLabel === 'APPROVED');
-                            $hasReport      = $isApproved && !empty($doc['report_id']);
-                            $isEligible     = $isApproved && empty($doc['report_id']);
+                            $hasReport      = !empty($doc['report_id']);
+                            $isEligible     = !$hasReport;
 
                             // ── Formatted dates ───────────────────────────────────────────
                             $agendaDate = !empty($doc['agenda_date'])
@@ -283,31 +279,21 @@ ob_start();
                                 ? date('M j, Y', strtotime($doc['outcome_date'])) : '';
                             ?>
                             <tr class="hover:bg-gray-50/50 transition
-                                       <?= $isApproved ? 'approved-doc-row' : '' ?>
+                                       <?= $isEligible ? 'shareable-doc-row' : '' ?>
                                        <?= $hasReport  ? 'opacity-75' : '' ?>"
-                                <?php if ($isApproved): ?>
-                                    data-doc-id="<?= (int) $doc['document_id'] ?>"
-                                    data-tracking="<?= htmlspecialchars($doc['tracking_number'] ?? '') ?>"
-                                    data-has-report="<?= $hasReport ? '1' : '0' ?>"
-                                <?php endif; ?>>
+                                data-doc-id="<?= (int) $doc['document_id'] ?>"
+                                data-tracking="<?= htmlspecialchars($doc['tracking_number'] ?? '') ?>"
+                                data-has-report="<?= $hasReport ? '1' : '0' ?>">
 
-                                <!-- ── Checkbox (approved tab only) ───────────────────── -->
-                                <?php if ($tab === 'approved'): ?>
-                                    <td class="px-4 py-4">
-                                        <?php if ($isApproved): ?>
-                                            <div title="<?= $hasReport ? 'Already assigned to a Committee Report' : '' ?>">
-                                                <input type="checkbox"
-                                                       class="doc-checkbox h-4 w-4 rounded border-gray-300 text-emerald-600
-                                                              focus:ring-emerald-500
-                                                              <?= $isEligible ? 'cursor-pointer' : 'cursor-not-allowed opacity-40' ?>"
-                                                       value="<?= (int) $doc['document_id'] ?>"
-                                                       <?= $hasReport ? 'disabled' : '' ?>
-                                                       aria-label="Select document <?= htmlspecialchars($doc['tracking_number'] ?? '') ?>"
-                                                       aria-disabled="<?= $hasReport ? 'true' : 'false' ?>">
-                                            </div>
-                                        <?php endif; ?>
-                                    </td>
-                                <?php endif; ?>
+                                <!-- ── Checkbox: any hearing status ───────────────────── -->
+                                <td class="px-4 py-4">
+                                    <?php if ($isEligible): ?>
+                                        <input type="checkbox"
+                                               class="doc-checkbox h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                               value="<?= (int) $doc['document_id'] ?>"
+                                               aria-label="Select document <?= htmlspecialchars($doc['tracking_number'] ?? '') ?>">
+                                    <?php endif; ?>
+                                </td>
 
                                 <!-- ── Document: tracking number + type badge ──────────── -->
                                 <td class="px-6 py-4">
@@ -419,15 +405,14 @@ ob_start();
                                 <td class="px-6 py-4">
                                     <?php if ($hasReport && !empty($doc['report_number'])): ?>
                                         <div class="flex flex-col gap-1">
-                                            <span class="inline-flex w-fit items-center gap-1 rounded-full
-                                                         bg-emerald-50 border border-emerald-200 px-2 py-0.5
-                                                         text-xs font-semibold text-emerald-700">
+                                                          <a href="<?= BASE_URL ?>/committee/reports/show?id=<?= (int) $doc['report_id'] ?>"
+                                                              class="inline-flex w-fit items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">
                                                 <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                           d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                 </svg>
                                                 #<?= htmlspecialchars($doc['report_number']) ?>
-                                            </span>
+                                            </a>
                                             <?php if (!empty($doc['report_type'])): ?>
                                                 <span class="text-[10px] text-gray-400 leading-tight max-w-[9rem]">
                                                     <?= htmlspecialchars(str_replace('_', ' ', $doc['report_type'])) ?>
@@ -435,15 +420,14 @@ ob_start();
                                             <?php endif; ?>
                                         </div>
                                     <?php elseif ($hasReport): ?>
-                                        <span class="inline-flex w-fit items-center gap-1 rounded-full
-                                                     bg-orange-50 border border-orange-200 px-2 py-0.5
-                                                     text-xs font-semibold text-orange-700">
+                                                     <a href="<?= BASE_URL ?>/committee/reports/show?id=<?= (int) $doc['report_id'] ?>"
+                                                         class="inline-flex w-fit items-center gap-1 rounded-full bg-orange-50 border border-orange-200 px-2 py-0.5 text-xs font-semibold text-orange-700 hover:bg-orange-100">
                                             <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                       d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                                             </svg>
                                             Assigned
-                                        </span>
+                                        </a>
                                     <?php else: ?>
                                         <span class="text-xs text-gray-400">—</span>
                                     <?php endif; ?>
@@ -590,13 +574,13 @@ ob_start();
 <!-- ═══════════════════════════════════════════════════════════════════════════
      JAVASCRIPT — approved-tab multi-select + navigate to share page
      ═══════════════════════════════════════════════════════════════════════════ -->
-<?php if ($tab === 'approved' && !empty($documents)): ?>
+<?php if (!empty($documents)): ?>
 <script>
 (function () {
     'use strict';
 
     const BASE_URL         = '<?= rtrim(BASE_URL, '/') ?>';
-    const selectAllCb      = document.getElementById('selectAllApproved');
+    const selectAllCb      = document.getElementById('selectAllDocuments');
     const selectionCounter = document.getElementById('selectionCounter');
     const shareBtn         = document.getElementById('openSharePageBtn');
 
@@ -661,7 +645,7 @@ ob_start();
 
         // Highlight selected rows
         getDocCheckboxes().forEach(function (cb) {
-            var row = cb.closest('.approved-doc-row');
+            var row = cb.closest('.shareable-doc-row');
             if (!row) return;
             if (cb.checked && !cb.disabled) {
                 row.classList.add('bg-emerald-50', 'ring-1', 'ring-inset', 'ring-emerald-300');
@@ -690,7 +674,7 @@ ob_start();
 
     /* ── Click anywhere on an approved eligible row to toggle checkbox ───── */
 
-    document.querySelectorAll('.approved-doc-row').forEach(function (row) {
+    document.querySelectorAll('.shareable-doc-row').forEach(function (row) {
         row.addEventListener('click', function (e) {
             if (e.target.closest('a, button, input')) return;
             var cb = row.querySelector('.doc-checkbox');

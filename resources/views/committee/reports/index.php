@@ -12,7 +12,6 @@
  *   $status                    string  Active status filter
  *   $dateFrom                  string  Active date-from filter
  *   $dateTo                    string  Active date-to filter
- *   $committeeReportCreatedId  int     Status ID for eligibility check
  *   $success                   string|null
  *   $error                     string|null
  */
@@ -26,8 +25,6 @@ $type                     = $type                     ?? '';
 $status                   = $status                   ?? '';
 $dateFrom                 = $dateFrom                 ?? '';
 $dateTo                   = $dateTo                   ?? '';
-$committeeReportCreatedId = $committeeReportCreatedId ?? 0;
-
 ob_start();
 ?>
 
@@ -42,9 +39,7 @@ ob_start();
                     Committee Reports
                 </h1>
                 <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
-                    Approved hearing reports awaiting plenary action. Use the
-                    <strong class="font-semibold text-white">Return to Plenary</strong>
-                    action to forward a completed report.
+                    Shared reports stay together as their documents and files move to Plenary individually.
                 </p>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
@@ -117,6 +112,10 @@ ob_start();
                         <option value="Committee Report Created"
                             <?= $status === 'Committee Report Created' ? 'selected' : '' ?>>
                             Committee Report Created
+                        </option>
+                        <option value="Partially Returned"
+                            <?= $status === 'Partially Returned' ? 'selected' : '' ?>>
+                            Partially Returned
                         </option>
                         <option value="Returned to Plenary"
                             <?= $status === 'Returned to Plenary' ? 'selected' : '' ?>>
@@ -198,8 +197,6 @@ ob_start();
                         <?php foreach ($reports as $rpt): ?>
                             <?php
                             $isJoint      = $rpt['report_type'] === 'JOINT_COMMITTEE_REPORT';
-                            $isReturnable = empty($rpt['returned_to_plenary_at'])
-                                            && $rpt['status'] === 'Committee Report Created';
                             $reportIdVal  = (int) $rpt['report_id'];
                             ?>
                             <tr class="hover:bg-gray-50/50 transition">
@@ -304,28 +301,6 @@ ob_start();
                                             </svg>
                                         </a>
 
-                                        <!-- Return to Plenary -->
-                                        <?php if ($isReturnable): ?>
-                                            <button type="button"
-                                                    onclick="openReturnModal(<?= $reportIdVal ?>, '<?= htmlspecialchars(addslashes($rpt['report_number'] ?? ''), ENT_QUOTES) ?>')"
-                                                    class="rounded-lg border border-violet-200 p-1.5 text-violet-600
-                                                           hover:border-violet-400 hover:bg-violet-50 transition"
-                                                    title="Return to Plenary">
-                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
-                                                </svg>
-                                            </button>
-                                        <?php else: ?>
-                                            <span class="rounded-lg border border-gray-100 p-1.5 text-gray-300 cursor-not-allowed"
-                                                  title="<?= !empty($rpt['returned_to_plenary_at']) ? 'Already returned to Plenary' : 'Not eligible' ?>">
-                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                          d="M5 13l4 4L19 7"/>
-                                                </svg>
-                                            </span>
-                                        <?php endif; ?>
-
                                     </div>
                                 </td>
 
@@ -420,6 +395,8 @@ ob_start();
                 <option value="">All Statuses</option>
                 <option value="Committee Report Created"
                     <?= $status === 'Committee Report Created' ? 'selected' : '' ?>>Committee Report Created</option>
+                <option value="Partially Returned"
+                    <?= $status === 'Partially Returned' ? 'selected' : '' ?>>Partially Returned</option>
                 <option value="Returned to Plenary"
                     <?= $status === 'Returned to Plenary' ? 'selected' : '' ?>>Returned to Plenary</option>
             </select>
@@ -461,8 +438,6 @@ ob_start();
     <?php foreach ($reports as $rpt): ?>
         <?php
         $isJoint      = $rpt['report_type'] === 'JOINT_COMMITTEE_REPORT';
-        $isReturnable = empty($rpt['returned_to_plenary_at'])
-                        && $rpt['status'] === 'Committee Report Created';
         $reportIdVal  = (int) $rpt['report_id'];
         ?>
         <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
@@ -549,28 +524,6 @@ ob_start();
                     </svg>
                     View Report
                 </a>
-                <?php if ($isReturnable): ?>
-                    <button type="button"
-                            onclick="openReturnModal(<?= $reportIdVal ?>, '<?= htmlspecialchars(addslashes($rpt['report_number'] ?? ''), ENT_QUOTES) ?>')"
-                            class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl
-                                   border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium
-                                   text-violet-700 hover:bg-violet-100 transition">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
-                        </svg>
-                        Return to Plenary
-                    </button>
-                <?php else: ?>
-                    <span class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl
-                                 border border-gray-100 bg-gray-50 px-3 py-2 text-xs font-medium
-                                 text-gray-300 cursor-not-allowed">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Returned
-                    </span>
-                <?php endif; ?>
             </div>
         </div>
     <?php endforeach; ?>

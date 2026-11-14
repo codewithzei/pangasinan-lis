@@ -132,9 +132,6 @@ class PlenaryCommController
         ")->fetchAll();
 
         $pageTitle = 'Plenary Communications';
-        $success   = flash_get('success');
-        $error     = flash_get('error');
-
         require __DIR__ . '/../../../resources/views/plenary/communications/index.php';
     }
 
@@ -206,9 +203,6 @@ class PlenaryCommController
         $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
 
         $pageTitle = 'Communication — ' . htmlspecialchars($document['tracking_number'] ?? '');
-        $success   = flash_get('success');
-        $error     = flash_get('error');
-
         require __DIR__ . '/../../../resources/views/plenary/communications/show.php';
     }
 

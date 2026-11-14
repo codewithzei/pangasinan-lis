@@ -108,8 +108,6 @@ class PlenaryPetitionsController
         $tabCounts = ['noted' => $total];
 
         $pageTitle = 'Plenary Petitions';
-        $success   = flash_get('success');
-        $error     = flash_get('error');
 
         require __DIR__ . '/../../../resources/views/plenary/petitions/index.php';
     }
@@ -180,8 +178,6 @@ class PlenaryPetitionsController
         $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
 
         $pageTitle = 'Petition — ' . htmlspecialchars($document['tracking_number'] ?? '');
-        $success   = flash_get('success');
-        $error     = flash_get('error');
 
         // ── Motion for Reconsideration data ───────────────────────────────────
         // Petitions are Complaint / Administrative Cases docs.

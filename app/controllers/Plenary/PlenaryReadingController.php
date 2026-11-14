@@ -177,9 +177,6 @@ class PlenaryReadingController
         }
 
         $pageTitle = 'First Reading — ' . htmlspecialchars($document['tracking_number']);
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors', []);
         $old     = old_get();
         require __DIR__ . '/../../../resources/views/plenary/first-reading/show.php';
     }
@@ -299,11 +296,8 @@ class PlenaryReadingController
     //                        (set by CommitteeReportsController::returnToPlenary)
     //                        and the document has NOT yet been advanced.
     //
-    // The "Proceed to 2nd Reading" button on the Returned tab POSTs to the
-    // EXISTING plenary/second-reading/advance-from-committee endpoint, which
-    // server-side validates the "Returned to Plenary" status, records the
-    // PLENARY_SECOND_READING_APPROVED (ADVANCE_FROM_COMMITTEE) event, and moves
-    // the document into the existing Second Reading workflow.
+    // Adoption decisions on the Returned tab either send approved documents to
+    // Second Reading or archive disapproved reports on Plenary Reports.
     // =========================================================================
 
     public function referredToCommitteeIndex(): void
@@ -357,6 +351,10 @@ class PlenaryReadingController
                 SELECT 1 FROM plenary_cases_adoptions pca_cases
                 WHERE pca_cases.document_id = d.id
             )
+            AND NOT EXISTS (
+                SELECT 1 FROM plenary_committee_report_adoptions pcra
+                WHERE pcra.document_id = d.id
+            )
         ";
 
         if ($tab === 'returned') {
@@ -398,6 +396,11 @@ class PlenaryReadingController
                 d.current_status_id,
                 ds.name            AS status,
                 ds.badge_color     AS status_badge_color,
+                (SELECT ch.outcome
+                 FROM committee_hearings ch
+                 WHERE ch.document_id = d.id
+                 ORDER BY ch.id DESC
+                 LIMIT 1) AS committee_hearing_outcome,
                 dt.name            AS document_type_name,
                 dt.badge_color     AS document_type_badge_color,
                 pdd.proposed_number,
@@ -493,9 +496,6 @@ class PlenaryReadingController
         unset($row);
 
         $pageTitle = 'Referred to Committee';
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors', []);
         require __DIR__ . '/../../../resources/views/plenary/referred-to-committee/index.php';
     }
 
@@ -616,9 +616,6 @@ class PlenaryReadingController
 
         $pageTitle = 'Second Reading';
         $currentFilter = $filter;
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors', []);
         require __DIR__ . '/../../../resources/views/plenary/second-reading/index.php';
     }
 
@@ -660,9 +657,6 @@ class PlenaryReadingController
         $isDeferred = (int) $document['current_status_id'] === $this->requireStatusId('Second Reading Deferred');
 
         $pageTitle = 'Second Reading — ' . htmlspecialchars($document['tracking_number']);
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors', []);
         $old     = old_get();
         require __DIR__ . '/../../../resources/views/plenary/second-reading/show.php';
     }
@@ -983,6 +977,7 @@ class PlenaryReadingController
                     pcfr.decision      AS fr_decision,
                     pcfr.reading_date  AS fr_reading_date,
                     pcfr.resolution_number AS fr_resolution_number,
+                    pcfr.final_output_type AS fr_final_output_type,
                     pcfr.approved_subject_matter AS fr_approved_subject_matter,
                     pcfr.proposed_number   AS fr_proposed_number,
                     pcfr.finalized_at  AS fr_finalized_at,
@@ -990,6 +985,7 @@ class PlenaryReadingController
                     -- Adoption (committee report path)
                     pca.id             AS adoption_id,
                     pca.resolution_number AS adoption_resolution_number,
+                    pca.final_output_type AS adoption_final_output_type,
                     pca.approved_subject_matter AS adoption_approved_subject_matter,
                     pca.proposed_number   AS adoption_proposed_number,
                     pca.adopted_at,
@@ -1074,6 +1070,7 @@ class PlenaryReadingController
                     -- Adoption (committee report path)
                     pca.id             AS adoption_id,
                     pca.resolution_number AS adoption_resolution_number,
+                    pca.final_output_type AS adoption_final_output_type,
                     pca.approved_subject_matter AS adoption_approved_subject_matter,
                     pca.proposed_number   AS adoption_proposed_number,
                     pca.adopted_at,
@@ -1189,8 +1186,6 @@ class PlenaryReadingController
         ];
 
         $pageTitle = 'Finalized Documents';
-        $success = flash_get('success');
-        $error   = flash_get('error');
         require __DIR__ . '/../../../resources/views/plenary/status-list/index.php';
     }
 
@@ -1273,8 +1268,6 @@ class PlenaryReadingController
                                         : [];
 
         $pageTitle = 'Finalized Document — ' . $document['tracking_number'];
-        $success = flash_get('success');
-        $error   = flash_get('error');
 
         // ── Motion for Reconsideration data ───────────────────────────────────
         // Finalized petitions (Complaint / Administrative Cases) may have MFRs
@@ -1645,67 +1638,204 @@ class PlenaryReadingController
     // =========================================================================
 
     /**
-     * After Committee returns a document (status = "Returned to Plenary"),
-     * and it previously had a First Reading with REFERRED_TO_COMMITTEE action,
-     * the document can enter the Second Reading queue.
-     *
-     * CommitteeReportsController::returnToPlenary() already sets the status to
-     * "Returned to Plenary". We need an additional step to advance it to
-     * "Awaiting Second Reading" so it appears in the queue.
-     *
-     * This is called via POST plenary/second-reading/advance-from-committee.
+     * Compatibility endpoint for older forms; a proceed action is an Approved
+     * Committee Report adoption and must pass the same validation and recording.
      */
     public function advanceFromCommittee(): void
     {
+        $_POST['decision'] = 'APPROVED';
+        $this->adoptCommitteeReportStore();
+    }
+
+    public function adoptCommitteeReportStore(): void
+    {
         $userId = auth_id();
-        if ($userId === null) { flash_set('error', 'You must be logged in.'); redirect('login'); }
+        if ($userId === null) {
+            flash_set('error', 'You must be logged in.');
+            redirect('login');
+        }
 
         $documentId = (int) ($_POST['document_id'] ?? 0);
-        if ($documentId <= 0) { flash_set('error', 'Invalid document ID.'); redirect('plenary/first-reading'); }
+        $decision = strtoupper(trim($_POST['decision'] ?? ''));
+        $remarks = trim($_POST['remarks'] ?? '');
+        if ($documentId <= 0 || !in_array($decision, ['APPROVED', 'DISAPPROVED'], true)) {
+            flash_set('error', 'Invalid Committee Report adoption request.');
+            redirect('plenary/referred-to-committee?tab=returned');
+        }
 
-        $this->runTransaction(function () use ($documentId, $userId) {
+        try {
+            $this->pdo->beginTransaction();
+
             $document = $this->requireDocument($documentId);
+            $this->requireOwnedByUser($documentId, $userId);
             $returnedStatusId = $this->requireStatusId('Returned to Plenary');
-
             if ((int) $document['current_status_id'] !== $returnedStatusId) {
                 throw new RuntimeException('This document has not been returned from Committee yet.');
             }
-
-            // Must have a First Reading referral
-            $frRow = $this->pdo->prepare("
-                SELECT id FROM plenary_readings
-                WHERE document_id = ? AND reading_number = 1
-                  AND action IN ('REFERRED_TO_COMMITTEE', 'REFERRED_TO_COMMITTEE_SECOND')
-                LIMIT 1
-            ");
-            $frRow->execute([$documentId]);
-            if (!$frRow->fetch()) {
-                throw new RuntimeException('No Committee referral found for this document.');
+            if ($this->isCommDocument($document) || $this->isCasesDocument($document)) {
+                throw new RuntimeException('Use the document-specific adoption form for Communications, MFRs, Complaints, and Administrative Cases.');
             }
 
-            $awaitingStatusId = $this->requireStatusId('Awaiting Second Reading');
+            $referralStmt = $this->pdo->prepare("
+                SELECT id
+                FROM plenary_readings
+                WHERE document_id = ? AND reading_number = 1
+                  AND action = 'REFERRED_TO_COMMITTEE'
+                LIMIT 1
+            ");
+            $referralStmt->execute([$documentId]);
+            if (!$referralStmt->fetch()) {
+                throw new RuntimeException('No First Reading Committee referral was found for this document.');
+            }
 
+            $secondReadingStmt = $this->pdo->prepare("
+                SELECT id FROM plenary_readings
+                WHERE document_id = ? AND reading_number = 2
+                LIMIT 1
+            ");
+            $secondReadingStmt->execute([$documentId]);
+            if ($secondReadingStmt->fetch()) {
+                throw new RuntimeException('This document has already entered Second Reading.');
+            }
+
+            $committeeReportId = $this->findReturnedCommitteeReportId($documentId);
+            $duplicateStmt = $this->pdo->prepare("
+                SELECT id FROM plenary_committee_report_adoptions
+                WHERE document_id = ?
+                LIMIT 1
+            ");
+            $duplicateStmt->execute([$documentId]);
+            if ($duplicateStmt->fetch()) {
+                throw new RuntimeException('A Committee Report has already been adopted for this document.');
+            }
+
+            $targetStatusId = $decision === 'APPROVED'
+                ? $this->requireStatusId('Awaiting Second Reading')
+                : $this->requireStatusId('Plenary: Committee Report Adopted');
+
+            $this->pdo->prepare("
+                INSERT INTO plenary_committee_report_adoptions
+                    (document_id, committee_report_id, decision, remarks, adopted_by)
+                VALUES (?, ?, ?, ?, ?)
+            ")->execute([
+                $documentId,
+                $committeeReportId,
+                $decision,
+                $remarks !== '' ? $remarks : null,
+                $userId,
+            ]);
+
+            $isDisapproved = $decision === 'DISAPPROVED';
             $this->pdo->prepare("
                 UPDATE documents
                 SET current_status_id = ?,
-                    current_phase     = 'PLENARY',
-                    updated_by        = ?
+                    current_phase = ?,
+                    finalized_at = " . ($isDisapproved ? 'NOW()' : 'NULL') . ",
+                    updated_by = ?
                 WHERE id = ?
-            ")->execute([$awaitingStatusId, $userId, $documentId]);
-
-            $this->insertEvent($documentId, 'PLENARY_SECOND_READING_APPROVED', $userId, $awaitingStatusId,
-                'Document advanced to Second Reading queue after Committee return.', [
-                'action' => 'ADVANCE_FROM_COMMITTEE',
+            ")->execute([
+                $targetStatusId,
+                $isDisapproved ? 'FINALIZED' : 'PLENARY',
+                $userId,
+                $documentId,
             ]);
-        });
+            $this->pdo->prepare("
+                UPDATE plenary_document_details
+                SET status_id = ?, updated_by = ?
+                WHERE document_id = ?
+            ")->execute([$targetStatusId, $userId, $documentId]);
 
-        flash_set('success', 'Document moved to Second Reading queue.');
-        redirect('plenary/second-reading');
+            $eventType = $isDisapproved
+                ? 'PLENARY_COMMITTEE_REPORT_DISAPPROVED'
+                : 'PLENARY_COMMITTEE_REPORT_APPROVED';
+            $this->insertEvent(
+                $documentId,
+                $eventType,
+                $userId,
+                $targetStatusId,
+                $remarks !== '' ? $remarks : null,
+                [
+                    'action' => $isDisapproved ? 'ADOPTED_WITHOUT_SECOND_READING' : 'ADOPTED_AND_PROCEED_TO_SECOND_READING',
+                    'decision' => $decision,
+                    'committee_report_id' => $committeeReportId,
+                ]
+            );
+            audit_log('UPDATE', 'Document', (string) $documentId, null, [
+                'action' => 'plenary_committee_report_adopted',
+                'decision' => $decision,
+                'committee_report_id' => $committeeReportId,
+            ], "Plenary adopted Committee Report #{$committeeReportId} for document ID {$documentId} with decision {$decision}.");
+
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            system_log('ERROR', 'Plenary Committee Report adoption failed', [
+                'document_id' => $documentId,
+                'decision' => $decision,
+                'error' => $e->getMessage(),
+            ]);
+            flash_set('error', $e instanceof RuntimeException
+                ? $e->getMessage()
+                : 'A database error occurred while adopting the Committee Report.');
+            redirect('plenary/referred-to-committee?tab=returned');
+        }
+
+        if ($decision === 'APPROVED') {
+            flash_set('success', 'Committee Report adopted. Document moved to Second Reading.');
+            redirect('plenary/second-reading');
+        }
+
+        flash_set('success', 'Committee Report adopted and saved to Plenary Reports. Document will not proceed to Second Reading.');
+        redirect('plenary/reports');
     }
 
     // =========================================================================
     // Private helpers
     // =========================================================================
+
+    private function findReturnedCommitteeReportId(int $documentId): int
+    {
+        $eventStmt = $this->pdo->prepare("
+            SELECT metadata
+            FROM document_events
+            WHERE document_id = ? AND event_type = 'RETURNED_TO_PLENARY'
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $eventStmt->execute([$documentId]);
+        $metadata = json_decode((string) $eventStmt->fetchColumn(), true);
+        $reportId = (int) ($metadata['report_id'] ?? 0);
+        if ($reportId <= 0) {
+            throw new RuntimeException('The Committee return record does not identify a Committee Report.');
+        }
+
+        $membershipStmt = $this->pdo->prepare("
+            SELECT 1
+            FROM committee_report_documents
+            WHERE committee_report_id = ? AND document_id = ?
+            LIMIT 1
+        ");
+        $membershipStmt->execute([$reportId, $documentId]);
+        if (!$membershipStmt->fetchColumn()) {
+            throw new RuntimeException('The returned Committee Report is not linked to this document.');
+        }
+
+        return $reportId;
+    }
+
+    private function recordAdoptedCommitteeReport(int $documentId, string $decision, int $userId, ?string $remarks): int
+    {
+        $reportId = $this->findReturnedCommitteeReportId($documentId);
+        $this->pdo->prepare("
+            INSERT INTO plenary_committee_report_adoptions
+                (document_id, committee_report_id, decision, remarks, adopted_by)
+            VALUES (?, ?, ?, ?, ?)
+        ")->execute([$documentId, $reportId, $decision, $remarks, $userId]);
+
+        return $reportId;
+    }
 
     private function requireDocument(int $documentId): array
     {
@@ -1878,13 +2008,31 @@ class PlenaryReadingController
     private function fetchAttachments(int $documentId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT da.*, ua.username AS uploaded_by_username
-            FROM document_attachments da
-            LEFT JOIN user_accounts ua ON ua.id = da.uploaded_by
-            WHERE da.document_id = ?
-            ORDER BY da.created_at ASC
+            SELECT *
+            FROM (
+                SELECT da.id, da.file_name, da.stored_path, da.mime_type, da.file_size,
+                       da.phase, da.attachment_type, da.created_at,
+                       ua.username AS uploaded_by_username,
+                       NULL AS report_number
+                FROM document_attachments da
+                LEFT JOIN user_accounts ua ON ua.id = da.uploaded_by
+                WHERE da.document_id = ?
+
+                UNION ALL
+
+                SELECT cra.id, cra.file_name, cra.stored_path, cra.mime_type, cra.file_size,
+                       'COMMITTEE' AS phase, 'COMMITTEE_REPORT' AS attachment_type, cra.created_at,
+                       ua.username AS uploaded_by_username,
+                       cr.report_number
+                FROM committee_report_attachments cra
+                INNER JOIN committee_reports cr ON cr.id = cra.committee_report_id
+                INNER JOIN committee_report_documents crd
+                    ON crd.committee_report_id = cr.id AND crd.document_id = ?
+                LEFT JOIN user_accounts ua ON ua.id = cra.uploaded_by
+            ) attachment_rows
+            ORDER BY created_at ASC, id ASC
         ");
-        $stmt->execute([$documentId]);
+        $stmt->execute([$documentId, $documentId]);
         return $stmt->fetchAll();
     }
 
@@ -2330,9 +2478,6 @@ class PlenaryReadingController
         $referredPetitionsCount = $this->fetchReferredPetitionsCount();
 
         $pageTitle = 'First Reading';
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors', []);
         require __DIR__ . '/../../../resources/views/plenary/first-reading/index.php';
     }
 
@@ -2384,9 +2529,6 @@ class PlenaryReadingController
         }
 
         $pageTitle = 'Communication First Reading — ' . htmlspecialchars($document['tracking_number']);
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors', []);
         $old     = old_get();
         require __DIR__ . '/../../../resources/views/plenary/comm-first-reading/show.php';
     }
@@ -2438,6 +2580,10 @@ class PlenaryReadingController
                 if ($resolutionNumber === '') {
                     $errors[] = 'Resolution/Ordinance No. is required for Approved for Resolution decision.';
                 }
+                $finalOutputType = strtoupper(trim($_POST['final_output_type'] ?? ''));
+                if (!in_array($finalOutputType, ['RESOLUTION', 'ORDINANCE'], true)) {
+                    $errors[] = 'Select whether the finalized output is a Resolution or Ordinance.';
+                }
                 // Validate resolution files are present
                 $resFiles = $_FILES['resolution_files'] ?? ['name' => ['']];
                 $hasFiles = false;
@@ -2447,7 +2593,7 @@ class PlenaryReadingController
                     }
                 }
                 if (!$hasFiles) {
-                    $errors[] = 'At least one Resolution file is required for an Approved decision.';
+                    $errors[] = 'At least one finalized output file is required for an Approved decision.';
                 }
                 if ($hasFiles) {
                     $fileErrors = $this->validateMultipleFiles($resFiles);
@@ -2535,9 +2681,11 @@ class PlenaryReadingController
                     $approvedSubjectMatter = trim($_POST['approved_subject_matter'] ?? '');
                     $resolutionNumber = trim($_POST['resolution_number'] ?? '');
                     $proposedNumber   = trim($_POST['proposed_number']   ?? '');
+                    $finalOutputType  = strtoupper(trim($_POST['final_output_type'] ?? ''));
                     $this->doCommFrApproved(
                         $documentId, $userId, $readingDate, $remarks,
-                        $resolutionNumber, $proposedNumber, $approvedSubjectMatter, $stagedResFiles
+                        $resolutionNumber, $proposedNumber, $approvedSubjectMatter,
+                        $finalOutputType, $stagedResFiles
                     );
                     break;
 
@@ -2612,24 +2760,25 @@ class PlenaryReadingController
     /**
      * APPROVED decision: finalize the communication directly.
      * Requires resolution_number; proposed_number is optional.
-     * Multiple resolution files are required.
+     * Multiple finalized-output files are required.
      */
     private function doCommFrApproved(
         int $documentId, int $userId, string $readingDate, string $remarks,
-        string $resolutionNumber, string $proposedNumber, string $approvedSubjectMatter, array $stagedFiles
+        string $resolutionNumber, string $proposedNumber, string $approvedSubjectMatter,
+        string $finalOutputType, array $stagedFiles
     ): void {
         $finalizedStatusId = $this->requireStatusId('Plenary Comm: Finalized');
 
         // Insert first reading record
         $this->pdo->prepare("
             INSERT INTO plenary_comm_first_reading
-                (document_id, decision, reading_date, remarks, proposed_number, resolution_number,
+                (document_id, decision, reading_date, remarks, proposed_number, resolution_number, final_output_type,
                  approved_subject_matter,
                  performed_by, finalized_at, finalized_by)
-            VALUES (?, 'APPROVED', ?, ?, ?, ?, ?, ?, NOW(), ?)
+            VALUES (?, 'APPROVED', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
         ")->execute([
             $documentId, $readingDate, $remarks ?: null,
-            $proposedNumber ?: null, $resolutionNumber, $approvedSubjectMatter,
+            $proposedNumber ?: null, $resolutionNumber, $finalOutputType, $approvedSubjectMatter,
             $userId, $userId,
         ]);
         $firstReadingId = (int) $this->pdo->lastInsertId();
@@ -2658,6 +2807,7 @@ class PlenaryReadingController
             $userId, $finalizedStatusId, $remarks, [
             'decision'          => 'APPROVED',
             'resolution_number' => $resolutionNumber,
+            'final_output_type' => $finalOutputType,
             'proposed_number'   => $proposedNumber,
             'approved_subject_matter' => $approvedSubjectMatter,
             'reading_date'      => $readingDate,
@@ -2674,6 +2824,7 @@ class PlenaryReadingController
             'action'            => 'plenary_comm_fr_approved',
             'decision'          => 'APPROVED',
             'resolution_number' => $resolutionNumber,
+            'final_output_type' => $finalOutputType,
             'approved_subject_matter' => $approvedSubjectMatter,
             'reading_date'      => $readingDate,
         ], "Plenary Comm First Reading (APPROVED) recorded for document ID {$documentId}");
@@ -2804,6 +2955,7 @@ class PlenaryReadingController
 
         $documentId      = (int) ($_POST['document_id'] ?? 0);
         $resolutionNumber = trim($_POST['resolution_number'] ?? '');
+        $finalOutputType = strtoupper(trim($_POST['final_output_type'] ?? ''));
         $approvedSubjectMatter = trim($_POST['approved_subject_matter'] ?? '');
         $proposedNumber  = trim($_POST['proposed_number']   ?? '');
         $remarks         = trim($_POST['remarks']           ?? '');
@@ -2814,6 +2966,9 @@ class PlenaryReadingController
         $errors = [];
         if ($resolutionNumber === '') {
             $errors[] = 'Resolution/Ordinance No. is required.';
+        }
+        if (!in_array($finalOutputType, ['RESOLUTION', 'ORDINANCE'], true)) {
+            $errors[] = 'Select whether the finalized output is a Resolution or Ordinance.';
         }
         if ($approvedSubjectMatter === '') {
             $errors[] = 'Subject Matter is required for committee report approval.';
@@ -2829,7 +2984,7 @@ class PlenaryReadingController
             }
         }
         if (!$hasFiles) {
-            $errors[] = 'At least one resolution attachment is required.';
+            $errors[] = 'At least one finalized output attachment is required.';
         } else {
             $fileErrors = $this->validateMultipleFiles($resFiles);
             $errors = array_merge($errors, $fileErrors);
@@ -2855,7 +3010,7 @@ class PlenaryReadingController
         }
 
         $this->runCommTransaction(function () use (
-            $documentId, $userId, $resolutionNumber, $approvedSubjectMatter,
+            $documentId, $userId, $resolutionNumber, $finalOutputType, $approvedSubjectMatter,
             $proposedNumber, $remarks, $stagedResFiles
         ) {
             $this->requireOwnedByUser($documentId, $userId);
@@ -2900,17 +3055,23 @@ class PlenaryReadingController
                 );
             }
 
+            $committeeReportId = $this->recordAdoptedCommitteeReport(
+                $documentId,
+                'ADOPTED',
+                $userId,
+                $remarks !== '' ? $remarks : null
+            );
             $finalizedStatusId = $this->requireStatusId('Plenary Comm: Finalized');
 
             // Insert adoption record
             $this->pdo->prepare("
                 INSERT INTO plenary_comm_adoptions
-                    (document_id, first_reading_id, resolution_number, approved_subject_matter,
+                    (document_id, first_reading_id, resolution_number, final_output_type, approved_subject_matter,
                      proposed_number, adopted_by, remarks)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ")->execute([
                 $documentId, $firstReadingId,
-                $resolutionNumber, $approvedSubjectMatter, $proposedNumber ?: null,
+                $resolutionNumber, $finalOutputType, $approvedSubjectMatter, $proposedNumber ?: null,
                 $userId, $remarks ?: null,
             ]);
             $adoptionId = (int) $this->pdo->lastInsertId();
@@ -2947,9 +3108,11 @@ class PlenaryReadingController
                 $documentId, 'PLENARY_COMM_ADOPTED',
                 $userId, $finalizedStatusId, $remarks, [
                 'resolution_number' => $resolutionNumber,
+                'final_output_type' => $finalOutputType,
                 'approved_subject_matter' => $approvedSubjectMatter,
                 'proposed_number'   => $proposedNumber,
                 'adoption_id'       => $adoptionId,
+                'committee_report_id' => $committeeReportId,
                 'file_count'        => count($stagedResFiles),
             ]);
 
@@ -2962,13 +3125,14 @@ class PlenaryReadingController
             audit_log('UPDATE', 'Document', (string) $documentId, null, [
                 'action'            => 'plenary_comm_adopted',
                 'resolution_number' => $resolutionNumber,
+                'final_output_type' => $finalOutputType,
                 'approved_subject_matter' => $approvedSubjectMatter,
                 'adoption_id'       => $adoptionId,
             ], "Plenary Communication adopted (committee report) for document ID {$documentId}");
         }, $documentId, 'plenary/referred-to-committee');
 
-        flash_set('success', 'Communication adopted successfully. It has been finalized.');
-        redirect('plenary/referred-to-committee');
+        flash_set('success', 'Communication adopted and finalized. The Committee Report copy is available in Plenary Reports.');
+        redirect('plenary/reports');
     }
 
     // =========================================================================
@@ -3709,9 +3873,6 @@ class PlenaryReadingController
         }
 
         $pageTitle = 'Petitions First Reading — ' . htmlspecialchars($document['tracking_number']);
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors', []);
         $old     = old_get();
         require __DIR__ . '/../../../resources/views/plenary/cases-first-reading/show.php';
     }
@@ -3832,6 +3993,7 @@ class PlenaryReadingController
 
         $documentId       = (int) ($_POST['document_id']    ?? 0);
         $resolutionNumber = trim($_POST['resolution_number'] ?? '');
+        $finalOutputType  = strtoupper(trim($_POST['final_output_type'] ?? ''));
         $approvedSubjectMatter = trim($_POST['approved_subject_matter'] ?? '');
         $proposedNumber   = trim($_POST['proposed_number']   ?? '');
         $remarks          = trim($_POST['remarks']           ?? '');
@@ -3846,6 +4008,9 @@ class PlenaryReadingController
 
         if ($resolutionNumber === '') {
             $errors[] = 'Resolution/Ordinance No. is required.';
+        }
+        if (!in_array($finalOutputType, ['RESOLUTION', 'ORDINANCE'], true)) {
+            $errors[] = 'Select whether the finalized output is a Resolution or Ordinance.';
         }
         if ($approvedSubjectMatter === '') {
             $errors[] = 'Subject Matter is required for committee report approval.';
@@ -3886,7 +4051,7 @@ class PlenaryReadingController
         }
 
         $this->runCommTransaction(function () use (
-            $documentId, $userId, $resolutionNumber, $approvedSubjectMatter,
+            $documentId, $userId, $resolutionNumber, $finalOutputType, $approvedSubjectMatter,
             $proposedNumber, $remarks, $stagedFiles
         ) {
             $this->requireOwnedByUser($documentId, $userId);
@@ -3929,18 +4094,25 @@ class PlenaryReadingController
                 throw new RuntimeException('This document has already been adopted.');
             }
 
+            $committeeReportId = $this->recordAdoptedCommitteeReport(
+                $documentId,
+                'ADOPTED',
+                $userId,
+                $remarks !== '' ? $remarks : null
+            );
             $finalizedStatusId = $this->requireStatusId('Plenary Cases: Finalized');
 
             // Insert adoption record
             $this->pdo->prepare("
                 INSERT INTO plenary_cases_adoptions
-                    (document_id, first_reading_id, resolution_number, approved_subject_matter,
+                    (document_id, first_reading_id, resolution_number, final_output_type, approved_subject_matter,
                      proposed_number, adopted_by, remarks)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ")->execute([
                 $documentId,
                 $firstReadingId,
                 $resolutionNumber,
+                $finalOutputType,
                 $approvedSubjectMatter,
                 $proposedNumber ?: null,
                 $userId,
@@ -3973,9 +4145,11 @@ class PlenaryReadingController
                 $documentId, 'PLENARY_CASES_ADOPTED',
                 $userId, $finalizedStatusId, $remarks, [
                 'resolution_number' => $resolutionNumber,
+                'final_output_type' => $finalOutputType,
                 'approved_subject_matter' => $approvedSubjectMatter,
                 'proposed_number'   => $proposedNumber,
                 'adoption_id'       => $adoptionId,
+                'committee_report_id' => $committeeReportId,
                 'file_count'        => count($stagedFiles),
             ]);
 
@@ -3988,14 +4162,15 @@ class PlenaryReadingController
             audit_log('UPDATE', 'Document', (string) $documentId, null, [
                 'action'            => 'plenary_cases_adopted',
                 'resolution_number' => $resolutionNumber,
+                'final_output_type' => $finalOutputType,
                 'approved_subject_matter' => $approvedSubjectMatter,
                 'adoption_id'       => $adoptionId,
                 'file_count'        => count($stagedFiles),
             ], "Plenary Cases document adopted (committee report) for document ID {$documentId}");
         }, $documentId, 'plenary/referred-to-committee');
 
-        flash_set('success', 'Committee report adopted. Document moved to Finalized Documents → Petitions.');
-        redirect('plenary/referred-to-committee');
+        flash_set('success', 'Committee report adopted and finalized. The report copy is available in Plenary Reports.');
+        redirect('plenary/reports');
     }
 
     // =========================================================================

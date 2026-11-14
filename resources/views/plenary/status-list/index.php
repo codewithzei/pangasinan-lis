@@ -195,6 +195,9 @@ function slDecisionLabel(string $decision): string {
                             $frDecision    = $row['fr_decision'] ?? '';
                             $isAdopted     = !empty($row['adoption_id']);
                             $resNum        = $isAdopted ? ($row['adoption_resolution_number'] ?? '') : ($row['fr_resolution_number'] ?? '');
+                            $finalOutputType = $isAdopted
+                                ? ($row['adoption_final_output_type'] ?? '')
+                                : ($row['fr_final_output_type'] ?? '');
                             $propNum       = $isAdopted ? ($row['adoption_proposed_number']  ?? '') : ($row['fr_proposed_number']  ?? '');
                             $finalizedDate = $row['finalized_at'] ?? null;
                             $committeeNames = $row['committee_names'] ?? '';
@@ -242,6 +245,11 @@ function slDecisionLabel(string $decision): string {
                                         : '<span class="text-xs italic text-gray-400">—</span>' ?>
                                 </td>
                                 <td class="px-6 py-4">
+                                    <?php if ($finalOutputType !== ''): ?>
+                                        <span class="mb-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                            <?= htmlspecialchars(ucfirst(strtolower($finalOutputType))) ?>
+                                        </span>
+                                    <?php endif; ?>
                                     <?= !empty($resNum)
                                         ? '<span class="font-semibold text-primary">' . htmlspecialchars($resNum) . '</span>'
                                         : '<span class="text-xs italic text-gray-400">—</span>' ?>
@@ -324,6 +332,7 @@ function slDecisionLabel(string $decision): string {
                             $frDecision  = $row['fr_decision'] ?? '';
                             $resolutionNo = !empty($row['adoption_resolution_number'])
                                 ? $row['adoption_resolution_number'] : '';
+                            $finalOutputType = $row['adoption_final_output_type'] ?? '';
                         ?>
                         <tr class="hover:bg-gray-50/50 transition">
                             <td class="px-6 py-4">
@@ -368,6 +377,11 @@ function slDecisionLabel(string $decision): string {
                                     : '<span class="text-xs italic text-gray-400">—</span>' ?>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-700">
+                                <?php if ($finalOutputType !== ''): ?>
+                                    <span class="mb-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                        <?= htmlspecialchars(ucfirst(strtolower($finalOutputType))) ?>
+                                    </span>
+                                <?php endif; ?>
                                 <?= $resolutionNo !== ''
                                     ? '<span class="font-medium">' . htmlspecialchars($resolutionNo) . '</span>'
                                     : '<span class="text-xs italic text-gray-400">—</span>' ?>

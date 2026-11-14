@@ -644,6 +644,9 @@ ob_start();
                             <?php if (!empty($commFirstReading['resolution_number'])): ?>
                                 <div><span class="text-gray-400">Resolution No:</span> <span class="font-semibold text-primary"><?= htmlspecialchars($commFirstReading['resolution_number']) ?></span></div>
                             <?php endif; ?>
+                            <?php if (!empty($commFirstReading['final_output_type'])): ?>
+                                <div><span class="text-gray-400">Final Output Type:</span> <?= htmlspecialchars(ucfirst(strtolower($commFirstReading['final_output_type']))) ?></div>
+                            <?php endif; ?>
                             <?php if (!empty($commFirstReading['proposed_number'])): ?>
                                 <div><span class="text-gray-400">Proposed No:</span> <?= htmlspecialchars($commFirstReading['proposed_number']) ?></div>
                             <?php endif; ?>
@@ -661,6 +664,9 @@ ob_start();
                         <p class="mt-0.5 text-xs text-gray-500"><?= slShowDateTime($commAdoption['adopted_at'] ?? null) ?></p>
                         <dl class="mt-2 space-y-1 text-xs text-gray-600">
                             <div><span class="text-gray-400">Resolution No:</span> <span class="font-semibold text-primary"><?= htmlspecialchars($commAdoption['resolution_number'] ?? '—') ?></span></div>
+                            <?php if (!empty($commAdoption['final_output_type'])): ?>
+                                <div><span class="text-gray-400">Final Output Type:</span> <?= htmlspecialchars(ucfirst(strtolower($commAdoption['final_output_type']))) ?></div>
+                            <?php endif; ?>
                             <?php if (!empty($commAdoption['proposed_number'])): ?>
                                 <div><span class="text-gray-400">Proposed No:</span> <?= htmlspecialchars($commAdoption['proposed_number']) ?></div>
                             <?php endif; ?>
@@ -747,6 +753,12 @@ ob_start();
                                 <span class="text-gray-400">Resolution No:</span>
                                 <span class="font-semibold text-primary"><?= htmlspecialchars($casesAdoption['resolution_number'] ?? '—') ?></span>
                             </div>
+                            <?php if (!empty($casesAdoption['final_output_type'])): ?>
+                                <div>
+                                    <span class="text-gray-400">Final Output Type:</span>
+                                    <?= htmlspecialchars(ucfirst(strtolower($casesAdoption['final_output_type']))) ?>
+                                </div>
+                            <?php endif; ?>
                             <?php if (!empty($casesAdoption['proposed_number'])): ?>
                                 <div>
                                     <span class="text-gray-400">Proposed No:</span>
@@ -1020,6 +1032,9 @@ ob_start();
                                 — <?= slShowDateTime($att['created_at'] ?? null) ?>
                                 <?php if (!empty($att['attachment_type'])): ?>
                                     — <span class="font-medium"><?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $att['attachment_type'])))) ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($att['report_number'])): ?>
+                                    — Committee Report #<?= htmlspecialchars($att['report_number']) ?>
                                 <?php endif; ?>
                             </div>
                         </div>

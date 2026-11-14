@@ -3,7 +3,7 @@
  * Committee — Share to Committee Report (dedicated page)
  *
  * Variables supplied by CommitteeHearingController::shareToReportShow():
- *   $selectedDocuments    array    Approved-hearing document rows
+ *   $selectedDocuments    array    Hearing document rows with mixed statuses
  *                                  [{document_id, tracking_number, subject_matter,
  *                                    document_type_name, document_type_badge_color,
  *                                    status, status_badge_color,
@@ -67,8 +67,8 @@ ob_start();
                 </h1>
                 <p class="mt-1 text-sm text-blue-100">
                     <?= $docCount === 1
-                        ? '1 approved document selected'
-                        : htmlspecialchars($docCount) . ' approved documents selected' ?>
+                        ? '1 hearing document selected'
+                        : htmlspecialchars($docCount) . ' hearing documents selected' ?>
                 </p>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full bg-white/10"></div>
@@ -82,8 +82,8 @@ ob_start();
         <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
         </svg>
-        <a href="<?= BASE_URL ?>/committee/hearing?tab=approved"
-           class="hover:text-emerald-700 transition">Approved</a>
+          <a href="<?= BASE_URL ?>/committee/hearing?tab=all"
+              class="hover:text-emerald-700 transition">All Hearings</a>
         <svg class="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
         </svg>
@@ -142,12 +142,10 @@ ob_start();
                                         <?= htmlspecialchars($doc['document_type_name']) ?>
                                     </span>
                                 <?php endif; ?>
-                                <!-- Hearing status -->
-                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                                    <svg class="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 8 8" aria-hidden="true">
-                                        <circle cx="4" cy="4" r="3"/>
-                                    </svg>
-                                    Approved
+                                <!-- Current document status -->
+                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-white"
+                                      style="background-color:<?= htmlspecialchars($doc['status_badge_color'] ?? '#6B7280') ?>">
+                                    <?= htmlspecialchars($doc['status'] ?? 'Status unavailable') ?>
                                 </span>
                             </div>
 
@@ -158,7 +156,10 @@ ob_start();
 
                             <!-- Outcome date -->
                             <?php if ($outcomeDate): ?>
-                                <p class="text-xs text-gray-400">Approved <?= htmlspecialchars($outcomeDate) ?></p>
+                                <p class="text-xs text-gray-400">
+                                    <?= !empty($doc['hearing_outcome']) ? htmlspecialchars(ucfirst(strtolower($doc['hearing_outcome']))) : 'Hearing pending' ?>
+                                    · <?= htmlspecialchars($outcomeDate) ?>
+                                </p>
                             <?php endif; ?>
                         </li>
                     <?php endforeach; ?>
@@ -173,9 +174,8 @@ ob_start();
                               d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     <p class="text-xs text-amber-800 leading-relaxed">
-                        Each document's status will change to
-                        <strong>Committee Report Created</strong> after sharing.
-                        This action cannot be undone.
+                        Each document keeps its current status. You can group documents with different statuses
+                        in one shared Committee Report and return them to Plenary individually.
                     </p>
                 </div>
             </div>
@@ -188,6 +188,7 @@ ob_start();
             <form method="POST"
                   action="<?= BASE_URL ?>/committee/hearing/share-to-report"
                   id="shareToReportForm"
+                enctype="multipart/form-data"
                   novalidate>
 
                 <!-- Pass all document IDs as hidden fields -->
@@ -260,7 +261,7 @@ ob_start();
 
                         <?php if (empty($existingReports)): ?>
                             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-                                No existing Committee Reports are available (none have been created yet, or all have been returned to Plenary).
+                                No existing Committee Reports are available yet.
                                 Use the <strong>New Report</strong> option instead.
                             </div>
                         <?php else: ?>
@@ -393,17 +394,51 @@ ob_start();
 
                     </div><!-- /newReportPanel -->
 
+                    <!-- ── Shared report attachments ───────────────────────── -->
+                    <div class="space-y-2">
+                        <label class="block text-sm font-semibold text-gray-700">
+                            Committee Report Attachments
+                            <span class="font-normal text-gray-400">(optional)</span>
+                        </label>
+                        <div id="sharedReportDropZone"
+                             class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2
+                                    border-dashed border-gray-300 bg-gray-50 px-5 py-7 text-center transition
+                                    hover:border-emerald-400 hover:bg-emerald-50/50"
+                             role="button" tabindex="0" aria-label="Choose or drop report attachments">
+                            <svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                            <p class="mt-2 text-sm font-medium text-gray-700">
+                                Drop files here or
+                                <button type="button" id="sharedReportBrowseBtn" class="text-emerald-700 underline hover:text-emerald-900">
+                                    browse
+                                </button>
+                            </p>
+                            <p class="mt-1 text-xs text-gray-400">
+                                PDF, Word, Excel, or images · Up to 10 files · 25 MB each
+                            </p>
+                            <input type="file" name="attachments[]" id="sharedReportFileInput" multiple
+                                   accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" class="sr-only">
+                        </div>
+                        <div id="sharedReportFileErrors" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert"></div>
+                        <ul id="sharedReportFileList" class="space-y-2" aria-live="polite"></ul>
+                        <p class="text-xs text-gray-400">
+                            Uploaded files are stored as Committee Report attachments, separately from the selected documents.
+                        </p>
+                    </div>
+
                     <!-- ── Form actions ─────────────────────────────────────── -->
                     <div class="flex items-center justify-between gap-3 border-t border-gray-100 pt-5">
 
-                        <a href="<?= BASE_URL ?>/committee/hearing?tab=approved"
+                        <a href="<?= BASE_URL ?>/committee/hearing?tab=all"
                            class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white
                                   px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition
                                   focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                             </svg>
-                            Back to Approved Hearings
+                            Back to All Hearings
                         </a>
 
                         <button type="submit"
@@ -442,6 +477,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const typeIndicator     = document.getElementById('reportTypeIndicator');
     const summaryTextarea   = document.getElementById('summary_of_findings');
     const summaryCounter    = document.getElementById('summaryCharCount');
+    const dropZone          = document.getElementById('sharedReportDropZone');
+    const fileInput         = document.getElementById('sharedReportFileInput');
+    const browseButton      = document.getElementById('sharedReportBrowseBtn');
+    const fileList          = document.getElementById('sharedReportFileList');
+    const fileErrors        = document.getElementById('sharedReportFileErrors');
     const submitBtn         = document.getElementById('submitShareBtn');
     const form              = document.getElementById('shareToReportForm');
 
@@ -500,6 +540,113 @@ document.addEventListener('DOMContentLoaded', function () {
     if (summaryTextarea && summaryCounter) {
         summaryTextarea.addEventListener('input', function () {
             summaryCounter.textContent = this.value.length;
+        });
+    }
+
+    /* ── Drag-and-drop multi-file upload ────────────────────────────────── */
+    const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const maxFileSize = 25 * 1024 * 1024;
+    const maxFiles = 10;
+    const selectedFiles = [];
+
+    function syncFileInput() {
+        const transfer = new DataTransfer();
+        selectedFiles.forEach(function (file) { transfer.items.add(file); });
+        fileInput.files = transfer.files;
+    }
+
+    function renderFiles() {
+        fileList.replaceChildren();
+        selectedFiles.forEach(function (file, index) {
+            const item = document.createElement('li');
+            item.className = 'flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2';
+
+            const filename = document.createElement('span');
+            filename.className = 'min-w-0 truncate text-sm text-gray-700';
+            filename.textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'shrink-0 rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50';
+            removeButton.textContent = 'Remove';
+            removeButton.setAttribute('aria-label', 'Remove ' + file.name);
+            removeButton.addEventListener('click', function () {
+                selectedFiles.splice(index, 1);
+                syncFileInput();
+                renderFiles();
+            });
+
+            item.append(filename, removeButton);
+            fileList.appendChild(item);
+        });
+    }
+
+    function addFiles(files) {
+        const errors = [];
+        Array.from(files).forEach(function (file) {
+            const extension = file.name.split('.').pop().toLowerCase();
+            if (!allowedExtensions.includes(extension)) {
+                errors.push(file.name + ': unsupported file type.');
+                return;
+            }
+            if (file.size > maxFileSize) {
+                errors.push(file.name + ': exceeds the 25 MB file limit.');
+                return;
+            }
+            const duplicate = selectedFiles.some(function (selected) {
+                return selected.name === file.name && selected.size === file.size;
+            });
+            if (duplicate) return;
+            if (selectedFiles.length >= maxFiles) {
+                errors.push('Maximum ' + maxFiles + ' files allowed.');
+                return;
+            }
+            selectedFiles.push(file);
+        });
+
+        fileErrors.replaceChildren();
+        if (errors.length) {
+            fileErrors.textContent = errors.join(' ');
+            fileErrors.classList.remove('hidden');
+        } else {
+            fileErrors.classList.add('hidden');
+        }
+        syncFileInput();
+        renderFiles();
+    }
+
+    if (dropZone && fileInput && fileList && fileErrors) {
+        dropZone.addEventListener('click', function (event) {
+            if (event.target.closest('button')) return;
+            fileInput.click();
+        });
+        dropZone.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                fileInput.click();
+            }
+        });
+        browseButton.addEventListener('click', function (event) {
+            event.stopPropagation();
+            fileInput.click();
+        });
+        fileInput.addEventListener('change', function () {
+            addFiles(this.files);
+        });
+        ['dragover', 'dragenter'].forEach(function (eventName) {
+            dropZone.addEventListener(eventName, function (event) {
+                event.preventDefault();
+                dropZone.classList.add('border-emerald-500', 'bg-emerald-50');
+            });
+        });
+        ['dragleave', 'drop'].forEach(function (eventName) {
+            dropZone.addEventListener(eventName, function () {
+                dropZone.classList.remove('border-emerald-500', 'bg-emerald-50');
+            });
+        });
+        dropZone.addEventListener('drop', function (event) {
+            event.preventDefault();
+            if (event.dataTransfer) addFiles(event.dataTransfer.files);
         });
     }
 

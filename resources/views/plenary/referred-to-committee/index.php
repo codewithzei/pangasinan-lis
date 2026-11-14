@@ -3,9 +3,8 @@
  * Plenary Referred to Committee — tracking list
  *
  * Tracks documents that were referred to a Committee during First Reading.
- * The page is read-only except for the "Proceed to 2nd Reading" action, which
- * reuses the existing POST plenary/second-reading/advance-from-committee
- * endpoint (gated server-side on the shared "Returned to Plenary" status).
+ * Returned legislative documents can adopt the Committee Report as Approved
+ * (proceeding to Second Reading) or Disapproved (archive the report only).
  *
  * The status column reflects documents.current_status_id — the SAME shared
  * status used by every other division. No Plenary-only status is introduced.
@@ -66,10 +65,10 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
 <div class="space-y-6">
 
     <?php if (!empty($success ?? null)): ?>
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars($success) ?></div>
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status" aria-live="polite"><?= htmlspecialchars($success) ?></div>
     <?php endif; ?>
     <?php if (!empty($error ?? null)): ?>
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><?= htmlspecialchars($error) ?></div>
+        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
     <?php if (!empty($errors)): ?>
         <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -83,7 +82,7 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
             <div class="relative z-10 max-w-3xl">
                 <p class="text-sm font-medium text-blue-100">PLENARY / LEGISLATIVE READINGS</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">Referred to Committee</h1>
-                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">Documents referred to a Committee during First Reading. Track committee progress and advance returned documents to Second Reading.</p>
+                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">Track documents referred to a Committee. Adopt returned Committee Reports as approved to proceed to Second Reading, or disapproved to save the report copy only.</p>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
         </div>
@@ -192,7 +191,7 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                         No documents currently referred to Committee.
                                     <?php endif; ?>
                                 </p>
-                                <p class="mt-1 text-xs text-gray-500">Documents referred during First Reading will appear here and remain tracked until advanced to Second Reading.</p>
+                                <p class="mt-1 text-xs text-gray-500">Documents referred during First Reading remain here until the returned Committee Report is adopted.</p>
                             </td>
                         </tr>
                     <?php else: ?>
@@ -258,7 +257,7 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                         <?php if (!empty($row['is_plenary_cases_referred'])): ?>
                                             <!-- Cases/Petitions returned from Committee: Adopt Committee Report -->
                                             <button type="button"
-                                                    onclick="openAdoptCasesModal(<?= (int) $row['document_id'] ?>, '<?= htmlspecialchars(addslashes($row['tracking_number'])) ?>', <?= json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)"
+                                                    onclick="openAdoptCasesModal(<?= (int) $row['document_id'] ?>, <?= htmlspecialchars(json_encode((string) $row['tracking_number'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"
                                                     class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
                                                     aria-label="Adopt Committee Report for <?= htmlspecialchars($row['tracking_number']) ?>">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -269,7 +268,7 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                         <?php elseif (!empty($row['is_plenary_comm_referred'])): ?>
                                             <!-- Communication returned from Committee: Adopt Committee Report -->
                                             <button type="button"
-                                                    onclick="openAdoptModal(<?= (int) $row['document_id'] ?>, '<?= htmlspecialchars(addslashes($row['tracking_number'])) ?>', <?= json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)"
+                                                    onclick="openAdoptModal(<?= (int) $row['document_id'] ?>, <?= htmlspecialchars(json_encode((string) $row['tracking_number'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"
                                                     class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -277,17 +276,22 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                                 Adopted Committee Report
                                             </button>
                                         <?php else: ?>
-                                            <!-- Legislative document: Proceed to 2nd Reading -->
-                                            <form method="POST" action="<?= BASE_URL ?>/plenary/second-reading/advance-from-committee" class="inline-block">
-                                                <input type="hidden" name="document_id" value="<?= (int) $row['document_id'] ?>">
-                                                <button type="submit"
-                                                        class="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 transition">
-                                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                                                    </svg>
-                                                    Adopted and Approved for 2nd Reading
-                                                </button>
-                                            </form>
+                                            <?php $hearingApproved = ($row['committee_hearing_outcome'] ?? '') === 'APPROVED'; ?>
+                                            <!-- Adoption follows the latest Committee hearing outcome. -->
+                                            <button type="button"
+                                                    class="open-report-adoption-confirmation inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition <?= $hearingApproved ? 'bg-violet-600 text-white hover:bg-violet-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50' ?>"
+                                                    data-document-id="<?= (int) $row['document_id'] ?>"
+                                                    data-decision="<?= $hearingApproved ? 'APPROVED' : 'DISAPPROVED' ?>"
+                                                    data-tracking-number="<?= htmlspecialchars($row['tracking_number'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                                                <?php if ($hearingApproved): ?>
+                                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                                                        </svg>
+                                                        Approve &amp; Proceed to 2nd Reading
+                                                <?php else: ?>
+                                                    Adopt Report Only (Disapproved)
+                                                <?php endif; ?>
+                                            </button>
                                         <?php endif; ?>
                                     <?php else: ?>
                                         <span class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-400">
@@ -342,6 +346,50 @@ $content = ob_get_clean();
 // ---------------------------------------------------------------------------
 ob_start();
 ?>
+<div id="reportAdoptionConfirmationModal"
+     class="fixed inset-0 z-[100] hidden items-center justify-center"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="reportAdoptionConfirmationTitle"
+     aria-describedby="reportAdoptionConfirmationMessage">
+    <div id="reportAdoptionConfirmationBackdrop"
+         class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm"></div>
+    <div class="relative z-10 mx-4 w-full max-w-md rounded-2xl border border-gray-100 bg-white shadow-2xl">
+        <div class="p-6">
+            <div class="flex items-start gap-4">
+                <div id="reportAdoptionConfirmationIcon"
+                     class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h2 id="reportAdoptionConfirmationTitle" class="text-lg font-semibold text-gray-900">
+                        Confirm Committee Report Adoption
+                    </h2>
+                    <p id="reportAdoptionConfirmationMessage" class="mt-1 text-sm text-gray-600"></p>
+                    <p id="reportAdoptionConfirmationTracking" class="mt-2 font-mono text-sm font-bold text-gray-800"></p>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-4">
+            <button type="button" id="cancelReportAdoptionConfirmation"
+                    class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+            </button>
+            <form id="reportAdoptionConfirmationForm" method="POST" action="<?= BASE_URL ?>/plenary/referred-to-committee/adopt-report">
+                <input type="hidden" name="document_id" id="reportAdoptionConfirmationDocumentId" value="">
+                <input type="hidden" name="decision" id="reportAdoptionConfirmationDecision" value="">
+                <button type="submit" id="confirmReportAdoptionConfirmation"
+                        class="inline-flex items-center justify-center rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-700">
+                    Confirm
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div
     id="adopt-comm-modal"
     class="fixed inset-0 z-[100] hidden items-center justify-center"
@@ -381,6 +429,24 @@ ob_start();
                 Finalizing committee report adoption for:
                 <span id="adopt-tracking-number" class="font-semibold text-gray-900"></span>
             </p>
+            <p class="text-xs text-gray-500">The returned Committee Report copy will also be available on Plenary Reports.</p>
+
+            <fieldset>
+                <legend class="block text-sm font-medium text-gray-700 mb-2">
+                    Final Output Type <span class="text-red-500" aria-hidden="true">*</span>
+                </legend>
+                <div class="flex flex-wrap gap-3">
+                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                        <input type="radio" name="final_output_type" value="RESOLUTION" required checked class="h-4 w-4 accent-primary">
+                        Resolution
+                    </label>
+                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                        <input type="radio" name="final_output_type" value="ORDINANCE" required class="h-4 w-4 accent-primary">
+                        Ordinance
+                    </label>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">This classifies the finalized output and does not change the original document type.</p>
+            </fieldset>
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -421,10 +487,10 @@ ob_start();
                                  focus:outline-none focus:ring-2 focus:ring-primary/20"></textarea>
             </div>
 
-            <!-- ── Resolution Attachment — drag-and-drop upload area ── -->
+            <!-- ── Final Output Attachment — drag-and-drop upload area ── -->
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Resolution Attachment(s) <span class="text-red-500" aria-hidden="true">*</span>
+                    Final Output Attachment(s) <span class="text-red-500" aria-hidden="true">*</span>
                 </label>
 
                 <!-- Hidden real file input (accumulator) -->
@@ -433,14 +499,14 @@ ob_start();
                        required
                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
                        class="sr-only"
-                       aria-label="Resolution attachment files"
+                       aria-label="Final output attachment files"
                        tabindex="-1">
 
                 <!-- Drop zone -->
                 <div id="adopt-drop-zone"
                      role="button"
                      tabindex="0"
-                     aria-label="Drop resolution files here or click to browse"
+                     aria-label="Drop final output files here or click to browse"
                      class="relative flex flex-col items-center justify-center gap-2
                             rounded-xl border-2 border-dashed border-gray-300 bg-gray-50
                             px-6 py-6 text-center transition
@@ -469,7 +535,7 @@ ob_start();
 
                 <ul id="adopt-file-list"
                     class="hidden mt-3 space-y-2"
-                    aria-label="Selected resolution files"
+                    aria-label="Selected final output files"
                     aria-live="polite">
                 </ul>
 
@@ -583,7 +649,7 @@ ob_start();
     var dragOverlay = document.getElementById('adopt-drag-overlay');
 
     // DataTransfer accumulates files across multiple browse/drop sessions.
-    var dt = new DataTransfer();
+    var dt = typeof DataTransfer === 'function' ? new DataTransfer() : null;
 
     function extOf(name) {
         return (name.split('.').pop() || '').toLowerCase();
@@ -606,13 +672,14 @@ ob_start();
 
     function renderFileList() {
         fileList.innerHTML = '';
-        if (dt.files.length === 0) {
+        var files = dt ? dt.files : fileInput.files;
+        if (files.length === 0) {
             fileList.classList.add('hidden');
             return;
         }
         fileList.classList.remove('hidden');
 
-        Array.from(dt.files).forEach(function (file, idx) {
+        Array.from(files).forEach(function (file, idx) {
             var li = document.createElement('li');
             li.className = 'flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm';
             li.dataset.fileIdx = idx;
@@ -639,20 +706,27 @@ ob_start();
             left.appendChild(nameSpan);
             left.appendChild(sizeSpan);
 
-            var btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'shrink-0 rounded-lg p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition';
-            btn.setAttribute('aria-label', 'Remove ' + file.name);
-            btn.innerHTML = '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
-            btn.addEventListener('click', function () { removeAdoptFile(idx); });
-
             li.appendChild(left);
-            li.appendChild(btn);
+            if (dt) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'shrink-0 rounded-lg p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition';
+                btn.setAttribute('aria-label', 'Remove ' + file.name);
+                btn.innerHTML = '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+                btn.addEventListener('click', function () { removeAdoptFile(idx); });
+                li.appendChild(btn);
+            }
             fileList.appendChild(li);
         });
     }
 
     function removeAdoptFile(idx) {
+        if (!dt) {
+            fileInput.value = '';
+            clearFileError();
+            renderFileList();
+            return;
+        }
         var updated = new DataTransfer();
         Array.from(dt.files).forEach(function (f, i) {
             if (i !== idx) { updated.items.add(f); }
@@ -666,7 +740,7 @@ ob_start();
     function addAdoptFiles(incoming) {
         clearFileError();
         var candidates = Array.from(incoming);
-        var existing   = Array.from(dt.files);
+        var existing   = dt ? Array.from(dt.files) : [];
         var existingKeys = new Set(existing.map(function (f) { return f.name + ':' + f.size; }));
 
         var rejected = [];
@@ -693,12 +767,13 @@ ob_start();
             accepted.push(file);
         });
 
-        accepted.forEach(function (f) {
-            dt.items.add(f);
-            existing.push(f);
-        });
-
-        fileInput.files = dt.files;
+        if (dt) {
+            accepted.forEach(function (f) {
+                dt.items.add(f);
+                existing.push(f);
+            });
+            fileInput.files = dt.files;
+        }
 
         if (rejected.length > 0) {
             showFileError('Some files were not added: ' + rejected.join('; ') + '.');
@@ -708,8 +783,12 @@ ob_start();
     }
 
     function adoptResetFiles() {
-        dt = new DataTransfer();
-        fileInput.files = dt.files;
+        if (dt) {
+            dt = new DataTransfer();
+            fileInput.files = dt.files;
+        } else {
+            fileInput.value = '';
+        }
         renderFileList();
         clearFileError();
     }
@@ -726,7 +805,6 @@ ob_start();
     fileInput.addEventListener('change', function () {
         if (fileInput.files.length > 0) {
             addAdoptFiles(fileInput.files);
-            fileInput.value = '';
         }
     });
 
@@ -748,7 +826,11 @@ ob_start();
         dropZone.classList.remove('border-primary', 'bg-primary/5');
         dragOverlay.classList.add('hidden');
         if (e.dataTransfer.files.length > 0) {
-            addAdoptFiles(e.dataTransfer.files);
+            if (dt) {
+                addAdoptFiles(e.dataTransfer.files);
+            } else {
+                showFileError('Use the file picker to attach files in this browser.');
+            }
         }
     });
 
@@ -802,8 +884,26 @@ ob_start();
 
             <div class="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
                 Recording the committee report adoption will <strong>finalize</strong> this document
-                and move it to <strong>Finalized Documents → Petitions</strong>.
+                and move it to <strong>Finalized Documents → Petitions</strong>. The returned report copy
+                will also be available on <strong>Plenary Reports</strong>.
             </div>
+
+            <fieldset>
+                <legend class="block text-sm font-medium text-gray-700 mb-2">
+                    Final Output Type <span class="text-red-500" aria-hidden="true">*</span>
+                </legend>
+                <div class="flex flex-wrap gap-3">
+                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                        <input type="radio" name="final_output_type" value="RESOLUTION" required checked class="h-4 w-4 accent-primary">
+                        Resolution
+                    </label>
+                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                        <input type="radio" name="final_output_type" value="ORDINANCE" required class="h-4 w-4 accent-primary">
+                        Ordinance
+                    </label>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">This classifies the finalized output and does not change the original document type.</p>
+            </fieldset>
 
             <!-- Resolution + Proposed Number -->
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1017,7 +1117,7 @@ ob_start();
     var casesDragOverlay = document.getElementById('adopt-cases-drag-overlay');
 
     // DataTransfer accumulates files across multiple browse / drop sessions
-    var casesDt = new DataTransfer();
+    var casesDt = typeof DataTransfer === 'function' ? new DataTransfer() : null;
 
     function casesExtOf(name) {
         return (name.split('.').pop() || '').toLowerCase();
@@ -1040,13 +1140,14 @@ ob_start();
 
     function casesRenderFileList() {
         casesFileList.innerHTML = '';
-        if (casesDt.files.length === 0) {
+        var files = casesDt ? casesDt.files : casesFileInput.files;
+        if (files.length === 0) {
             casesFileList.classList.add('hidden');
             return;
         }
         casesFileList.classList.remove('hidden');
 
-        Array.from(casesDt.files).forEach(function (file, idx) {
+        Array.from(files).forEach(function (file, idx) {
             var li = document.createElement('li');
             li.className = 'flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm';
 
@@ -1072,20 +1173,27 @@ ob_start();
             left.appendChild(nameSpan);
             left.appendChild(sizeSpan);
 
-            var btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'shrink-0 rounded-lg p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition';
-            btn.setAttribute('aria-label', 'Remove ' + file.name);
-            btn.innerHTML = '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
-            btn.addEventListener('click', function () { casesRemoveFile(idx); });
-
             li.appendChild(left);
-            li.appendChild(btn);
+            if (casesDt) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'shrink-0 rounded-lg p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition';
+                btn.setAttribute('aria-label', 'Remove ' + file.name);
+                btn.innerHTML = '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+                btn.addEventListener('click', function () { casesRemoveFile(idx); });
+                li.appendChild(btn);
+            }
             casesFileList.appendChild(li);
         });
     }
 
     function casesRemoveFile(idx) {
+        if (!casesDt) {
+            casesFileInput.value = '';
+            casesClearFileError();
+            casesRenderFileList();
+            return;
+        }
         var updated = new DataTransfer();
         Array.from(casesDt.files).forEach(function (f, i) {
             if (i !== idx) { updated.items.add(f); }
@@ -1099,7 +1207,7 @@ ob_start();
     function casesAddFiles(incoming) {
         casesClearFileError();
         var candidates   = Array.from(incoming);
-        var existing     = Array.from(casesDt.files);
+        var existing     = casesDt ? Array.from(casesDt.files) : [];
         var existingKeys = new Set(existing.map(function (f) { return f.name + ':' + f.size; }));
 
         var rejected = [];
@@ -1126,12 +1234,13 @@ ob_start();
             accepted.push(file);
         });
 
-        accepted.forEach(function (f) {
-            casesDt.items.add(f);
-            existing.push(f);
-        });
-
-        casesFileInput.files = casesDt.files;
+        if (casesDt) {
+            accepted.forEach(function (f) {
+                casesDt.items.add(f);
+                existing.push(f);
+            });
+            casesFileInput.files = casesDt.files;
+        }
 
         if (rejected.length > 0) {
             casesShowFileError('Some files were not added: ' + rejected.join('; ') + '.');
@@ -1141,8 +1250,12 @@ ob_start();
     }
 
     function casesResetFiles() {
-        casesDt = new DataTransfer();
-        casesFileInput.files = casesDt.files;
+        if (casesDt) {
+            casesDt = new DataTransfer();
+            casesFileInput.files = casesDt.files;
+        } else {
+            casesFileInput.value = '';
+        }
         casesRenderFileList();
         casesClearFileError();
     }
@@ -1157,7 +1270,6 @@ ob_start();
     casesFileInput.addEventListener('change', function () {
         if (casesFileInput.files.length > 0) {
             casesAddFiles(casesFileInput.files);
-            casesFileInput.value = '';
         }
     });
 
@@ -1179,7 +1291,11 @@ ob_start();
         casesDropZone.classList.remove('border-primary', 'bg-primary/5');
         casesDragOverlay.classList.add('hidden');
         if (e.dataTransfer.files.length > 0) {
-            casesAddFiles(e.dataTransfer.files);
+            if (casesDt) {
+                casesAddFiles(e.dataTransfer.files);
+            } else {
+                casesShowFileError('Use the file picker to attach files in this browser.');
+            }
         }
     });
 
@@ -1192,6 +1308,69 @@ ob_start();
         }
     });
 
+}());
+</script>
+<script>
+(function () {
+    var modal = document.getElementById('reportAdoptionConfirmationModal');
+    var backdrop = document.getElementById('reportAdoptionConfirmationBackdrop');
+    var form = document.getElementById('reportAdoptionConfirmationForm');
+    var documentIdInput = document.getElementById('reportAdoptionConfirmationDocumentId');
+    var decisionInput = document.getElementById('reportAdoptionConfirmationDecision');
+    var message = document.getElementById('reportAdoptionConfirmationMessage');
+    var trackingNumber = document.getElementById('reportAdoptionConfirmationTracking');
+    var confirmButton = document.getElementById('confirmReportAdoptionConfirmation');
+    var cancelButton = document.getElementById('cancelReportAdoptionConfirmation');
+    var activeButton = null;
+    var submitted = false;
+
+    function closeModal() {
+        if (modal.classList.contains('hidden')) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        documentIdInput.value = '';
+        decisionInput.value = '';
+        if (activeButton) activeButton.focus();
+        activeButton = null;
+    }
+
+    document.querySelectorAll('.open-report-adoption-confirmation').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var decision = button.dataset.decision;
+            activeButton = button;
+            submitted = false;
+            documentIdInput.value = button.dataset.documentId;
+            decisionInput.value = decision;
+            trackingNumber.textContent = button.dataset.trackingNumber;
+            message.textContent = decision === 'APPROVED'
+                ? 'This will adopt the Committee Report and move the document to Second Reading.'
+                : 'This will adopt the Committee Report without moving the document to Second Reading.';
+            confirmButton.textContent = decision === 'APPROVED' ? 'Approve & Proceed' : 'Adopt Report Only';
+            confirmButton.classList.toggle('bg-violet-600', decision === 'APPROVED');
+            confirmButton.classList.toggle('hover:bg-violet-700', decision === 'APPROVED');
+            confirmButton.classList.toggle('bg-gray-700', decision !== 'APPROVED');
+            confirmButton.classList.toggle('hover:bg-gray-800', decision !== 'APPROVED');
+            confirmButton.disabled = false;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            cancelButton.focus();
+        });
+    });
+
+    cancelButton.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closeModal();
+    });
+    form.addEventListener('submit', function (event) {
+        if (submitted) {
+            event.preventDefault();
+            return;
+        }
+        submitted = true;
+        confirmButton.disabled = true;
+        confirmButton.textContent = 'Processing…';
+    });
 }());
 </script>
 <?php

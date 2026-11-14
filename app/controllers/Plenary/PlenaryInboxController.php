@@ -340,10 +340,6 @@ class PlenaryInboxController
         $pageTitle   = 'Plenary Inbox';
         $currentView = $view;
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors', []);
-
         require __DIR__ . '/../../../resources/views/plenary/inbox/index.php';
     }
 
@@ -491,10 +487,6 @@ class PlenaryInboxController
         }
 
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
-
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors', []);
 
         require __DIR__ . '/../../../resources/views/plenary/inbox/show.php';
     }
@@ -1785,13 +1777,31 @@ class PlenaryInboxController
     private function fetchAttachments(int $documentId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT da.*, ua.username AS uploaded_by_username
-            FROM document_attachments da
-            LEFT JOIN user_accounts ua ON ua.id = da.uploaded_by
-            WHERE da.document_id = ?
-            ORDER BY da.created_at DESC
+            SELECT *
+            FROM (
+                SELECT da.id, da.file_name, da.stored_path, da.mime_type, da.file_size,
+                       da.phase, da.attachment_type, da.created_at,
+                       ua.username AS uploaded_by_username,
+                       NULL AS report_number
+                FROM document_attachments da
+                LEFT JOIN user_accounts ua ON ua.id = da.uploaded_by
+                WHERE da.document_id = ?
+
+                UNION ALL
+
+                SELECT cra.id, cra.file_name, cra.stored_path, cra.mime_type, cra.file_size,
+                       'COMMITTEE' AS phase, 'COMMITTEE_REPORT' AS attachment_type, cra.created_at,
+                       ua.username AS uploaded_by_username,
+                       cr.report_number
+                FROM committee_report_attachments cra
+                INNER JOIN committee_reports cr ON cr.id = cra.committee_report_id
+                INNER JOIN committee_report_documents crd
+                    ON crd.committee_report_id = cr.id AND crd.document_id = ?
+                LEFT JOIN user_accounts ua ON ua.id = cra.uploaded_by
+            ) attachment_rows
+            ORDER BY created_at DESC, id DESC
         ");
-        $stmt->execute([$documentId]);
+        $stmt->execute([$documentId, $documentId]);
         return $stmt->fetchAll();
     }
 

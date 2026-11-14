@@ -286,6 +286,13 @@ if ($userRoleId !== null) {
                     </svg>
                     Second Reading
                 </a>
+                <a href="<?= BASE_URL ?>/plenary/reports" class="<?= $navBase ?> <?= isActiveNav('plenary/reports', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M7 3h7l5 5v13H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5M9 13h6m-6 4h6"/>
+                    </svg>
+                    Plenary Reports
+                </a>
                 <a href="<?= BASE_URL ?>/plenary/status-list" class="<?= $navBase ?> <?= isActiveNav('plenary/status-list', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
@@ -439,6 +446,13 @@ if ($userRoleId !== null) {
         <div class="mb-7">
             <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Document Management</p>
             <nav class="space-y-1">
+                <a href="<?= BASE_URL ?>/master/documents" class="<?= $navBase ?> <?= isActiveNav('master/documents', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M4 5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm10-2v6h6M8 13h8m-8 4h8"/>
+                    </svg>
+                    Document Registry
+                </a>
                 <a href="<?= BASE_URL ?>/master/document-types" class="<?= $navBase ?> <?= isActiveNav('master/document-types', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"

@@ -159,7 +159,7 @@ ob_start();
                             $selectedDecision = $old['comm_fr_decision'] ?? '';
                             $decisions = [
                                 'NOTED'              => ['label' => 'Noted', 'color' => 'emerald', 'desc' => 'Noted; Communication appears on Plenary Communications page.'],
-                                'APPROVED'           => ['label' => 'Approved for Resolution under Other Matters', 'color' => 'blue', 'desc' => 'Record the approved subject matter, Resolution/Ordinance No., and resolution files.'],
+                                'APPROVED'           => ['label' => 'Approved for Resolution/Ordinance under Other Matters', 'color' => 'blue', 'desc' => 'Record the approved subject matter, number, final output type, and files.'],
                                 'REFER_TO_COMMITTEE' => ['label' => 'Referred to Committee', 'color' => 'violet', 'desc' => 'Hand off to Committee using the existing referral workflow.'],
                             ];
                             foreach ($decisions as $val => $info):
@@ -228,6 +228,22 @@ ob_start();
                                 The current subject matter is prefilled. Updating it here keeps the original document subject matter in the record.
                             </p>
                         </div>
+                        <fieldset>
+                            <legend class="block text-sm font-medium text-gray-700 mb-2">
+                                Final Output Type <span class="text-red-500">*</span>
+                            </legend>
+                            <div class="flex flex-wrap gap-3">
+                                <?php foreach (['RESOLUTION' => 'Resolution', 'ORDINANCE' => 'Ordinance'] as $value => $label): ?>
+                                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                                        <input type="radio" name="final_output_type" value="<?= $value ?>"
+                                               <?= ($old['final_output_type'] ?? 'RESOLUTION') === $value ? 'checked' : '' ?>
+                                               class="h-4 w-4 accent-primary">
+                                        <?= htmlspecialchars($label) ?>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">This classifies the finalized output and does not change the original document type.</p>
+                        </fieldset>
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
                                 <label for="resolution_number" class="block text-sm font-medium text-gray-700 mb-1">
@@ -257,7 +273,7 @@ ob_start();
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">
-                                Resolution File(s) <span class="text-red-500">*</span>
+                                Final Output File(s) <span class="text-red-500">*</span>
                             </label>
 
                             <!-- Hidden real file input (accepts multiple) -->
@@ -265,14 +281,14 @@ ob_start();
                                    multiple
                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
                                    class="sr-only"
-                                   aria-label="Resolution files"
+                                   aria-label="Final output files"
                                    tabindex="-1">
 
                             <!-- Drop zone -->
                             <div id="res-drop-zone"
                                  role="button"
                                  tabindex="0"
-                                 aria-label="Drop resolution files here or click to browse"
+                                 aria-label="Drop final output files here or click to browse"
                                  class="relative flex flex-col items-center justify-center gap-2
                                         rounded-xl border-2 border-dashed border-gray-300 bg-gray-50
                                         px-6 py-8 text-center transition
@@ -304,7 +320,7 @@ ob_start();
                             <!-- Selected-file list -->
                             <ul id="res-file-list"
                                 class="hidden mt-3 space-y-2"
-                                aria-label="Selected resolution files"
+                                aria-label="Selected final output files"
                                 aria-live="polite">
                             </ul>
 
@@ -633,7 +649,7 @@ ob_start();
 
         if (decision && decision.value === 'APPROVED' && fileInput.files.length === 0) {
             e.preventDefault();
-            showError('Please attach at least one resolution file before submitting.');
+            showError('Please attach at least one final output file before submitting.');
             dropZone.focus();
         }
     });
