@@ -145,13 +145,18 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 
                 <?php foreach ($members as $member): ?>
+                    <?php
+                    $photoPath = str_replace('\\', '/', trim((string) ($member['photo_path'] ?? '')));
+                    $photoPath = preg_replace('#^(?:public/)+#i', '', ltrim($photoPath, '/'));
+                    $photoUrl = BASE_URL . '/public/' . $photoPath;
+                    ?>
                     <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all card-hover border border-gray-200 overflow-hidden">
                         
                         <!-- Member Photo -->
                         <div class="aspect-square bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center overflow-hidden">
                             <?php if (!empty($member['photo_path'])): ?>
                                 <img 
-                                    src="<?= BASE_URL ?>/<?= htmlspecialchars($member['photo_path']) ?>" 
+                                    src="<?= htmlspecialchars($photoUrl, ENT_QUOTES, 'UTF-8') ?>"
                                     alt="<?= htmlspecialchars($member['first_name'] . ' ' . $member['last_name']) ?>" 
                                     class="w-full h-full object-cover"
                                     onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\'fa-solid fa-user text-6xl text-blue-300\'></i>';"

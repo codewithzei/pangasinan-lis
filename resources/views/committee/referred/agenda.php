@@ -23,6 +23,10 @@ $spMembers            = $spMembers            ?? [];
 
 $documentId = (int) ($document['id'] ?? 0);
 $cycleId    = (int) ($cycle['id']    ?? 0);
+$isResetReschedule = $isResetReschedule ?? false;
+$agendaSourceUrl = $isResetReschedule
+    ? BASE_URL . '/committee/hearing?tab=reset'
+    : BASE_URL . '/committee/referred?tab=ready_for_agenda';
 
 // Old input helper for repopulation
 $oldCommitteeIds   = old_get()['committee_ids']   ?? $assignedCommitteeIds;
@@ -37,12 +41,16 @@ ob_start();
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-7 sm:px-8">
             <div class="relative z-10">
-                <p class="text-sm font-medium text-blue-100">COMMITTEE / REFERRED / SCHEDULE AGENDA</p>
+                <p class="text-sm font-medium text-blue-100">
+                    <?= $isResetReschedule ? 'COMMITTEE / HEARINGS / RESET' : 'COMMITTEE / REFERRED / SCHEDULE AGENDA' ?>
+                </p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                    Schedule Agenda
+                    <?= $isResetReschedule ? 'Reschedule Agenda' : 'Schedule Agenda' ?>
                 </h1>
                 <p class="mt-1 text-sm text-blue-100">
-                    Set the date, time, venue, and participants for the committee hearing.
+                    <?= $isResetReschedule
+                        ? 'Set a new date, time, venue, and participants. The previous agenda remains in the workflow history.'
+                        : 'Set the date, time, venue, and participants for the committee hearing.' ?>
                 </p>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full bg-white/10"></div>
@@ -51,11 +59,13 @@ ob_start();
 
     <!-- Breadcrumb -->
     <nav class="flex items-center gap-2 text-sm text-gray-500">
-        <a href="<?= BASE_URL ?>/committee/referred?tab=ready_for_agenda" class="hover:text-primary transition">Ready for Agenda</a>
+        <a href="<?= htmlspecialchars($agendaSourceUrl) ?>" class="hover:text-primary transition">
+            <?= $isResetReschedule ? 'Reset' : 'Ready for Agenda' ?>
+        </a>
         <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
         </svg>
-        <span class="font-medium text-gray-700">Schedule Agenda</span>
+        <span class="font-medium text-gray-700"><?= $isResetReschedule ? 'Reschedule Agenda' : 'Schedule Agenda' ?></span>
     </nav>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">

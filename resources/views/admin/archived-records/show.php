@@ -57,7 +57,7 @@ function arFileIcon(string $mime): string {
 
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <!-- ── Page header ─────────────────────────────────────────────────────── -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
@@ -129,7 +129,7 @@ function arFileIcon(string $mime): string {
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Subject Matter</dt>
                         <dd class="mt-1.5 text-sm text-gray-800 leading-relaxed">
-                            <?= nl2br(htmlspecialchars($record['subject_matter'])) ?>
+                            <?= nl2br(escape_trimmed_text($record['subject_matter'])) ?>
                         </dd>
                     </div>
 
@@ -137,7 +137,7 @@ function arFileIcon(string $mime): string {
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Description</dt>
                         <dd class="mt-1.5 text-sm text-gray-700 leading-relaxed">
-                            <?= nl2br(htmlspecialchars($record['description'])) ?>
+                            <?= nl2br(escape_trimmed_text($record['description'])) ?>
                         </dd>
                     </div>
                     <?php endif; ?>

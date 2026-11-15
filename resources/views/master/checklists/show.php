@@ -11,7 +11,7 @@ $pageSubtitle = $pageSubtitle ?? '';
 $accent = $accent ?? 'primary';
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <nav class="flex items-center gap-2 text-xs font-medium text-gray-500">
         <a href="<?= BASE_URL ?>/master/checklists" class="hover:text-primary transition">

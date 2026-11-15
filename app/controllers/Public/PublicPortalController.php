@@ -46,7 +46,7 @@ class PublicPortalController
         $position = isset($_GET['position']) ? trim($_GET['position']) : '';
         $position = mb_substr($position, 0, 150); // Match position field length
         
-        // Build query for active, non-deleted members
+        // Show only active members assigned to the currently active legislative term.
         $sql = "SELECT 
                     sp.sp_member_id,
                     sp.first_name,
@@ -61,7 +61,15 @@ class PublicPortalController
                 FROM sp_members sp
                 LEFT JOIN districts d ON sp.district_id = d.id
                 WHERE sp.is_active = 1 
-                  AND sp.is_deleted = 0";
+                  AND sp.is_deleted = 0
+                  AND EXISTS (
+                      SELECT 1
+                      FROM term_legislators tl
+                      INNER JOIN terms t ON t.id = tl.term_id
+                      WHERE tl.sp_member_id = sp.sp_member_id
+                        AND t.is_active = 1
+                        AND t.is_deleted = 0
+                  )";
         
         $params = [];
         
@@ -100,19 +108,35 @@ class PublicPortalController
         
         // Get all active districts for filter dropdown
         $districtsStmt = $this->pdo->query("
-            SELECT id, name 
-            FROM districts 
-            WHERE is_active = 1 AND is_deleted = 0 
-            ORDER BY name ASC
+            SELECT DISTINCT d.id, d.name
+            FROM districts d
+            INNER JOIN sp_members sp ON sp.district_id = d.id
+            WHERE d.is_active = 1 AND d.is_deleted = 0
+              AND sp.is_active = 1 AND sp.is_deleted = 0
+              AND EXISTS (
+                  SELECT 1
+                  FROM term_legislators tl
+                  INNER JOIN terms t ON t.id = tl.term_id
+                  WHERE tl.sp_member_id = sp.sp_member_id
+                    AND t.is_active = 1 AND t.is_deleted = 0
+              )
+            ORDER BY d.name ASC
         ");
         $districts = $districtsStmt->fetchAll();
         
         // Get unique positions for filter
         $positionsStmt = $this->pdo->query("
-            SELECT DISTINCT position 
-            FROM sp_members 
-            WHERE is_active = 1 AND is_deleted = 0 
-            ORDER BY position ASC
+            SELECT DISTINCT sp.position
+            FROM sp_members sp
+            WHERE sp.is_active = 1 AND sp.is_deleted = 0
+              AND EXISTS (
+                  SELECT 1
+                  FROM term_legislators tl
+                  INNER JOIN terms t ON t.id = tl.term_id
+                  WHERE tl.sp_member_id = sp.sp_member_id
+                    AND t.is_active = 1 AND t.is_deleted = 0
+              )
+            ORDER BY sp.position ASC
         ");
         $positions = $positionsStmt->fetchAll(PDO::FETCH_COLUMN);
         

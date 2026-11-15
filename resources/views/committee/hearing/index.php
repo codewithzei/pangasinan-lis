@@ -3,14 +3,14 @@
  * Committee — Hearing Index (tabbed, table layout)
  *
  * Variables supplied by CommitteeHearingController::index():
- *   $tab         string   Active tab key: all|scheduled|approved|deferred|remanded|withdrawn
+ *   $tab         string   Active tab key: all|scheduled|approved|deferred|remanded|withdrawn|reset
  *   $documents   array    Paginated hearing rows
  *   $total       int
  *   $totalPages  int
  *   $page        int
  *   $perPage     int
  *   $search      string
- *   $counts      array    {all, scheduled, approved, deferred, remanded, withdrawn}
+ *   $counts      array    {all, scheduled, approved, deferred, remanded, withdrawn, reset}
  *   $success     string|null
  *   $error       string|null
  */
@@ -22,7 +22,7 @@ $totalPages = $totalPages ?? 1;
 $page       = $page       ?? 1;
 $perPage    = $perPage    ?? 20;
 $search     = $search     ?? '';
-$counts     = $counts     ?? ['all' => 0, 'scheduled' => 0, 'approved' => 0, 'deferred' => 0, 'remanded' => 0, 'withdrawn' => 0];
+$counts     = $counts     ?? ['all' => 0, 'scheduled' => 0, 'approved' => 0, 'deferred' => 0, 'remanded' => 0, 'withdrawn' => 0, 'reset' => 0];
 
 // Tab configuration: key => [label, inactive badge class]
 $tabConfig = [
@@ -32,6 +32,7 @@ $tabConfig = [
     'deferred'  => ['Deferred',     'bg-amber-100 text-amber-700'],
     'remanded'  => ['Remanded',     'bg-red-100 text-red-700'],
     'withdrawn' => ['Withdrawn',    'bg-gray-100 text-gray-600'],
+    'reset'     => ['Reset',        'bg-blue-100 text-blue-700'],
 ];
 
 // Outcome badge styles
@@ -40,6 +41,8 @@ $outcomeBadge = [
     'DEFERRED'  => 'bg-amber-100 text-amber-800',
     'REMANDED'  => 'bg-red-100 text-red-800',
     'WITHDRAWN' => 'bg-gray-100 text-gray-700',
+    'COMPLETED_TERMINATED' => 'bg-slate-100 text-slate-800',
+    'RESET'     => 'bg-blue-100 text-blue-800',
 ];
 
 /**
@@ -56,10 +59,10 @@ function hearingUrl(string $newTab = '', string $newSearch = '', int $newPage = 
     return BASE_URL . '/committee/hearing' . $qs;
 }
 
-// Count documents on this page that are not yet part of a shared report.
+// Count documents on this page that can be shared in a report.
 $eligibleCount = 0;
 foreach ($documents as $d) {
-    if (empty($d['report_id'])) {
+    if (empty($d['report_id']) && ($d['hearing_outcome'] ?? null) !== 'RESET') {
         $eligibleCount++;
     }
 }
@@ -239,6 +242,8 @@ ob_start();
                                         No remanded hearings.
                                     <?php elseif ($tab === 'withdrawn'): ?>
                                         No withdrawn hearings.
+                                    <?php elseif ($tab === 'reset'): ?>
+                                        No documents are waiting to be rescheduled.
                                     <?php else: ?>
                                         No hearings found.
                                     <?php endif; ?>
@@ -251,6 +256,8 @@ ob_start();
                                         Documents will appear here once an agenda is scheduled and their status is <strong>On Going</strong>.
                                     <?php elseif ($tab === 'all'): ?>
                                         Documents with a scheduled agenda will appear here.
+                                    <?php elseif ($tab === 'reset'): ?>
+                                        Documents reset from a hearing will appear here until a new agenda is scheduled.
                                     <?php else: ?>
                                         No hearings with this outcome have been recorded yet.
                                     <?php endif; ?>
@@ -264,11 +271,16 @@ ob_start();
                             // ── Derived flags ─────────────────────────────────────────────
                             $outcomeLabel   = $doc['hearing_outcome'] ?? null;
                             $outcomeCls     = $outcomeBadge[$outcomeLabel] ?? 'bg-gray-100 text-gray-700';
-                            $outcomeDisplay = $outcomeLabel ? ucfirst(strtolower($outcomeLabel)) : null;
+                            $outcomeDisplay = match ($outcomeLabel) {
+                                'COMPLETED_TERMINATED' => 'Completed/Terminated',
+                                'RESET' => 'Reset',
+                                default => $outcomeLabel ? ucfirst(strtolower($outcomeLabel)) : null,
+                            };
                             $isScheduled    = ($outcomeLabel === null);
                             $isApproved     = ($outcomeLabel === 'APPROVED');
+                            $isReset        = ($outcomeLabel === 'RESET');
                             $hasReport      = !empty($doc['report_id']);
-                            $isEligible     = !$hasReport;
+                            $isEligible     = !$hasReport && !$isReset;
 
                             // ── Formatted dates ───────────────────────────────────────────
                             $agendaDate = !empty($doc['agenda_date'])
@@ -495,6 +507,29 @@ ob_start();
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                           d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                </svg>
+                                            </a>
+
+                                        <?php elseif ($isReset): ?>
+                                            <a href="<?= BASE_URL ?>/committee/referred/agenda?id=<?= (int) $doc['document_id'] ?>"
+                                               class="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5
+                                                      text-xs font-semibold text-white hover:bg-blue-700 transition
+                                                      whitespace-nowrap"
+                                               title="Set a new agenda date and time">
+                                                Reschedule Agenda
+                                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5.64 18.36A9 9 0 0118.36 5.64"/>
+                                                </svg>
+                                            </a>
+                                            <a href="<?= BASE_URL ?>/committee/hearing/show?id=<?= (int) $doc['document_id'] ?>"
+                                               class="rounded-lg border border-gray-200 p-1.5 text-gray-500
+                                                      hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition"
+                                               title="View Details">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                                 </svg>
                                             </a>
 

@@ -32,11 +32,14 @@ $hasReport  = !empty($comm['report_id']);
 
 $hearingOutcome = $linkedHearing['outcome'] ?? null;
 $hearingApproved = $hearingOutcome === 'APPROVED';
+$hearingOutcomeLabel = $hearingOutcome === 'COMPLETED_TERMINATED'
+    ? 'Completed/Terminated'
+    : ucfirst(strtolower(str_replace('_', ' ', (string)$hearingOutcome)));
 
 ob_start();
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <!-- Back + header --------------------------------------------------------->
     <div class="flex items-center gap-4">
@@ -116,22 +119,16 @@ ob_start();
                     </div>
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Subject / Summary</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">
-                            <?= htmlspecialchars($comm['subject'] ?? '') ?>
-                        </dd>
+                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($comm['subject'] ?? '') ?></dd>
                     </div>
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Sender / Originating Party</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">
-                            <?= htmlspecialchars($comm['sender_details'] ?? '') ?>
-                        </dd>
+                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($comm['sender_details'] ?? '') ?></dd>
                     </div>
                     <?php if (!empty($comm['notes'])): ?>
                         <div class="sm:col-span-2">
                             <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Notes</dt>
-                            <dd class="mt-1 text-sm text-gray-700 whitespace-pre-wrap italic">
-                                <?= htmlspecialchars($comm['notes']) ?>
-                            </dd>
+                            <dd class="mt-1 text-sm text-gray-700 whitespace-pre-wrap italic"><?= escape_trimmed_text($comm['notes']) ?></dd>
                         </div>
                     <?php endif; ?>
                     <?php if (!empty($comm['source_type'])): ?>
@@ -219,6 +216,7 @@ ob_start();
                     'DEFERRED'  => ['bg' => 'bg-amber-100',  'text' => 'text-amber-800',  'border' => 'border-amber-200'],
                     'REMANDED'  => ['bg' => 'bg-red-100',    'text' => 'text-red-800',    'border' => 'border-red-200'],
                     'WITHDRAWN' => ['bg' => 'bg-gray-100',   'text' => 'text-gray-800',   'border' => 'border-gray-200'],
+                    'COMPLETED_TERMINATED' => ['bg' => 'bg-slate-100', 'text' => 'text-slate-800', 'border' => 'border-slate-200'],
                 ];
                 $oc = $outcomeColors[$hearingOutcome] ?? $outcomeColors['DEFERRED'];
                 ?>
@@ -237,14 +235,14 @@ ob_start();
                         </div>
                         <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold
                                      <?= $oc['bg'] ?> <?= $oc['text'] ?> <?= $oc['border'] ?>">
-                            <?= htmlspecialchars(ucfirst(strtolower($hearingOutcome ?? ''))) ?>
+                            <?= htmlspecialchars($hearingOutcomeLabel) ?>
                         </span>
                     </div>
                     <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
                         <div>
                             <dt class="text-xs font-medium uppercase tracking-wide text-blue-600">Outcome</dt>
                             <dd class="mt-0.5 font-semibold text-blue-900">
-                                <?= htmlspecialchars(ucfirst(strtolower($hearingOutcome ?? ''))) ?>
+                                <?= htmlspecialchars($hearingOutcomeLabel) ?>
                             </dd>
                         </div>
                         <div>
@@ -256,9 +254,7 @@ ob_start();
                         <?php if (!empty($linkedHearing['remarks'])): ?>
                             <div class="sm:col-span-2">
                                 <dt class="text-xs font-medium uppercase tracking-wide text-blue-600">Remarks</dt>
-                                <dd class="mt-0.5 text-blue-800 whitespace-pre-wrap text-sm">
-                                    <?= htmlspecialchars($linkedHearing['remarks']) ?>
-                                </dd>
+                                <dd class="mt-0.5 text-blue-800 whitespace-pre-wrap text-sm"><?= escape_trimmed_text($linkedHearing['remarks']) ?></dd>
                             </div>
                         <?php endif; ?>
                     </dl>
@@ -340,9 +336,7 @@ ob_start();
                                         <?php endif; ?>
                                     </div>
                                     <?php if (!empty($evt['remarks'])): ?>
-                                        <p class="text-xs text-gray-500 whitespace-pre-wrap">
-                                            <?= htmlspecialchars($evt['remarks']) ?>
-                                        </p>
+                                        <p class="text-xs text-gray-500 whitespace-pre-wrap"><?= escape_trimmed_text($evt['remarks']) ?></p>
                                     <?php endif; ?>
                                 </div>
                             </li>
@@ -472,7 +466,7 @@ ob_start();
                         <p class="text-sm text-gray-600">
                             Hearing outcome was
                             <span class="font-semibold">
-                                <?= htmlspecialchars(ucfirst(strtolower($hearingOutcome ?? ''))) ?>
+                                <?= htmlspecialchars($hearingOutcomeLabel) ?>
                             </span>.
                             No Committee Report is required.
                         </p>

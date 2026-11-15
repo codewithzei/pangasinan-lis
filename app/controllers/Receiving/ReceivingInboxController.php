@@ -474,14 +474,8 @@ class ReceivingInboxController
         ");
         $municipalities = $municipalitiesStmt->fetchAll();
 
-        // Fetch SP members
-        $spMembersStmt = $this->pdo->query("
-            SELECT sp_member_id, first_name, middle_name, last_name, suffix
-            FROM sp_members
-            WHERE is_active = 1 AND is_deleted = 0
-            ORDER BY last_name, first_name
-        ");
-        $spMembers = $spMembersStmt->fetchAll();
+        // SP member source options are limited to the active legislative term.
+        $spMembers = $this->docService->getSpMembers();
 
         $old     = old_get();
 
@@ -656,6 +650,30 @@ class ReceivingInboxController
 
         // Validate document fields
         $errors = $this->validateUpdate($data);
+        if ($sourceTypeName === 'SP Member') {
+            if (empty($data['sp_member_id'])) {
+                $errors[] = 'SP Member is required for this source type.';
+            } else {
+                $memberStmt = $this->pdo->prepare("
+                    SELECT sm.sp_member_id
+                    FROM sp_members sm
+                    WHERE sm.sp_member_id = ?
+                      AND sm.is_active = 1 AND sm.is_deleted = 0
+                      AND EXISTS (
+                          SELECT 1
+                          FROM term_legislators tl
+                          INNER JOIN terms t ON t.id = tl.term_id
+                          WHERE tl.sp_member_id = sm.sp_member_id
+                            AND t.is_active = 1 AND t.is_deleted = 0
+                      )
+                    LIMIT 1
+                ");
+                $memberStmt->execute([$data['sp_member_id']]);
+                if (!$memberStmt->fetch()) {
+                    $errors[] = 'Select an active SP Member assigned to the active legislative term.';
+                }
+            }
+        }
 
         if (!empty($errors)) {
             flash_set('errors', $errors);

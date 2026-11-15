@@ -178,10 +178,19 @@ class ArchivedRecordsController
             "SELECT DISTINCT YEAR(date_approved) AS y FROM archived_records WHERE is_deleted = 0 ORDER BY y DESC"
         )->fetchAll(PDO::FETCH_COLUMN);
 
-        // SP members and committees for create modal
+        // Current-term SP members and committees for the create modal
         $spMembers = $this->pdo->query(
-            "SELECT sp_member_id, CONCAT_WS(' ', first_name, last_name) AS full_name, position
-             FROM sp_members WHERE is_active = 1 AND is_deleted = 0 ORDER BY last_name ASC"
+            "SELECT sm.sp_member_id, CONCAT_WS(' ', sm.first_name, sm.last_name) AS full_name, sm.position
+             FROM sp_members sm
+             WHERE sm.is_active = 1 AND sm.is_deleted = 0
+               AND EXISTS (
+                   SELECT 1
+                   FROM term_legislators tl
+                   INNER JOIN terms t ON t.id = tl.term_id
+                   WHERE tl.sp_member_id = sm.sp_member_id
+                     AND t.is_active = 1 AND t.is_deleted = 0
+               )
+             ORDER BY sm.last_name ASC"
         )->fetchAll();
 
         $committees = $this->pdo->query(
@@ -290,9 +299,18 @@ class ArchivedRecordsController
             "SELECT sm.sp_member_id, CONCAT_WS(' ', sm.first_name, sm.last_name) AS full_name, sm.position,
                     sm.is_active, sm.is_deleted
              FROM sp_members sm
-             WHERE (sm.is_active = 1 AND sm.is_deleted = 0)
-                OR EXISTS (SELECT 1 FROM archived_records_authors ara
-                           WHERE ara.sp_member_id = sm.sp_member_id AND ara.archived_record_id = ?)
+             WHERE (
+                    (sm.is_active = 1 AND sm.is_deleted = 0
+                     AND EXISTS (
+                         SELECT 1
+                         FROM term_legislators tl
+                         INNER JOIN terms t ON t.id = tl.term_id
+                         WHERE tl.sp_member_id = sm.sp_member_id
+                           AND t.is_active = 1 AND t.is_deleted = 0
+                     ))
+                    OR EXISTS (SELECT 1 FROM archived_records_authors ara
+                               WHERE ara.sp_member_id = sm.sp_member_id AND ara.archived_record_id = ?)
+             )
              ORDER BY sm.last_name ASC"
         );
         $spMembersStmt->execute([$id]);
@@ -833,10 +851,37 @@ class ArchivedRecordsController
                     continue;
                 }
                 if (!array_key_exists($memberId, $memberNames)) {
-                    $memberStmt = $this->pdo->prepare(
-                        'SELECT CONCAT_WS(\' \' , first_name, last_name) FROM sp_members WHERE sp_member_id = ?'
-                    );
-                    $memberStmt->execute([$memberId]);
+                    $memberSql = "
+                        SELECT CONCAT_WS(' ', sm.first_name, sm.last_name)
+                        FROM sp_members sm
+                        WHERE sm.sp_member_id = ?
+                          AND (
+                              (
+                                  sm.is_active = 1 AND sm.is_deleted = 0
+                                  AND EXISTS (
+                                      SELECT 1
+                                      FROM term_legislators tl
+                                      INNER JOIN terms t ON t.id = tl.term_id
+                                      WHERE tl.sp_member_id = sm.sp_member_id
+                                        AND t.is_active = 1 AND t.is_deleted = 0
+                                  )
+                              )
+                    ";
+                    $memberParams = [$memberId];
+                    if ($excludeId !== null) {
+                        $memberSql .= "
+                              OR EXISTS (
+                                  SELECT 1
+                                  FROM archived_records_authors ara
+                                  WHERE ara.sp_member_id = sm.sp_member_id
+                                    AND ara.archived_record_id = ?
+                              )
+                        ";
+                        $memberParams[] = $excludeId;
+                    }
+                    $memberSql .= ') LIMIT 1';
+                    $memberStmt = $this->pdo->prepare($memberSql);
+                    $memberStmt->execute($memberParams);
                     $memberNames[$memberId] = $memberStmt->fetchColumn() ?: null;
                 }
                 if ($memberNames[$memberId] === null) {
@@ -917,9 +962,16 @@ class ArchivedRecordsController
         $activeMemberIds = array_map(
             'intval',
             $this->pdo->query("
-                SELECT sp_member_id
-                FROM sp_members
-                WHERE is_active = 1 AND is_deleted = 0
+                SELECT sm.sp_member_id
+                FROM sp_members sm
+                WHERE sm.is_active = 1 AND sm.is_deleted = 0
+                  AND EXISTS (
+                      SELECT 1
+                      FROM term_legislators tl
+                      INNER JOIN terms t ON t.id = tl.term_id
+                      WHERE tl.sp_member_id = sm.sp_member_id
+                        AND t.is_active = 1 AND t.is_deleted = 0
+                  )
             ")->fetchAll(PDO::FETCH_COLUMN)
         );
         $authorIds = array_map(

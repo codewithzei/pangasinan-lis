@@ -61,7 +61,7 @@ function _ss_typeLabel(string $type): string
 }
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <!-- ── Page header ──────────────────────────────────────────────────── -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
@@ -136,9 +136,7 @@ function _ss_typeLabel(string $type): string
 
                     <div class="sm:col-span-2">
                         <p class="text-xs font-medium text-gray-500">Subject Matter</p>
-                        <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
-                            <?= htmlspecialchars($document['subject_matter']) ?>
-                        </p>
+                        <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap"><?= escape_trimmed_text($document['subject_matter']) ?></p>
                     </div>
 
                     <div>
@@ -185,9 +183,7 @@ function _ss_typeLabel(string $type): string
                     <?php if (!empty($document['remarks'])): ?>
                     <div class="sm:col-span-2">
                         <p class="text-xs font-medium text-gray-500">Remarks</p>
-                        <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
-                            <?= htmlspecialchars($document['remarks']) ?>
-                        </p>
+                        <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap"><?= escape_trimmed_text($document['remarks']) ?></p>
                     </div>
                     <?php endif; ?>
                 </div>

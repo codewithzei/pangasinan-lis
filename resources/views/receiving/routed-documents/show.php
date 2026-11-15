@@ -40,7 +40,7 @@ function formatFileSize(int $bytes): string
 $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_badge_color'] : '#6B7280';
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
@@ -92,7 +92,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
                     <div>
                         <p class="text-xs font-medium text-gray-500">Subject Matter</p>
-                        <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap"><?= htmlspecialchars($document['subject_matter']) ?></p>
+                        <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap"><?= escape_trimmed_text($document['subject_matter']) ?></p>
                     </div>
 
                     <div>
@@ -122,7 +122,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                     <?php if (!empty($document['remarks'])): ?>
                     <div>
                         <p class="text-xs font-medium text-gray-500">Remarks / Notes</p>
-                        <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap"><?= htmlspecialchars($document['remarks']) ?></p>
+                        <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap"><?= escape_trimmed_text($document['remarks']) ?></p>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -227,7 +227,11 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                                         </p>
                                     </div>
                                 </div>
-                                <a href="<?= BASE_URL ?>/<?= htmlspecialchars($attachment['stored_path']) ?>" 
+                                <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars(
+                                    preg_replace('#^(?:public/)+#i', '', ltrim((string) $attachment['stored_path'], '/\\')) ?? '',
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>"
                                    target="_blank"
                                    class="ml-3 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition">
                                     Download

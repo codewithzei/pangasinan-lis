@@ -53,7 +53,7 @@ ob_start();
 
     <!-- Form ----------------------------------------------------------------->
     <form method="POST" action="<?= BASE_URL ?>/admin/receive-document/submit"
-          enctype="multipart/form-data" id="documentForm">
+          enctype="multipart/form-data" id="documentForm" novalidate>
 
         <div class="space-y-6">
 
@@ -106,7 +106,7 @@ ob_start();
                         </label>
                         <textarea name="subject_matter" id="subject_matter" rows="4" required
                                   class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                                  placeholder="Enter the subject matter or title of the document (e.g., Request for Infrastructure Budget Allocation)"><?= htmlspecialchars(old('subject_matter') ?? '') ?></textarea>
+                                  placeholder="Describe the subject or purpose of this document"><?= htmlspecialchars(old('subject_matter') ?? '') ?></textarea>
                         <p class="mt-1 text-xs text-gray-500">Brief description or title of the document</p>
                     </div>
 
@@ -119,31 +119,11 @@ ob_start();
                             <option value="">-- Select Document Type --</option>
                             <?php foreach ($documentTypes as $type): ?>
                                 <option value="<?= (int) $type['id'] ?>"
-                                        title="<?= htmlspecialchars($type['name'] ?? '') ?>"
                                         <?= old('document_type_id') == $type['id'] ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($type['name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <p id="documentTypeFullLabel" class="mt-1 hidden break-words text-sm text-gray-700" aria-live="polite"></p>
-                        <script>
-                            (function () {
-                                const select = document.getElementById('document_type_id');
-                                const fullLabel = document.getElementById('documentTypeFullLabel');
-                                if (!select || !fullLabel) return;
-
-                                const updateDocumentTypeLabel = function () {
-                                    const option = select.selectedOptions[0];
-                                    const label = option && option.value ? option.textContent.trim() : '';
-                                    fullLabel.textContent = label;
-                                    fullLabel.classList.toggle('hidden', label === '');
-                                    select.title = label;
-                                };
-
-                                select.addEventListener('change', updateDocumentTypeLabel);
-                                updateDocumentTypeLabel();
-                            }());
-                        </script>
                         <p class="mt-1 text-xs text-gray-500">Select the type of document</p>
                     </div>
                 </div>
@@ -178,7 +158,7 @@ ob_start();
                         </label>
                         <div class="relative mt-1">
                             <input type="text" id="mfrCaseSearch" autocomplete="off"
-                                   placeholder="Type tracking number, docket, or subject…"
+                                   placeholder="Search by tracking number, docket, or subject"
                                    class="block w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                                    aria-label="Search reference case" aria-autocomplete="list" aria-controls="mfrDropdown">
                             <svg class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -414,7 +394,7 @@ ob_start();
                         <input type="text" name="source_name" id="source_name_agency" disabled
                                value="<?= htmlspecialchars(old('source_name') ?? '') ?>"
                                class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                               placeholder="Enter agency name">
+                               placeholder="Enter the agency name">
                     </div>
 
                     <!-- Client Name Field -->
@@ -425,7 +405,7 @@ ob_start();
                         <input type="text" name="source_name" id="source_name_client" disabled
                                value="<?= htmlspecialchars(old('source_name') ?? '') ?>"
                                class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                               placeholder="Enter client name">
+                               placeholder="Enter the client's name">
                     </div>
 
                     <!-- Municipality Field (for Client) -->
@@ -451,16 +431,17 @@ ob_start();
                             <label for="source_contact_number" class="block text-sm font-medium text-gray-700">
                                 Contact Number
                             </label>
-                            <input type="text" name="source_contact_number" id="source_contact_number"
+                            <input type="tel" name="source_contact_number" id="source_contact_number"
+                                   inputmode="numeric" pattern="[0-9]{7,15}" maxlength="15"
                                    value="<?= htmlspecialchars(old('source_contact_number') ?? '') ?>"
                                    class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                                   placeholder="Enter contact number">
+                                   placeholder="7-15 digits">
                         </div>
                         <div>
                             <label for="source_address" class="block text-sm font-medium text-gray-700">Address</label>
                             <textarea name="source_address" id="source_address" rows="2"
                                       class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                                      placeholder="Enter address"><?= htmlspecialchars(old('source_address') ?? '') ?></textarea>
+                                      placeholder="Enter the source address"><?= htmlspecialchars(old('source_address') ?? '') ?></textarea>
                         </div>
                         <div>
                             <label for="source_liaison_name" class="block text-sm font-medium text-gray-700">
@@ -469,7 +450,7 @@ ob_start();
                             <input type="text" name="source_liaison_name" id="source_liaison_name"
                                    value="<?= htmlspecialchars(old('source_liaison_name') ?? '') ?>"
                                    class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                                   placeholder="Enter liaison or contact person name">
+                                   placeholder="Enter contact person name">
                         </div>
                     </div>
 
@@ -497,7 +478,7 @@ ob_start();
                                 </p>
                                 <p class="text-xs text-gray-500">PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (MAX. 25 MB each)</p>
                             </div>
-                            <input id="attachments" name="attachments[]" type="file" multiple required
+                            <input id="attachments" name="attachments[]" type="file" multiple
                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
                                    class="hidden"/>
                         </label>
@@ -514,7 +495,7 @@ ob_start();
                 <div class="mt-4">
                     <textarea name="remarks" id="remarks" rows="3"
                               class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                              placeholder="Enter any additional remarks or notes…"><?= htmlspecialchars(old('remarks') ?? '') ?></textarea>
+                              placeholder="Add any notes about this document"><?= htmlspecialchars(old('remarks') ?? '') ?></textarea>
                 </div>
             </section>
 
@@ -560,6 +541,48 @@ document.addEventListener('DOMContentLoaded', function () {
     const form             = document.getElementById('documentForm');
 
     if (!sourceTypeSelect || !documentTypeSelect || !attachmentsInput || !fileList || !submitBtn || !form) return;
+
+    const contactNumberInput = document.getElementById('source_contact_number');
+    if (contactNumberInput) {
+        contactNumberInput.addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '').slice(0, 15);
+        });
+    }
+
+    let receiveValidationFlashTimer;
+    function showReceiveValidationFlash(messages) {
+        const existingFlash = document.getElementById('receiveValidationFlash');
+        if (existingFlash) existingFlash.remove();
+        window.clearTimeout(receiveValidationFlashTimer);
+
+        const flash = document.createElement('div');
+        flash.id = 'receiveValidationFlash';
+        flash.className = 'fixed top-24 right-6 z-50 max-w-sm rounded-xl border border-red-100 bg-red-50 px-4 py-3 shadow-lg';
+        flash.setAttribute('role', 'alert');
+        flash.setAttribute('aria-live', 'assertive');
+
+        const heading = document.createElement('p');
+        heading.className = 'text-sm font-semibold text-red-800';
+        heading.textContent = 'Please review the following:';
+        flash.appendChild(heading);
+
+        const list = document.createElement('ul');
+        list.className = 'mt-1 list-disc space-y-0.5 pl-4 text-xs text-red-700';
+        (Array.isArray(messages) ? messages : [messages]).forEach(function(message) {
+            const item = document.createElement('li');
+            item.textContent = message;
+            list.appendChild(item);
+        });
+        flash.appendChild(list);
+        document.body.appendChild(flash);
+
+        receiveValidationFlashTimer = window.setTimeout(function() {
+            flash.style.transition = 'opacity 300ms, transform 300ms';
+            flash.style.opacity = '0';
+            flash.style.transform = 'translateX(20px)';
+            window.setTimeout(function() { flash.remove(); }, 300);
+        }, 4500);
+    }
 
     // Document type change handler — Load checklists + MFR section
     documentTypeSelect.addEventListener('change', function() {
@@ -963,6 +986,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Submit button spinner with checklist validation
     form.addEventListener('submit', function (e) {
+        const invalidFields = Array.from(form.querySelectorAll(':invalid'));
+        if (invalidFields.length > 0) {
+            e.preventDefault();
+            showReceiveValidationFlash(invalidFields.map(function(field) {
+                const label = form.querySelector(`label[for="${field.id}"]`);
+                const fieldName = label ? label.textContent.replace('*', '').trim() : field.name;
+                if (field.id === 'source_contact_number' && field.validity.patternMismatch) {
+                    return 'Contact number must contain 7 to 15 digits only.';
+                }
+                return fieldName + (field.validity.valueMissing ? ' is required.' : ' is invalid.');
+            }));
+            invalidFields[0].focus();
+            return false;
+        }
+
+        if (attachmentsInput.files.length === 0) {
+            e.preventDefault();
+            showReceiveValidationFlash(['At least one attachment is required.']);
+            return false;
+        }
+
         // Validate required checklist items
         const requiredChecklists = document.querySelectorAll('.required-checklist');
         const uncheckedRequired = [];
@@ -977,7 +1021,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (uncheckedRequired.length > 0) {
             e.preventDefault();
-            alert('Please complete all required checklist items:\n\n' + uncheckedRequired.join('\n'));
+            showReceiveValidationFlash(
+                uncheckedRequired.map(name => 'Required checklist item: ' + name)
+            );
             return false;
         }
 
@@ -992,7 +1038,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     searchInput.classList.add('border-red-400', 'ring-1', 'ring-red-400');
                     searchInput.focus();
                 }
-                alert('Please search for and select the original Complaint or Administrative Case before submitting.');
+                showReceiveValidationFlash([
+                    'Select the original Complaint or Administrative Case before submitting.'
+                ]);
                 return false;
             }
         }

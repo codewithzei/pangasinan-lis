@@ -1133,6 +1133,13 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'admin/noted-documents' => [
+        'method'     => 'GET',
+        'controller' => 'Admin/AdminNotedDocumentsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // -------------------------------------------------------------------------
     // Admin Routed Documents Routes
     // -------------------------------------------------------------------------

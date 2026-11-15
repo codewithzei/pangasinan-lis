@@ -1738,6 +1738,16 @@ try {
     // ── The views must expose those same rules ────────────────────────────
     $indexView   = (string) file_get_contents($root . '/resources/views/committee/referred/index.php');
     $opinionView = (string) file_get_contents($root . '/resources/views/committee/referred/opinion.php');
+    $endorseView = (string) file_get_contents($root . '/resources/views/committee/referred/endorse.php');
+    $referredController = (string) file_get_contents($root . '/app/controllers/Committee/CommitteeReferredController.php');
+    $requireDocumentBlock = '';
+    if (preg_match(
+        '/private function requireDocument\(.*?(?=\n    private function isResetReadyForAgenda)/s',
+        $referredController,
+        $requireDocumentMatch
+    )) {
+        $requireDocumentBlock = $requireDocumentMatch[0];
+    }
 
     assert_test(
         'UI: the For Opinion list advances the indicator from the cleared count, not the submission count',
@@ -1758,6 +1768,14 @@ try {
         'UI: the second review screen offers the Compliance upload as well (no second-review guard)',
         strpos($opinionView, 'data-second-review') === false
             && strpos($opinionView, "return selectedType() === 'UNFAVORABLE';") !== false
+    );
+    assert_test(
+        'REFERRED: endorsement document loader joins document types and exposes the type name',
+        strpos($requireDocumentBlock, 'dt.name AS document_type_name')
+            !== false
+            && strpos($requireDocumentBlock, 'LEFT JOIN document_types dt ON dt.id = d.document_type_id')
+                !== false
+            && strpos($endorseView, "\$document['document_type_name']") !== false
     );
 
 } catch (Throwable $e) {

@@ -361,7 +361,7 @@ usort($timeline, static fn($a, $b) => strcmp((string) $a['ts'], (string) $b['ts'
 ob_start();
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <?php if (!empty($success)): ?>
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars($success) ?></div>
@@ -445,13 +445,13 @@ ob_start();
                         ? 'Original Subject Matter'
                         : 'Subject Matter' ?>
                 </dt>
-                <dd class="mt-1 whitespace-pre-line text-sm text-gray-800"><?= htmlspecialchars($document['subject_matter']) ?></dd>
+                <dd class="mt-1 whitespace-pre-line text-sm text-gray-800"><?= escape_trimmed_text($document['subject_matter']) ?></dd>
             </div>
         <?php endif; ?>
         <?php if (!empty($document['remarks'])): ?>
             <div class="mt-4">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Remarks</dt>
-                <dd class="mt-1 whitespace-pre-line text-sm text-gray-700"><?= htmlspecialchars($document['remarks']) ?></dd>
+                <dd class="mt-1 whitespace-pre-line text-sm text-gray-700"><?= escape_trimmed_text($document['remarks']) ?></dd>
             </div>
         <?php endif; ?>
     </section>
@@ -589,14 +589,54 @@ ob_start();
                                 <?php if (!empty($secondReadingDetails['approval_files'])): ?>
                                     <div class="pt-1">
                                         <span class="text-gray-400">Approval Attachments:</span>
-                                        <ul class="mt-1 space-y-1">
+                                        <ul class="mt-2 space-y-2">
                                             <?php foreach ($secondReadingDetails['approval_files'] as $file): ?>
+                                                <?php
+                                                $approvalFilePath = preg_replace(
+                                                    '#^(?:public/)+#i',
+                                                    '',
+                                                    ltrim((string) ($file['file_path'] ?? ''), '/\\')
+                                                );
+                                                $approvalFileUrl = BASE_URL . '/public/' . $approvalFilePath;
+                                                $approvalFileSize = (int) ($file['file_size'] ?? 0);
+                                                $approvalFileSizeLabel = $approvalFileSize >= 1048576
+                                                    ? number_format($approvalFileSize / 1048576, 1) . ' MB'
+                                                    : number_format($approvalFileSize / 1024) . ' KB';
+                                                ?>
                                                 <li>
-                                                    <a href="<?= BASE_URL ?>/<?= htmlspecialchars(ltrim($file['file_path'], '/')) ?>"
-                                                       target="_blank" rel="noopener noreferrer"
-                                                       class="text-primary underline">
-                                                        <?= htmlspecialchars($file['original_filename']) ?>
-                                                    </a>
+                                                    <div class="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white px-3 py-3 shadow-sm">
+                                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                                                      d="M7 3h7l5 5v11a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5m-9 5h4m-4 4h6"/>
+                                                            </svg>
+                                                        </span>
+                                                        <div class="min-w-0 flex-1">
+                                                            <p class="truncate text-sm font-medium text-gray-800"
+                                                               title="<?= htmlspecialchars($file['original_filename'] ?? '') ?>">
+                                                                <?= htmlspecialchars($file['original_filename'] ?? 'Approval attachment') ?>
+                                                            </p>
+                                                            <p class="mt-0.5 text-xs text-gray-500">
+                                                                <?= htmlspecialchars($approvalFileSizeLabel) ?>
+                                                                <?php if (!empty($file['uploaded_at'])): ?>
+                                                                    · Uploaded <?= slShowDate($file['uploaded_at']) ?>
+                                                                <?php endif; ?>
+                                                            </p>
+                                                        </div>
+                                                        <a href="<?= htmlspecialchars($approvalFileUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                                           data-attachment-preview
+                                                           data-preview-url="<?= htmlspecialchars($approvalFileUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                                           data-preview-name="<?= htmlspecialchars($file['original_filename'] ?? 'Approval attachment', ENT_QUOTES, 'UTF-8') ?>"
+                                                           class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                                                           aria-label="Preview <?= htmlspecialchars($file['original_filename'] ?? 'approval attachment', ENT_QUOTES, 'UTF-8') ?>">
+                                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                                                      d="M2.25 12s3.5-6 9.75-6 9.75 6 9.75 6-3.5 6-9.75 6-9.75-6-9.75-6z"/>
+                                                                <circle cx="12" cy="12" r="2.5" stroke-width="1.8"/>
+                                                            </svg>
+                                                            Preview
+                                                        </a>
+                                                    </div>
                                                 </li>
                                             <?php endforeach; ?>
                                         </ul>
@@ -638,7 +678,7 @@ ob_start();
                             <?php if (!empty($commFirstReading['approved_subject_matter'])): ?>
                                 <div>
                                     <span class="text-gray-400">Approved Subject Matter:</span>
-                                    <p class="mt-0.5 whitespace-pre-line text-gray-700"><?= htmlspecialchars($commFirstReading['approved_subject_matter']) ?></p>
+                                    <p class="mt-0.5 whitespace-pre-line text-gray-700"><?= escape_trimmed_text($commFirstReading['approved_subject_matter']) ?></p>
                                 </div>
                             <?php endif; ?>
                             <?php if (!empty($commFirstReading['resolution_number'])): ?>
@@ -673,7 +713,7 @@ ob_start();
                             <?php if (!empty($commAdoption['approved_subject_matter'])): ?>
                                 <div class="sm:col-span-2">
                                     <span class="text-gray-400">Approved Subject Matter:</span>
-                                    <p class="mt-0.5 whitespace-pre-line text-gray-700"><?= htmlspecialchars($commAdoption['approved_subject_matter']) ?></p>
+                                    <p class="mt-0.5 whitespace-pre-line text-gray-700"><?= escape_trimmed_text($commAdoption['approved_subject_matter']) ?></p>
                                 </div>
                             <?php endif; ?>
                             <?php if (!empty($commAdoption['adopted_by_username'])): ?>
@@ -768,7 +808,7 @@ ob_start();
                             <?php if (!empty($casesAdoption['approved_subject_matter'])): ?>
                                 <div>
                                     <span class="text-gray-400">Approved Subject Matter:</span>
-                                    <p class="mt-0.5 whitespace-pre-line text-gray-700"><?= htmlspecialchars($casesAdoption['approved_subject_matter']) ?></p>
+                                    <p class="mt-0.5 whitespace-pre-line text-gray-700"><?= escape_trimmed_text($casesAdoption['approved_subject_matter']) ?></p>
                                 </div>
                             <?php endif; ?>
                             <?php if (!empty($casesAdoption['adopted_by_username'])): ?>
@@ -884,7 +924,7 @@ ob_start();
             <?php if (!empty($committeeCase['nature_of_case'])): ?>
             <div class="mt-5 border-t border-gray-100 pt-4">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Nature of Case</dt>
-                <dd class="mt-1 whitespace-pre-line text-sm text-gray-800"><?= htmlspecialchars($committeeCase['nature_of_case']) ?></dd>
+                <dd class="mt-1 whitespace-pre-line text-sm text-gray-800"><?= escape_trimmed_text($committeeCase['nature_of_case']) ?></dd>
             </div>
             <?php endif; ?>
 
@@ -892,7 +932,7 @@ ob_start();
             <?php if (!empty($committeeCase['complainant_details'])): ?>
             <div class="mt-4">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Complainant</dt>
-                <dd class="mt-1 whitespace-pre-line text-sm text-gray-800"><?= htmlspecialchars($committeeCase['complainant_details']) ?></dd>
+                <dd class="mt-1 whitespace-pre-line text-sm text-gray-800"><?= escape_trimmed_text($committeeCase['complainant_details']) ?></dd>
             </div>
             <?php endif; ?>
 
@@ -900,7 +940,7 @@ ob_start();
             <?php if (!empty($committeeCase['respondents'])): ?>
             <div class="mt-4">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Respondents</dt>
-                <dd class="mt-1 whitespace-pre-line text-sm text-gray-800"><?= htmlspecialchars($committeeCase['respondents']) ?></dd>
+                <dd class="mt-1 whitespace-pre-line text-sm text-gray-800"><?= escape_trimmed_text($committeeCase['respondents']) ?></dd>
             </div>
             <?php endif; ?>
 
@@ -908,7 +948,7 @@ ob_start();
             <?php if (!empty($committeeCase['final_outcome_remarks'])): ?>
             <div class="mt-4">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Outcome Remarks</dt>
-                <dd class="mt-1 whitespace-pre-line text-sm italic text-gray-600"><?= htmlspecialchars($committeeCase['final_outcome_remarks']) ?></dd>
+                <dd class="mt-1 whitespace-pre-line text-sm italic text-gray-600"><?= escape_trimmed_text($committeeCase['final_outcome_remarks']) ?></dd>
             </div>
             <?php endif; ?>
 

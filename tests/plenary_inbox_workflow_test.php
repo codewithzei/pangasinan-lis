@@ -669,6 +669,72 @@ try {
             $stmt->fetch() === false);
     }
 
+    // ==========================================================================
+    // TEST GROUP 9: Plenary processing saves the subject matter shown in Inbox
+    // ==========================================================================
+    echo PHP_EOL . "Group 9: Processing subject matter is reflected in the inbox" . PHP_EOL;
+
+    $subjectDoc = createPlenaryDoc(
+        $pdo,
+        $genericDocTypeId,
+        $sourceTypeId,
+        $pendingStatusId,
+        $plenaryRoleId,
+        $userA,
+        $genericDocTypeName
+    );
+    $updatedSubject = 'Updated subject from Plenary processing';
+    $pdo->prepare("
+        UPDATE documents
+        SET subject_matter = ?, updated_by = ?
+        WHERE id = ?
+    ")->execute([$updatedSubject, $userA, $subjectDoc['document_id']]);
+
+    $inboxSubject = $pdo->prepare("
+        SELECT d.subject_matter
+        FROM document_assignments da
+        INNER JOIN documents d ON d.id = da.document_id
+        WHERE da.id = ?
+    ");
+    $inboxSubject->execute([$subjectDoc['assignment_id']]);
+    check('9.1: Inbox query returns the updated subject matter',
+        $inboxSubject->fetchColumn() === $updatedSubject);
+
+    $controllerSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Plenary/PlenaryInboxController.php');
+    $processingStart = strpos($controllerSrc, 'private function doSaveProcessing(');
+    $processingEnd = strpos($controllerSrc, 'private function doSubmitCompliance(', $processingStart ?: 0);
+    $processingSource = $processingStart !== false && $processingEnd !== false
+        ? substr($controllerSrc, $processingStart, $processingEnd - $processingStart)
+        : '';
+    $subjectUpdateStart = strpos($processingSource, '// The processing form allows the subject matter');
+    $subjectUpdateEnd = strpos($processingSource, '// ── 4b.', $subjectUpdateStart ?: 0);
+    $subjectUpdateSource = $subjectUpdateStart !== false && $subjectUpdateEnd !== false
+        ? substr($processingSource, $subjectUpdateStart, $subjectUpdateEnd - $subjectUpdateStart)
+        : '';
+    check('9.2: Subject matter update is part of processing for every document type',
+        $subjectUpdateSource !== ''
+            && str_contains($subjectUpdateSource, 'UPDATE documents')
+            && str_contains($subjectUpdateSource, 'SET subject_matter = ?')
+            && str_contains($subjectUpdateSource, '[$subjectMatter, $userId, $documentId]')
+            && !str_contains($subjectUpdateSource, 'if ($isCommunication)'));
+
+    $memberSelectorSource = strpos($controllerSrc, 'private function fetchSpMembersForDocument(');
+    $memberSelectorEnd = strpos($controllerSrc, 'private function fetchCommittees(', $memberSelectorSource ?: 0);
+    $memberSelector = $memberSelectorSource !== false && $memberSelectorEnd !== false
+        ? substr($controllerSrc, $memberSelectorSource, $memberSelectorEnd - $memberSelectorSource)
+        : '';
+    $processingView = (string) file_get_contents(__DIR__ . '/../resources/views/plenary/inbox/show.php');
+    $documentServiceSource = (string) file_get_contents(__DIR__ . '/../app/services/DocumentService.php');
+    check('9.3: Plenary author and co-author options are limited to active-term members',
+        $memberSelector !== ''
+            && str_contains($memberSelector, 'term_legislators')
+            && str_contains($memberSelector, 'is_in_active_term')
+            && str_contains($processingView, "!empty(\$m['is_in_active_term'])"));
+    check('9.4: shared SP member selections and source validation require active-term membership',
+        str_contains($documentServiceSource, 'public function getSpMembers()')
+            && str_contains($documentServiceSource, 'tl.sp_member_id = sm.sp_member_id')
+            && str_contains($documentServiceSource, 'Select an active SP Member assigned to the active legislative term.'));
+
 } finally {
     $pdo->rollBack(); // zero permanent DB changes
 }

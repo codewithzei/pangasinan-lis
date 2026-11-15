@@ -79,12 +79,23 @@ $outcomeConfig = [
         'badge_text' => 'text-gray-700',
         'icon'       => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>',
     ],
+    'RESET' => [
+        'label'      => 'Reset',
+        'desc'       => 'Return the document to Ready for Agenda so a new agenda can be scheduled.',
+        'ring'       => 'ring-blue-500',
+        'bg'         => 'bg-blue-50',
+        'text'       => 'text-blue-800',
+        'icon_color' => 'text-blue-500',
+        'badge_bg'   => 'bg-blue-100',
+        'badge_text' => 'text-blue-800',
+        'icon'       => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5.64 18.36A9 9 0 0118.36 5.64"/>',
+    ],
 ];
 
 ob_start();
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <!-- Page header -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
@@ -480,7 +491,7 @@ ob_start();
                     <p class="mt-1 text-sm text-gray-600">
                         You are about to record the hearing outcome as
                         <strong id="modalOutcomeLabel" class="text-gray-900">—</strong>.
-                        This action will update the document status and cannot be reversed.
+                        <span id="modalOutcomeDescription">This action will update the document status.</span>
                     </p>
                 </div>
             </div>
@@ -519,6 +530,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelBtn     = document.getElementById('cancelConfirmBtn');
     const modal         = document.getElementById('confirmModal');
     const modalLabel    = document.getElementById('modalOutcomeLabel');
+    const modalDescription = document.getElementById('modalOutcomeDescription');
     const modalOutcome  = document.getElementById('modalOutcomeInput');
     const modalRemarks  = document.getElementById('modalRemarksInput');
     const remarksInput  = document.getElementById('hearingRemarks');
@@ -530,6 +542,10 @@ document.addEventListener('DOMContentLoaded', function () {
         'DEFERRED':  'Deferred',
         'REMANDED':  'Remanded',
         'WITHDRAWN': 'Withdrawn',
+        'RESET':     'Reset',
+    };
+    const outcomeDescriptions = {
+        'RESET': 'The document will return to Ready for Agenda so a new agenda can be scheduled. The existing agenda and hearing record will remain in the history.',
     };
 
     // Track selected outcome via card clicks
@@ -569,6 +585,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             // Populate modal
             modalLabel.textContent  = outcomeLabels[selectedOutcome] || selectedOutcome;
+            modalDescription.textContent = outcomeDescriptions[selectedOutcome] || 'This action will update the document status.';
             modalOutcome.value      = selectedOutcome;
             modalRemarks.value      = remarksInput ? remarksInput.value.trim() : '';
 

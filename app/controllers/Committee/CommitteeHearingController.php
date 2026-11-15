@@ -28,6 +28,7 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *   ?tab=deferred   Documents whose hearing outcome is DEFERRED
  *   ?tab=remanded   Documents whose hearing outcome is REMANDED
  *   ?tab=withdrawn  Documents whose hearing outcome is WITHDRAWN
+ *   ?tab=reset      Documents returned to Ready for Agenda for rescheduling
  *
  * AUTHORIZATION
  *   RoleMiddleware already restricts every committee/* route to
@@ -45,6 +46,7 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *   DEFERRED   → status: "Deferred"          → redirect to hearing list (deferred tab)
  *   REMANDED   → status: "Remanded"          → redirect to hearing list (remanded tab)
  *   WITHDRAWN  → status: "Withdrawn"         → redirect to hearing list (withdrawn tab)
+ *   RESET      → status: "Ready for Agenda"  → allow a new agenda in the same cycle
  *
  * COMMITTEE REPORT
  *   - report_type auto-derived: 1 committee = COMMITTEE_REPORT, 2+ = JOINT_COMMITTEE_REPORT
@@ -65,6 +67,7 @@ class CommitteeHearingController
         'deferred'  => 'Deferred',
         'remanded'  => 'Remanded',
         'withdrawn' => 'Withdrawn',
+        'reset'     => 'Reset',
     ];
 
     public function __construct()
@@ -302,7 +305,7 @@ class CommitteeHearingController
         }
 
         // ── Validate outcome ──────────────────────────────────────────────────
-        $validOutcomes = ['APPROVED', 'DEFERRED', 'REMANDED', 'WITHDRAWN'];
+        $validOutcomes = ['APPROVED', 'DEFERRED', 'REMANDED', 'WITHDRAWN', 'RESET'];
         if (!in_array($outcome, $validOutcomes, true)) {
             flash_set('errors', ['Please select a valid hearing outcome.']);
             flash_set('error', 'Please select a hearing outcome before submitting.');
@@ -343,6 +346,7 @@ class CommitteeHearingController
             'DEFERRED'  => 'Deferred',
             'REMANDED'  => 'Remanded',
             'WITHDRAWN' => 'Withdrawn',
+            'RESET'     => 'Ready for Agenda',
         ];
         $targetStatusName = $statusMap[$outcome];
         $targetStatus     = $this->requireDocumentStatus($targetStatusName);
@@ -353,6 +357,7 @@ class CommitteeHearingController
             'DEFERRED'  => 'HEARING_DEFERRED',
             'REMANDED'  => 'HEARING_REMANDED',
             'WITHDRAWN' => 'HEARING_WITHDRAWN',
+            'RESET'     => 'HEARING_AGENDA_RESET',
         ];
         $eventType = $eventTypeMap[$outcome];
 
@@ -457,6 +462,7 @@ class CommitteeHearingController
             'DEFERRED'  => 'deferred',
             'REMANDED'  => 'remanded',
             'WITHDRAWN' => 'withdrawn',
+            'RESET'     => 'reset',
         ];
         $redirectTab = $tabMap[$outcome] ?? 'all';
 
@@ -965,7 +971,7 @@ class CommitteeHearingController
      * Fetch per-tab counts for the counter badges.
      * Each count is an integer; missing status IDs produce 0.
      *
-     * @return array{all:int, scheduled:int, approved:int, deferred:int, remanded:int, withdrawn:int}
+     * @return array{all:int, scheduled:int, approved:int, deferred:int, remanded:int, withdrawn:int, reset:int}
      */
     private function countTabs(
         int $onGoingId,
@@ -982,41 +988,60 @@ class CommitteeHearingController
         );
         $all = (int) $allStmt->fetchColumn();
 
-        // "scheduled" = On Going with an agenda, no completed hearing yet
+        // "scheduled" = On Going with a latest agenda that has no hearing yet
         $schStmt = $this->pdo->prepare(
             "SELECT COUNT(DISTINCT d.id) FROM documents d
               INNER JOIN agendas ag ON ag.document_id = d.id
-              LEFT  JOIN committee_hearings ch ON ch.document_id = d.id
+                AND ag.id = (SELECT MAX(ag2.id) FROM agendas ag2 WHERE ag2.document_id = d.id)
+              LEFT JOIN committee_hearings ch ON ch.agenda_id = ag.id
              WHERE d.current_status_id = ? AND ch.id IS NULL"
         );
         $schStmt->execute([$onGoingId]);
         $scheduled = (int) $schStmt->fetchColumn();
 
-        // "approved"  = outcome APPROVED in committee_hearings
-        $appStmt = $this->pdo->query(
-            "SELECT COUNT(DISTINCT document_id) FROM committee_hearings WHERE outcome = 'APPROVED'"
-        );
+        // Outcome counts represent the latest scheduled agenda, not old cycles.
+        $appStmt = $this->countLatestAgendaOutcome('APPROVED');
         $approved = (int) $appStmt->fetchColumn();
 
         // "deferred" = outcome DEFERRED
-        $defStmt = $this->pdo->query(
-            "SELECT COUNT(DISTINCT document_id) FROM committee_hearings WHERE outcome = 'DEFERRED'"
-        );
+        $defStmt = $this->countLatestAgendaOutcome('DEFERRED');
         $deferred = (int) $defStmt->fetchColumn();
 
         // "remanded" = outcome REMANDED
-        $remStmt = $this->pdo->query(
-            "SELECT COUNT(DISTINCT document_id) FROM committee_hearings WHERE outcome = 'REMANDED'"
-        );
+        $remStmt = $this->countLatestAgendaOutcome('REMANDED');
         $remanded = (int) $remStmt->fetchColumn();
 
         // "withdrawn" = outcome WITHDRAWN
-        $witStmt = $this->pdo->query(
-            "SELECT COUNT(DISTINCT document_id) FROM committee_hearings WHERE outcome = 'WITHDRAWN'"
-        );
+        $witStmt = $this->countLatestAgendaOutcome('WITHDRAWN');
         $withdrawn = (int) $witStmt->fetchColumn();
 
-        return compact('all', 'scheduled', 'approved', 'deferred', 'remanded', 'withdrawn');
+        $resetStmt = $this->countLatestAgendaOutcome('RESET', true);
+        $reset = (int) $resetStmt->fetchColumn();
+
+        return compact('all', 'scheduled', 'approved', 'deferred', 'remanded', 'withdrawn', 'reset');
+    }
+
+    private function countLatestAgendaOutcome(string $outcome, bool $requireReadyStatus = false): PDOStatement
+    {
+        $readyStatusFilter = $requireReadyStatus
+            ? "AND ds.name = 'Ready for Agenda'"
+            : '';
+        $stmt = $this->pdo->prepare("
+            SELECT COUNT(DISTINCT d.id)
+            FROM documents d
+            INNER JOIN agendas ag
+                ON ag.document_id = d.id
+                AND ag.id = (SELECT MAX(ag2.id) FROM agendas ag2 WHERE ag2.document_id = d.id)
+            INNER JOIN committee_hearings ch
+                ON ch.document_id = d.id
+                AND ch.agenda_id = ag.id
+                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.agenda_id = ag.id)
+                AND ch.outcome = ?
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            WHERE 1=1 {$readyStatusFilter}
+        ");
+        $stmt->execute([$outcome]);
+        return $stmt;
     }
 
     /**
@@ -1052,6 +1077,9 @@ class CommitteeHearingController
             ),
             'withdrawn' => $this->queryOutcomeTab(
                 'WITHDRAWN', $searchWhere, $searchParams, $perPage, $offset
+            ),
+            'reset' => $this->queryOutcomeTab(
+                'RESET', $searchWhere, $searchParams, $perPage, $offset, true
             ),
             default     => $this->queryAllTab(
                 $searchWhere, $searchParams, $perPage, $offset
@@ -1107,7 +1135,8 @@ class CommitteeHearingController
             LEFT  JOIN document_types    dt   ON dt.id          = d.document_type_id
             LEFT  JOIN document_statuses ds   ON ds.id          = d.current_status_id
             LEFT  JOIN committee_hearings ch  ON ch.document_id = d.id
-                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
+                AND ch.agenda_id = ag.id
+                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.agenda_id = ag.id)
             LEFT  JOIN user_accounts ua_ch    ON ua_ch.id       = ch.performed_by
             LEFT  JOIN committee_report_documents crd ON crd.document_id = d.id
             LEFT  JOIN committee_reports cr ON cr.id = crd.committee_report_id
@@ -1135,7 +1164,8 @@ class CommitteeHearingController
             SELECT COUNT(DISTINCT d.id)
             FROM documents d
             INNER JOIN agendas ag ON ag.document_id = d.id
-            LEFT  JOIN committee_hearings ch ON ch.document_id = d.id
+                AND ag.id = (SELECT MAX(a2.id) FROM agendas a2 WHERE a2.document_id = d.id)
+            LEFT JOIN committee_hearings ch ON ch.agenda_id = ag.id
             WHERE d.current_status_id = ? AND ch.id IS NULL
             {$searchWhere}
         ");
@@ -1171,7 +1201,7 @@ class CommitteeHearingController
             LEFT  JOIN committees         c ON  c.id        = ac.committee_id
             LEFT  JOIN document_types    dt ON dt.id        = d.document_type_id
             LEFT  JOIN document_statuses ds ON ds.id        = d.current_status_id
-            LEFT  JOIN committee_hearings ch ON ch.document_id = d.id
+            LEFT  JOIN committee_hearings ch ON ch.agenda_id = ag.id
             LEFT  JOIN committee_report_documents crd ON crd.document_id = d.id
             LEFT  JOIN committee_reports cr ON cr.id = crd.committee_report_id
             WHERE d.current_status_id = ? AND ch.id IS NULL
@@ -1194,17 +1224,29 @@ class CommitteeHearingController
      * Uses DISTINCT on document_id with the latest hearing record per doc.
      */
     private function queryOutcomeTab(
-        string $outcome, string $searchWhere, array $searchParams, int $perPage, int $offset
+        string $outcome,
+        string $searchWhere,
+        array $searchParams,
+        int $perPage,
+        int $offset,
+        bool $requireReadyStatus = false
     ): array {
+        $readyStatusFilter = $requireReadyStatus
+            ? "AND ds.name = 'Ready for Agenda'"
+            : '';
         $countStmt = $this->pdo->prepare("
             SELECT COUNT(DISTINCT d.id)
             FROM documents d
+            INNER JOIN agendas ag
+                ON ag.document_id = d.id
+                AND ag.id = (SELECT MAX(ag2.id) FROM agendas ag2 WHERE ag2.document_id = d.id)
             INNER JOIN committee_hearings ch
                 ON ch.document_id = d.id
+                AND ch.agenda_id = ag.id
                 AND ch.outcome    = ?
-                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
-            INNER JOIN agendas ag ON ag.id = ch.agenda_id
-            WHERE 1=1 {$searchWhere}
+                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.agenda_id = ag.id)
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            WHERE 1=1 {$readyStatusFilter} {$searchWhere}
         ");
         $countStmt->execute([$outcome, ...$searchParams]);
         $total = (int) $countStmt->fetchColumn();
@@ -1232,12 +1274,14 @@ class CommitteeHearingController
                 cr.report_number,
                 cr.report_type
             FROM documents d
+            INNER JOIN agendas ag
+                ON ag.document_id = d.id
+                AND ag.id = (SELECT MAX(ag2.id) FROM agendas ag2 WHERE ag2.document_id = d.id)
             INNER JOIN committee_hearings ch
                 ON ch.document_id = d.id
+                AND ch.agenda_id = ag.id
                 AND ch.outcome    = ?
-                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
-            INNER JOIN agendas ag
-                ON ag.id = ch.agenda_id
+                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.agenda_id = ag.id)
             LEFT  JOIN agenda_committees ac   ON ac.agenda_id  = ag.id
             LEFT  JOIN committees         c   ON  c.id         = ac.committee_id
             LEFT  JOIN document_types    dt   ON dt.id         = d.document_type_id
@@ -1245,7 +1289,7 @@ class CommitteeHearingController
             LEFT  JOIN user_accounts ua_ch    ON ua_ch.id      = ch.performed_by
             LEFT  JOIN committee_report_documents crd ON crd.document_id = d.id
             LEFT  JOIN committee_reports cr ON cr.id = crd.committee_report_id
-            WHERE 1=1 {$searchWhere}
+            WHERE 1=1 {$readyStatusFilter} {$searchWhere}
             GROUP BY
                 d.id, d.tracking_number, d.subject_matter,
                 dt.name, dt.badge_color, ds.name, ds.badge_color,

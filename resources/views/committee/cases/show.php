@@ -80,7 +80,7 @@ function caseActionBadgeClass(string $actionType): string
 ob_start();
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <!-- Back + header --------------------------------------------------------->
     <div class="flex items-center gap-4">
@@ -261,23 +261,17 @@ ob_start();
                     <!-- Subject Matter -->
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Subject Matter</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">
-                            <?= htmlspecialchars($case['subject_matter'] ?? '') ?>
-                        </dd>
+                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($case['subject_matter'] ?? '') ?></dd>
                     </div>
                     <!-- Nature of Case -->
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Nature of Case</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">
-                            <?= htmlspecialchars($case['nature_of_case'] ?? '') ?>
-                        </dd>
+                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($case['nature_of_case'] ?? '') ?></dd>
                     </div>
                     <!-- Complainant Details -->
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Complainant Details</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap">
-                            <?= htmlspecialchars($case['complainant_details'] ?? '') ?>
-                        </dd>
+                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($case['complainant_details'] ?? '') ?></dd>
                     </div>
                     <!-- Complainant Municipality -->
                     <?php if (!empty($case['complainant_municipality'])): ?>
@@ -424,9 +418,7 @@ ob_start();
 
                                     <!-- Description -->
                                     <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                                        <p class="text-sm text-gray-800 whitespace-pre-wrap">
-                                            <?= htmlspecialchars($action['description']) ?>
-                                        </p>
+                                        <p class="text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($action['description']) ?></p>
 
                                         <!-- Notes -->
                                         <?php if (!empty($action['notes'])): ?>
@@ -435,9 +427,7 @@ ob_start();
                                                           text-gray-400 mb-1">
                                                     Notes
                                                 </p>
-                                                <p class="text-xs text-gray-600 whitespace-pre-wrap italic">
-                                                    <?= htmlspecialchars($action['notes']) ?>
-                                                </p>
+                                                <p class="text-xs text-gray-600 whitespace-pre-wrap italic"><?= escape_trimmed_text($action['notes']) ?></p>
                                             </div>
                                         <?php endif; ?>
 
@@ -567,9 +557,7 @@ ob_start();
                         <?php if (!empty($outcomeRemarks)): ?>
                             <div class="sm:col-span-2">
                                 <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Remarks</dt>
-                                <dd class="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
-                                    <?= htmlspecialchars($outcomeRemarks) ?>
-                                </dd>
+                                <dd class="mt-1 text-sm text-gray-700 whitespace-pre-wrap"><?= escape_trimmed_text($outcomeRemarks) ?></dd>
                             </div>
                         <?php endif; ?>
                     </dl>

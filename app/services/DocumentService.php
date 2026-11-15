@@ -109,6 +109,14 @@ class DocumentService
             $stmt->execute([$data['document_type_id']]);
             if (!$stmt->fetch()) {
                 $errors[] = 'Invalid or inactive document type selected.';
+            } else {
+                $errors = array_merge(
+                    $errors,
+                    $this->validateRequiredChecklistItems(
+                        (int) $data['document_type_id'],
+                        $data['checklist_items'] ?? []
+                    )
+                );
             }
         }
 
@@ -152,11 +160,55 @@ class DocumentService
     }
 
     /**
+     * Ensure every required checklist item for the selected document type was submitted.
+     *
+     * @param int   $documentTypeId
+     * @param mixed $submittedItems
+     * @return string[]
+     */
+    private function validateRequiredChecklistItems(int $documentTypeId, $submittedItems): array
+    {
+        $selectedIds = [];
+        if (is_array($submittedItems)) {
+            foreach ($submittedItems as $itemId) {
+                if (is_scalar($itemId) && (int) $itemId > 0) {
+                    $selectedIds[(int) $itemId] = true;
+                }
+            }
+        }
+
+        $stmt = $this->pdo->prepare("
+            SELECT c.id, c.name
+            FROM checklists c
+            INNER JOIN checklist_document_types cdt ON c.id = cdt.checklist_id
+            WHERE cdt.document_type_id = ?
+              AND cdt.is_required = 1
+              AND c.is_active = 1
+              AND c.is_deleted = 0
+        ");
+        $stmt->execute([$documentTypeId]);
+
+        $errors = [];
+        foreach ($stmt->fetchAll() as $checklist) {
+            if (!isset($selectedIds[(int) $checklist['id']])) {
+                $errors[] = sprintf('Checklist item "%s" is required.', $checklist['name']);
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
      * Validate source-type-specific fields.
      */
     public function validateSourceFields(string $sourceTypeName, array $data): array
     {
         $errors = [];
+        $contactNumber = trim((string) ($data['source_contact_number'] ?? ''));
+
+        if ($contactNumber !== '' && !preg_match('/^\d{7,15}$/', $contactNumber)) {
+            $errors[] = 'Contact number must contain 7 to 15 digits only.';
+        }
 
         switch ($sourceTypeName) {
             case 'Provincial Government Offices':
@@ -201,11 +253,20 @@ class DocumentService
                 } else {
                     $stmt = $this->pdo->prepare(
                         "SELECT sp_member_id FROM sp_members
-                          WHERE sp_member_id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+                          WHERE sp_member_id = ? AND is_active = 1 AND is_deleted = 0
+                            AND EXISTS (
+                                SELECT 1
+                                FROM term_legislators tl
+                                INNER JOIN terms t ON t.id = tl.term_id
+                                WHERE tl.sp_member_id = sp_members.sp_member_id
+                                  AND t.is_active = 1
+                                  AND t.is_deleted = 0
+                            )
+                          LIMIT 1"
                     );
                     $stmt->execute([$data['sp_member_id']]);
                     if (!$stmt->fetch()) {
-                        $errors[] = 'Invalid SP Member selected.';
+                        $errors[] = 'Select an active SP Member assigned to the active legislative term.';
                     }
                 }
                 break;
@@ -396,7 +457,16 @@ class DocumentService
                 $spStmt = $this->pdo->prepare(
                     "SELECT first_name, middle_name, last_name, suffix
                        FROM sp_members
-                      WHERE sp_member_id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+                      WHERE sp_member_id = ? AND is_active = 1 AND is_deleted = 0
+                        AND EXISTS (
+                            SELECT 1
+                            FROM term_legislators tl
+                            INNER JOIN terms t ON t.id = tl.term_id
+                            WHERE tl.sp_member_id = sp_members.sp_member_id
+                              AND t.is_active = 1
+                              AND t.is_deleted = 0
+                        )
+                      LIMIT 1"
                 );
                 $spStmt->execute([$data['sp_member_id']]);
                 $spMember = $spStmt->fetch();
@@ -602,14 +672,8 @@ class DocumentService
             //     route so the document appears in Admin Routed Documents and
             //     in the target role's inbox — NOT in the Admin Inbox.
             if ($isForwardRouted) {
-                // Update document phase/status to reflect immediate forward routing.
-                // Use "For Encoding" status to signal it is in transit.
-                $forwardStatusRow = $this->pdo->query(
-                    "SELECT id FROM document_statuses
-                      WHERE name = 'For Encoding' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
-                )->fetch();
-                $forwardStatusId = $forwardStatusRow ? (int) $forwardStatusRow['id'] : $statusId;
-
+                // Routing only creates a pending assignment. Plenary processing
+                // status is selected later, after the document is opened there.
                 $this->pdo->prepare("
                     UPDATE documents
                     SET current_phase         = ?,
@@ -617,7 +681,7 @@ class DocumentService
                         current_owner_user_id = NULL,
                         updated_by            = ?
                     WHERE id = ?
-                ")->execute([$targetPhase, $forwardStatusId, $userId, $documentId]);
+                ")->execute([$targetPhase, $statusId, $userId, $documentId]);
 
                 // Route record: ADMIN → target phase
                 $this->pdo->prepare("
@@ -776,7 +840,7 @@ class DocumentService
                     $forwardEventType,
                     'ADMIN',
                     $userId,
-                    $forwardStatusId,
+                    $statusId,
                     "Document routed directly to {$forwardRouteMap[$routingOptionId]['role']} at intake",
                     json_encode(
                         array_merge($baseMetadata, ['routed_to_role_id' => $targetRoleId]),
@@ -988,9 +1052,19 @@ class DocumentService
     public function getSpMembers(): array
     {
         return $this->pdo->query(
-            "SELECT sp_member_id, first_name, middle_name, last_name, suffix, position, district_id
-               FROM sp_members
-              WHERE is_active = 1 AND is_deleted = 0 ORDER BY last_name ASC, first_name ASC"
+            "SELECT sm.sp_member_id, sm.first_name, sm.middle_name, sm.last_name,
+                    sm.suffix, sm.position, sm.district_id
+               FROM sp_members sm
+              WHERE sm.is_active = 1 AND sm.is_deleted = 0
+                AND EXISTS (
+                    SELECT 1
+                    FROM term_legislators tl
+                    INNER JOIN terms t ON t.id = tl.term_id
+                    WHERE tl.sp_member_id = sm.sp_member_id
+                      AND t.is_active = 1
+                      AND t.is_deleted = 0
+                )
+              ORDER BY sm.last_name ASC, sm.first_name ASC"
         )->fetchAll();
     }
 

@@ -9,6 +9,8 @@
     var title;
     var content;
     var downloadLink;
+    var scriptPromises = Object.create(null);
+    var docxPreviewPromise;
 
     function getExtension(url) {
         var path = url.split('?')[0].split('#')[0];
@@ -87,17 +89,19 @@
             preview.className = 'min-h-[60vh] overflow-auto bg-white p-4';
             content.append(status, preview);
 
-            Promise.all([
-                loadScript(window.documentAttachmentPreviewBase + '/public/assets/js/jszip.min.js'),
-                loadScript(window.documentAttachmentPreviewBase + '/public/assets/js/docx-preview.min.js')
-            ]).then(function () {
+            loadDocxPreviewLibraries().then(function () {
                 return fetch(url, { credentials: 'same-origin' });
             }).then(function (response) {
-                if (!response.ok) throw new Error('The attachment could not be loaded.');
+                if (!response.ok) {
+                    throw new Error('Attachment preview failed (HTTP ' + response.status + ').');
+                }
                 return response.arrayBuffer();
             }).then(function (buffer) {
                 if (!window.docx || typeof window.docx.renderAsync !== 'function') {
                     throw new Error('The document preview library did not load.');
+                }
+                if (!window.JSZip || typeof window.JSZip.loadAsync !== 'function') {
+                    throw new Error('The ZIP preview library did not initialize correctly.');
                 }
                 return window.docx.renderAsync(buffer, preview);
             }).then(function () {
@@ -112,31 +116,78 @@
         showDownloadFallback('Preview is not available for this file type. Use Download to open it in a compatible application.');
     }
 
-    function loadScript(src) {
-        return new Promise(function (resolve, reject) {
-            var existing = document.querySelector('script[src="' + src + '"]');
-            if (existing) {
-                if (existing.dataset.loaded === 'true'
-                    || (src.indexOf('docx-preview.min.js') !== -1 && window.docx)
-                    || (src.indexOf('jszip.min.js') !== -1 && window.JSZip)) {
-                    resolve();
-                } else {
-                    existing.addEventListener('load', resolve, { once: true });
-                    existing.addEventListener('error', reject, { once: true });
-                }
-                return;
+    function loadDocxPreviewLibraries() {
+        if (docxPreviewPromise) return docxPreviewPromise;
+
+        var baseUrl = window.documentAttachmentPreviewBase || '';
+        docxPreviewPromise = loadScript(
+            baseUrl + '/public/assets/js/jszip.min.js',
+            function () {
+                return window.JSZip && typeof window.JSZip.loadAsync === 'function';
             }
-            var script = document.createElement('script');
-            script.src = src;
-            script.onload = function () {
-                script.dataset.loaded = 'true';
-                resolve();
-            };
-            script.onerror = function () {
-                reject(new Error('The document preview library could not be loaded.'));
-            };
-            document.head.appendChild(script);
+        ).then(function () {
+            return loadScript(
+                baseUrl + '/public/assets/js/docx-preview.min.js',
+                function () {
+                    return window.docx && typeof window.docx.renderAsync === 'function';
+                }
+            );
+        }).catch(function (error) {
+            docxPreviewPromise = null;
+            throw error;
         });
+
+        return docxPreviewPromise;
+    }
+
+    function loadScript(src, isReady) {
+        if (isReady()) return Promise.resolve();
+        if (scriptPromises[src]) return scriptPromises[src];
+
+        var existing = document.querySelector('script[src="' + src + '"]');
+        if (existing && existing.dataset.loaded === 'true') {
+            return Promise.reject(
+                new Error('Preview library loaded without its required API: ' + src)
+            );
+        }
+
+        scriptPromises[src] = new Promise(function (resolve, reject) {
+            var script = existing || document.createElement('script');
+
+            function cleanup() {
+                script.removeEventListener('load', onLoad);
+                script.removeEventListener('error', onError);
+            }
+
+            function onLoad() {
+                script.dataset.loaded = 'true';
+                cleanup();
+                if (isReady()) {
+                    resolve();
+                    return;
+                }
+                delete scriptPromises[src];
+                script.remove();
+                reject(new Error('Preview library loaded without its required API: ' + src));
+            }
+
+            function onError() {
+                cleanup();
+                delete scriptPromises[src];
+                script.remove();
+                reject(new Error('Could not load preview library (check for HTTP 404): ' + src));
+            }
+
+            script.addEventListener('load', onLoad, { once: true });
+            script.addEventListener('error', onError, { once: true });
+
+            if (!existing) {
+                script.src = src;
+                document.head.appendChild(script);
+            }
+        });
+
+        return scriptPromises[src];
     }
 
     function isAttachmentLink(link) {

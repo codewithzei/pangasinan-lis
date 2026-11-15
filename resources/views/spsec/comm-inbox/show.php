@@ -27,7 +27,7 @@ $trackingNumber = $document['tracking_number'] ?? '';
 ob_start();
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <?php if (!empty($success)): ?>
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars($success) ?></div>

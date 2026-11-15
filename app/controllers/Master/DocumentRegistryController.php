@@ -305,14 +305,19 @@ class DocumentRegistryController
         $municipalities = $municipalitiesStmt->fetchAll();
 
         $spMembersStmt = $this->pdo->prepare("
-            SELECT sp_member_id, first_name, middle_name, last_name, suffix
-            FROM sp_members
-            WHERE (is_active = 1 AND is_deleted = 0)
-               OR TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(middle_name, ''),
-                    NULLIF(last_name, ''), NULLIF(suffix, ''))) = ?
-            ORDER BY last_name, first_name
+            SELECT sm.sp_member_id, sm.first_name, sm.middle_name, sm.last_name, sm.suffix
+            FROM sp_members sm
+            WHERE sm.is_active = 1 AND sm.is_deleted = 0
+              AND EXISTS (
+                  SELECT 1
+                  FROM term_legislators tl
+                  INNER JOIN terms t ON t.id = tl.term_id
+                  WHERE tl.sp_member_id = sm.sp_member_id
+                    AND t.is_active = 1 AND t.is_deleted = 0
+              )
+            ORDER BY sm.last_name, sm.first_name
         ");
-        $spMembersStmt->execute([(string)($document['source_name'] ?? '')]);
+        $spMembersStmt->execute();
         $spMembers = $spMembersStmt->fetchAll();
 
         $attachmentStmt = $this->pdo->prepare("
@@ -624,11 +629,19 @@ class DocumentRegistryController
                 SELECT id, name FROM committees ORDER BY name
             ")->fetchAll(),
             'sp_member_id' => $this->pdo->query("
-                SELECT sp_member_id AS id,
-                       TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(middle_name, ''),
-                           NULLIF(last_name, ''), NULLIF(suffix, ''))) AS name
-                FROM sp_members
-                ORDER BY last_name, first_name
+                SELECT sm.sp_member_id AS id,
+                       TRIM(CONCAT_WS(' ', NULLIF(sm.first_name, ''), NULLIF(sm.middle_name, ''),
+                           NULLIF(sm.last_name, ''), NULLIF(sm.suffix, ''))) AS name
+                FROM sp_members sm
+                WHERE sm.is_active = 1 AND sm.is_deleted = 0
+                  AND EXISTS (
+                      SELECT 1
+                      FROM term_legislators tl
+                      INNER JOIN terms t ON t.id = tl.term_id
+                      WHERE tl.sp_member_id = sm.sp_member_id
+                        AND t.is_active = 1 AND t.is_deleted = 0
+                  )
+                ORDER BY sm.last_name, sm.first_name
             ")->fetchAll(),
             'opinion_office_id' => $this->pdo->query("
                 SELECT id, name FROM opinion_offices ORDER BY name
@@ -1153,30 +1166,24 @@ class DocumentRegistryController
                     break;
                 }
 
-                $memberSql = "
-                    SELECT first_name, middle_name, last_name, suffix
-                    FROM sp_members
-                    WHERE sp_member_id = ? AND is_active = 1 AND is_deleted = 0
-                ";
-                if ($sameSourceType && trim((string)$original['source_name']) !== '') {
-                    $memberSql = "
-                        SELECT first_name, middle_name, last_name, suffix
-                        FROM sp_members
-                        WHERE sp_member_id = ? AND (
-                            (is_active = 1 AND is_deleted = 0)
-                            OR TRIM(CONCAT_WS(' ', NULLIF(first_name, ''), NULLIF(middle_name, ''),
-                                NULLIF(last_name, ''), NULLIF(suffix, ''))) = ?
-                        )
-                    ";
-                    $memberParams = [$memberId, (string)$original['source_name']];
-                } else {
-                    $memberParams = [$memberId];
-                }
-                $memberStmt = $this->pdo->prepare($memberSql . ' LIMIT 1');
-                $memberStmt->execute($memberParams);
+                $memberStmt = $this->pdo->prepare("
+                    SELECT sm.first_name, sm.middle_name, sm.last_name, sm.suffix
+                    FROM sp_members sm
+                    WHERE sm.sp_member_id = ?
+                      AND sm.is_active = 1 AND sm.is_deleted = 0
+                      AND EXISTS (
+                          SELECT 1
+                          FROM term_legislators tl
+                          INNER JOIN terms t ON t.id = tl.term_id
+                          WHERE tl.sp_member_id = sm.sp_member_id
+                            AND t.is_active = 1 AND t.is_deleted = 0
+                      )
+                    LIMIT 1
+                ");
+                $memberStmt->execute([$memberId]);
                 $member = $memberStmt->fetch();
                 if (!$member) {
-                    $errors[] = 'Select an active, valid SP Member.';
+                    $errors[] = 'Select an active SP Member assigned to the active legislative term.';
                     break;
                 }
                 $source['source_name'] = trim(implode(' ', array_filter([

@@ -392,6 +392,139 @@ try {
         } else {
             echo "  SKIP  C7: Communication type not in DB\n"; $passed++;
         }
+
+        // C8: Required checklist items are enforced by the shared server-side validator
+        if ($commTypeId) {
+            $checklistName = '__required_receive_validation_' . bin2hex(random_bytes(6));
+            $insertChecklist = $pdo->prepare(
+                'INSERT INTO checklists (name, is_active, is_deleted) VALUES (?, 1, 0)'
+            );
+            $insertChecklist->execute([$checklistName]);
+            $requiredChecklistId = (int) $pdo->lastInsertId();
+
+            $linkChecklist = $pdo->prepare(
+                'INSERT INTO checklist_document_types (checklist_id, document_type_id, is_required) VALUES (?, ?, 1)'
+            );
+            $linkChecklist->execute([$requiredChecklistId, $commTypeId]);
+
+            $selectedChecklistIds = [];
+            foreach ($ds->getChecklistsByDocumentType($commTypeId) as $checklist) {
+                if ((int) $checklist['is_required'] === 1
+                    && (int) $checklist['id'] !== $requiredChecklistId) {
+                    $selectedChecklistIds[] = (int) $checklist['id'];
+                }
+            }
+
+            $data = array_merge($base, [
+                'document_type_id' => $commTypeId,
+                'referenced_document_id' => 0,
+                'checklist_items' => $selectedChecklistIds,
+            ]);
+            $errs = $ds->validateSubmission($data);
+            $expectedChecklistError = sprintf('Checklist item "%s" is required.', $checklistName);
+            ok('C8a: missing required checklist item fails server-side validation',
+                in_array($expectedChecklistError, $errs, true),
+                'errors: ' . implode('; ', $errs));
+
+            $data['checklist_items'][] = $requiredChecklistId;
+            $errs = $ds->validateSubmission($data);
+            $checklistErrors = array_filter($errs, fn($e) => str_starts_with($e, 'Checklist item "'));
+            ok('C8b: submitted required checklist item passes checklist validation',
+                empty($checklistErrors),
+                'errors: ' . implode('; ', $checklistErrors));
+        } else {
+            echo "  SKIP  C8: Communication type not in DB\n"; $passed += 2;
+        }
+
+        // C9: Every common required field and at least one attachment is enforced
+        $requiredFieldData = [
+            'date_received' => '',
+            'time_received' => '',
+            'subject_matter' => '',
+            'document_type_id' => 0,
+            'source_type_id' => 0,
+            'referenced_document_id' => 0,
+            'checklist_items' => [],
+            'source_name' => '',
+            'external_office_id' => null,
+            'hospital_id' => null,
+            'municipality_id' => null,
+            'sp_member_id' => null,
+        ];
+        $requiredFieldErrors = $ds->validateSubmission($requiredFieldData);
+        $expectedRequiredErrors = [
+            'Date received is required.',
+            'Time received is required.',
+            'Subject matter is required.',
+            'Document type is required.',
+            'Source type is required.',
+        ];
+        $missingRequiredErrors = array_diff($expectedRequiredErrors, $requiredFieldErrors);
+        ok('C9a: empty common required fields each produce validation errors',
+            empty($missingRequiredErrors),
+            'missing errors: ' . implode('; ', $missingRequiredErrors));
+
+        $attachmentErrors = $ds->validateFileUploads([], true);
+        ok('C9b: missing required attachment produces a validation error',
+            in_array('At least one attachment is required.', $attachmentErrors, true),
+            'errors: ' . implode('; ', $attachmentErrors));
+
+        // C10: Every source type enforces the fields marked required in the form
+        $emptySourceData = [
+            'source_name' => '',
+            'external_office_id' => null,
+            'hospital_id' => null,
+            'municipality_id' => null,
+            'sp_member_id' => null,
+        ];
+        $sourceFieldCases = [
+            [
+                'Provincial Government Offices',
+                'External office is required for this source type.',
+            ],
+            ['Hospital', 'Hospital is required for this source type.'],
+            ['SP Member', 'SP Member is required for this source type.'],
+            ['Agency', 'Agency name is required for this source type.'],
+            [
+                'Client',
+                'Client name is required for this source type.',
+                'Municipality / City is required for this source type.',
+            ],
+        ];
+        $sourceFieldErrors = [];
+        $expectedSourceFieldErrors = [];
+        foreach ($sourceFieldCases as $case) {
+            $expectedSourceFieldErrors = array_merge(
+                $expectedSourceFieldErrors,
+                array_slice($case, 1)
+            );
+            $sourceFieldErrors = array_merge(
+                $sourceFieldErrors,
+                $ds->validateSourceFields($case[0], $emptySourceData)
+            );
+        }
+        $missingSourceFieldErrors = array_diff($expectedSourceFieldErrors, $sourceFieldErrors);
+        ok('C10: all conditional required source fields produce validation errors',
+            empty($missingSourceFieldErrors),
+            'missing errors: ' . implode('; ', $missingSourceFieldErrors));
+
+        $contactData = array_merge($emptySourceData, ['source_contact_number' => '0917ABC1234']);
+        $contactErrors = $ds->validateSourceFields('Agency', $contactData);
+        ok('C11a: letters in a contact number fail validation',
+            in_array('Contact number must contain 7 to 15 digits only.', $contactErrors, true),
+            'errors: ' . implode('; ', $contactErrors));
+
+        $contactData['source_contact_number'] = '123456';
+        $contactErrors = $ds->validateSourceFields('Agency', $contactData);
+        ok('C11b: a contact number shorter than 7 digits fails validation',
+            in_array('Contact number must contain 7 to 15 digits only.', $contactErrors, true),
+            'errors: ' . implode('; ', $contactErrors));
+
+        $contactData['source_contact_number'] = '09171234567';
+        $contactErrors = $ds->validateSourceFields('Agency', $contactData);
+        ok('C11c: a valid 11-digit mobile number passes contact validation',
+            !in_array('Contact number must contain 7 to 15 digits only.', $contactErrors, true),
+            'errors: ' . implode('; ', $contactErrors));
     }
 } catch (Throwable $e) {
     failTest('Group C exception', $e->getMessage());

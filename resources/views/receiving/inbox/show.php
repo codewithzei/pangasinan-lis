@@ -57,7 +57,7 @@ function normalizeTimeForInput(?string $time): string {
 }
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <!-- Page Header -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
@@ -169,7 +169,7 @@ function normalizeTimeForInput(?string $time): string {
         <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             <div>
                 <dt class="text-xs font-medium text-gray-500">Subject Matter</dt>
-                <dd class="mt-1 text-sm text-gray-900"><?= nl2br(htmlspecialchars($document['subject_matter'] ?? '—')) ?></dd>
+                <dd class="mt-1 text-sm text-gray-900"><?= nl2br(escape_trimmed_text($document['subject_matter'] ?? '—')) ?></dd>
             </div>
             <div>
                 <dt class="text-xs font-medium text-gray-500">Document Type</dt>
@@ -207,7 +207,7 @@ function normalizeTimeForInput(?string $time): string {
             <?php if (!empty($document['remarks'])): ?>
             <div class="sm:col-span-2">
                 <dt class="text-xs font-medium text-gray-500">Remarks</dt>
-                <dd class="mt-1 text-sm text-gray-900"><?= nl2br(htmlspecialchars($document['remarks'])) ?></dd>
+                <dd class="mt-1 text-sm text-gray-900"><?= nl2br(escape_trimmed_text($document['remarks'])) ?></dd>
             </div>
             <?php endif; ?>
         </dl>

@@ -54,6 +54,15 @@ $outcomeOptions = [
         'badge_bg'    => 'bg-gray-100',
         'badge_text'  => 'text-gray-700',
     ],
+    'COMPLETED_TERMINATED' => [
+        'label'       => 'Completed/Terminated',
+        'description' => 'Record the hearing as completed or terminated. No further committee action or report will follow.',
+        'ring'        => 'ring-slate-500',
+        'bg'          => 'bg-slate-50',
+        'text'        => 'text-slate-700',
+        'badge_bg'    => 'bg-slate-100',
+        'badge_text'  => 'text-slate-700',
+    ],
 ];
 
 ob_start();
@@ -217,6 +226,8 @@ ob_start();
                                  <dd>Sent back to originating body.</dd></div>
                             <div><dt class="font-semibold text-gray-700">Withdrawn</dt>
                                  <dd>Removed from the process.</dd></div>
+                            <div><dt class="font-semibold text-gray-700">Completed/Terminated</dt>
+                                 <dd>Saved as the final hearing record. No further committee action or report is required.</dd></div>
                         </dl>
                     </div>
                 </div>
@@ -270,6 +281,7 @@ document.addEventListener('DOMContentLoaded', function () {
         DEFERRED:  'Save hearing outcome as Deferred. The workflow will close after this.',
         REMANDED:  'Save hearing outcome as Remanded. The workflow will close after this.',
         WITHDRAWN: 'Save hearing outcome as Withdrawn. The workflow will close after this.',
+        COMPLETED_TERMINATED: 'Save Completed/Terminated as the final hearing record. No further committee action or report will follow.',
     };
 
     function openModal() {

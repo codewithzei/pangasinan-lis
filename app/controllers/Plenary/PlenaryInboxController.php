@@ -1108,14 +1108,24 @@ class PlenaryInboxController
             if (!empty($allMemberIds)) {
                 $placeholders = implode(',', array_fill(0, count($allMemberIds), '?'));
                 $memberCheck  = $this->pdo->prepare("
-                    SELECT sp_member_id FROM sp_members
-                    WHERE sp_member_id IN ({$placeholders})
+                    SELECT sm.sp_member_id FROM sp_members sm
+                    WHERE sm.sp_member_id IN ({$placeholders})
                       AND (
-                            (is_active = 1 AND is_deleted = 0)
+                            (
+                                sm.is_active = 1 AND sm.is_deleted = 0
+                                AND EXISTS (
+                                    SELECT 1
+                                    FROM term_legislators tl
+                                    INNER JOIN terms t ON t.id = tl.term_id
+                                    WHERE tl.sp_member_id = sm.sp_member_id
+                                      AND t.is_active = 1
+                                      AND t.is_deleted = 0
+                                )
+                            )
                             OR EXISTS (
                                 SELECT 1 FROM document_authors da
                                 WHERE da.document_id = ?
-                                  AND da.sp_member_id = sp_members.sp_member_id
+                                  AND da.sp_member_id = sm.sp_member_id
                             )
                       )
                 ");
@@ -1136,9 +1146,16 @@ class PlenaryInboxController
             $activeMemberIds = array_map(
                 'intval',
                 $this->pdo->query("
-                    SELECT sp_member_id
-                    FROM sp_members
-                    WHERE is_active = 1 AND is_deleted = 0
+                    SELECT sm.sp_member_id
+                    FROM sp_members sm
+                    WHERE sm.is_active = 1 AND sm.is_deleted = 0
+                      AND EXISTS (
+                          SELECT 1
+                          FROM term_legislators tl
+                          INNER JOIN terms t ON t.id = tl.term_id
+                          WHERE tl.sp_member_id = sm.sp_member_id
+                            AND t.is_active = 1 AND t.is_deleted = 0
+                      )
                 ")->fetchAll(PDO::FETCH_COLUMN)
             );
             $authorsAll = !empty($activeMemberIds)
@@ -1207,15 +1224,14 @@ class PlenaryInboxController
             $userId,
         ]);
 
-        // ── 4a. Communications: the Subject Matter field updates the title ─
-        if ($isCommunication) {
-            $this->pdo->prepare("
-                UPDATE documents
-                SET subject_matter = ?,
-                    updated_by     = ?
-                WHERE id = ?
-            ")->execute([$subjectMatter, $userId, $documentId]);
-        }
+        // The processing form allows the subject matter to be corrected for
+        // every document type; keep the inbox's documents row in sync.
+        $this->pdo->prepare("
+            UPDATE documents
+            SET subject_matter = ?,
+                updated_by     = ?
+            WHERE id = ?
+        ")->execute([$subjectMatter, $userId, $documentId]);
 
         // ── 4b. Advance document status to "Awaiting First Reading" ───────
         // This moves the document into the First Reading queue.
@@ -1722,15 +1738,33 @@ class PlenaryInboxController
     {
         $stmt = $this->pdo->prepare("
             SELECT sm.sp_member_id, sm.first_name, sm.middle_name, sm.last_name, sm.suffix, sm.position,
-                   sm.is_active, sm.is_deleted
+                   sm.is_active, sm.is_deleted,
+                   EXISTS (
+                       SELECT 1
+                       FROM term_legislators tl
+                       INNER JOIN terms t ON t.id = tl.term_id
+                       WHERE tl.sp_member_id = sm.sp_member_id
+                         AND t.is_active = 1
+                         AND t.is_deleted = 0
+                   ) AS is_in_active_term
             FROM sp_members sm
-            WHERE (sm.is_active = 1 AND sm.is_deleted = 0)
-               OR EXISTS (
+            WHERE (
+                    (sm.is_active = 1 AND sm.is_deleted = 0)
+                    AND EXISTS (
+                        SELECT 1
+                        FROM term_legislators tl
+                        INNER JOIN terms t ON t.id = tl.term_id
+                        WHERE tl.sp_member_id = sm.sp_member_id
+                          AND t.is_active = 1
+                          AND t.is_deleted = 0
+                    )
+                )
+                OR EXISTS (
                     SELECT 1
                     FROM document_authors da
                     WHERE da.document_id = ?
                       AND da.sp_member_id = sm.sp_member_id
-               )
+                )
             ORDER BY sm.last_name ASC, sm.first_name ASC
         ");
         $stmt->execute([$documentId]);

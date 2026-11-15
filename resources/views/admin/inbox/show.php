@@ -104,7 +104,7 @@ function showEvent(string $et): string {
 ob_start();
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <!-- Back + Page header --------------------------------------------------->
     <div class="flex items-center gap-4">
@@ -158,7 +158,7 @@ ob_start();
                     </div>
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Subject Matter</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= htmlspecialchars($document['subject_matter'] ?? '') ?></dd>
+                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($document['subject_matter'] ?? '') ?></dd>
                     </div>
                     <div>
                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Document Type</dt>
@@ -179,7 +179,7 @@ ob_start();
                     <?php if (!empty($document['remarks'])): ?>
                         <div class="sm:col-span-2">
                             <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Remarks</dt>
-                            <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= htmlspecialchars($document['remarks']) ?></dd>
+                            <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($document['remarks']) ?></dd>
                         </div>
                     <?php endif; ?>
                 </dl>
@@ -308,7 +308,7 @@ ob_start();
                     <?php if (!empty($document['source_address'])): ?>
                         <div class="sm:col-span-2">
                             <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Address</dt>
-                            <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= htmlspecialchars($document['source_address']) ?></dd>
+                            <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($document['source_address']) ?></dd>
                         </div>
                     <?php endif; ?>
                 </dl>
@@ -936,6 +936,10 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.addEventListener('click', function () {
             pendingAction = this.dataset.action;
 
+            // Show the Communication category before validating it; otherwise
+            // the required select remains hidden and cannot receive focus.
+            updateFieldVisibility(pendingAction);
+
             // Client-side validation before showing modal
             if (pendingAction === 'decline' && remarksEl && remarksEl.value.trim() === '') {
                 remarksEl.classList.add('border-red-400');
@@ -949,9 +953,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 commSelect.focus();
                 return;
             }
-
-            // Show/hide comm category field based on action
-            updateFieldVisibility(pendingAction);
 
             confirmBody.textContent = actionLabels[pendingAction] || 'Proceed with this action?';
             openModal();

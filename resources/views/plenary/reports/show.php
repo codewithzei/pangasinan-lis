@@ -29,7 +29,7 @@ $disapprovedCount = count(array_filter($adoptions, static fn(array $item): bool 
 
 ob_start();
 ?>
-<div class="space-y-6">
+<div class="detail-page space-y-6">
     <a href="<?= BASE_URL ?>/plenary/reports"
        class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary">
         <span aria-hidden="true">←</span> Back to Plenary Reports
@@ -131,7 +131,7 @@ ob_start();
             <section class="rounded-2xl border border-gray-200 bg-white p-5">
                 <h2 class="text-sm font-semibold text-gray-900">Committee Findings and Recommendations</h2>
                 <?php if (!empty($report['summary_of_findings'])): ?>
-                    <div class="mt-3 whitespace-pre-wrap text-sm leading-7 text-gray-700"><?= htmlspecialchars($report['summary_of_findings']) ?></div>
+                    <div class="mt-3 whitespace-pre-wrap text-sm leading-7 text-gray-700"><?= escape_trimmed_text($report['summary_of_findings']) ?></div>
                 <?php else: ?>
                     <p class="mt-3 text-sm italic text-gray-500">No findings or recommendations were recorded.</p>
                 <?php endif; ?>
@@ -188,7 +188,7 @@ ob_start();
                                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">First Reading Referral</dt>
                                         <dd class="mt-1 text-gray-700"><?= !empty($adoption['first_reading_date']) ? htmlspecialchars(date('M j, Y', strtotime($adoption['first_reading_date']))) : '—' ?></dd>
                                         <?php if (!empty($adoption['first_reading_remarks'])): ?>
-                                            <p class="mt-1 whitespace-pre-wrap text-xs text-gray-500"><?= htmlspecialchars($adoption['first_reading_remarks']) ?></p>
+                                            <p class="mt-1 whitespace-pre-wrap text-xs text-gray-500"><?= escape_trimmed_text($adoption['first_reading_remarks']) ?></p>
                                         <?php endif; ?>
                                     </div>
                                     <div>
@@ -211,7 +211,7 @@ ob_start();
                                             <?php endif; ?>
                                         </dd>
                                         <?php if (!empty($adoption['committee_hearing_remarks'])): ?>
-                                            <p class="mt-1 whitespace-pre-wrap text-xs text-gray-500"><?= htmlspecialchars($adoption['committee_hearing_remarks']) ?></p>
+                                            <p class="mt-1 whitespace-pre-wrap text-xs text-gray-500"><?= escape_trimmed_text($adoption['committee_hearing_remarks']) ?></p>
                                         <?php endif; ?>
                                     </div>
                                 </dl>
@@ -223,7 +223,7 @@ ob_start();
                                 <?php if (!empty($adoption['remarks'])): ?>
                                     <div class="mt-3 rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2">
                                         <p class="text-xs font-semibold text-blue-900">Plenary Remarks</p>
-                                        <p class="mt-1 whitespace-pre-wrap text-sm text-gray-700"><?= htmlspecialchars($adoption['remarks']) ?></p>
+                                        <p class="mt-1 whitespace-pre-wrap text-sm text-gray-700"><?= escape_trimmed_text($adoption['remarks']) ?></p>
                                     </div>
                                 <?php endif; ?>
                             </article>

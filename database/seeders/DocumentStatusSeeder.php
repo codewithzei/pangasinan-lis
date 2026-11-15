@@ -158,6 +158,15 @@ class DocumentStatusSeeder extends Seeder
                 'created_at' => date('Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s'),
             ],
+            [
+                'name' => 'Completed/Terminated',
+                'description' => 'Communication hearing recorded as completed or terminated with no further committee action.',
+                'badge_color' => '#64748B', // Slate
+                'sort_order' => 18,
+                'is_active' => 1,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ],
         ];
 
         $this->insertOrIgnore('document_statuses', $document_statuses);

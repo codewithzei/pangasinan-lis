@@ -35,7 +35,7 @@ $targetDate     = $plenaryDetails['target_first_reading_date'] ?? '';
 ob_start();
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <!-- Back + title -->
     <div class="flex items-center gap-4">

@@ -545,6 +545,20 @@ try {
     $serviceSrc    = (string) file_get_contents(__DIR__ . '/../app/services/DocumentService.php');
     $adminViewSrc  = (string) file_get_contents(__DIR__ . '/../resources/views/admin/inbox/show.php');
     $spsecViewSrc  = (string) file_get_contents(__DIR__ . '/../resources/views/spsec/inbox/show.php');
+    $notedCtrlSrc  = (string) file_get_contents(__DIR__ . '/../app/controllers/Admin/AdminNotedDocumentsController.php');
+    $notedViewSrc  = (string) file_get_contents(__DIR__ . '/../resources/views/admin/noted-documents/index.php');
+    $webRoutesSrc  = (string) file_get_contents(__DIR__ . '/../routes/web.php');
+    $sidebarSrc    = (string) file_get_contents(__DIR__ . '/../resources/views/layouts/sidebar.php');
+    $adminRouteStart = strpos($adminCtrlSrc, 'private function doRoute(');
+    $adminNotedStart = strpos($adminCtrlSrc, 'private function doNoted(', $adminRouteStart ?: 0);
+    $adminRouteSrc = $adminRouteStart !== false && $adminNotedStart !== false
+        ? substr($adminCtrlSrc, $adminRouteStart, $adminNotedStart - $adminRouteStart)
+        : '';
+    $intakeForwardStart = strpos($serviceSrc, 'if ($isForwardRouted) {');
+    $intakeForwardEnd = strpos($serviceSrc, '} elseif (!$isNoted)', $intakeForwardStart ?: 0);
+    $intakeForwardSrc = $intakeForwardStart !== false && $intakeForwardEnd !== false
+        ? substr($serviceSrc, $intakeForwardStart, $intakeForwardEnd - $intakeForwardStart)
+        : '';
 
     check('5.1: AdminInboxController exposes the noted action', str_contains($adminCtrlSrc, "'noted',"));
     check('5.2: SpsecInboxController exposes the noted action', str_contains($spsecCtrlSrc, "'noted',"));
@@ -564,6 +578,46 @@ try {
         str_contains($adminViewSrc, 'if ($isCommunication):'));
     check('5.10: SPSEC inbox view gates the category field on Communication',
         str_contains($spsecViewSrc, 'if ($isCommunication):'));
+    $categoryVisibilityCall = strpos($adminViewSrc, 'updateFieldVisibility(pendingAction);');
+    $categoryValidation = strpos($adminViewSrc, "pendingAction === 'noted' && commSelect");
+    check('5.11: Admin shows the category field before validating the noted action',
+        $categoryVisibilityCall !== false
+            && $categoryValidation !== false
+            && $categoryVisibilityCall < $categoryValidation);
+    check('5.12: Noted Documents classifies provincial ordinances, resolutions, and cases',
+        str_contains($notedCtrlSrc, "LIKE 'provincial%ordinance%'")
+            && str_contains($notedCtrlSrc, "LIKE 'provincial%resolution%'")
+            && str_contains($notedCtrlSrc, "LIKE '%complaint%'"));
+    check('5.13: Noted Documents classifies Municipal/City ordinances and resolutions separately',
+        str_contains($notedCtrlSrc, "'municipal_ordinances'")
+            && str_contains($notedCtrlSrc, "'municipal_resolutions'")
+            && str_contains($notedCtrlSrc, "LIKE 'municipal%ordinance%'")
+            && str_contains($notedCtrlSrc, "LIKE 'municipal%resolution%'"));
+    check('5.14: Communications are excluded from Noted Documents',
+        str_contains($notedCtrlSrc, "LIKE '%communication%' THEN NULL"));
+    check('5.15: Noted Documents page is routed and available in the Admin sidebar',
+        str_contains($webRoutesSrc, "'admin/noted-documents'")
+            && str_contains($sidebarSrc, 'BASE_URL ?>/admin/noted-documents'));
+    check('5.16: Noted Documents page provides separate tabs for the requested groups',
+        str_contains($notedViewSrc, 'Provincial Ordinances')
+            && str_contains($notedViewSrc, 'Provincial Resolutions')
+            && str_contains($notedViewSrc, 'Municipal/City Ordinances')
+            && str_contains($notedViewSrc, 'Municipal/City Resolutions')
+            && str_contains($notedViewSrc, 'Cases')
+            && str_contains($notedViewSrc, 'Others'));
+    check('5.17: Direct intake routing keeps the document and route event at Pending',
+        $intakeForwardSrc !== ''
+            && str_contains($intakeForwardSrc, 'current_status_id     = ?')
+            && str_contains($intakeForwardSrc, '[$targetPhase, $statusId, $userId, $documentId]')
+            && !str_contains($intakeForwardSrc, 'For Encoding')
+            && str_contains($serviceSrc, '$forwardEventType')
+            && str_contains($serviceSrc, '$statusId,'));
+    check('5.18: Admin routing resets the document to Pending until destination processing',
+        $adminRouteSrc !== ''
+            && str_contains($adminRouteSrc, "name = 'Pending'")
+            && str_contains($adminRouteSrc, 'current_status_id     = ?')
+            && str_contains($adminRouteSrc, '$pendingStatusId')
+            && !str_contains($adminRouteSrc, '$currentStatusId'));
 
     // Role gate (mirrors RoleMiddleware).
     $roleGate = function (string $route): array {
@@ -577,10 +631,10 @@ try {
             default                               => [],
         };
     };
-    check('5.11: Admin routes allow the Admin role', in_array('Admin', $roleGate('admin/inbox/process'), true));
-    check('5.12: Admin routes are closed to the SP Secretary role', !in_array('SP Secretary', $roleGate('admin/inbox/process'), true));
-    check('5.13: SPSEC routes allow the SP Secretary role', in_array('SP Secretary', $roleGate('spsec/inbox/process'), true));
-    check('5.14: SPSEC routes are closed to the Admin role', !in_array('Admin', $roleGate('spsec/inbox/process'), true));
+    check('5.19: Admin routes allow the Admin role', in_array('Admin', $roleGate('admin/inbox/process'), true));
+    check('5.20: Admin routes are closed to the SP Secretary role', !in_array('SP Secretary', $roleGate('admin/inbox/process'), true));
+    check('5.21: SPSEC routes allow the SP Secretary role', in_array('SP Secretary', $roleGate('spsec/inbox/process'), true));
+    check('5.22: SPSEC routes are closed to the Admin role', !in_array('Admin', $roleGate('spsec/inbox/process'), true));
 
 } finally {
     if ($pdo->inTransaction()) {

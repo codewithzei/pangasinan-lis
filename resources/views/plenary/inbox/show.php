@@ -144,7 +144,7 @@ $old = old_get();
 ob_start();
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <!-- Back + Page header --------------------------------------------------->
     <div class="flex items-center gap-4">
@@ -244,9 +244,7 @@ ob_start();
             </div>
             <div class="sm:col-span-2 lg:col-span-3">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Subject Matter</dt>
-                <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap leading-6">
-                    <?= htmlspecialchars($document['subject_matter'] ?? '—') ?>
-                </dd>
+                <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap leading-6"><?= escape_trimmed_text($document['subject_matter'] ?? '—') ?></dd>
             </div>
             <?php if (!empty($document['source_name'])): ?>
                 <div>
@@ -257,9 +255,7 @@ ob_start();
             <?php if (!empty($document['remarks'])): ?>
                 <div class="sm:col-span-2 lg:col-span-3">
                     <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Remarks</dt>
-                    <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap leading-6">
-                        <?= htmlspecialchars($document['remarks']) ?>
-                    </dd>
+                    <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap leading-6"><?= escape_trimmed_text($document['remarks']) ?></dd>
                 </div>
             <?php endif; ?>
         </dl>
@@ -574,7 +570,9 @@ ob_start();
                             $m['suffix']      ?? '',
                         ]))),
                         'position'     => $m['position'] ?? '',
-                        'is_selectable' => !empty($m['is_active']) && empty($m['is_deleted']),
+                        'is_selectable' => !empty($m['is_active'])
+                            && empty($m['is_deleted'])
+                            && !empty($m['is_in_active_term']),
                     ];
                 }, $spMembers);
 
@@ -654,7 +652,9 @@ ob_start();
                                 Authors
                                 <span class="text-xs font-normal text-gray-400">(select one or more)</span>
                             </label>
-                            <p class="mb-2 text-xs text-gray-500">Search and select multiple SP members.</p>
+                            <p class="mb-2 text-xs text-gray-500">
+                                Search and select members assigned to the active legislative term.
+                            </p>
                             <div class="ar-multi-select" data-list-key="spMembers" data-role="AUTHOR"
                                  data-selected="<?= htmlspecialchars(json_encode(array_values($currentAuthorIds)), ENT_QUOTES, 'UTF-8') ?>">
                                 <button type="button" class="ar-select-all mb-2 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
@@ -682,7 +682,7 @@ ob_start();
                                 <span class="text-xs font-normal text-gray-400">(select zero or more)</span>
                             </label>
                             <p class="mb-2 text-xs text-gray-500">
-                                Search and select multiple SP members. A member already set as an Author cannot be chosen here.
+                                Search and select active-term members. A member already set as an Author cannot be chosen here.
                             </p>
                             <div class="ar-multi-select" data-list-key="spMembers" data-role="CO_AUTHOR"
                                  data-selected="<?= htmlspecialchars(json_encode(array_values($currentCoAuthorIds)), ENT_QUOTES, 'UTF-8') ?>">

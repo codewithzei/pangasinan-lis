@@ -865,6 +865,7 @@ class CommitteeReferredController
         if ($documentId <= 0) { flash_set('error', 'Invalid document.'); redirect('committee/referred'); }
 
         [$document, $cycle] = $this->requireReferredDocument($documentId);
+        $isResetReschedule = $this->isResetReadyForAgenda($documentId, (int) $cycle['id']);
 
         // Must be resolved as PROCEED_TO_AGENDA
         $resRow = $this->pdo->prepare("
@@ -878,12 +879,12 @@ class CommitteeReferredController
             redirect('committee/referred?tab=ready_for_agenda');
         }
 
-        // Must not already have an agenda
+        // An existing agenda is allowed only for a RESET record being rescheduled.
         $existingAgenda = $this->pdo->prepare("
             SELECT id FROM agendas WHERE cycle_id = ? LIMIT 1
         ");
         $existingAgenda->execute([$cycle['id']]);
-        if ($existingAgenda->fetch()) {
+        if ($existingAgenda->fetch() && !$isResetReschedule) {
             flash_set('error', 'An agenda has already been scheduled for this cycle.');
             redirect('committee/referred?tab=ready_for_agenda');
         }
@@ -911,7 +912,7 @@ class CommitteeReferredController
         // Load SP members
         $spMembers = $this->docService->getSpMembers();
 
-        $pageTitle = 'Schedule Agenda';
+        $pageTitle = $isResetReschedule ? 'Reschedule Agenda' : 'Schedule Agenda';
         require __DIR__ . '/../../../resources/views/committee/referred/agenda.php';
     }
 
@@ -974,6 +975,7 @@ class CommitteeReferredController
         }
 
         [$document, $cycle] = $this->requireReferredDocument($documentId, $cycleId);
+        $isResetReschedule = $this->isResetReadyForAgenda($documentId, (int) $cycle['id']);
 
         // Guard: resolution must be PROCEED_TO_AGENDA
         $resRow = $this->pdo->prepare("
@@ -1007,10 +1009,10 @@ class CommitteeReferredController
             redirect('committee/referred/agenda?id=' . $documentId);
         }
 
-        // Guard: no existing agenda
+        // Existing agenda history is retained; RESET permits a new agenda entry.
         $existingAgendaStmt = $this->pdo->prepare("SELECT id FROM agendas WHERE cycle_id = ? LIMIT 1");
         $existingAgendaStmt->execute([$cycleId]);
-        if ($existingAgendaStmt->fetch()) {
+        if ($existingAgendaStmt->fetch() && !$isResetReschedule) {
             flash_set('error', 'An agenda has already been scheduled for this cycle.');
             redirect('committee/referred?tab=ready_for_agenda');
         }
@@ -1040,7 +1042,17 @@ class CommitteeReferredController
         if (!empty($chairpersonIds)) {
             $spPh  = implode(',', array_fill(0, count($chairpersonIds), '?'));
             $spChk = $this->pdo->prepare(
-                "SELECT sp_member_id FROM sp_members WHERE sp_member_id IN ({$spPh}) AND is_active = 1 AND is_deleted = 0"
+                "SELECT sm.sp_member_id
+                 FROM sp_members sm
+                 WHERE sm.sp_member_id IN ({$spPh})
+                   AND sm.is_active = 1 AND sm.is_deleted = 0
+                   AND EXISTS (
+                       SELECT 1
+                       FROM term_legislators tl
+                       INNER JOIN terms t ON t.id = tl.term_id
+                       WHERE tl.sp_member_id = sm.sp_member_id
+                         AND t.is_active = 1 AND t.is_deleted = 0
+                   )"
             );
             $spChk->execute($chairpersonIds);
             $validSpIds = array_column($spChk->fetchAll(), 'sp_member_id');
@@ -1108,10 +1120,13 @@ class CommitteeReferredController
                 $userId,
                 $document['current_status_id'],
                 $onGoingStatus['id'],
-                'Agenda scheduled. Document status set to On Going.',
+                $isResetReschedule
+                    ? 'Agenda rescheduled after reset. Document status set to On Going.'
+                    : 'Agenda scheduled. Document status set to On Going.',
                 json_encode([
                     'agenda_id'       => $agendaId,
                     'cycle_id'        => $cycleId,
+                    'rescheduled_after_reset' => $isResetReschedule,
                     'agenda_date'     => $agendaDate,
                     'agenda_time'     => $agendaTime,
                     'committee_ids'   => $committeeIds,
@@ -1133,8 +1148,11 @@ class CommitteeReferredController
                 'created_by'       => $userId,
                 'new_status'       => 'On Going',
                 'new_status_id'    => $onGoingStatus['id'],
-            ], "Agenda scheduled for document ID {$documentId} by {$username}; status set to On Going");
-            system_log('INFO', 'Agenda scheduled; document status → On Going', [
+            ], ($isResetReschedule ? 'Agenda rescheduled' : 'Agenda scheduled')
+                . " for document ID {$documentId} by {$username}; status set to On Going");
+            system_log('INFO', $isResetReschedule
+                ? 'Agenda rescheduled after hearing reset; document status → On Going'
+                : 'Agenda scheduled; document status → On Going', [
                 'agenda_id'   => $agendaId,
                 'document_id' => $documentId,
                 'status_id'   => $onGoingStatus['id'],
@@ -1148,6 +1166,10 @@ class CommitteeReferredController
         }
 
         old_clear();
+        if ($isResetReschedule) {
+            flash_set('success', 'Agenda rescheduled successfully. Document status updated to On Going.');
+            redirect('committee/hearing?tab=scheduled');
+        }
         flash_set('success', 'Agenda scheduled successfully. Document status updated to On Going.');
         redirect('committee/referred?tab=ready_for_agenda');
     }
@@ -1491,8 +1513,13 @@ class CommitteeReferredController
     private function requireDocument(int $documentId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT d.*, ds.name AS status, ds.badge_color AS status_badge_color
+            SELECT d.*,
+                   dt.name AS document_type_name,
+                   dt.badge_color AS document_type_badge_color,
+                   ds.name AS status,
+                   ds.badge_color AS status_badge_color
             FROM documents d
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             WHERE d.id = ? LIMIT 1
         ");
@@ -1503,6 +1530,36 @@ class CommitteeReferredController
             redirect('committee/referred');
         }
         return $doc;
+    }
+
+    private function isResetReadyForAgenda(int $documentId, int $cycleId): bool
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT 1
+            FROM documents d
+            INNER JOIN document_statuses ds ON ds.id = d.current_status_id
+            INNER JOIN agendas ag
+                ON ag.document_id = d.id
+                AND ag.cycle_id = ?
+                AND ag.id = (
+                    SELECT MAX(ag2.id)
+                    FROM agendas ag2
+                    WHERE ag2.document_id = d.id
+                )
+            INNER JOIN committee_hearings ch
+                ON ch.document_id = d.id
+                AND ch.agenda_id = ag.id
+                AND ch.id = (
+                    SELECT MAX(ch2.id)
+                    FROM committee_hearings ch2
+                    WHERE ch2.agenda_id = ag.id
+                )
+                AND ch.outcome = 'RESET'
+            WHERE d.id = ? AND ds.name = 'Ready for Agenda'
+            LIMIT 1
+        ");
+        $stmt->execute([$cycleId, $documentId]);
+        return $stmt->fetchColumn() !== false;
     }
 
     /**

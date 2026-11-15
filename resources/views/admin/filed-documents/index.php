@@ -21,9 +21,7 @@ $approvalYears   = $approvalYears   ?? [];
 $totalFiledCount = $totalFiledCount ?? 0;
 $publicCount     = $publicCount     ?? 0;
 
-$flashSuccess = flash_get('success');
-$flashError   = flash_get('error');
-$flashErrors  = flash_get('errors');
+$flashErrors  = flash_peek('errors', []);
 $filingDocId  = (int) (flash_get('filing_doc_id') ?? 0);
 // Re-open the modal when server-side validation fails
 $autoOpenModal = ($filingDocId > 0 && !empty($flashErrors));
@@ -35,25 +33,6 @@ $prevIsPublic    = !empty($_POST['is_public']);
 ?>
 
 <div class="space-y-6">
-
-    <!-- ── Flash messages ────────────────────────────────────────────────── -->
-    <?php if ($flashSuccess): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4" role="alert">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-            </svg>
-            <p class="text-sm text-emerald-800"><?= htmlspecialchars($flashSuccess) ?></p>
-        </div>
-    <?php endif; ?>
-
-    <?php if ($flashError): ?>
-        <div class="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4" role="alert">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-            <p class="text-sm text-red-800"><?= htmlspecialchars($flashError) ?></p>
-        </div>
-    <?php endif; ?>
 
     <!-- ── Page header ───────────────────────────────────────────────────── -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">

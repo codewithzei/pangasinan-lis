@@ -29,6 +29,7 @@
  *     C1  plenary/status-list/show is registered and maps to statusListShow.
  *     C2  It uses the same middleware as plenary/status-list.
  *     C3  The role gate still allows only Super Admin / Plenary.
+ *     C4  Finalized approval attachments use public URLs and shared previews.
  *
  * Strategy
  * --------
@@ -449,6 +450,26 @@ try {
     check('C3b Super Admin may reach plenary routes',  roleAllowedForRoute('plenary/status-list/show', 'Super Admin'));
     check('C3c Admin may NOT reach plenary routes',   !roleAllowedForRoute('plenary/status-list/show', 'Admin'));
     check('C3d Committee may NOT reach plenary routes',!roleAllowedForRoute('plenary/status-list/show', 'Committee'));
+
+    // C4 — finalized approval attachments use the shared preview URL contract.
+    $showView = @file_get_contents(__DIR__ . '/../resources/views/plenary/status-list/show.php');
+    if ($showView === false) {
+        fail('C4  finalized detail view is readable', 'file_get_contents failed');
+    } else {
+        check('C4a stored public prefixes are normalized before URL creation',
+            str_contains($showView, "preg_replace(")
+            && str_contains($showView, "ltrim((string) (\$file['file_path'] ?? ''), '/\\\\')")
+            && str_contains($showView, "BASE_URL . '/public/' . \$approvalFilePath"));
+        check('C4b approval files opt into the shared attachment preview',
+            str_contains($showView, 'data-attachment-preview')
+            && str_contains($showView, 'data-preview-url=')
+            && str_contains($showView, 'data-preview-name='));
+        check('C4c approval attachments show a dedicated Preview action',
+            (bool) preg_match('/>\s*Preview\s*<\/a>/', $showView)
+            && str_contains($showView, 'rounded-xl border border-emerald-100'));
+        check('C4d the old broken direct path construction is absent',
+            !str_contains($showView, "BASE_URL ?>/<?= htmlspecialchars(ltrim(\$file['file_path'], '/'))"));
+    }
 
 } catch (Throwable $e) {
     echo PHP_EOL . "EXCEPTION: " . $e->getMessage() . PHP_EOL;

@@ -64,6 +64,11 @@ function flash_get(string $key, mixed $default = null): mixed
     return $value;
 }
 
+function flash_peek(string $key, mixed $default = null): mixed
+{
+    return $_SESSION['_flash'][$key] ?? $default;
+}
+
 function flash_has(string $key): bool
 {
     return isset($_SESSION['_flash'][$key]);
@@ -72,6 +77,11 @@ function flash_has(string $key): bool
 function old(string $key, string $default = ''): string
 {
     return htmlspecialchars($_SESSION['_old'][$key] ?? $default);
+}
+
+function escape_trimmed_text(mixed $value): string
+{
+    return htmlspecialchars(trim((string) ($value ?? '')), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
 function old_set(array $data): void

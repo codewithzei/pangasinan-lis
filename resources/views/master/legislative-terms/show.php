@@ -20,9 +20,18 @@ function formatName(array $row): string
     ]);
     return trim(implode(' ', $parts));
 }
+
+function legislativeTermMemberPhotoUrl(?string $photoPath): string
+{
+    $path = str_replace('\\', '/', trim((string) $photoPath));
+    $path = ltrim($path, '/');
+    $path = preg_replace('#^(?:public/)+#i', '', $path);
+
+    return BASE_URL . '/public/' . $path;
+}
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <nav class="flex items-center gap-2 text-xs font-medium text-gray-500">
         <a href="<?= BASE_URL ?>/master/legislative-terms" class="hover:text-primary transition">
@@ -160,12 +169,13 @@ function formatName(array $row): string
                                 $position = htmlspecialchars($m['position'] ?? '');
                                 $district = htmlspecialchars($m['district_name'] ?? '');
                                 $searchData = strtolower($full . ' ' . $position . ' ' . $district);
+                                $photoUrl = legislativeTermMemberPhotoUrl($m['photo_path'] ?? null);
                             ?>
                             <label class="member-item flex items-center gap-2.5 rounded-lg p-2 hover:bg-white cursor-pointer transition" data-search="<?= htmlspecialchars($searchData) ?>">
                                 <input type="checkbox" name="member_ids[]" value="<?= $mId ?>"
                                     class="member-checkbox h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
                                 <?php if (!empty($m['photo_path'])): ?>
-                                    <img src="<?= htmlspecialchars($m['photo_path']) ?>"
+                                    <img src="<?= htmlspecialchars($photoUrl, ENT_QUOTES, 'UTF-8') ?>"
                                          alt="" class="h-8 w-8 rounded-full object-cover border border-gray-200">
                                 <?php else: ?>
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-primary">
@@ -235,12 +245,13 @@ function formatName(array $row): string
                                 $legId = (int)($leg['id'] ?? 0);
                                 $position = htmlspecialchars($leg['position'] ?? 'SP Member');
                                 $district = htmlspecialchars($leg['district_name'] ?? '');
+                                $photoUrl = legislativeTermMemberPhotoUrl($leg['photo_path'] ?? null);
                             ?>
                             <tr class="hover:bg-gray-50/50 transition" data-row-id="<?= $legId ?>">
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
                                         <?php if (!empty($leg['photo_path'])): ?>
-                                            <img src="<?= htmlspecialchars($leg['photo_path']) ?>"
+                                            <img src="<?= htmlspecialchars($photoUrl, ENT_QUOTES, 'UTF-8') ?>"
                                                  alt="" class="h-10 w-10 rounded-full object-cover border border-gray-200">
                                         <?php else: ?>
                                             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-primary">

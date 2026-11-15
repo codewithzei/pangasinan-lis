@@ -50,7 +50,7 @@ $reportStatusClass = match ($reportStatus) {
 ob_start();
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <!-- ── Page header ─────────────────────────────────────────────────────── -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
@@ -256,9 +256,7 @@ ob_start();
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
                 <h2 class="text-sm font-semibold text-gray-900">Summary of Findings</h2>
                 <?php if (!empty($report['summary_of_findings'])): ?>
-                    <div class="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
-                        <?= htmlspecialchars($report['summary_of_findings']) ?>
-                    </div>
+                    <div class="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap text-sm leading-relaxed"><?= escape_trimmed_text($report['summary_of_findings']) ?></div>
                 <?php else: ?>
                     <p class="text-sm text-gray-400 italic">No summary provided.</p>
                 <?php endif; ?>

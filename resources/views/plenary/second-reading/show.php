@@ -51,7 +51,7 @@ $hasFinalSecondReading = $secondReading && in_array($secondReading['action'], ['
 ob_start();
 ?>
 
-<div class="space-y-6">
+<div class="detail-page space-y-6">
 
     <div class="flex items-center gap-4">
         <a href="<?= BASE_URL ?>/plenary/second-reading"
@@ -192,15 +192,55 @@ ob_start();
                     <?php endif; ?>
                     <?php if (!empty($secondReadingDetails['approval_files'])): ?>
                         <div>
-                            <p class="text-xs text-emerald-700">Approval Attachments</p>
-                            <ul class="mt-1 space-y-1">
+                            <p class="mb-2 text-xs font-medium text-emerald-700">Approval Attachments</p>
+                            <ul class="space-y-2">
                                 <?php foreach ($secondReadingDetails['approval_files'] as $file): ?>
+                                    <?php
+                                    $approvalFilePath = preg_replace(
+                                        '#^(?:public/)+#i',
+                                        '',
+                                        ltrim((string) ($file['file_path'] ?? ''), '/\\')
+                                    );
+                                    $approvalFileUrl = BASE_URL . '/public/' . $approvalFilePath;
+                                    $approvalFileSize = (int) ($file['file_size'] ?? 0);
+                                    $approvalFileSizeLabel = $approvalFileSize >= 1048576
+                                        ? number_format($approvalFileSize / 1048576, 1) . ' MB'
+                                        : number_format($approvalFileSize / 1024) . ' KB';
+                                    ?>
                                     <li>
-                                        <a href="<?= BASE_URL ?>/<?= htmlspecialchars(ltrim($file['file_path'], '/')) ?>"
-                                           target="_blank" rel="noopener noreferrer"
-                                           class="text-sm text-primary underline">
-                                            <?= htmlspecialchars($file['original_filename']) ?>
-                                        </a>
+                                        <div class="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white px-3 py-3 shadow-sm">
+                                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                                          d="M7 3h7l5 5v11a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2zm7 0v5h5m-9 5h4m-4 4h6"/>
+                                                </svg>
+                                            </span>
+                                            <div class="min-w-0 flex-1">
+                                                <p class="truncate text-sm font-medium text-gray-800"
+                                                   title="<?= htmlspecialchars($file['original_filename'] ?? '') ?>">
+                                                    <?= htmlspecialchars($file['original_filename'] ?? 'Approval attachment') ?>
+                                                </p>
+                                                <p class="mt-0.5 text-xs text-gray-500">
+                                                    <?= htmlspecialchars($approvalFileSizeLabel) ?>
+                                                    <?php if (!empty($file['uploaded_at'])): ?>
+                                                        · Uploaded <?= htmlspecialchars(date('M j, Y', strtotime($file['uploaded_at']))) ?>
+                                                    <?php endif; ?>
+                                                </p>
+                                            </div>
+                                            <a href="<?= htmlspecialchars($approvalFileUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                               data-attachment-preview
+                                               data-preview-url="<?= htmlspecialchars($approvalFileUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                               data-preview-name="<?= htmlspecialchars($file['original_filename'] ?? 'Approval attachment', ENT_QUOTES, 'UTF-8') ?>"
+                                               class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                                               aria-label="Preview <?= htmlspecialchars($file['original_filename'] ?? 'approval attachment', ENT_QUOTES, 'UTF-8') ?>">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                                          d="M2.25 12s3.5-6 9.75-6 9.75 6 9.75 6-3.5 6-9.75 6-9.75-6-9.75-6z"/>
+                                                    <circle cx="12" cy="12" r="2.5" stroke-width="1.8"/>
+                                                </svg>
+                                                Preview
+                                            </a>
+                                        </div>
                                     </li>
                                 <?php endforeach; ?>
                             </ul>

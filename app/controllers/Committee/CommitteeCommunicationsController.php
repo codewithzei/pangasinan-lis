@@ -522,13 +522,8 @@ class CommitteeCommunicationsController
         $acStmt->execute([$documentId]);
         $assignedCommitteeIds = array_column($acStmt->fetchAll(PDO::FETCH_ASSOC), 'committee_id');
 
-        // All active SP members for chairperson selection
-        $spMembers = $this->pdo->query("
-            SELECT sp_member_id, first_name, last_name, middle_name, suffix
-            FROM sp_members
-            WHERE is_active = 1 AND is_deleted = 0
-            ORDER BY last_name ASC, first_name ASC
-        ")->fetchAll(PDO::FETCH_ASSOC);
+        // Chairperson options are limited to members of the active legislative term.
+        $spMembers = $this->docService->getSpMembers();
 
         $pageTitle = 'Schedule Agenda — Communication';
         require __DIR__ . '/../../../resources/views/committee/communications/agenda.php';
@@ -642,8 +637,17 @@ class CommitteeCommunicationsController
         if (!empty($chairpersonIds)) {
             $spPh  = implode(',', array_fill(0, count($chairpersonIds), '?'));
             $spChk = $this->pdo->prepare(
-                "SELECT sp_member_id FROM sp_members WHERE sp_member_id IN ({$spPh})
-                 AND is_active = 1 AND is_deleted = 0"
+                "SELECT sm.sp_member_id
+                 FROM sp_members sm
+                 WHERE sm.sp_member_id IN ({$spPh})
+                   AND sm.is_active = 1 AND sm.is_deleted = 0
+                   AND EXISTS (
+                       SELECT 1
+                       FROM term_legislators tl
+                       INNER JOIN terms t ON t.id = tl.term_id
+                       WHERE tl.sp_member_id = sm.sp_member_id
+                         AND t.is_active = 1 AND t.is_deleted = 0
+                   )"
             );
             $spChk->execute($chairpersonIds);
             $validChairIds = array_column($spChk->fetchAll(PDO::FETCH_ASSOC), 'sp_member_id');
@@ -914,7 +918,7 @@ class CommitteeCommunicationsController
         $outcome = trim($_POST['outcome'] ?? '');
         $remarks = trim($_POST['remarks'] ?? '');
 
-        $validOutcomes = ['APPROVED', 'DEFERRED', 'REMANDED', 'WITHDRAWN'];
+        $validOutcomes = ['APPROVED', 'DEFERRED', 'REMANDED', 'WITHDRAWN', 'COMPLETED_TERMINATED'];
         if (!in_array($outcome, $validOutcomes, true)) {
             flash_set('error', 'Please select a valid hearing outcome.');
             redirect('committee/communications/hearing?id=' . $commId);
@@ -926,6 +930,7 @@ class CommitteeCommunicationsController
             'DEFERRED'  => 'Deferred',
             'REMANDED'  => 'Remanded',
             'WITHDRAWN' => 'Withdrawn',
+            'COMPLETED_TERMINATED' => 'Completed/Terminated',
         ];
 
         try {
@@ -1026,6 +1031,11 @@ class CommitteeCommunicationsController
         if ($outcome === 'APPROVED') {
             flash_set('success', 'Hearing outcome: Approved. Please create the Committee Report.');
             redirect('committee/communications/report?id=' . $commId);
+        }
+
+        if ($outcome === 'COMPLETED_TERMINATED') {
+            flash_set('success', 'Completed/Terminated recorded. No further committee action or report is required.');
+            redirect('committee/communications/show?id=' . $commId);
         }
 
         flash_set('success', "Hearing outcome recorded: {$outcome}.");

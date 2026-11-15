@@ -579,15 +579,15 @@ class AdminInboxController
                         break;
 
                     case 'route_sp_secretary':
-                        $notificationData = $this->doRoute($documentId, $assignmentId, $userId, $currentStatusId, $remarks, 'SP Secretary', 'SP_SECRETARY', 'ROUTED_TO_SP_SECRETARY');
+                        $notificationData = $this->doRoute($documentId, $assignmentId, $userId, $remarks, 'SP Secretary', 'SP_SECRETARY', 'ROUTED_TO_SP_SECRETARY');
                         break;
 
                     case 'route_plenary':
-                        $notificationData = $this->doRoute($documentId, $assignmentId, $userId, $currentStatusId, $remarks, 'Plenary', 'PLENARY', 'ROUTED_TO_PLENARY');
+                        $notificationData = $this->doRoute($documentId, $assignmentId, $userId, $remarks, 'Plenary', 'PLENARY', 'ROUTED_TO_PLENARY');
                         break;
 
                     case 'route_committee':
-                        $notificationData = $this->doRoute($documentId, $assignmentId, $userId, $currentStatusId, $remarks, 'Committee', 'COMMITTEE', 'ROUTED_TO_COMMITTEE');
+                        $notificationData = $this->doRoute($documentId, $assignmentId, $userId, $remarks, 'Committee', 'COMMITTEE', 'ROUTED_TO_COMMITTEE');
                         break;
 
                     case 'noted':
@@ -1179,12 +1179,22 @@ class AdminInboxController
         int    $documentId,
         int    $assignmentId,
         int    $userId,
-        int    $currentStatusId,
         string $remarks,
         string $targetRoleName,
         string $targetPhase,
         string $eventType
     ): array {
+        $pendingStatus = $this->pdo->query("
+            SELECT id
+            FROM document_statuses
+            WHERE name = 'Pending' AND is_active = 1 AND is_deleted = 0
+            LIMIT 1
+        ")->fetch();
+        if (!$pendingStatus) {
+            throw new RuntimeException("Document status 'Pending' not found. Please configure document statuses.");
+        }
+        $pendingStatusId = (int) $pendingStatus['id'];
+
         // Snapshot
         $doc = $this->pdo->prepare("SELECT * FROM documents WHERE id = ? LIMIT 1");
         $doc->execute([$documentId]);
@@ -1265,14 +1275,16 @@ class AdminInboxController
             ) VALUES (?, ?, ?, ?, 'PENDING', NOW(), NULL, NULL)
         ")->execute([$documentId, $targetRoleId, $targetPhase, $userId]);
 
-        // Update document phase
+        // Routing creates a pending assignment; keep the shared document
+        // status Pending until the destination role processes it.
         $this->pdo->prepare("
             UPDATE documents
             SET current_phase         = ?,
+                current_status_id     = ?,
                 current_owner_user_id = NULL,
                 updated_by            = ?
             WHERE id = ?
-        ")->execute([$targetPhase, $userId, $documentId]);
+        ")->execute([$targetPhase, $pendingStatusId, $userId, $documentId]);
 
         // Route record
         $this->pdo->prepare("
@@ -1293,7 +1305,7 @@ class AdminInboxController
             $eventType,
             $targetPhase,
             $userId,
-            $currentStatusId,
+            $pendingStatusId,
             $effectiveRemarks ?: "Routed to {$targetRoleName} by Admin.",
             json_encode(['routed_to_role_id' => $targetRoleId, 'ip_address' => client_ip()]),
         ]);
