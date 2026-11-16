@@ -1669,8 +1669,8 @@ class DocumentService
      * referenced by a Motion for Reconsideration.
      *
      * Eligible = Complaint or Administrative Cases documents that have been
-     * finalized by Plenary (status name starts with "Plenary Cases: Finalized"
-     * or current_phase = 'FINALIZED').
+     * finalized by Plenary, either by status or workflow phase. The phase may
+     * later change to FILED while the Plenary-finalized status is retained.
      *
      * @return array  Array of document rows with id, tracking_number,
      *                subject_matter, document_type_name, docket_number,
@@ -1718,7 +1718,10 @@ class DocumentService
             INNER JOIN document_statuses ds ON ds.id = d.current_status_id
             LEFT  JOIN committee_cases   cc ON cc.document_id = d.id
             WHERE dt.name IN ({$ph})
-              AND d.current_phase = 'FINALIZED'
+              AND (
+                  ds.name = 'Plenary Cases: Finalized'
+                  OR d.current_phase = 'FINALIZED'
+              )
               {$searchClause}
             ORDER BY d.tracking_number ASC
             LIMIT 50
@@ -1734,7 +1737,8 @@ class DocumentService
      *   1. The referenced_document_id is a positive integer.
      *   2. The referenced document exists.
      *   3. The referenced document's type is Complaint or Administrative Cases.
-     *   4. The referenced document's phase is FINALIZED.
+     *   4. The referenced document is finalized by Plenary, based on its
+     *      status or phase (the phase may later change to FILED).
      *
      * @param  int   $referencedDocumentId
      * @return array{valid: bool, error: string, document: array|null}
@@ -1758,9 +1762,11 @@ class DocumentService
                 d.tracking_number,
                 d.subject_matter,
                 d.current_phase,
+                ds.name AS status_name,
                 dt.name AS document_type_name
             FROM documents d
             INNER JOIN document_types dt ON dt.id = d.document_type_id AND dt.is_deleted = 0
+            INNER JOIN document_statuses ds ON ds.id = d.current_status_id
             WHERE d.id = ?
             LIMIT 1
         ");
@@ -1783,7 +1789,8 @@ class DocumentService
             ];
         }
 
-        if ($doc['current_phase'] !== 'FINALIZED') {
+        if ($doc['current_phase'] !== 'FINALIZED'
+            && $doc['status_name'] !== 'Plenary Cases: Finalized') {
             return [
                 'valid'    => false,
                 'error'    => 'The selected reference document has not been finalized by Plenary. Only finalized cases may be referenced.',

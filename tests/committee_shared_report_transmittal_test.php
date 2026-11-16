@@ -44,10 +44,14 @@ $checks = [
     'return action targets an individual document' => str_contains($returnAction, "\$_POST['item_id']")
         && str_contains($returnAction, "\$itemType = 'DOCUMENT';"),
     'documents must belong to the selected shared report' => str_contains($returnAction, 'crd.committee_report_id = ? AND d.id = ?'),
-    'returned documents are routed into the Plenary inbox' => str_contains($returnAction, "SET current_phase = 'PLENARY'")
-        && str_contains($returnAction, "VALUES (?, ?, 'PLENARY', ?, 'PENDING', NOW(), NULL, NULL)")
+    'returned documents are routed to Plenary tracking, not the inbox' => str_contains($returnAction, "SET current_phase = 'PLENARY'")
+        && !str_contains($returnAction, "VALUES (?, ?, 'PLENARY', ?, 'PENDING', NOW(), NULL, NULL)")
         && str_contains($returnAction, 'requirePlenaryRoleId()')
-        && str_contains($returnAction, '$plenaryRoleId'),
+        && str_contains($returnAction, '$plenaryRoleId')
+        && str_contains($plenaryReadingController, "if (\$tab === 'returned')")
+        && str_contains($plenaryReadingController, 'AND d.current_status_id = ?'),
+    'returned documents are excluded from the Plenary Accepted list' => str_contains($plenaryInboxController, "'Awaiting First Reading', 'Returned to Plenary'")
+        && str_contains($plenaryInboxController, 'ACCEPTED_STILL_PROCESSING'),
     'attachments are loaded only from documents in the shared report' => str_contains($controller, 'WHERE da.document_id IN ({$docPlaceholders})'),
     'returning an item does not close the shared parent' => !str_contains($returnAction, 'UPDATE committee_reports'),
     'document status does not gate the return action' => !str_contains($returnAction, "requireDocumentStatus('Committee Report Created')"),

@@ -162,6 +162,8 @@ class PlenaryInboxController
      * intentionally left untouched (completed_at stays NULL) because the First
      * Reading / Second Reading ownership checks in PlenaryReadingController
      * rely on it (see ::isOwnedByUser()).
+    * Documents returned from Committee are tracked on the Referred to Committee
+    * page and must also stay out of this list.
      *
      * Additionally, documents that have moved to another phase (e.g., FINALIZED
      * or COMMITTEE) must not appear in the Accepted tab. The current_phase
@@ -174,7 +176,7 @@ class PlenaryInboxController
     private const ACCEPTED_STILL_PROCESSING = "
         d.current_status_id NOT IN (
             SELECT id FROM document_statuses
-            WHERE name = 'Awaiting First Reading'
+                        WHERE name IN ('Awaiting First Reading', 'Returned to Plenary')
               AND is_active  = 1
               AND is_deleted = 0
         )

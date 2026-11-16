@@ -306,21 +306,6 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                             <?= $currentView === 'inbox' ? 'Process' : 'Details' ?>
                                         </a>
 
-                                        <?php if ($isOwner): ?>
-                                            <?php
-                                            // Noted only for Communication documents
-                                            $isCommunication = stripos($row['document_type_name'] ?? '', 'communication') !== false;
-                                            if ($isCommunication): ?>
-                                                <a href="<?= BASE_URL ?>/spsec/inbox/show?id=<?= (int) $row['document_id'] ?>#noted"
-                                                   class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition"
-                                                   title="Mark as Noted">
-                                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                                    </svg>
-                                                    Noted
-                                                </a>
-                                            <?php endif; ?>
-                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>

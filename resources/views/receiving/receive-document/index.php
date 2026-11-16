@@ -122,11 +122,11 @@ ob_start();
                     <!-- Search input -->
                     <div class="relative">
                         <label for="mfrCaseSearch" class="block text-sm font-medium text-gray-700">
-                            Search original case <span class="text-red-500" id="mfrSearchRequired">*</span>
+                            Select or search original case <span class="text-red-500" id="mfrSearchRequired">*</span>
                         </label>
                         <div class="relative mt-1">
                             <input type="text" id="mfrCaseSearch" autocomplete="off"
-                                   placeholder="Search by tracking number, docket, or subject"
+                                   placeholder="Click to view finalized cases or search by tracking number, docket, or subject"
                                    class="block w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
                                    aria-label="Search reference case" aria-autocomplete="list" aria-controls="mfrDropdown">
                             <svg class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -175,7 +175,6 @@ ob_start();
 
                     <!-- No results notice -->
                     <div id="mfrNoResults" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-3 text-center text-xs text-gray-500">
-                        No finalized cases match your search. Try a different tracking number, docket, or subject.
                     </div>
 
                 </div>
@@ -862,55 +861,90 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!searchInput || !dropdown) return;
 
         let _debounceTimer = null;
+        let _requestId = 0;
 
-        searchInput.addEventListener('input', function () {
-            const q = this.value.trim();
-            clearTimeout(_debounceTimer);
+        function loadMfrCases(q) {
+            const requestId = ++_requestId;
+            spinner.classList.remove('hidden');
             noResults.classList.add('hidden');
             dropdown.classList.add('hidden');
             dropdown.innerHTML = '';
 
-            if (q.length < 2) return; // require at least 2 chars
+            fetch(window.__mfrSearchUrl + '?q=' + encodeURIComponent(q))
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to fetch finalized cases');
+                    return response.json();
+                })
+                .then(data => {
+                    if (requestId !== _requestId) return;
+                    spinner.classList.add('hidden');
+                    if (!data.success) throw new Error(data.error || 'Failed to fetch finalized cases');
+
+                    const cases = Array.isArray(data.cases) ? data.cases : [];
+                    if (cases.length === 0) {
+                        noResults.textContent = q
+                            ? 'No finalized cases match your search. Try a different tracking number, docket, or subject.'
+                            : 'No finalized cases are currently available.';
+                        noResults.classList.remove('hidden');
+                        return;
+                    }
+
+                    cases.forEach(c => {
+                        const li = document.createElement('li');
+                        li.setAttribute('role', 'option');
+                        li.className = 'cursor-pointer px-4 py-3 hover:bg-amber-50 border-b border-gray-100 last:border-0';
+                        const docketBit = c.docket_number
+                            ? `<span class="ml-2 text-gray-400">DKT: ${escapeHtml(c.docket_number)}</span>` : '';
+                        li.innerHTML = `
+                            <p class="font-semibold text-gray-800 text-xs">${escapeHtml(c.tracking_number || '')}${docketBit}</p>
+                            <p class="text-gray-500 text-xs mt-0.5 truncate">${escapeHtml((c.subject_matter || '').substring(0, 100))}</p>
+                            <span class="inline-block mt-0.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">${escapeHtml(c.document_type_name || '')}</span>
+                        `;
+                        li.addEventListener('mousedown', function (e) {
+                            e.preventDefault();
+                            selectMfrCase(c);
+                            noResults.classList.add('hidden');
+                        });
+                        dropdown.appendChild(li);
+                    });
+                    dropdown.classList.remove('hidden');
+                })
+                .catch(error => {
+                    if (requestId !== _requestId) return;
+                    spinner.classList.add('hidden');
+                    noResults.textContent = 'Unable to load finalized cases. Please try again.';
+                    noResults.classList.remove('hidden');
+                    console.error(error);
+                });
+        }
+
+        searchInput.addEventListener('focus', function () {
+            if (!document.getElementById('referenced_document_id').value) {
+                loadMfrCases(this.value.trim());
+            }
+        });
+
+        searchInput.addEventListener('input', function () {
+            const q = this.value.trim();
+            clearTimeout(_debounceTimer);
+            _requestId++;
+            spinner.classList.add('hidden');
+            document.getElementById('referenced_document_id').value = '';
+            document.getElementById('mfrCasePreview').classList.add('hidden');
+            noResults.classList.add('hidden');
+            dropdown.classList.add('hidden');
+            dropdown.innerHTML = '';
 
             _debounceTimer = setTimeout(() => {
-                spinner.classList.remove('hidden');
-                fetch(window.__mfrSearchUrl + '?q=' + encodeURIComponent(q))
-                    .then(r => r.json())
-                    .then(data => {
-                        spinner.classList.add('hidden');
-                        const cases = (data.success && Array.isArray(data.cases)) ? data.cases : [];
-                        if (cases.length === 0) {
-                            noResults.classList.remove('hidden');
-                            return;
-                        }
-                        // Render dropdown items
-                        cases.forEach(c => {
-                            const li = document.createElement('li');
-                            li.setAttribute('role', 'option');
-                            li.className = 'cursor-pointer px-4 py-3 hover:bg-amber-50 border-b border-gray-100 last:border-0';
-                            const docketBit = c.docket_number
-                                ? `<span class="ml-2 text-gray-400">DKT: ${escapeHtml(c.docket_number)}</span>` : '';
-                            li.innerHTML = `
-                                <p class="font-semibold text-gray-800 text-xs">${escapeHtml(c.tracking_number || '')}${docketBit}</p>
-                                <p class="text-gray-500 text-xs mt-0.5 truncate">${escapeHtml((c.subject_matter || '').substring(0, 100))}</p>
-                                <span class="inline-block mt-0.5 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">${escapeHtml(c.document_type_name || '')}</span>
-                            `;
-                            li.addEventListener('mousedown', function (e) {
-                                e.preventDefault(); // keep focus on input
-                                selectMfrCase(c);
-                                noResults.classList.add('hidden');
-                            });
-                            dropdown.appendChild(li);
-                        });
-                        dropdown.classList.remove('hidden');
-                    })
-                    .catch(() => { spinner.classList.add('hidden'); });
+                loadMfrCases(q);
             }, 280);
         });
 
         // Hide dropdown on blur (use mousedown+preventDefault above to avoid premature close)
         searchInput.addEventListener('blur', function () {
             setTimeout(() => {
+                _requestId++;
+                spinner.classList.add('hidden');
                 dropdown.classList.add('hidden');
                 dropdown.innerHTML = '';
             }, 200);

@@ -657,13 +657,6 @@ class CommitteeReportsController
                 ")->execute([$remarks, $remarks, $documentId]);
 
                 $this->pdo->prepare("
-                    INSERT INTO document_assignments (
-                        document_id, assigned_to_role_id, phase, assigned_by,
-                        decision, received_at, accepted_by, assigned_to_user_id
-                    ) VALUES (?, ?, 'PLENARY', ?, 'PENDING', NOW(), NULL, NULL)
-                ")->execute([$documentId, $plenaryRoleId, $userId]);
-
-                $this->pdo->prepare("
                     UPDATE documents
                     SET current_phase = 'PLENARY',
                         current_status_id = ?,

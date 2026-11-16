@@ -7,6 +7,8 @@
  * ──────────────────────────────────────────────────────────────────────────
  * Group 1 — Search / Eligibility filtering (getEligibleCasesForMotion):
  *   1a. Empty search returns only FINALIZED Complaint / Administrative Cases.
+ *       A Plenary-finalized document remains eligible after its phase changes
+ *       to FILED.
  *   1b. Search by tracking number prefix matches and excludes non-matching.
  *   1c. Search by subject matter keyword matches and excludes non-matching.
  *   1d. Search by docket number matches the correct case only.
@@ -176,11 +178,13 @@ section('Group 1 — Search / Eligibility filtering (getEligibleCasesForMotion)'
 $pdo->beginTransaction();
 try {
     if (!$complaintTypeId || !$adminCaseTypeId || !$srcId) {
-        echo "  SKIP  Group 1: required document types not in DB\n"; $passed += 8;
+        echo "  SKIP  Group 1: required document types not in DB\n"; $passed += 10;
     } else {
         // Insert several test documents
         $finalComplaintId   = insertDoc($pdo, $complaintTypeId, $finalStatusId, $srcId, 'FINALIZED',
                                          'Budget allocation for infrastructure', 'DKT-SRCH-001');
+        $filedComplaintId   = insertDoc($pdo, $complaintTypeId, $finalStatusId, $srcId, 'FILED',
+                                         'Finalized complaint filed after Plenary', 'DKT-SRCH-FILED');
         $finalAdminCaseId   = insertDoc($pdo, $adminCaseTypeId, $finalStatusId, $srcId, 'FINALIZED',
                                          'Administrative disciplinary proceeding', 'DKT-SRCH-002');
         $nonFinalComplaintId = insertDoc($pdo, $complaintTypeId, $pendingStatusId, $srcId, 'ADMIN',
@@ -198,6 +202,8 @@ try {
         $all     = $ds->getEligibleCasesForMotion('');
         $allIds  = array_map('intval', array_column($all, 'id'));
         ok('1a: finalized Complaint in empty-search results',    in_array($finalComplaintId, $allIds, true));
+        ok('1a: Plenary-finalized Complaint remains eligible after filing',
+            in_array($filedComplaintId, $allIds, true));
         ok('1a: finalized Admin Case in empty-search results',   in_array($finalAdminCaseId, $allIds, true));
         ok('1a: non-finalized Complaint excluded from results',  !in_array($nonFinalComplaintId, $allIds, true));
         ok('1a: Communication excluded from results',
@@ -211,6 +217,11 @@ try {
             in_array($finalComplaintId, $byTrkIds, true));
         ok('1b: tracking-number search excludes non-finalized Complaint',
             !in_array($nonFinalComplaintId, $byTrkIds, true));
+        $filedTracking = $pdo->query("SELECT tracking_number FROM documents WHERE id={$filedComplaintId}")->fetchColumn();
+        $byFiledTracking = $ds->getEligibleCasesForMotion((string) $filedTracking);
+        $byFiledTrackingIds = array_map('intval', array_column($byFiledTracking, 'id'));
+        ok('1b: tracking-number search finds Plenary-finalized Complaint in FILED phase',
+            in_array($filedComplaintId, $byFiledTrackingIds, true));
 
         // 1c: search by unique keyword in subject matter
         $bySub   = $ds->getEligibleCasesForMotion('disciplinary');
@@ -288,7 +299,7 @@ section('Group 2 — Server-side validation (validateMotionReference / validateS
 $pdo->beginTransaction();
 try {
     if (!$mfrTypeId || !$complaintTypeId || !$srcId) {
-        echo "  SKIP  Group 2: required types not in DB\n"; $passed += 8;
+        echo "  SKIP  Group 2: required types not in DB\n"; $passed += 9;
     } else {
         // 2a: referenced_document_id = 0
         $r = $ds->validateMotionReference(0);
@@ -316,6 +327,11 @@ try {
         $finalComplaintId = insertDoc($pdo, $complaintTypeId, $finalStatusId, $srcId, 'FINALIZED');
         $r = $ds->validateMotionReference($finalComplaintId);
         ok('2e: FINALIZED Complaint passes', $r['valid'], $r['error']);
+
+        // A filed document keeps its Plenary-finalized status and remains eligible.
+        $filedComplaintId = insertDoc($pdo, $complaintTypeId, $finalStatusId, $srcId, 'FILED');
+        $r = $ds->validateMotionReference($filedComplaintId);
+        ok('2e: Plenary-finalized Complaint in FILED phase passes', $r['valid'], $r['error']);
 
         // 2f: FINALIZED Administrative Cases
         if ($adminCaseTypeId) {
