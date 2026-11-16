@@ -330,6 +330,10 @@ ob_start();
                 <?php else: ?>
                     <div class="space-y-2">
                         <?php foreach ($attachments as $att): ?>
+                            <?php
+                            $attachmentUrl = BASE_URL . '/public/' . ltrim((string) ($att['stored_path'] ?? ''), '/');
+                            $attachmentName = (string) ($att['file_name'] ?? 'Attachment');
+                            ?>
                             <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
                                 <div class="flex items-center gap-3 min-w-0">
                                     <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary">
@@ -352,11 +356,21 @@ ob_start();
                                         </p>
                                     </div>
                                 </div>
-                                <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars($att['stored_path']) ?>"
-                                   target="_blank"
-                                   class="ml-4 shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition">
-                                    Download
-                                </a>
+                                <div class="ml-4 flex shrink-0 items-center gap-2">
+                                    <a href="<?= htmlspecialchars($attachmentUrl) ?>"
+                                       data-attachment-preview
+                                       data-preview-url="<?= htmlspecialchars($attachmentUrl) ?>"
+                                       data-preview-name="<?= htmlspecialchars($attachmentName) ?>"
+                                       data-download-url="<?= htmlspecialchars($attachmentUrl) ?>"
+                                       class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition">
+                                        Preview
+                                    </a>
+                                    <a href="<?= htmlspecialchars($attachmentUrl) ?>"
+                                       download
+                                       class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition">
+                                        Download
+                                    </a>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>

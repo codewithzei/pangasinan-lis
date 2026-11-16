@@ -92,6 +92,10 @@ class AdminReceiveDocumentController
             'referenced_document_id' => !empty($_POST['referenced_document_id'])
                 ? (int) $_POST['referenced_document_id']
                 : 0,
+            'is_resubmission' => ($_POST['is_resubmission'] ?? '') === '1',
+            'resubmission_reference_id' => !empty($_POST['resubmission_reference_id'])
+                ? (int) $_POST['resubmission_reference_id']
+                : 0,
         ];
 
         // Collect checklist items (if any)
@@ -115,6 +119,23 @@ class AdminReceiveDocumentController
             if (!in_array($routingOptionId, array_map('intval', $validOptions), true)) {
                 $errors[] = 'Invalid routing option selected.';
             }
+        }
+
+        if ($data['is_resubmission']) {
+            if (!in_array($routingOptionId, [3, 4, 5], true)) {
+                $errors[] = 'Resubmission is available only when routing to SP Secretary, Plenary, or Committee.';
+            } elseif ($data['resubmission_reference_id'] <= 0) {
+                $errors[] = 'Select a previous document that needs resubmission.';
+            } else {
+                $reference = $this->docService->validateResubmissionReference(
+                    $data['resubmission_reference_id']
+                );
+                if (!$reference['valid']) {
+                    $errors[] = $reference['error'];
+                }
+            }
+        } else {
+            $data['resubmission_reference_id'] = 0;
         }
 
         // Noted (id=6) is available for every document type. A communication
@@ -251,6 +272,34 @@ class AdminReceiveDocumentController
             echo json_encode(['success' => true, 'cases' => $cases]);
         } catch (Throwable $e) {
             echo json_encode(['success' => false, 'cases' => [], 'error' => 'Failed to fetch eligible cases']);
+        }
+        exit;
+    }
+
+    // =========================================================================
+    // GET  admin/receive-document/get-resubmission-references  (AJAX)
+    // =========================================================================
+
+    public function getResubmissionReferences(): void
+    {
+        header('Content-Type: application/json');
+
+        if (auth_id() === null) {
+            echo json_encode(['success' => false, 'documents' => [], 'error' => 'Unauthorized']);
+            exit;
+        }
+
+        try {
+            $search = trim((string) ($_GET['q'] ?? ''));
+            $documentId = isset($_GET['id']) ? (int) $_GET['id'] : null;
+            $documents = $this->docService->getEligibleResubmissionDocuments($search, $documentId);
+            echo json_encode(['success' => true, 'documents' => $documents]);
+        } catch (Throwable $e) {
+            system_log('ERROR', 'Failed to fetch resubmission reference documents', [
+                'error' => $e->getMessage(),
+                'user_id' => auth_id(),
+            ]);
+            echo json_encode(['success' => false, 'documents' => [], 'error' => 'Failed to fetch reference documents']);
         }
         exit;
     }

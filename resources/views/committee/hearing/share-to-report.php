@@ -3,7 +3,7 @@
  * Committee — Share to Committee Report (dedicated page)
  *
  * Variables supplied by CommitteeHearingController::shareToReportShow():
- *   $selectedDocuments    array    Hearing documents and Approved case outcomes
+ *   $selectedDocuments    array    Hearing documents and finalized case outcomes
  *                                  [{document_id, tracking_number, subject_matter,
  *                                    document_type_name, document_type_badge_color,
  *                                    status, status_badge_color,
@@ -185,7 +185,7 @@ ob_start();
                     </svg>
                     <p class="text-xs text-amber-800 leading-relaxed">
                         Each document keeps its current status. You can group hearing documents and your
-                        Approved cases in one shared Committee Report and return them to Plenary individually.
+                        Finalized case outcomes in one shared Committee Report and return them to Plenary individually.
                     </p>
                 </div>
             </div>

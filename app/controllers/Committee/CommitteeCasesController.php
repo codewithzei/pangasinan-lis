@@ -679,6 +679,20 @@ class CommitteeCasesController
             }
         }
 
+        // All files attached to the linked source document, including files
+        // uploaded during Receiving and Admin processing.
+        $documentAttachmentsStmt = $this->pdo->prepare("
+            SELECT
+                da.*,
+                ua.username AS uploaded_by_username
+            FROM document_attachments da
+            LEFT JOIN user_accounts ua ON da.uploaded_by = ua.id
+            WHERE da.document_id = ?
+            ORDER BY da.created_at ASC, da.id ASC
+        ");
+        $documentAttachmentsStmt->execute([(int) $case['document_id']]);
+        $documentAttachments = $documentAttachmentsStmt->fetchAll(PDO::FETCH_ASSOC);
+
         // ── Finalized-by user name ────────────────────────────────────────────
         $finalizedByName = null;
         if (!empty($case['finalized_by'])) {

@@ -391,6 +391,24 @@ class DocumentService
 
         try {
             $currentYear = (int) date('Y');
+            $isResubmission = !empty($data['is_resubmission']);
+            $resubmissionReference = null;
+
+            if ($isResubmission) {
+                if (!in_array($routingOptionId, [3, 4, 5], true)) {
+                    throw new RuntimeException(
+                        'Resubmission is available only when routing to SP Secretary, Plenary, or Committee.'
+                    );
+                }
+
+                $referenceId = (int) ($data['resubmission_reference_id'] ?? 0);
+                $resubmissionReference = $this->findEligibleResubmissionDocument($referenceId, true);
+                if ($resubmissionReference === null) {
+                    throw new RuntimeException(
+                        'The selected resubmission reference is no longer eligible. Please select another document.'
+                    );
+                }
+            }
 
             // 1. Tracking number (row-locked for safety)
             $trackingInfo    = $this->generateTrackingNumber($currentYear);
@@ -620,6 +638,32 @@ class DocumentService
                 ]);
             }
 
+            // 7c. Persist resubmission relationship. Committee resubmissions
+            //     inherit their prior proposed number so they can bypass the
+            //     plenary's initial-numbering steps and enter the Committee inbox.
+            if ($isResubmission && $resubmissionReference !== null) {
+                $this->linkResubmissionDocument(
+                    $documentId,
+                    (int) $resubmissionReference['id'],
+                    $routingOptionId,
+                    $userId
+                );
+
+                if ($routingOptionId === 5) {
+                    $this->pdo->prepare("
+                        INSERT INTO plenary_document_details
+                            (document_id, proposed_number, status_id, created_by, updated_by)
+                        VALUES (?, ?, ?, ?, ?)
+                    ")->execute([
+                        $documentId,
+                        $resubmissionReference['proposed_number'] ?: null,
+                        $statusId,
+                        $userId,
+                        $userId,
+                    ]);
+                }
+            }
+
             // 8. Determine if a non-Noted forward routing option was selected.
             //    Routing options: 3=SP Secretary, 4=Plenary, 5=Committee, 6=Noted.
             //    When Admin selects one of 3–5 during direct intake the document
@@ -738,6 +782,28 @@ class DocumentService
                 'ip_address' => client_ip(),
                 'user_agent' => client_user_agent(),
             ];
+
+            if ($isResubmission && $resubmissionReference !== null) {
+                $insertEvent->execute([
+                    $documentId,
+                    'RESUBMISSION_LINKED',
+                    'RECEIVING',
+                    $userId,
+                    $statusId,
+                    "Resubmission linked to {$resubmissionReference['tracking_number']}: "
+                        . $resubmissionReference['subject_matter'],
+                    json_encode(
+                        array_merge($baseMetadata, [
+                            'referenced_document_id' => (int) $resubmissionReference['id'],
+                            'routing_option_id' => $routingOptionId,
+                            'adopted_proposed_number' => $routingOptionId === 5
+                                ? ($resubmissionReference['proposed_number'] ?: null)
+                                : null,
+                        ]),
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                    ),
+                ]);
+            }
 
             // 10b. Noted routing: add ADMIN→ADMIN route, assignment, and event.
             //      Available for every document type. Communication documents
@@ -1728,6 +1794,136 @@ class DocumentService
         ");
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Return documents that may be selected as resubmission references.
+     * Only documents currently marked Remanded, Deferred, or Withdrawn qualify.
+     */
+    public function getEligibleResubmissionDocuments(string $search = '', ?int $documentId = null): array
+    {
+        $statusNames = ['Remanded', 'Deferred', 'Withdrawn'];
+        $params = $statusNames;
+        $filters = [];
+
+        if ($documentId !== null && $documentId > 0) {
+            $filters[] = 'd.id = ?';
+            $params[] = $documentId;
+        } elseif (trim($search) !== '') {
+            $like = '%' . trim($search) . '%';
+            $filters[] = '(
+                d.tracking_number LIKE ?
+                OR d.subject_matter LIKE ?
+                OR dt.name LIKE ?
+                OR pdd.proposed_number LIKE ?
+            )';
+            array_push($params, $like, $like, $like, $like);
+        }
+
+        $stmt = $this->pdo->prepare("
+            SELECT
+                d.id,
+                d.tracking_number,
+                d.subject_matter,
+                dt.name AS document_type_name,
+                ds.name AS status_name,
+                pdd.proposed_number
+            FROM documents d
+            INNER JOIN document_types dt ON dt.id = d.document_type_id
+                                         AND dt.is_deleted = 0
+            INNER JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
+            WHERE ds.name IN (?, ?, ?)
+              AND ds.is_active = 1
+              AND ds.is_deleted = 0
+              " . (!empty($filters) ? 'AND ' . implode(' AND ', $filters) : '') . "
+            ORDER BY d.tracking_number DESC
+            LIMIT 50
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Validate that a document is still in a resubmission-eligible status.
+     *
+     * @return array{valid:bool,error:string,document:array|null}
+     */
+    public function validateResubmissionReference(int $referencedDocumentId): array
+    {
+        if ($referencedDocumentId <= 0) {
+            return [
+                'valid' => false,
+                'error' => 'Select a previous document that needs resubmission.',
+                'document' => null,
+            ];
+        }
+
+        $document = $this->findEligibleResubmissionDocument($referencedDocumentId);
+        if ($document === null) {
+            return [
+                'valid' => false,
+                'error' => 'The selected document is not Remanded, Deferred, or Withdrawn.',
+                'document' => null,
+            ];
+        }
+
+        return ['valid' => true, 'error' => '', 'document' => $document];
+    }
+
+    /**
+     * Persist the one-to-one relationship from a new resubmission to its prior document.
+     */
+    public function linkResubmissionDocument(
+        int $resubmittedDocumentId,
+        int $referencedDocumentId,
+        int $routingOptionId,
+        int $userId
+    ): void {
+        $stmt = $this->pdo->prepare("
+            INSERT INTO document_resubmission_links
+                (resubmitted_document_id, referenced_document_id, routing_option_id, linked_by)
+            VALUES (?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $resubmittedDocumentId,
+            $referencedDocumentId,
+            $routingOptionId,
+            $userId,
+        ]);
+    }
+
+    /**
+     * Fetch an eligible previous document, optionally locking it for the receipt transaction.
+     */
+    private function findEligibleResubmissionDocument(int $documentId, bool $forUpdate = false): ?array
+    {
+        if ($documentId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare("
+            SELECT
+                d.id,
+                d.tracking_number,
+                d.subject_matter,
+                dt.name AS document_type_name,
+                ds.name AS status_name,
+                pdd.proposed_number
+            FROM documents d
+            INNER JOIN document_types dt ON dt.id = d.document_type_id
+                                         AND dt.is_deleted = 0
+            INNER JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
+            WHERE d.id = ?
+              AND ds.name IN ('Remanded', 'Deferred', 'Withdrawn')
+              AND ds.is_active = 1
+              AND ds.is_deleted = 0
+            LIMIT 1" . ($forUpdate ? ' FOR UPDATE' : '')
+        );
+        $stmt->execute([$documentId]);
+        $document = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $document ?: null;
     }
 
     /**

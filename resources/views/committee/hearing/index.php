@@ -80,12 +80,12 @@ $eligibleCount = 0;
 foreach ($documents as $d) {
     $isCaseOutcome = !empty($d['is_case_outcome']);
     $isCaseOwner = (int) ($d['case_owner_id'] ?? 0) === (int) ($userId ?? 0);
-    $isApprovedCase = $isCaseOutcome && $isCaseOwner && ($d['hearing_outcome'] ?? null) === 'APPROVED';
+    $isShareableCase = $isCaseOutcome && $isCaseOwner;
     $isShareableHearing = !$isCaseOutcome
         && !empty($d['hearing_outcome'])
         && $d['hearing_outcome'] !== 'RESET';
 
-    if (empty($d['report_id']) && ($isApprovedCase || $isShareableHearing)) {
+    if (empty($d['report_id']) && ($isShareableCase || $isShareableHearing)) {
         $eligibleCount++;
     }
 }
@@ -231,7 +231,7 @@ ob_start();
                                   <?= $eligibleCount === 0 ? 'opacity-40 cursor-not-allowed' : '' ?>">
                    <input type="checkbox" id="selectAllDocuments"
                                class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                       aria-label="Select all available hearing documents and approved cases on this page"
+                       aria-label="Select all available hearing documents and finalized cases on this page"
                                <?= $eligibleCount === 0 ? 'disabled' : '' ?>>
                    Select All Available
                         <?php if ($eligibleCount > 0): ?>
@@ -349,7 +349,7 @@ ob_start();
                                 && (int) ($doc['case_owner_id'] ?? 0) === (int) ($userId ?? 0);
                             $hasReport      = !empty($doc['report_id']);
                             $isEligible     = !$hasReport
-                                && (($isCaseOutcome && $isCaseOwner && $isApproved)
+                                && (($isCaseOutcome && $isCaseOwner)
                                     || (!$isCaseOutcome && !$isScheduled && !$isReset));
 
                             // ── Formatted dates ───────────────────────────────────────────

@@ -1570,7 +1570,7 @@ class CommitteeHearingController
         )));
 
         if (empty($documentIds)) {
-            flash_set('error', 'No documents selected. Select at least one hearing document or Approved case to share.');
+            flash_set('error', 'No documents selected. Select at least one hearing document or finalized case to share.');
             redirect('committee/hearing?tab=all');
         }
 
@@ -1579,7 +1579,7 @@ class CommitteeHearingController
             redirect('committee/hearing?tab=all');
         }
 
-        // ── Load selected hearing documents and report-eligible case outcomes ─
+        // ── Load selected hearing documents and finalized case outcomes ───────
         $ph = implode(',', array_fill(0, count($documentIds), '?'));
         $docStmt = $this->pdo->prepare("
             SELECT d.id              AS document_id,
@@ -1615,7 +1615,7 @@ class CommitteeHearingController
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             WHERE d.id IN ({$ph})
               AND (
-                    (cc.final_outcome = 'APPROVED' AND cc.assigned_by = ?)
+                    (cc.final_outcome IS NOT NULL AND cc.assigned_by = ?)
                     OR (
                         cc.final_outcome IS NULL
                         AND ag.id IS NOT NULL
@@ -1631,7 +1631,7 @@ class CommitteeHearingController
         // Reject the whole request if any selected item is stale, ineligible, or
         // belongs to another case owner.
         if (count($selectedDocuments) !== count($documentIds)) {
-            flash_set('error', 'One or more selected items are no longer eligible for a Committee Report. Only hearings with a recorded outcome and your own Approved cases can be shared.');
+            flash_set('error', 'One or more selected items are no longer eligible for a Committee Report. Only hearings with a recorded outcome and finalized cases assigned to you can be shared.');
             redirect('committee/hearing?tab=all');
         }
 
@@ -1800,8 +1800,8 @@ class CommitteeHearingController
     // 9. shareToReport — group hearing documents of any status under one report
     //
     // BUSINESS RULES (enforced server-side regardless of client state):
-    //   1. Every submitted document_id must be a hearing document or an
-    //      APPROVED case owned by the current user.
+    //   1. Every submitted document_id must be a hearing document or a
+    //      finalized case owned by the current user.
     //   2. Every submitted document_id must have NO existing committee_report_documents row.
     //      If even ONE document is already assigned to any report the ENTIRE request is
     //      rejected — no partial saves, full rollback.
@@ -1836,7 +1836,7 @@ class CommitteeHearingController
 
         // ── Validate: at least one document ───────────────────────────────────
         if (empty($documentIds)) {
-            flash_set('error', 'Please select at least one hearing document or Approved case to share.');
+            flash_set('error', 'Please select at least one hearing document or finalized case to share.');
             redirect($redirectBack);
         }
 
@@ -1934,7 +1934,7 @@ class CommitteeHearingController
                AND cc.id = (SELECT MAX(cc2.id) FROM committee_cases cc2 WHERE cc2.document_id = d.id)
             WHERE d.id IN ({$ph})
               AND (
-                    (cc.final_outcome = 'APPROVED' AND cc.assigned_by = ?)
+                    (cc.final_outcome IS NOT NULL AND cc.assigned_by = ?)
                     OR (
                         cc.final_outcome IS NULL
                         AND ag.id IS NOT NULL
@@ -1948,7 +1948,7 @@ class CommitteeHearingController
 
         if (count($validDocs) !== count($documentIds)) {
             flash_set('error',
-                'One or more selected items are no longer eligible. Only hearings with a recorded outcome and your own Approved cases can be added to a Committee Report.'
+                'One or more selected items are no longer eligible. Only hearings with a recorded outcome and finalized cases assigned to you can be added to a Committee Report.'
             );
             redirect($redirectBack);
         }

@@ -218,6 +218,10 @@ function normalizeTimeForInput(?string $time): string {
         <h2 class="text-lg font-semibold text-gray-900">Attachments</h2>
         <div class="mt-4 space-y-2">
             <?php foreach ($attachments as $attachment): ?>
+                <?php
+                $attachmentUrl = BASE_URL . '/public/' . ltrim((string) ($attachment['stored_path'] ?? ''), '/');
+                $attachmentName = (string) ($attachment['file_name'] ?? 'Attachment');
+                ?>
                 <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
                     <div class="flex min-w-0 items-center gap-3">
                         <svg class="h-5 w-5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,10 +237,14 @@ function normalizeTimeForInput(?string $time): string {
                         </div>
                     </div>
                     <?php if (!empty($attachment['stored_path'])): ?>
-                        <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars($attachment['stored_path'], ENT_QUOTES, 'UTF-8') ?>"
+                        <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
                            target="_blank"
+                           data-attachment-preview
+                           data-preview-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                           data-preview-name="<?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?>"
+                           data-download-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
                            class="ml-3 shrink-0 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200 transition">
-                            View
+                            Preview
                         </a>
                     <?php endif; ?>
                 </div>
@@ -717,6 +725,10 @@ function normalizeTimeForInput(?string $time): string {
                 <p class="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">Attached Files</p>
                 <div class="space-y-2">
                     <?php foreach ($attachments as $attachment): ?>
+                        <?php
+                        $attachmentUrl = BASE_URL . '/public/' . ltrim((string) ($attachment['stored_path'] ?? ''), '/');
+                        $attachmentName = (string) ($attachment['file_name'] ?? 'Attachment');
+                        ?>
                         <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
                             <div class="flex min-w-0 items-center gap-3">
                                 <svg class="h-5 w-5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -733,10 +745,14 @@ function normalizeTimeForInput(?string $time): string {
                             </div>
                             <div class="ml-3 flex shrink-0 items-center gap-2">
                                 <?php if (!empty($attachment['stored_path'])): ?>
-                                    <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars($attachment['stored_path'], ENT_QUOTES, 'UTF-8') ?>"
+                                    <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
                                        target="_blank"
+                                       data-attachment-preview
+                                       data-preview-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                       data-preview-name="<?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?>"
+                                       data-download-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
                                        class="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200 transition">
-                                        View
+                                        Preview
                                     </a>
                                 <?php endif; ?>
                                 <!-- Hidden delete form — submitted by JS after modal confirmation -->

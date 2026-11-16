@@ -1064,9 +1064,18 @@ class PlenaryInboxController
                 FROM plenary_document_details
                 WHERE proposed_number = ?
                   AND document_id    != ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM document_resubmission_links drl
+                      INNER JOIN plenary_document_details refpdd
+                          ON refpdd.document_id = drl.referenced_document_id
+                      WHERE drl.resubmitted_document_id = ?
+                        AND refpdd.document_id = plenary_document_details.document_id
+                        AND refpdd.proposed_number = ?
+                  )
                 LIMIT 1
             ");
-            $dupStmt->execute([$proposedNumber, $documentId]);
+            $dupStmt->execute([$proposedNumber, $documentId, $documentId, $proposedNumber]);
             if ($dupStmt->fetch()) {
                 $errors[] = 'Proposed Number "' . htmlspecialchars($proposedNumber) . '" is already used by another document.';
             }

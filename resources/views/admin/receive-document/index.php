@@ -212,6 +212,7 @@ ob_start();
             <script>
                 window.__mfrTypeIds   = [<?= $mfrTypeIdList ?>];
                 window.__mfrSearchUrl = '<?= BASE_URL ?>/admin/receive-document/get-eligible-cases';
+                window.__resubmissionSearchUrl = '<?= BASE_URL ?>/admin/receive-document/get-resubmission-references';
             </script>
 
             <!-- Routing Option ---------------------------------------------->
@@ -257,6 +258,52 @@ ob_start();
                             <?php endforeach; ?>
                         </select>
                     </div>
+                </div>
+            </section>
+
+            <!-- Resubmission Reference ------------------------------------->
+            <section id="resubmissionSection" class="rounded-2xl border border-indigo-200 bg-indigo-50 p-6 hidden">
+                <h2 class="text-lg font-semibold text-gray-900">Resubmission</h2>
+                <p class="mt-1 text-sm text-gray-600">
+                    Link this document to a prior document with Remanded, Deferred, or Withdrawn status.
+                </p>
+
+                <label class="mt-4 inline-flex items-center gap-3 text-sm font-medium text-gray-800">
+                    <input type="checkbox" name="is_resubmission" id="is_resubmission" value="1"
+                           <?= old('is_resubmission') === '1' ? 'checked' : '' ?>
+                           class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    This document is a resubmission
+                </label>
+
+                <div id="resubmissionReferenceWrapper" class="mt-4 hidden">
+                    <input type="hidden" name="resubmission_reference_id" id="resubmission_reference_id"
+                           value="<?= htmlspecialchars(old('resubmission_reference_id', '')) ?>">
+
+                    <label for="resubmissionSearch" class="block text-sm font-medium text-gray-700">
+                        Previous document <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative mt-1">
+                        <input type="text" id="resubmissionSearch" autocomplete="off"
+                               placeholder="Search by tracking number, proposed number, document type, or title"
+                               class="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-9 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                               aria-label="Search resubmission reference" aria-autocomplete="list"
+                               aria-controls="resubmissionDropdown">
+                        <span id="resubmissionSpinner" class="absolute right-3 top-2.5 hidden text-xs text-indigo-600">Loading…</span>
+                        <ul id="resubmissionDropdown"
+                            class="absolute left-0 top-full z-20 hidden max-h-72 w-full overflow-auto rounded-xl border border-indigo-200 bg-white text-sm shadow-lg"
+                            role="listbox"></ul>
+                    </div>
+
+                    <p class="mt-2 text-xs text-gray-500">
+                        For Committee routing, the previous document's proposed number is adopted and the new document
+                        enters the normal Committee Inbox workflow.
+                    </p>
+                    <div id="resubmissionPreview" class="mt-3 hidden rounded-lg border border-indigo-200 bg-white p-3 text-sm">
+                        <p id="resubmissionPreviewTracking" class="font-semibold text-gray-800"></p>
+                        <p id="resubmissionPreviewSubject" class="mt-1 text-gray-600"></p>
+                        <p id="resubmissionPreviewMeta" class="mt-1 text-xs text-indigo-700"></p>
+                    </div>
+                    <div id="resubmissionNoResults" class="mt-2 hidden text-sm text-red-700" role="status"></div>
                 </div>
             </section>
 
@@ -711,6 +758,154 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialise on page load (handles repopulation after a validation error)
     syncCommCategory();
 
+    // Resubmission is available only for direct routing to SP Secretary,
+    // Plenary, or Committee. The selected prior document is independently
+    // verified again by the server before it is linked.
+    const resubmissionSection = document.getElementById('resubmissionSection');
+    const resubmissionToggle = document.getElementById('is_resubmission');
+    const resubmissionWrapper = document.getElementById('resubmissionReferenceWrapper');
+    const resubmissionId = document.getElementById('resubmission_reference_id');
+    const resubmissionSearch = document.getElementById('resubmissionSearch');
+    const resubmissionDropdown = document.getElementById('resubmissionDropdown');
+    const resubmissionSpinner = document.getElementById('resubmissionSpinner');
+    const resubmissionPreview = document.getElementById('resubmissionPreview');
+    const resubmissionNoResults = document.getElementById('resubmissionNoResults');
+    let resubmissionRequestId = 0;
+    let resubmissionDebounce = null;
+
+    function isResubmissionRouting() {
+        return [3, 4, 5].includes(Number(routingSelect && routingSelect.value));
+    }
+
+    function clearResubmissionSelection() {
+        if (resubmissionId) resubmissionId.value = '';
+        if (resubmissionSearch) resubmissionSearch.value = '';
+        if (resubmissionPreview) resubmissionPreview.classList.add('hidden');
+        if (resubmissionDropdown) {
+            resubmissionDropdown.classList.add('hidden');
+            resubmissionDropdown.innerHTML = '';
+        }
+        if (resubmissionNoResults) resubmissionNoResults.classList.add('hidden');
+    }
+
+    function selectResubmissionDocument(item) {
+        resubmissionId.value = item.id;
+        resubmissionSearch.value = item.tracking_number || '';
+        resubmissionDropdown.classList.add('hidden');
+        resubmissionDropdown.innerHTML = '';
+        document.getElementById('resubmissionPreviewTracking').textContent =
+            (item.tracking_number || '') + ' — ' + (item.status_name || '');
+        document.getElementById('resubmissionPreviewSubject').textContent =
+            item.subject_matter || '';
+        document.getElementById('resubmissionPreviewMeta').textContent =
+            (item.document_type_name || '') +
+            (item.proposed_number ? ' · Proposed Number: ' + item.proposed_number : '');
+        resubmissionPreview.classList.remove('hidden');
+        resubmissionNoResults.classList.add('hidden');
+    }
+
+    function loadResubmissionReferences(search, documentId) {
+        const requestId = ++resubmissionRequestId;
+        const query = documentId
+            ? '?id=' + encodeURIComponent(documentId)
+            : '?q=' + encodeURIComponent(search || '');
+        resubmissionSpinner.classList.remove('hidden');
+        resubmissionNoResults.classList.add('hidden');
+        resubmissionDropdown.classList.add('hidden');
+        resubmissionDropdown.innerHTML = '';
+
+        fetch(window.__resubmissionSearchUrl + query)
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to fetch resubmission references');
+                return response.json();
+            })
+            .then(data => {
+                if (requestId !== resubmissionRequestId) return;
+                resubmissionSpinner.classList.add('hidden');
+                if (!data.success) throw new Error(data.error || 'Failed to fetch references');
+
+                const documents = Array.isArray(data.documents) ? data.documents : [];
+                if (documents.length === 0) {
+                    resubmissionNoResults.textContent = documentId
+                        ? 'The previously selected document is no longer eligible. Please choose another.'
+                        : 'No Remanded, Deferred, or Withdrawn documents match your search.';
+                    resubmissionNoResults.classList.remove('hidden');
+                    return;
+                }
+
+                documents.forEach(item => {
+                    const option = document.createElement('li');
+                    option.setAttribute('role', 'option');
+                    option.className = 'cursor-pointer border-b border-gray-100 px-4 py-3 last:border-0 hover:bg-indigo-50';
+                    const title = document.createElement('p');
+                    title.className = 'font-semibold text-gray-800';
+                    title.textContent = (item.tracking_number || '') + ' · ' + (item.status_name || '');
+                    const subject = document.createElement('p');
+                    subject.className = 'mt-0.5 truncate text-xs text-gray-600';
+                    subject.textContent = item.subject_matter || '';
+                    const details = document.createElement('p');
+                    details.className = 'mt-0.5 text-xs text-indigo-700';
+                    details.textContent = (item.document_type_name || '') +
+                        (item.proposed_number ? ' · Proposed Number: ' + item.proposed_number : '');
+                    option.append(title, subject, details);
+                    option.addEventListener('mousedown', event => {
+                        event.preventDefault();
+                        selectResubmissionDocument(item);
+                    });
+                    resubmissionDropdown.appendChild(option);
+                });
+                resubmissionDropdown.classList.remove('hidden');
+            })
+            .catch(error => {
+                if (requestId !== resubmissionRequestId) return;
+                resubmissionSpinner.classList.add('hidden');
+                resubmissionNoResults.textContent = 'Unable to load reference documents. Please try again.';
+                resubmissionNoResults.classList.remove('hidden');
+                console.error(error);
+            });
+    }
+
+    function syncResubmissionSection() {
+        if (!isResubmissionRouting()) {
+            resubmissionSection.classList.add('hidden');
+            resubmissionToggle.checked = false;
+            resubmissionWrapper.classList.add('hidden');
+            clearResubmissionSelection();
+            return;
+        }
+
+        resubmissionSection.classList.remove('hidden');
+        if (resubmissionToggle.checked) {
+            resubmissionWrapper.classList.remove('hidden');
+        } else {
+            resubmissionWrapper.classList.add('hidden');
+            clearResubmissionSelection();
+        }
+    }
+
+    if (routingSelect) routingSelect.addEventListener('change', syncResubmissionSection);
+    resubmissionToggle.addEventListener('change', syncResubmissionSection);
+    resubmissionSearch.addEventListener('focus', function () {
+        if (!resubmissionId.value) loadResubmissionReferences(this.value.trim());
+    });
+    resubmissionSearch.addEventListener('input', function () {
+        const query = this.value.trim();
+        resubmissionId.value = '';
+        resubmissionPreview.classList.add('hidden');
+        clearTimeout(resubmissionDebounce);
+        resubmissionDebounce = setTimeout(() => loadResubmissionReferences(query), 250);
+    });
+    resubmissionSearch.addEventListener('blur', function () {
+        setTimeout(() => {
+            resubmissionDropdown.classList.add('hidden');
+            resubmissionDropdown.innerHTML = '';
+        }, 200);
+    });
+    syncResubmissionSection();
+    if (resubmissionToggle.checked && resubmissionId.value && isResubmissionRouting()) {
+        loadResubmissionReferences('', resubmissionId.value);
+    }
+
     // =========================================================================
     // Motion for Reconsideration — live search helpers
     // =========================================================================
@@ -1024,6 +1219,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Submit button spinner with checklist validation
     form.addEventListener('submit', function (e) {
+        if (resubmissionToggle.checked && isResubmissionRouting() && !resubmissionId.value) {
+            e.preventDefault();
+            showReceiveValidationFlash(['Select a previous document that needs resubmission.']);
+            resubmissionSearch.focus();
+            return false;
+        }
+
         const invalidFields = Array.from(form.querySelectorAll(':invalid'));
         if (invalidFields.length > 0) {
             e.preventDefault();

@@ -81,6 +81,7 @@ function committeeShowEvent(string $et): string
 {
     return match ($et) {
         'DOCUMENT_RECEIVED'           => 'Document Received',
+        'RESUBMISSION_LINKED'         => 'Resubmission Reference Linked',
         'ROUTED_TO_ADMIN'             => 'Routed to Admin',
         'ADMIN_ACCEPTED'              => 'Admin Accepted',
         'ADMIN_DECLINED'              => 'Admin Declined',

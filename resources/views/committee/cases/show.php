@@ -6,12 +6,14 @@
  *   $case                 array   committee_cases row + joined document / creator fields
  *   $actions              array   committee_case_actions rows ordered by action_date ASC
  *   $attachmentsByAction  array   [ action_id => [ attachment rows ] ]
+ *   $documentAttachments  array   Attachments uploaded to the linked source document
  *   $errors               array   Peeked validation errors (header renders flash toasts)
  */
 
 $case                = $case                ?? [];
 $actions             = $actions             ?? [];
 $attachmentsByAction = $attachmentsByAction ?? [];
+$documentAttachments = $documentAttachments ?? [];
 $finalizedByName     = $finalizedByName     ?? null;
 $linkedReport        = $linkedReport        ?? null;
 $caseBackUrl         = $caseBackUrl         ?? (BASE_URL . '/committee/cases');
@@ -439,6 +441,10 @@ ob_start();
                                                     Attachment<?= count($atts) > 1 ? 's' : '' ?>
                                                 </p>
                                                 <?php foreach ($atts as $att): ?>
+                                                    <?php
+                                                    $attachmentUrl = BASE_URL . '/public/' . ltrim((string) ($att['stored_path'] ?? ''), '/');
+                                                    $attachmentName = (string) ($att['file_name'] ?? 'Attachment');
+                                                    ?>
                                                     <div class="flex items-center justify-between rounded-lg
                                                                 border border-gray-200 bg-white px-3 py-2">
                                                         <div class="flex items-center gap-2 min-w-0">
@@ -465,13 +471,21 @@ ob_start();
                                                                 </p>
                                                             </div>
                                                         </div>
-                                                        <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars($att['stored_path']) ?>"
-                                                           target="_blank"
-                                                           class="ml-3 shrink-0 rounded-lg border border-gray-200 bg-white
-                                                                  px-2.5 py-1 text-xs font-medium text-gray-600
-                                                                  hover:bg-gray-50 transition">
-                                                            Download
-                                                        </a>
+                                                        <div class="ml-3 flex shrink-0 items-center gap-2">
+                                                            <a href="<?= htmlspecialchars($attachmentUrl) ?>"
+                                                               data-attachment-preview
+                                                               data-preview-url="<?= htmlspecialchars($attachmentUrl) ?>"
+                                                               data-preview-name="<?= htmlspecialchars($attachmentName) ?>"
+                                                               data-download-url="<?= htmlspecialchars($attachmentUrl) ?>"
+                                                               class="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-hover transition">
+                                                                Preview
+                                                            </a>
+                                                            <a href="<?= htmlspecialchars($attachmentUrl) ?>"
+                                                               download
+                                                               class="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition">
+                                                                Download
+                                                            </a>
+                                                        </div>
                                                     </div>
                                                 <?php endforeach; ?>
                                             </div>
@@ -838,6 +852,50 @@ ob_start();
                     </dl>
                 </div>
 
+                <?php if (!empty($documentAttachments)): ?>
+                    <div class="rounded-2xl border border-gray-200 bg-white p-5">
+                        <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                            Source Document Attachments
+                        </p>
+                        <div class="space-y-2">
+                            <?php foreach ($documentAttachments as $att): ?>
+                                <?php
+                                $attachmentUrl = BASE_URL . '/public/' . ltrim((string) ($att['stored_path'] ?? ''), '/');
+                                $attachmentName = (string) ($att['file_name'] ?? 'Attachment');
+                                $attachmentType = ucwords(strtolower(str_replace('_', ' ', (string) ($att['attachment_type'] ?? 'OTHER'))));
+                                ?>
+                                <div class="rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+                                    <p class="truncate text-sm font-medium text-gray-800">
+                                        <?= htmlspecialchars($attachmentName) ?>
+                                    </p>
+                                    <p class="mt-1 text-xs text-gray-400">
+                                        <?= htmlspecialchars(ucwords(strtolower((string) ($att['phase'] ?? '')))) ?>
+                                        &middot; <?= htmlspecialchars($attachmentType) ?>
+                                        <?php if (!empty($att['uploaded_by_username'])): ?>
+                                            &middot; <?= htmlspecialchars($att['uploaded_by_username']) ?>
+                                        <?php endif; ?>
+                                    </p>
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <a href="<?= htmlspecialchars($attachmentUrl) ?>"
+                                           data-attachment-preview
+                                           data-preview-url="<?= htmlspecialchars($attachmentUrl) ?>"
+                                           data-preview-name="<?= htmlspecialchars($attachmentName) ?>"
+                                           data-download-url="<?= htmlspecialchars($attachmentUrl) ?>"
+                                           class="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-hover transition">
+                                            Preview
+                                        </a>
+                                        <a href="<?= htmlspecialchars($attachmentUrl) ?>"
+                                           download
+                                           class="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition">
+                                            Download
+                                        </a>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
             </div>
         </div><!-- /right column -->
 
@@ -1189,9 +1247,10 @@ document.addEventListener('keydown', function (e) {
 
     input.addEventListener('change', function () {
         if (this.files.length) {
-            addFiles(this.files);
+            var newlySelectedFiles = Array.from(this.files);
             // Reset so the same file can be re-picked after removal.
             this.value = '';
+            addFiles(newlySelectedFiles);
         }
     });
 
