@@ -3,14 +3,16 @@
  * Committee — Share to Committee Report (dedicated page)
  *
  * Variables supplied by CommitteeHearingController::shareToReportShow():
- *   $selectedDocuments    array    Hearing document rows with mixed statuses
+ *   $selectedDocuments    array    Hearing documents and Approved case outcomes
  *                                  [{document_id, tracking_number, subject_matter,
  *                                    document_type_name, document_type_badge_color,
  *                                    status, status_badge_color,
- *                                    hearing_id, hearing_outcome, outcome_date}]
+ *                                    hearing_id, hearing_outcome, outcome_date,
+ *                                    case_id, case_owner_id, is_case_outcome}]
  *   $validatedIds         array    int[] of document_id values (canonical)
  *   $documentCommittees   array    [ document_id => [ ['id'=>.., 'name'=>..], ... ] ]
- *                                  Per-document committee mapping from agenda_committees.
+ *                                  Per-document assignment from agenda_committees or
+ *                                  document_committees, depending on source.
  *   $availableCommittees  array    [{id, name}] unique committees across all selected docs
  *   $defaultCommIds       int[]    Committee IDs pre-selected on first page load
  *   $existingReports      array    [{id, report_number, report_type, created_at,
@@ -37,7 +39,7 @@ $oldReportNum        = $oldReportNum        ?? '';
 $oldSummary          = $oldSummary          ?? '';
 $oldCommIds          = $oldCommIds          ?? [];
 
-// Identify documents that have no committee assigned (no agenda_committees row found)
+// Identify documents that have no committee assigned through their workflow source.
 $docsWithoutCommittee = [];
 foreach ($selectedDocuments as $doc) {
     $docId = (int) $doc['document_id'];
@@ -67,8 +69,8 @@ ob_start();
                 </h1>
                 <p class="mt-1 text-sm text-blue-100">
                     <?= $docCount === 1
-                        ? '1 hearing document selected'
-                        : htmlspecialchars($docCount) . ' hearing documents selected' ?>
+                        ? '1 document selected'
+                            : htmlspecialchars($docCount) . ' documents selected' ?>
                 </p>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full bg-white/10"></div>
@@ -136,6 +138,11 @@ ob_start();
                                 <span class="font-mono text-sm font-bold text-emerald-700">
                                     <?= htmlspecialchars($doc['tracking_number'] ?? '—') ?>
                                 </span>
+                                <?php if (!empty($doc['is_case_outcome'])): ?>
+                                    <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                                        Case Outcome
+                                    </span>
+                                <?php endif; ?>
                                 <?php if (!empty($doc['document_type_name'])): ?>
                                     <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white"
                                           style="background-color:<?= htmlspecialchars($doc['document_type_badge_color'] ?? '#6B7280') ?>">
@@ -158,6 +165,7 @@ ob_start();
                             <?php if ($outcomeDate): ?>
                                 <p class="text-xs text-gray-400">
                                     <?= !empty($doc['hearing_outcome']) ? htmlspecialchars(ucfirst(strtolower($doc['hearing_outcome']))) : 'Hearing pending' ?>
+                                    <?= !empty($doc['is_case_outcome']) ? '· Finalized' : '' ?>
                                     · <?= htmlspecialchars($outcomeDate) ?>
                                 </p>
                             <?php endif; ?>
@@ -174,8 +182,8 @@ ob_start();
                               d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     <p class="text-xs text-amber-800 leading-relaxed">
-                        Each document keeps its current status. You can group documents with different statuses
-                        in one shared Committee Report and return them to Plenary individually.
+                        Each document keeps its current status. You can group hearing documents and your
+                        Approved cases in one shared Committee Report and return them to Plenary individually.
                     </p>
                 </div>
             </div>
@@ -299,7 +307,7 @@ ob_start();
                                 <span class="text-red-500" aria-hidden="true">*</span>
                             </p>
                             <p class="text-xs text-gray-400 mb-2">
-                                Pre-populated from the committee(s) assigned to each selected document's agenda.
+                                Pre-populated from the committees assigned to each selected document or agenda.
                                 Select at least one. Multiple committees produce a
                                 <strong>Joint Committee Report</strong>.
                             </p>
@@ -309,7 +317,7 @@ ob_start();
                                 <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-1"
                                      role="alert">
                                     <p class="text-xs font-semibold text-amber-800">
-                                        The following document(s) have no committee assigned to their agenda.
+                                        The following document(s) have no committee assignment.
                                         They will not contribute committees to this report:
                                     </p>
                                     <ul class="list-disc pl-4 space-y-0.5">
@@ -330,7 +338,7 @@ ob_start();
                             <?php if (empty($availableCommittees)): ?>
                                 <p class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
                                     No committees found for the selected documents.
-                                    Ensure each document's agenda has at least one committee assigned.
+                                    Ensure the selected documents have at least one committee assigned.
                                 </p>
                             <?php else: ?>
                                 <div class="rounded-xl border border-gray-200 p-3 space-y-1.5 max-h-48 overflow-y-auto">

@@ -8,6 +8,8 @@
  *   $totalPages          int
  *   $total               int     total rows matching current filter
  *   $search              string
+ *   $tab                 string  active|completed_terminated
+ *   $tabCounts           array   counts for active and Completed/Terminated tabs
  *   $totalCommunications int     all communications created by this user (unfiltered)
  *   $success             string|null
  *   $error               string|null
@@ -19,7 +21,26 @@ $page                = $page                ?? 1;
 $totalPages          = $totalPages          ?? 1;
 $total               = $total               ?? 0;
 $search              = $search              ?? '';
+$tab                 = $tab                 ?? 'active';
+$tabCounts           = $tabCounts           ?? ['active' => 0, 'completed_terminated' => 0];
 $totalCommunications = $totalCommunications ?? 0;
+
+function committeeCommunicationsUrl(string $tab, string $search = '', int $page = 1): string
+{
+    $params = [];
+    if ($tab !== 'active') {
+        $params['tab'] = $tab;
+    }
+    if ($search !== '') {
+        $params['search'] = $search;
+    }
+    if ($page > 1) {
+        $params['page'] = $page;
+    }
+
+    return BASE_URL . '/committee/communications'
+        . ($params ? '?' . http_build_query($params) : '');
+}
 
 ob_start();
 ?>
@@ -54,6 +75,40 @@ ob_start();
         </div>
     </section>
 
+    <!-- Communications status tabs ------------------------------------------>
+    <section>
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex gap-6 overflow-x-auto" aria-label="Communication status tabs">
+                <?php
+                $communicationTabs = [
+                    'active' => ['label' => 'In Progress', 'count' => (int) ($tabCounts['active'] ?? 0)],
+                    'completed_terminated' => [
+                        'label' => 'Completed/Terminated',
+                        'count' => (int) ($tabCounts['completed_terminated'] ?? 0),
+                    ],
+                ];
+                foreach ($communicationTabs as $key => $config):
+                    $isActiveTab = $tab === $key;
+                ?>
+                    <a href="<?= htmlspecialchars(committeeCommunicationsUrl($key, $search)) ?>"
+                       class="<?= $isActiveTab
+                           ? 'border-primary text-primary'
+                           : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>
+                              whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition"
+                       <?= $isActiveTab ? 'aria-current="page"' : '' ?>>
+                        <?= htmlspecialchars($config['label']) ?>
+                        <?php if ($config['count'] > 0): ?>
+                            <span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold
+                                         <?= $isActiveTab ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700' ?>">
+                                <?= number_format($config['count']) ?>
+                            </span>
+                        <?php endif; ?>
+                    </a>
+                <?php endforeach; ?>
+            </nav>
+        </div>
+    </section>
+
     <!-- Communications list card --------------------------------------------->
     <section class="rounded-2xl border border-gray-200 bg-white">
 
@@ -72,6 +127,9 @@ ob_start();
             </div>
             <form method="GET" action="<?= BASE_URL ?>/committee/communications"
                   class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <?php if ($tab !== 'active'): ?>
+                    <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
+                <?php endif; ?>
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,7 +151,7 @@ ob_start();
                     Search
                 </button>
                 <?php if ($search !== ''): ?>
-                    <a href="<?= BASE_URL ?>/committee/communications"
+                    <a href="<?= htmlspecialchars(committeeCommunicationsUrl($tab)) ?>"
                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium
                               text-gray-700 hover:bg-gray-50 transition text-center">
                         Clear
@@ -137,22 +195,30 @@ ob_start();
                                            class="text-primary hover:underline">Clear search</a>
                                     </p>
                                 <?php else: ?>
-                                    <p class="mt-4 text-sm font-medium text-gray-700">No communications yet.</p>
-                                    <p class="mt-1 text-xs text-gray-500">
-                                        Communications you log from your inbox will appear here.
+                                    <p class="mt-4 text-sm font-medium text-gray-700">
+                                        <?= $tab === 'completed_terminated'
+                                            ? 'No Completed/Terminated communications.'
+                                            : 'No communications in progress.' ?>
                                     </p>
-                                    <a href="<?= BASE_URL ?>/committee/inbox"
-                                       class="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2
-                                              text-sm font-semibold text-white hover:bg-blue-700 transition">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2
-                                                     2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414
-                                                     2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414
-                                                     -2.414A1 1 0 006.586 13H4"/>
-                                        </svg>
-                                        Go to Inbox
-                                    </a>
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        <?= $tab === 'completed_terminated'
+                                            ? 'Communications with this hearing outcome will appear here.'
+                                            : 'Communications with a recorded hearing outcome continue on the Hearings page.' ?>
+                                    </p>
+                                    <?php if ($tab === 'active'): ?>
+                                        <a href="<?= BASE_URL ?>/committee/inbox"
+                                           class="mt-5 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2
+                                                  text-sm font-semibold text-white hover:bg-blue-700 transition">
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2
+                                                         2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414
+                                                         2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414
+                                                         -2.414A1 1 0 006.586 13H4"/>
+                                            </svg>
+                                            Go to Inbox
+                                        </a>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -270,12 +336,7 @@ ob_start();
 
         <!-- Pagination ------------------------------------------------------->
         <?php if ($totalPages > 1): ?>
-            <?php
-            $query = [];
-            if ($search !== '') $query['search'] = $search;
-            $queryString = !empty($query) ? '&' . http_build_query($query) : '';
-            ?>
-            <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
+                    <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
                 <p class="text-xs text-gray-500">
                     Showing page <span class="font-medium text-gray-700"><?= $page ?></span> of
                     <span class="font-medium text-gray-700"><?= $totalPages ?></span>
@@ -283,7 +344,7 @@ ob_start();
                 </p>
                 <div class="flex items-center gap-1">
                     <?php if ($page > 1): ?>
-                        <a href="?page=<?= $page - 1 ?><?= $queryString ?>"
+                        <a href="<?= htmlspecialchars(committeeCommunicationsUrl($tab, $search, $page - 1)) ?>"
                            class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium
                                   text-gray-700 hover:bg-gray-50 transition">
                             Prev
@@ -295,7 +356,7 @@ ob_start();
                     $endPage   = min($totalPages, $page + 2);
                     for ($i = $startPage; $i <= $endPage; $i++):
                     ?>
-                        <a href="?page=<?= $i ?><?= $queryString ?>"
+                        <a href="<?= htmlspecialchars(committeeCommunicationsUrl($tab, $search, $i)) ?>"
                            class="rounded-lg border px-3 py-1.5 text-sm font-medium transition
                                   <?= $i === $page
                                       ? 'border-primary bg-primary text-white'
@@ -305,7 +366,7 @@ ob_start();
                     <?php endfor; ?>
 
                     <?php if ($page < $totalPages): ?>
-                        <a href="?page=<?= $page + 1 ?><?= $queryString ?>"
+                        <a href="<?= htmlspecialchars(committeeCommunicationsUrl($tab, $search, $page + 1)) ?>"
                            class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium
                                   text-gray-700 hover:bg-gray-50 transition">
                             Next

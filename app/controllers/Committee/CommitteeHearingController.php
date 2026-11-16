@@ -28,6 +28,7 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *   ?tab=deferred   Documents whose hearing outcome is DEFERRED
  *   ?tab=remanded   Documents whose hearing outcome is REMANDED
  *   ?tab=withdrawn  Documents whose hearing outcome is WITHDRAWN
+ *   ?tab=noted      Documents finalized as NOTED from the Cases workflow
  *   ?tab=reset      Documents returned to Ready for Agenda for rescheduling
  *
  * AUTHORIZATION
@@ -67,6 +68,7 @@ class CommitteeHearingController
         'deferred'  => 'Deferred',
         'remanded'  => 'Remanded',
         'withdrawn' => 'Withdrawn',
+        'noted'     => 'Noted',
         'reset'     => 'Reset',
     ];
 
@@ -981,11 +983,25 @@ class CommitteeHearingController
         int $remandedId,
         int $withdrawnId
     ): array {
-        // "all" = every document that has at least one agenda entry
-        $allStmt = $this->pdo->query(
-            "SELECT COUNT(DISTINCT d.id) FROM documents d
-              INNER JOIN agendas ag ON ag.document_id = d.id"
-        );
+        // Prefer a finalized Cases outcome over an agenda row for the same document.
+        $allStmt = $this->pdo->query("
+            SELECT COUNT(*) FROM (
+                SELECT d.id
+                FROM documents d
+                INNER JOIN agendas ag ON ag.document_id = d.id
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM committee_cases cc
+                    WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+                )
+                GROUP BY d.id
+
+                UNION
+
+                SELECT cc.document_id
+                FROM committee_cases cc
+                WHERE cc.final_outcome IS NOT NULL
+            ) hearing_documents
+        ");
         $all = (int) $allStmt->fetchColumn();
 
         // "scheduled" = On Going with a latest agenda that has no hearing yet
@@ -1001,11 +1017,11 @@ class CommitteeHearingController
 
         // Outcome counts represent the latest scheduled agenda, not old cycles.
         $appStmt = $this->countLatestAgendaOutcome('APPROVED');
-        $approved = (int) $appStmt->fetchColumn();
+        $approved = (int) $appStmt->fetchColumn() + $this->countFinalCaseDocuments('APPROVED');
 
         // "deferred" = outcome DEFERRED
         $defStmt = $this->countLatestAgendaOutcome('DEFERRED');
-        $deferred = (int) $defStmt->fetchColumn();
+        $deferred = (int) $defStmt->fetchColumn() + $this->countFinalCaseDocuments('DEFERRED');
 
         // "remanded" = outcome REMANDED
         $remStmt = $this->countLatestAgendaOutcome('REMANDED');
@@ -1013,12 +1029,27 @@ class CommitteeHearingController
 
         // "withdrawn" = outcome WITHDRAWN
         $witStmt = $this->countLatestAgendaOutcome('WITHDRAWN');
-        $withdrawn = (int) $witStmt->fetchColumn();
+        $withdrawn = (int) $witStmt->fetchColumn() + $this->countFinalCaseDocuments('WITHDRAWN');
+
+        $noted = $this->countFinalCaseDocuments('NOTED');
 
         $resetStmt = $this->countLatestAgendaOutcome('RESET', true);
         $reset = (int) $resetStmt->fetchColumn();
 
-        return compact('all', 'scheduled', 'approved', 'deferred', 'remanded', 'withdrawn', 'reset');
+        return compact('all', 'scheduled', 'approved', 'deferred', 'remanded', 'withdrawn', 'noted', 'reset');
+    }
+
+    private function countFinalCaseDocuments(?string $outcome = null): int
+    {
+        $outcomeFilter = $outcome === null ? '' : 'AND cc.final_outcome = ?';
+        $stmt = $this->pdo->prepare("
+            SELECT COUNT(DISTINCT cc.document_id)
+            FROM committee_cases cc
+            WHERE cc.final_outcome IS NOT NULL
+              {$outcomeFilter}
+        ");
+        $stmt->execute($outcome === null ? [] : [$outcome]);
+        return (int) $stmt->fetchColumn();
     }
 
     private function countLatestAgendaOutcome(string $outcome, bool $requireReadyStatus = false): PDOStatement
@@ -1039,6 +1070,10 @@ class CommitteeHearingController
                 AND ch.outcome = ?
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             WHERE 1=1 {$readyStatusFilter}
+              AND NOT EXISTS (
+                  SELECT 1 FROM committee_cases cc
+                  WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+              )
         ");
         $stmt->execute([$outcome]);
         return $stmt;
@@ -1078,6 +1113,9 @@ class CommitteeHearingController
             'withdrawn' => $this->queryOutcomeTab(
                 'WITHDRAWN', $searchWhere, $searchParams, $perPage, $offset
             ),
+            'noted' => $this->queryOutcomeTab(
+                'NOTED', $searchWhere, $searchParams, $perPage, $offset
+            ),
             'reset' => $this->queryOutcomeTab(
                 'RESET', $searchWhere, $searchParams, $perPage, $offset, true
             ),
@@ -1088,69 +1126,132 @@ class CommitteeHearingController
     }
 
     /**
-     * "All" tab: every document that has at least one agenda row.
-     * No duplicate rows because we GROUP BY document — GROUP_CONCAT aggregates
-     * committee names.
+     * "All" tab: agenda hearings plus finalized case outcomes. A finalized
+     * Cases record takes precedence when a document also has an agenda.
      */
     private function queryAllTab(
         string $searchWhere, array $searchParams, int $perPage, int $offset
     ): array {
         $countStmt = $this->pdo->prepare("
-            SELECT COUNT(DISTINCT d.id)
-            FROM documents d
-            INNER JOIN agendas ag ON ag.document_id = d.id
-            WHERE 1=1 {$searchWhere}
+            SELECT COUNT(*) FROM (
+                SELECT d.id
+                FROM documents d
+                INNER JOIN agendas ag ON ag.document_id = d.id
+                WHERE 1=1
+                  AND NOT EXISTS (
+                      SELECT 1 FROM committee_cases cc
+                      WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+                  )
+                  {$searchWhere}
+                GROUP BY d.id
+
+                UNION
+
+                SELECT d.id
+                FROM documents d
+                INNER JOIN committee_cases cc ON cc.document_id = d.id
+                WHERE cc.final_outcome IS NOT NULL
+                  {$searchWhere}
+                GROUP BY d.id
+            ) hearing_documents
         ");
-        $countStmt->execute($searchParams);
+        $countStmt->execute([...$searchParams, ...$searchParams]);
         $total = (int) $countStmt->fetchColumn();
 
         $listStmt = $this->pdo->prepare("
-            SELECT
-                d.id                            AS document_id,
-                d.tracking_number,
-                d.subject_matter,
-                dt.name                         AS document_type_name,
-                dt.badge_color                  AS document_type_badge_color,
-                ds.name                         AS status,
-                ds.badge_color                  AS status_badge_color,
-                ag.id                           AS agenda_id,
-                ag.agenda_date,
-                ag.agenda_time,
-                ag.venue,
-                GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ')
-                                                AS committee_names,
-                ch.id                           AS hearing_id,
-                ch.outcome                      AS hearing_outcome,
-                ch.performed_at                 AS outcome_date,
-                ua_ch.username                  AS outcome_by,
-                cr.id                           AS report_id,
-                cr.report_number,
-                cr.report_type
-            FROM documents d
-            INNER JOIN agendas ag
-                ON ag.document_id = d.id
-                AND ag.id = (SELECT MAX(a2.id) FROM agendas a2 WHERE a2.document_id = d.id)
-            LEFT  JOIN agenda_committees ac   ON ac.agenda_id   = ag.id
-            LEFT  JOIN committees         c   ON  c.id          = ac.committee_id
-            LEFT  JOIN document_types    dt   ON dt.id          = d.document_type_id
-            LEFT  JOIN document_statuses ds   ON ds.id          = d.current_status_id
-            LEFT  JOIN committee_hearings ch  ON ch.document_id = d.id
-                AND ch.agenda_id = ag.id
-                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.agenda_id = ag.id)
-            LEFT  JOIN user_accounts ua_ch    ON ua_ch.id       = ch.performed_by
-            LEFT  JOIN committee_report_documents crd ON crd.document_id = d.id
-            LEFT  JOIN committee_reports cr ON cr.id = crd.committee_report_id
-            WHERE 1=1 {$searchWhere}
-            GROUP BY
-                d.id, d.tracking_number, d.subject_matter,
-                dt.name, dt.badge_color, ds.name, ds.badge_color,
-                ag.id, ag.agenda_date, ag.agenda_time, ag.venue,
-                ch.id, ch.outcome, ch.performed_at, ua_ch.username,
-                cr.id, cr.report_number, cr.report_type
-            ORDER BY ag.agenda_date DESC, d.id DESC
+            SELECT * FROM (
+                SELECT
+                    d.id                            AS document_id,
+                    d.tracking_number,
+                    d.subject_matter,
+                    dt.name                         AS document_type_name,
+                    dt.badge_color                  AS document_type_badge_color,
+                    ds.name                         AS status,
+                    ds.badge_color                  AS status_badge_color,
+                    ag.id                           AS agenda_id,
+                    ag.agenda_date,
+                    ag.agenda_time,
+                    ag.venue,
+                    GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ')
+                                                    AS committee_names,
+                    ch.id                           AS hearing_id,
+                    ch.outcome                      AS hearing_outcome,
+                    ch.performed_at                 AS outcome_date,
+                    ua_ch.username                  AS outcome_by,
+                    cr.id                           AS report_id,
+                    cr.report_number,
+                    cr.report_type,
+                    NULL                            AS case_id,
+                    NULL                            AS case_owner_id,
+                    0                               AS is_case_outcome
+                FROM documents d
+                INNER JOIN agendas ag
+                    ON ag.document_id = d.id
+                    AND ag.id = (SELECT MAX(a2.id) FROM agendas a2 WHERE a2.document_id = d.id)
+                LEFT  JOIN agenda_committees ac   ON ac.agenda_id   = ag.id
+                LEFT  JOIN committees         c   ON  c.id          = ac.committee_id
+                LEFT  JOIN document_types    dt   ON dt.id          = d.document_type_id
+                LEFT  JOIN document_statuses ds   ON ds.id          = d.current_status_id
+                LEFT  JOIN committee_hearings ch  ON ch.document_id = d.id
+                    AND ch.agenda_id = ag.id
+                    AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.agenda_id = ag.id)
+                LEFT  JOIN user_accounts ua_ch    ON ua_ch.id       = ch.performed_by
+                LEFT  JOIN committee_report_documents crd ON crd.document_id = d.id
+                LEFT  JOIN committee_reports cr ON cr.id = crd.committee_report_id
+                WHERE 1=1
+                  AND NOT EXISTS (
+                      SELECT 1 FROM committee_cases cc
+                      WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+                  )
+                  {$searchWhere}
+                GROUP BY
+                    d.id, d.tracking_number, d.subject_matter,
+                    dt.name, dt.badge_color, ds.name, ds.badge_color,
+                    ag.id, ag.agenda_date, ag.agenda_time, ag.venue,
+                    ch.id, ch.outcome, ch.performed_at, ua_ch.username,
+                    cr.id, cr.report_number, cr.report_type
+
+                UNION ALL
+
+                SELECT
+                    d.id                            AS document_id,
+                    d.tracking_number,
+                    d.subject_matter,
+                    dt.name                         AS document_type_name,
+                    dt.badge_color                  AS document_type_badge_color,
+                    ds.name                         AS status,
+                    ds.badge_color                  AS status_badge_color,
+                    NULL                            AS agenda_id,
+                    NULL                            AS agenda_date,
+                    NULL                            AS agenda_time,
+                    NULL                            AS venue,
+                    CONVERT('' USING utf8mb4) COLLATE utf8mb4_0900_ai_ci
+                                                    AS committee_names,
+                    NULL                            AS hearing_id,
+                    cc.final_outcome COLLATE utf8mb4_0900_ai_ci
+                                                    AS hearing_outcome,
+                    cc.finalized_at                 AS outcome_date,
+                    ua_cc.username                  AS outcome_by,
+                    cr.id                           AS report_id,
+                    cr.report_number,
+                    cr.report_type,
+                    cc.id                           AS case_id,
+                    cc.assigned_by                  AS case_owner_id,
+                    1                               AS is_case_outcome
+                FROM documents d
+                INNER JOIN committee_cases cc ON cc.document_id = d.id
+                LEFT JOIN document_types dt ON dt.id = d.document_type_id
+                LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+                LEFT JOIN user_accounts ua_cc ON ua_cc.id = cc.finalized_by
+                LEFT JOIN committee_report_documents crd ON crd.document_id = d.id
+                LEFT JOIN committee_reports cr ON cr.id = crd.committee_report_id
+                WHERE cc.final_outcome IS NOT NULL
+                  {$searchWhere}
+            ) hearing_rows
+            ORDER BY COALESCE(outcome_date, agenda_date) DESC, document_id DESC
             LIMIT ? OFFSET ?
         ");
-        $listStmt->execute([...$searchParams, $perPage, $offset]);
+        $listStmt->execute([...$searchParams, ...$searchParams, $perPage, $offset]);
         return [$listStmt->fetchAll(), $total];
     }
 
@@ -1219,9 +1320,8 @@ class CommitteeHearingController
     }
 
     /**
-     * Outcome tabs (Approved / Deferred / Remanded / Withdrawn):
-     * Join committee_hearings on outcome = $outcome to avoid duplicates.
-     * Uses DISTINCT on document_id with the latest hearing record per doc.
+     * Outcome tabs combine the latest agenda hearing outcome with finalized
+     * Cases records, preferring the Cases record if both workflows exist.
      */
     private function queryOutcomeTab(
         string $outcome,
@@ -1247,9 +1347,64 @@ class CommitteeHearingController
                 AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.agenda_id = ag.id)
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             WHERE 1=1 {$readyStatusFilter} {$searchWhere}
+              AND NOT EXISTS (
+                  SELECT 1 FROM committee_cases cc
+                  WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+              )
         ");
         $countStmt->execute([$outcome, ...$searchParams]);
         $total = (int) $countStmt->fetchColumn();
+
+        if (!$requireReadyStatus) {
+            $caseCountStmt = $this->pdo->prepare("
+                SELECT COUNT(DISTINCT cc.document_id)
+                FROM committee_cases cc
+                INNER JOIN documents d ON d.id = cc.document_id
+                WHERE cc.final_outcome = ?
+                  {$searchWhere}
+            ");
+            $caseCountStmt->execute([$outcome, ...$searchParams]);
+            $total += (int) $caseCountStmt->fetchColumn();
+        }
+
+        $caseOutcomeQuery = $requireReadyStatus ? '' : "
+            UNION ALL
+
+            SELECT
+                d.id                            AS document_id,
+                d.tracking_number,
+                d.subject_matter,
+                dt.name                         AS document_type_name,
+                dt.badge_color                  AS document_type_badge_color,
+                ds.name                         AS status,
+                ds.badge_color                  AS status_badge_color,
+                NULL                            AS agenda_id,
+                NULL                            AS agenda_date,
+                NULL                            AS agenda_time,
+                NULL                            AS venue,
+                CONVERT('' USING utf8mb4) COLLATE utf8mb4_0900_ai_ci
+                                                AS committee_names,
+                NULL                            AS hearing_id,
+                cc.final_outcome COLLATE utf8mb4_0900_ai_ci
+                                                AS hearing_outcome,
+                cc.finalized_at                 AS outcome_date,
+                ua_cc.username                  AS outcome_by,
+                cr.id                           AS report_id,
+                cr.report_number,
+                cr.report_type,
+                cc.id                           AS case_id,
+                cc.assigned_by                  AS case_owner_id,
+                1                               AS is_case_outcome
+            FROM documents d
+            INNER JOIN committee_cases cc ON cc.document_id = d.id
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN user_accounts ua_cc ON ua_cc.id = cc.finalized_by
+            LEFT JOIN committee_report_documents crd ON crd.document_id = d.id
+            LEFT JOIN committee_reports cr ON cr.id = crd.committee_report_id
+            WHERE cc.final_outcome = ?
+              {$searchWhere}
+        ";
 
         $listStmt = $this->pdo->prepare("
             SELECT
@@ -1272,7 +1427,10 @@ class CommitteeHearingController
                 ua_ch.username                  AS outcome_by,
                 cr.id                           AS report_id,
                 cr.report_number,
-                cr.report_type
+                cr.report_type,
+                NULL                            AS case_id,
+                NULL                            AS case_owner_id,
+                0                               AS is_case_outcome
             FROM documents d
             INNER JOIN agendas ag
                 ON ag.document_id = d.id
@@ -1290,16 +1448,22 @@ class CommitteeHearingController
             LEFT  JOIN committee_report_documents crd ON crd.document_id = d.id
             LEFT  JOIN committee_reports cr ON cr.id = crd.committee_report_id
             WHERE 1=1 {$readyStatusFilter} {$searchWhere}
+              AND NOT EXISTS (
+                  SELECT 1 FROM committee_cases cc
+                  WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+              )
             GROUP BY
                 d.id, d.tracking_number, d.subject_matter,
                 dt.name, dt.badge_color, ds.name, ds.badge_color,
                 ag.id, ag.agenda_date, ag.agenda_time, ag.venue,
                 ch.id, ch.outcome, ch.performed_at, ua_ch.username,
                 cr.id, cr.report_number, cr.report_type
-            ORDER BY ch.performed_at DESC, d.id DESC
+            {$caseOutcomeQuery}
+            ORDER BY outcome_date DESC, document_id DESC
             LIMIT ? OFFSET ?
         ");
-        $listStmt->execute([$outcome, ...$searchParams, $perPage, $offset]);
+        $caseOutcomeParams = $requireReadyStatus ? [] : [$outcome, ...$searchParams];
+        $listStmt->execute([$outcome, ...$searchParams, ...$caseOutcomeParams, $perPage, $offset]);
         return [$listStmt->fetchAll(), $total];
     }
 
@@ -1386,7 +1550,7 @@ class CommitteeHearingController
         )));
 
         if (empty($documentIds)) {
-            flash_set('error', 'No documents selected. Select at least one hearing document to share.');
+            flash_set('error', 'No documents selected. Select at least one hearing document or Approved case to share.');
             redirect('committee/hearing?tab=all');
         }
 
@@ -1395,7 +1559,7 @@ class CommitteeHearingController
             redirect('committee/hearing?tab=all');
         }
 
-        // ── Load selected documents with any current hearing outcome ──────────
+        // ── Load selected hearing documents and report-eligible case outcomes ─
         $ph = implode(',', array_fill(0, count($documentIds), '?'));
         $docStmt = $this->pdo->prepare("
             SELECT d.id              AS document_id,
@@ -1406,37 +1570,57 @@ class CommitteeHearingController
                    ds.name          AS status,
                    ds.badge_color   AS status_badge_color,
                    ch.id            AS hearing_id,
-                   ch.outcome       AS hearing_outcome,
-                   ch.performed_at  AS outcome_date
+                   CASE
+                       WHEN cc.final_outcome IS NOT NULL THEN cc.final_outcome
+                       ELSE ch.outcome
+                   END              AS hearing_outcome,
+                   CASE
+                       WHEN cc.final_outcome IS NOT NULL THEN cc.finalized_at
+                       ELSE ch.performed_at
+                   END              AS outcome_date,
+                   cc.id            AS case_id,
+                   cc.assigned_by   AS case_owner_id,
+                   CASE WHEN cc.final_outcome IS NOT NULL THEN 1 ELSE 0 END AS is_case_outcome
             FROM documents d
-            INNER JOIN agendas ag
+            LEFT JOIN agendas ag
                 ON ag.document_id = d.id
                AND ag.id = (SELECT MAX(ag2.id) FROM agendas ag2 WHERE ag2.document_id = d.id)
             LEFT JOIN committee_hearings ch
                 ON ch.document_id = d.id
                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
+            LEFT JOIN committee_cases cc
+                ON cc.document_id = d.id
+               AND cc.id = (SELECT MAX(cc2.id) FROM committee_cases cc2 WHERE cc2.document_id = d.id)
             LEFT JOIN document_types    dt ON dt.id = d.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             WHERE d.id IN ({$ph})
+              AND (
+                    (cc.final_outcome = 'APPROVED' AND cc.assigned_by = ?)
+                    OR (
+                        cc.final_outcome IS NULL
+                        AND ag.id IS NOT NULL
+                        AND ch.outcome IS NOT NULL
+                        AND ch.outcome <> 'RESET'
+                    )
+              )
             ORDER BY d.tracking_number ASC
         ");
-        $docStmt->execute($documentIds);
+        $docStmt->execute([...$documentIds, $userId]);
         $selectedDocuments = $docStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Guard: only documents in the hearing workflow can be shared.
-        if (empty($selectedDocuments)) {
-            flash_set('error', 'None of the selected documents have a hearing agenda. Return to All Hearings and try again.');
+        // Reject the whole request if any selected item is stale, ineligible, or
+        // belongs to another case owner.
+        if (count($selectedDocuments) !== count($documentIds)) {
+            flash_set('error', 'One or more selected items are no longer eligible for a Committee Report. Only hearings with a recorded outcome and your own Approved cases can be shared.');
             redirect('committee/hearing?tab=all');
         }
 
         // Build a canonical list of validated IDs (only those that passed the query)
         $validatedIds = array_column($selectedDocuments, 'document_id');
 
-        // ── Build per-document committee mapping from agenda_committees ────────
-        //
-        // Each selected document carries a hearing_id which links to an agenda.
-        // We join: committee_hearings → agendas → agenda_committees → committees
-        // to find the committee(s) in charge for every document individually.
+        // ── Build per-document committee mapping ──────────────────────────────
+        // Hearing documents use agenda_committees; case outcomes use the
+        // document_committees assigned to the case's document.
         //
         // We do a single query for all validated document IDs to avoid N+1 queries.
         // The result is keyed by document_id so the view can warn when a document
@@ -1455,13 +1639,20 @@ class CommitteeHearingController
                     c.name           AS committee_name,
                     c.sort_order     AS committee_sort_order
                 FROM documents d
-                INNER JOIN agendas ag
+                LEFT JOIN agendas ag
                     ON ag.document_id = d.id
                    AND ag.id = (SELECT MAX(ag2.id) FROM agendas ag2 WHERE ag2.document_id = d.id)
-                INNER JOIN agenda_committees ac
+                LEFT JOIN committee_cases cc
+                    ON cc.document_id = d.id
+                   AND cc.id = (SELECT MAX(cc2.id) FROM committee_cases cc2 WHERE cc2.document_id = d.id)
+                LEFT JOIN agenda_committees ac
                     ON ac.agenda_id = ag.id
+                   AND cc.final_outcome IS NULL
+                LEFT JOIN document_committees dc
+                    ON dc.document_id = d.id
+                   AND cc.final_outcome IS NOT NULL
                 INNER JOIN committees c
-                    ON c.id = ac.committee_id
+                    ON c.id = COALESCE(ac.committee_id, dc.committee_id)
                 WHERE d.id IN ({$dcPh})
                 ORDER BY c.sort_order ASC, c.name ASC
             ");
@@ -1545,7 +1736,8 @@ class CommitteeHearingController
     // 9. shareToReport — group hearing documents of any status under one report
     //
     // BUSINESS RULES (enforced server-side regardless of client state):
-    //   1. Every submitted document_id must have a hearing agenda.
+    //   1. Every submitted document_id must be a hearing document or an
+    //      APPROVED case owned by the current user.
     //   2. Every submitted document_id must have NO existing committee_report_documents row.
     //      If even ONE document is already assigned to any report the ENTIRE request is
     //      rejected — no partial saves, full rollback.
@@ -1577,7 +1769,7 @@ class CommitteeHearingController
 
         // ── Validate: at least one document ───────────────────────────────────
         if (empty($documentIds)) {
-            flash_set('error', 'Please select at least one hearing document to share.');
+            flash_set('error', 'Please select at least one hearing document or Approved case to share.');
             redirect($redirectBack);
         }
 
@@ -1647,7 +1839,7 @@ class CommitteeHearingController
             redirect($sharePageUrl);
         }
 
-        // ── STEP 1: Verify every document belongs to a hearing agenda ─────────
+        // ── STEP 1: Verify every item is eligible for a Committee Report ─────
         $ph = implode(',', array_fill(0, count($documentIds), '?'));
         $docCheckStmt = $this->pdo->prepare("
             SELECT d.id              AS document_id,
@@ -1655,23 +1847,38 @@ class CommitteeHearingController
                    d.subject_matter,
                    ch.id             AS hearing_id,
                    ch.outcome,
-                   ag.id             AS agenda_id
+                   ag.id             AS agenda_id,
+                   cc.id             AS case_id,
+                   cc.assigned_by    AS case_owner_id,
+                   cc.final_outcome  AS case_outcome,
+                   CASE WHEN cc.final_outcome IS NOT NULL THEN 1 ELSE 0 END AS is_case_outcome
             FROM documents d
-            INNER JOIN agendas ag
+            LEFT JOIN agendas ag
                 ON ag.document_id = d.id
                AND ag.id = (SELECT MAX(ag2.id) FROM agendas ag2 WHERE ag2.document_id = d.id)
             LEFT JOIN committee_hearings ch
                 ON ch.document_id = d.id
                AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
+            LEFT JOIN committee_cases cc
+                ON cc.document_id = d.id
+               AND cc.id = (SELECT MAX(cc2.id) FROM committee_cases cc2 WHERE cc2.document_id = d.id)
             WHERE d.id IN ({$ph})
+              AND (
+                    (cc.final_outcome = 'APPROVED' AND cc.assigned_by = ?)
+                    OR (
+                        cc.final_outcome IS NULL
+                        AND ag.id IS NOT NULL
+                        AND ch.outcome IS NOT NULL
+                        AND ch.outcome <> 'RESET'
+                    )
+              )
         ");
-        $docCheckStmt->execute($documentIds);
+        $docCheckStmt->execute([...$documentIds, $userId]);
         $validDocs = $docCheckStmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (count($validDocs) !== count($documentIds)) {
             flash_set('error',
-                'One or more selected documents no longer have a hearing agenda. ' .
-                'Refresh All Hearings and select the documents again.'
+                'One or more selected items are no longer eligible. Only hearings with a recorded outcome and your own Approved cases can be added to a Committee Report.'
             );
             redirect($redirectBack);
         }
@@ -1972,10 +2179,10 @@ class CommitteeHearingController
 
         // ── Branch: new report ────────────────────────────────────────────────
 
-        // Validate committee IDs
+        // Validate committee IDs against active committees and committees
+        // assigned to any selected hearing agenda or case document.
         $cPh = implode(',', array_fill(0, count($committeeIds), '?'));
-        $agendaIds = array_values(array_unique(array_map('intval', array_column($validDocs, 'agenda_id'))));
-        $agendaPh = implode(',', array_fill(0, count($agendaIds), '?'));
+        $docPh = implode(',', array_fill(0, count($documentIds), '?'));
         $cChk = $this->pdo->prepare("
             SELECT c.id
             FROM committees c
@@ -1983,13 +2190,20 @@ class CommitteeHearingController
               AND (
                     (c.is_active = 1 AND c.is_deleted = 0)
                     OR EXISTS (
-                        SELECT 1 FROM agenda_committees ac
+                        SELECT 1
+                        FROM agenda_committees ac
+                        INNER JOIN agendas ag ON ag.id = ac.agenda_id
                         WHERE ac.committee_id = c.id
-                          AND ac.agenda_id IN ({$agendaPh})
+                          AND ag.document_id IN ({$docPh})
+                    )
+                    OR EXISTS (
+                        SELECT 1 FROM document_committees dc
+                        WHERE dc.committee_id = c.id
+                          AND dc.document_id IN ({$docPh})
                     )
               )
         ");
-        $cChk->execute(array_merge($committeeIds, $agendaIds));
+        $cChk->execute([...$committeeIds, ...$documentIds, ...$documentIds]);
         $validCIds = array_column($cChk->fetchAll(), 'id');
 
         if (count($validCIds) !== count($committeeIds)) {
@@ -2006,9 +2220,16 @@ class CommitteeHearingController
 
         $reportType = count($validCIds) > 1 ? 'JOINT_COMMITTEE_REPORT' : 'COMMITTEE_REPORT';
 
-        // Use the first valid doc's agenda/hearing as the primary report references
-        $primaryDoc     = $validDocs[0];
-        $primaryAgenda  = (int) $primaryDoc['agenda_id'];
+        // Prefer an agenda-backed document for legacy report references; case-only
+        // reports intentionally leave agenda_id and hearing_id NULL.
+        $primaryDoc = $validDocs[0];
+        foreach ($validDocs as $validDoc) {
+            if (!empty($validDoc['agenda_id'])) {
+                $primaryDoc = $validDoc;
+                break;
+            }
+        }
+        $primaryAgenda  = !empty($primaryDoc['agenda_id']) ? (int) $primaryDoc['agenda_id'] : null;
         $primaryHearing = !empty($primaryDoc['hearing_id']) ? (int) $primaryDoc['hearing_id'] : null;
 
         $reportId     = null;

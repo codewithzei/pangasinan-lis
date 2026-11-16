@@ -679,6 +679,9 @@ section('Group 1 — Server-side restriction + source invariants');
 $controllerSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Committee/CommitteeInboxController.php');
 $viewSrc       = (string) file_get_contents(__DIR__ . '/../resources/views/committee/inbox/show.php');
 $migrationSrc  = (string) file_get_contents(__DIR__ . '/../database/migrations/076_committee_return_to_origin_event.php');
+$communicationsControllerSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Committee/CommitteeCommunicationsController.php');
+$communicationsIndexSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/communications/index.php');
+$communicationsShowSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/communications/show.php');
 
 check('controller accepts the two new action keys', str_contains($controllerSrc, "'proceed_to_communications'")
     && str_contains($controllerSrc, "'return_to_origin'"));
@@ -698,6 +701,26 @@ check('proceed reuses committee_communications (no parallel workflow)',
 check('proceed reuses COMMITTEE_COMMUNICATION_CREATED', str_contains($controllerSrc, "'COMMITTEE_COMMUNICATION_CREATED'"));
 check('return writes COMMITTEE_RETURNED_TO_ORIGIN', str_contains($controllerSrc, "'COMMITTEE_RETURNED_TO_ORIGIN'"));
 check('migration 076 declares COMMITTEE_RETURNED_TO_ORIGIN', str_contains($migrationSrc, 'COMMITTEE_RETURNED_TO_ORIGIN'));
+check('communications active tab excludes recorded hearing outcomes',
+    str_contains($communicationsControllerSrc, "'active', 'completed_terminated'")
+    && str_contains($communicationsControllerSrc, '$where[] = \'ch.outcome IS NULL\''));
+check('Completed/Terminated communications have a dedicated tab',
+    str_contains($communicationsControllerSrc, "ch.outcome = 'COMPLETED_TERMINATED'")
+    && str_contains($communicationsIndexSrc, 'Completed/Terminated')
+    && str_contains($communicationsIndexSrc, "committeeCommunicationsUrl(\$key, \$search)"));
+check('Communications tabs match the separate Legislative-style tab navigation',
+    str_contains($communicationsIndexSrc, 'class="-mb-px flex gap-6 overflow-x-auto"')
+    && str_contains($communicationsIndexSrc, 'whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition')
+    && str_contains($communicationsIndexSrc, "'bg-primary text-white' : 'bg-gray-100 text-gray-700'")
+    && strpos($communicationsIndexSrc, '<!-- Communications status tabs')
+        < strpos($communicationsIndexSrc, '<!-- Communications list card'));
+check('Approved communication outcomes continue in Hearings for report creation',
+    str_contains($communicationsControllerSrc, "redirect('committee/hearing?tab=approved')")
+    && str_contains($communicationsShowSrc, 'Create and manage the Committee Report from the Hearings page.')
+    && str_contains($communicationsShowSrc, 'committee/hearing?tab=approved'));
+check('Completed/Terminated outcome returns to its Communications tab',
+    str_contains($communicationsControllerSrc, "redirect('committee/communications?tab=completed_terminated')")
+    && str_contains($communicationsShowSrc, "committee/communications?tab=completed_terminated"));
 
 // Live ENUM check — the migration must actually have been applied.
 $enumRow = $pdo->query("

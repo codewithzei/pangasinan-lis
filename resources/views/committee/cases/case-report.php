@@ -57,8 +57,8 @@ ob_start();
 
     <!-- Breadcrumb ----------------------------------------------------------->
     <nav class="flex items-center gap-2 text-sm text-gray-500" aria-label="Breadcrumb">
-        <a href="<?= BASE_URL ?>/committee/cases/for-report"
-           class="hover:text-primary transition">For Report</a>
+        <a href="<?= BASE_URL ?>/committee/hearing?tab=approved"
+           class="hover:text-primary transition">Approved Hearings</a>
         <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
         </svg>

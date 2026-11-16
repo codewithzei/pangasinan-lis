@@ -32,6 +32,11 @@ $shareEnd = strpos($hearingController, '// Private helpers', $shareStart ?: 0);
 $shareAction = $shareStart !== false && $shareEnd !== false
     ? substr($hearingController, $shareStart, $shareEnd - $shareStart)
     : '';
+$shareShowStart = strpos($hearingController, 'public function shareToReportShow(): void');
+$shareShowEnd = strpos($hearingController, 'public function shareToReport(): void', $shareShowStart ?: 0);
+$shareShowAction = $shareShowStart !== false && $shareShowEnd !== false
+    ? substr($hearingController, $shareShowStart, $shareShowEnd - $shareShowStart)
+    : '';
 $summaryPosition = strpos($shareForm, 'id="summary_of_findings"');
 $dropZonePosition = strpos($shareForm, 'id="sharedReportDropZone"');
 
@@ -62,7 +67,24 @@ $checks = [
     'reports list no longer offers a report-wide return action' => !str_contains($listView, 'onclick="openReturnModal('),
     'hearing selection is available beyond the approved tab' => str_contains($hearingIndex, 'id="selectAllDocuments"')
         && !str_contains($hearingIndex, "if (\$tab === 'approved' && !empty(\$documents))"),
-    'shared-report validation accepts documents with any hearing outcome' => !str_contains($shareAction, "ch.outcome    = 'APPROVED'"),
+    'hearing selection includes owned Approved case outcomes' => str_contains($hearingIndex, '$isApprovedCase')
+        && str_contains($hearingIndex, '$isCaseOwner')
+        && str_contains($hearingIndex, '&& $isApproved'),
+    'shared-report GET and POST accept only owned Approved case outcomes' => str_contains($shareShowAction, "cc.final_outcome = 'APPROVED' AND cc.assigned_by = ?")
+        && str_contains($shareAction, "cc.final_outcome = 'APPROVED' AND cc.assigned_by = ?"),
+    'case committees come from document_committees in shared-report flow' => str_contains($shareShowAction, 'LEFT JOIN document_committees dc')
+        && str_contains($shareAction, 'FROM document_committees dc'),
+    'case-only new reports keep agenda references nullable' => str_contains($shareAction, "\$primaryAgenda  = !empty(\$primaryDoc['agenda_id']) ? (int) \$primaryDoc['agenda_id'] : null")
+        && str_contains($shareAction, "\$primaryHearing = !empty(\$primaryDoc['hearing_id']) ? (int) \$primaryDoc['hearing_id'] : null"),
+    'shared-report page identifies selected case outcomes' => str_contains($shareForm, 'Case Outcome')
+        && str_contains($shareForm, 'Approved cases'),
+    'scheduled and reset hearings are not selectable for shared reports' => str_contains($shareShowAction, 'AND ch.outcome IS NOT NULL')
+        && str_contains($shareShowAction, "AND ch.outcome <> 'RESET'")
+        && str_contains($shareAction, 'AND ch.outcome IS NOT NULL')
+        && str_contains($shareAction, "AND ch.outcome <> 'RESET'")
+        && str_contains($hearingIndex, '!$isScheduled && !$isReset'),
+    'finalized hearing outcomes remain shareable' => !str_contains($shareAction, "ch.outcome    = 'APPROVED'")
+        && str_contains($shareAction, 'AND ch.outcome IS NOT NULL'),
     'linking a document preserves its current status' => !str_contains($shareAction, 'UPDATE documents SET current_status_id')
         && str_contains($shareAction, 'document status unchanged'),
     'shared-report form accepts multiple attachment uploads' => str_contains($shareForm, 'enctype="multipart/form-data"')

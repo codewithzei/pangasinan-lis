@@ -10,6 +10,8 @@
  *   $alreadySubmitted  bool         Whether a submission already exists for this endorsement
  *   $canSecondEndorse  bool         Whether a second endorsement can be issued
  *   $submittedFiles    array        ['opinion' => [...], 'compliance' => [...]] previously submitted
+ *   $submission        array|null   The saved submission, including its remarks
+ *   $otherAttachments  array        Other files attached to the document
  *   $success           string|null
  *   $error             string|null
  *   $errors            array
@@ -22,6 +24,8 @@ $office           = $office           ?? [];
 $alreadySubmitted = $alreadySubmitted ?? false;
 $canSecondEndorse = $canSecondEndorse ?? false;
 $submittedFiles   = $submittedFiles   ?? ['opinion' => [], 'compliance' => []];
+$submission       = $submission       ?? null;
+$otherAttachments = $otherAttachments ?? [];
 
 // Files selected on a failed submission — browsers cannot restore file inputs,
 // so we surface the names so the user knows what to re-attach.
@@ -110,6 +114,16 @@ ob_start();
                         Second Endorsement
                     </span>
                 <?php endif; ?>
+                <?php if (trim((string) ($endorsement['remarks'] ?? '')) !== ''): ?>
+                    <div class="border-t border-violet-200 pt-2">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-violet-500">
+                            Endorsement Remarks
+                        </p>
+                        <p class="mt-1 whitespace-pre-line text-xs text-violet-800">
+                            <?= htmlspecialchars($endorsement['remarks']) ?>
+                        </p>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <!-- Already submitted? -->
@@ -182,8 +196,30 @@ ob_start();
                             <p class="text-xs text-gray-400">
                                 Submitted files are listed below and remain available for download.
                             </p>
+                            <?php if ($submission): ?>
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Outcome:
+                                    <span class="font-semibold text-gray-700">
+                                        <?= htmlspecialchars(ucfirst(strtolower((string) $submission['opinion_type']))) ?>
+                                    </span>
+                                    <?php if (!empty($submission['submitted_at'])): ?>
+                                        &middot; <?= htmlspecialchars($submission['submitted_at']) ?>
+                                    <?php endif; ?>
+                                </p>
+                            <?php endif; ?>
                         </div>
                     </div>
+
+                    <?php if (trim((string) ($submission['remarks'] ?? '')) !== ''): ?>
+                        <div class="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                            <h3 class="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                                Opinion Remarks
+                            </h3>
+                            <p class="mt-1 whitespace-pre-line text-sm text-blue-900">
+                                <?= htmlspecialchars($submission['remarks']) ?>
+                            </p>
+                        </div>
+                    <?php endif; ?>
 
                     <!-- Submitted Opinion files -->
                     <div class="mt-5">
@@ -239,6 +275,40 @@ ob_start();
                                         </div>
                                         <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars(ltrim($f['stored_path'], '/')) ?>"
                                            target="_blank"
+                                           class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5
+                                                  text-xs font-medium text-gray-600 hover:bg-gray-50 transition">
+                                            Download
+                                        </a>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Other document attachments -->
+                    <div class="mt-5">
+                        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                            Other Attachments (<?= count($otherAttachments) ?>)
+                        </h3>
+                        <?php if (empty($otherAttachments)): ?>
+                            <p class="text-xs text-gray-400">No other document attachments recorded.</p>
+                        <?php else: ?>
+                            <div class="space-y-1.5">
+                                <?php foreach ($otherAttachments as $f): ?>
+                                    <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100
+                                                bg-white px-3 py-2">
+                                        <div class="min-w-0">
+                                            <p class="truncate text-xs font-medium text-gray-800">
+                                                <?= htmlspecialchars($f['file_name']) ?>
+                                            </p>
+                                            <p class="text-[11px] text-gray-400">
+                                                <?= htmlspecialchars((string) ($f['attachment_type'] ?? 'Attachment')) ?>
+                                                &middot;
+                                                <?= htmlspecialchars(number_format(((int) $f['file_size']) / 1024, 1)) ?> KB
+                                            </p>
+                                        </div>
+                                        <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars(ltrim($f['stored_path'], '/')) ?>"
+                                           target="_blank" rel="noopener noreferrer"
                                            class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5
                                                   text-xs font-medium text-gray-600 hover:bg-gray-50 transition">
                                             Download
@@ -334,22 +404,29 @@ ob_start();
                                 max 25 MB each, up to 10 files).
                             </p>
                             <div id="opinionDropzone"
-                                 class="relative flex cursor-pointer flex-col items-center justify-center rounded-xl
-                                        border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-7 text-center
-                                        transition hover:bg-gray-100">
+                                 role="button" aria-label="Choose or drop opinion documents" tabindex="0"
+                                 class="flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl
+                                        border-2 border-dashed border-gray-300 bg-gray-50 px-4 text-center
+                                        transition hover:border-primary hover:bg-blue-50">
                                 <input type="file" id="opinionFiles" name="opinion_files[]" multiple
                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" class="hidden">
-                                <svg class="mb-2 h-8 w-8 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9
-                                             M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                                </svg>
-                                <p class="text-xs text-gray-500">
-                                    <span class="font-semibold text-gray-700">Click to upload</span>
-                                    or drag and drop files here
-                                </p>
+                                <div class="flex flex-col items-center justify-center py-3">
+                                    <svg class="mb-1 h-6 w-6 text-gray-400" fill="none" stroke="currentColor"
+                                         viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9
+                                                 M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                    </svg>
+                                    <p class="text-xs text-gray-500">
+                                        <span class="font-semibold text-gray-700">Click to upload</span>
+                                        or drag and drop
+                                    </p>
+                                    <p class="mt-1 text-[10px] text-gray-400">
+                                        PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, WEBP · Max 25 MB each · Up to 10 files
+                                    </p>
+                                </div>
                             </div>
-                            <ul id="opinionFileList" class="mt-3 space-y-1.5"></ul>
+                            <ul id="opinionFileList" class="mt-3 space-y-2" aria-live="polite"></ul>
                             <?php if (!empty($oldSelected['opinion'])): ?>
                                 <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                                     <p class="text-[11px] font-medium text-amber-700">
@@ -373,22 +450,29 @@ ob_start();
                                 max 25 MB each, up to 10 files). Required for an Unfavorable opinion.
                             </p>
                             <div id="complianceDropzone"
-                                 class="relative flex cursor-pointer flex-col items-center justify-center rounded-xl
-                                        border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-7 text-center
-                                        transition hover:bg-gray-100">
+                                 role="button" aria-label="Choose or drop compliance documents" tabindex="0"
+                                 class="flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl
+                                        border-2 border-dashed border-gray-300 bg-gray-50 px-4 text-center
+                                        transition hover:border-primary hover:bg-blue-50">
                                 <input type="file" id="complianceFiles" name="compliance_files[]" multiple
                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" class="hidden">
-                                <svg class="mb-2 h-8 w-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9
-                                             M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                                </svg>
-                                <p class="text-xs text-gray-500">
-                                    <span class="font-semibold text-gray-700">Click to upload</span>
-                                    or drag and drop files here
-                                </p>
+                                <div class="flex flex-col items-center justify-center py-3">
+                                    <svg class="mb-1 h-6 w-6 text-gray-400" fill="none" stroke="currentColor"
+                                         viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9
+                                                 M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                    </svg>
+                                    <p class="text-xs text-gray-500">
+                                        <span class="font-semibold text-gray-700">Click to upload</span>
+                                        or drag and drop
+                                    </p>
+                                    <p class="mt-1 text-[10px] text-gray-400">
+                                        PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, WEBP · Max 25 MB each · Up to 10 files
+                                    </p>
+                                </div>
                             </div>
-                            <ul id="complianceFileList" class="mt-3 space-y-1.5"></ul>
+                            <ul id="complianceFileList" class="mt-3 space-y-2" aria-live="polite"></ul>
                             <?php if (!empty($oldSelected['compliance'])): ?>
                                 <div class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                                     <p class="text-[11px] font-medium text-amber-700">
@@ -482,15 +566,15 @@ document.addEventListener('DOMContentLoaded', function () {
             list.innerHTML = '';
             selected.forEach(function (file, index) {
                 const li = document.createElement('li');
-                li.className = 'flex items-center justify-between gap-2 rounded-lg border border-gray-200 ' +
-                               'bg-white px-3 py-2';
+                li.className = 'flex items-center justify-between gap-3 rounded-xl border border-gray-200 ' +
+                               'bg-white px-3 py-2.5 shadow-sm';
 
                 const left = document.createElement('div');
                 left.className = 'flex min-w-0 items-center gap-2';
 
                 const badge = document.createElement('span');
-                badge.className = 'flex h-7 w-7 flex-none items-center justify-center rounded-md ' +
-                                  'bg-indigo-50 text-[10px] font-bold uppercase text-indigo-600';
+                badge.className = 'flex h-9 w-9 flex-none items-center justify-center rounded-lg ' +
+                                  'bg-indigo-50 text-[10px] font-bold uppercase text-indigo-700';
                 badge.textContent = fileExt(file.name).slice(0, 4) || 'file';
 
                 const meta = document.createElement('div');
@@ -512,8 +596,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const removeBtn = document.createElement('button');
                 removeBtn.type = 'button';
-                removeBtn.className = 'flex-none rounded-md px-2 py-1 text-xs font-medium text-red-600 ' +
-                                      'transition hover:bg-red-50';
+                removeBtn.className = 'flex-none rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-500 ' +
+                                      'transition hover:bg-red-50 hover:text-red-600 focus:outline-none ' +
+                                      'focus:ring-2 focus:ring-red-500';
+                removeBtn.setAttribute('aria-label', 'Remove ' + file.name);
                 removeBtn.textContent = 'Remove';
                 removeBtn.addEventListener('click', function () {
                     selected.splice(index, 1);
@@ -582,25 +668,41 @@ document.addEventListener('DOMContentLoaded', function () {
             addFiles(picked);
         });
 
-        dropzone.addEventListener('click', function () { input.click(); });
+        dropzone.addEventListener('click', function (e) {
+            if (e.target !== input) input.click();
+        });
+        dropzone.addEventListener('keydown', function (e) {
+            if (e.target === dropzone && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                input.click();
+            }
+        });
+        function setDragging(active) {
+            dropzone.classList.toggle('border-primary', active);
+            dropzone.classList.toggle('bg-blue-50', active);
+        }
 
         ['dragenter', 'dragover'].forEach(function (evt) {
             dropzone.addEventListener(evt, function (e) {
                 e.preventDefault();
                 e.stopPropagation();
-                dropzone.classList.add('border-indigo-400', 'bg-indigo-50');
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+                setDragging(true);
             });
         });
 
-        ['dragleave', 'drop'].forEach(function (evt) {
-            dropzone.addEventListener(evt, function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                dropzone.classList.remove('border-indigo-400', 'bg-indigo-50');
-            });
+        dropzone.addEventListener('dragleave', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!e.relatedTarget || !dropzone.contains(e.relatedTarget)) {
+                setDragging(false);
+            }
         });
 
         dropzone.addEventListener('drop', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragging(false);
             const dropped = e.dataTransfer ? e.dataTransfer.files : null;
             if (dropped && dropped.length) {
                 addFiles(dropped);

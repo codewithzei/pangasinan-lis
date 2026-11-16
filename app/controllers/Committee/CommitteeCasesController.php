@@ -16,10 +16,7 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *  GET  committee/cases/show?id={case_id}         show()           — case details
  *  POST committee/cases/actions/store             storeAction()    — add timeline action
  *  POST committee/cases/outcome                   outcomeStore()   — set final outcome
- *  GET  committee/cases/for-report                forReport()      — Approved / For Report list
- *  GET  committee/cases/deferred                  deferred()       — Deferred list
- *  GET  committee/cases/withdrawn                 withdrawn()      — Withdrawn list
- *  GET  committee/cases/noted                     noted()          — Noted list
+ *  GET  committee/cases/{outcome}                 legacy redirects to Hearing outcome tabs
  *  GET  committee/cases/report?case_id={id}       caseReportShow() — Create Report form
  *  POST committee/cases/report                    caseReportStore()— Persist Report
  *
@@ -733,6 +730,35 @@ class CommitteeCasesController
         $errors  = flash_peek('errors', []);
         $old     = old_get();
 
+        $caseBackUrl = BASE_URL . '/committee/cases';
+        $caseBackLabel = 'Back to Cases';
+        if (($_GET['return_to'] ?? '') === 'hearing') {
+            $hearingTabs = ['all', 'scheduled', 'approved', 'deferred', 'remanded', 'withdrawn', 'noted', 'reset'];
+            $hearingTab = (string) ($_GET['hearing_tab'] ?? 'all');
+            if (!in_array($hearingTab, $hearingTabs, true)) {
+                $hearingTab = 'all';
+            }
+
+            $hearingReturnParams = [];
+            if ($hearingTab !== 'all') {
+                $hearingReturnParams['tab'] = $hearingTab;
+            }
+
+            $hearingSearch = $_GET['hearing_search'] ?? '';
+            if (is_string($hearingSearch) && trim($hearingSearch) !== '') {
+                $hearingReturnParams['search'] = trim($hearingSearch);
+            }
+
+            $hearingPage = max(1, (int) ($_GET['hearing_page'] ?? 1));
+            if ($hearingPage > 1) {
+                $hearingReturnParams['page'] = $hearingPage;
+            }
+
+            $caseBackUrl = BASE_URL . '/committee/hearing'
+                . ($hearingReturnParams ? '?' . http_build_query($hearingReturnParams) : '');
+            $caseBackLabel = 'Back to Hearings';
+        }
+
         require __DIR__ . '/../../../resources/views/committee/cases/show.php';
     }
 
@@ -1129,55 +1155,44 @@ class CommitteeCasesController
         ], "Case {$case['docket_number']} finalized: {$outcome} (user: {$username})");
 
         $successMessages = [
-            'APPROVED'  => 'Case outcome set to Approved. The case is now available in For Report.',
-            'DEFERRED'  => 'Case outcome set to Deferred.',
-            'WITHDRAWN' => 'Case outcome set to Withdrawn.',
-            'NOTED'     => 'Case outcome set to Noted.',
+            'APPROVED'  => 'Case outcome set to Approved. The case is now available in Committee Hearings.',
+            'DEFERRED'  => 'Case outcome set to Deferred. The case is now available in Committee Hearings.',
+            'WITHDRAWN' => 'Case outcome set to Withdrawn. The case is now available in Committee Hearings.',
+            'NOTED'     => 'Case outcome set to Noted. The case is now available in Committee Hearings.',
         ];
 
         flash_set('success', $successMessages[$outcome]);
-        redirect('committee/cases/show?id=' . $caseId);
+        $hearingTab = strtolower($outcome);
+        redirect('committee/hearing?tab=' . $hearingTab);
     }
 
     // =========================================================================
-    // 6. For Report list  GET committee/cases/for-report
-    //    Shows approved cases. Only cases finalized_by the current user.
+    // Legacy outcome-list routes now point to Committee Hearings.
     // =========================================================================
 
     public function forReport(): void
     {
-        $userId = $this->requireAuth();
-        $this->renderOutcomeList('APPROVED', 'for-report', 'For Report', $userId);
+        $this->requireAuth();
+        redirect('committee/hearing?tab=approved');
     }
 
     // =========================================================================
-    // 7. Deferred list  GET committee/cases/deferred
-    // =========================================================================
-
     public function deferred(): void
     {
-        $userId = $this->requireAuth();
-        $this->renderOutcomeList('DEFERRED', 'deferred', 'Deferred Cases', $userId);
+        $this->requireAuth();
+        redirect('committee/hearing?tab=deferred');
     }
-
-    // =========================================================================
-    // 8. Withdrawn list  GET committee/cases/withdrawn
-    // =========================================================================
 
     public function withdrawn(): void
     {
-        $userId = $this->requireAuth();
-        $this->renderOutcomeList('WITHDRAWN', 'withdrawn', 'Withdrawn Cases', $userId);
+        $this->requireAuth();
+        redirect('committee/hearing?tab=withdrawn');
     }
-
-    // =========================================================================
-    // 9. Noted list  GET committee/cases/noted
-    // =========================================================================
 
     public function noted(): void
     {
-        $userId = $this->requireAuth();
-        $this->renderOutcomeList('NOTED', 'noted', 'Noted Cases', $userId);
+        $this->requireAuth();
+        redirect('committee/hearing?tab=noted');
     }
 
     // =========================================================================
@@ -1191,13 +1206,13 @@ class CommitteeCasesController
 
         if ($caseId <= 0) {
             flash_set('error', 'Invalid case ID.');
-            redirect('committee/cases/for-report');
+            redirect('committee/hearing?tab=approved');
         }
 
         $case = $this->loadCaseWithDocument($caseId);
         if (!$case) {
             flash_set('error', 'Case not found.');
-            redirect('committee/cases/for-report');
+            redirect('committee/hearing?tab=approved');
         }
 
         // Only the case creator may create the report.
@@ -1266,13 +1281,13 @@ class CommitteeCasesController
 
         if ($caseId <= 0) {
             flash_set('error', 'Invalid case ID.');
-            redirect('committee/cases/for-report');
+            redirect('committee/hearing?tab=approved');
         }
 
         $case = $this->loadCaseWithDocument($caseId);
         if (!$case) {
             flash_set('error', 'Case not found.');
-            redirect('committee/cases/for-report');
+            redirect('committee/hearing?tab=approved');
         }
 
         // Only the case creator may create the report.
@@ -1888,91 +1903,7 @@ class CommitteeCasesController
     }
 
     /**
-     * Shared query + render for the four outcome-filtered list pages
-     * (for-report / deferred / withdrawn / noted).
-     *
-     * Scoped to cases finalized by the current user so each Committee member
-     * only sees their own resolved cases.
-     */
-    private function renderOutcomeList(
-        string $outcome,
-        string $viewSlug,
-        string $pageTitle,
-        int    $userId
-    ): void {
-        $caseStats = $this->getCaseStatusCounts($userId);
-        $search  = trim($_GET['search'] ?? '');
-        $page    = max(1, (int) ($_GET['page'] ?? 1));
-        $perPage = 20;
-        $offset  = ($page - 1) * $perPage;
-
-        $where  = ['cc.assigned_by = ?', 'cc.final_outcome = ?'];
-        $params = [$userId, $outcome];
-
-        if ($search !== '') {
-            $where[]  = '(cc.docket_number LIKE ? OR d.tracking_number LIKE ?
-                          OR d.subject_matter LIKE ? OR cc.nature_of_case LIKE ?
-                          OR cc.complainant_details LIKE ? OR cc.respondents LIKE ?)';
-            $params[] = "%{$search}%";
-            $params[] = "%{$search}%";
-            $params[] = "%{$search}%";
-            $params[] = "%{$search}%";
-            $params[] = "%{$search}%";
-            $params[] = "%{$search}%";
-        }
-
-        $whereClause = implode(' AND ', $where);
-
-        $countStmt = $this->pdo->prepare("
-            SELECT COUNT(*) AS total
-            FROM committee_cases cc
-            INNER JOIN documents d ON cc.document_id = d.id
-            WHERE {$whereClause}
-        ");
-        $countStmt->execute($params);
-        $total      = (int) $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
-        $totalPages = max(1, (int) ceil($total / $perPage));
-
-        $listStmt = $this->pdo->prepare("
-            SELECT
-                cc.id,
-                cc.docket_number,
-                cc.nature_of_case,
-                cc.complainant_details,
-                cc.respondents,
-                cc.date_assigned,
-                cc.final_outcome,
-                cc.finalized_at,
-                cc.final_outcome_remarks,
-                d.id              AS document_id,
-                d.tracking_number,
-                d.subject_matter,
-                dt.name           AS document_type_name,
-                dt.badge_color    AS document_type_badge_color,
-                ds.name           AS status,
-                ds.badge_color    AS status_badge_color,
-                (
-                    SELECT COUNT(*) FROM committee_reports cr2
-                    INNER JOIN committee_report_documents crd2
-                        ON crd2.committee_report_id = cr2.id
-                    WHERE crd2.document_id = d.id
-                ) AS report_count
-            FROM committee_cases cc
-            INNER JOIN documents         d  ON cc.document_id        = d.id
-            LEFT  JOIN document_types    dt ON d.document_type_id    = dt.id
-            LEFT  JOIN document_statuses ds ON d.current_status_id   = ds.id
-            WHERE {$whereClause}
-            ORDER BY cc.finalized_at DESC, cc.id DESC
-            LIMIT ? OFFSET ?
-        ");
-        $listStmt->execute([...$params, $perPage, $offset]);
-        $cases = $listStmt->fetchAll(PDO::FETCH_ASSOC);
-
-        require __DIR__ . "/../../../resources/views/committee/cases/{$viewSlug}.php";
-    }
-
-    /**
-     * Shared case counts for the Cases overview cards and outcome navigation.
+     * Shared counts for the active Cases overview cards.
      */
     private function getCaseStatusCounts(int $userId): array
     {
@@ -1988,11 +1919,7 @@ class CommitteeCasesController
                         OR COALESCE(TRIM(cc.respondents), '') = ''
                      )
                     THEN 1 ELSE 0
-                END), 0) AS details_pending,
-                COALESCE(SUM(CASE WHEN cc.final_outcome = 'APPROVED' THEN 1 ELSE 0 END), 0) AS approved,
-                COALESCE(SUM(CASE WHEN cc.final_outcome = 'DEFERRED' THEN 1 ELSE 0 END), 0) AS deferred,
-                COALESCE(SUM(CASE WHEN cc.final_outcome = 'WITHDRAWN' THEN 1 ELSE 0 END), 0) AS withdrawn,
-                COALESCE(SUM(CASE WHEN cc.final_outcome = 'NOTED' THEN 1 ELSE 0 END), 0) AS noted
+                END), 0) AS details_pending
             FROM committee_cases cc
             WHERE cc.assigned_by = ?
         ");
@@ -2001,10 +1928,6 @@ class CommitteeCasesController
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [
             'active_cases' => 0,
             'details_pending' => 0,
-            'approved' => 0,
-            'deferred' => 0,
-            'withdrawn' => 0,
-            'noted' => 0,
         ];
     }
 }

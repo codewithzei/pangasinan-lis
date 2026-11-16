@@ -14,6 +14,8 @@ $actions             = $actions             ?? [];
 $attachmentsByAction = $attachmentsByAction ?? [];
 $finalizedByName     = $finalizedByName     ?? null;
 $linkedReport        = $linkedReport        ?? null;
+$caseBackUrl         = $caseBackUrl         ?? (BASE_URL . '/committee/cases');
+$caseBackLabel       = $caseBackLabel       ?? 'Back to Cases';
 $errors              = $errors              ?? [];
 $old                 = $old                 ?? [];
 
@@ -92,10 +94,12 @@ ob_start();
 
     <!-- Back + header --------------------------------------------------------->
     <div class="flex items-center gap-4">
-        <a href="<?= BASE_URL ?>/committee/cases"
+        <a href="<?= htmlspecialchars($caseBackUrl) ?>"
            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200
-                  bg-white text-gray-500 hover:bg-gray-50 transition">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  bg-white text-gray-500 hover:bg-gray-50 transition"
+           title="<?= htmlspecialchars($caseBackLabel) ?>"
+           aria-label="<?= htmlspecialchars($caseBackLabel) ?>">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
             </svg>
         </a>
@@ -612,11 +616,11 @@ ob_start();
                                     This case is approved and ready for a Committee Report.
                                 </p>
                             <?php endif; ?>
-                            <a href="<?= BASE_URL ?>/committee/cases/for-report"
+                            <a href="<?= BASE_URL ?>/committee/hearing?tab=approved"
                                class="inline-flex w-full items-center justify-center gap-2 rounded-xl
                                       border border-gray-200 bg-white px-4 py-2 text-sm font-medium
                                       text-gray-600 hover:bg-gray-50 transition">
-                                ← Back to For Report
+                                ← Back to Approved Hearings
                             </a>
                         </div>
 
@@ -625,13 +629,13 @@ ob_start();
                         <div class="mt-5 border-t border-gray-100 pt-4">
                             <?php
                             $outcomeLinkMap = [
-                                'DEFERRED'  => ['url' => 'committee/cases/deferred',  'label' => '← Back to Deferred'],
-                                'WITHDRAWN' => ['url' => 'committee/cases/withdrawn', 'label' => '← Back to Withdrawn'],
-                                'NOTED'     => ['url' => 'committee/cases/noted',     'label' => '← Back to Noted'],
+                                'DEFERRED'  => ['url' => 'committee/hearing?tab=deferred',  'label' => '← Back to Deferred Hearings'],
+                                'WITHDRAWN' => ['url' => 'committee/hearing?tab=withdrawn', 'label' => '← Back to Withdrawn Hearings'],
+                                'NOTED'     => ['url' => 'committee/hearing?tab=noted',     'label' => '← Back to Noted Hearings'],
                             ];
                             $ol = $outcomeLinkMap[$finalOutcome];
                             ?>
-                            <a href="<?= BASE_URL ?>/<?= $ol['url'] ?>"
+                            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($ol['url']) ?>"
                                class="inline-flex w-full items-center justify-center gap-2 rounded-xl
                                       border border-gray-200 bg-white px-4 py-2 text-sm font-medium
                                       text-gray-600 hover:bg-gray-50 transition">

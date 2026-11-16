@@ -1388,6 +1388,10 @@ try {
         !empty($wfSubRow) && (int) $wfSubRow['compliance_file_attachment_id'] > 0
             && (int) $wfSubRow['opinion_file_attachment_id'] > 0
     );
+    assert_test(
+        'E2E: opinion remarks are persisted exactly on the submission',
+        ($wfSubRow['remarks'] ?? null) === 'Office is not in favour; compliance submitted.'
+    );
 
     $wfOpCount = (int) $pdo->query(
         "SELECT COUNT(*) FROM document_attachments WHERE document_id = {$wfDocId} AND attachment_type = 'OPINION_FILE'"
@@ -1426,6 +1430,10 @@ try {
     assert_test(
         'E2E: the audit event still records the new opinion status',
         ($wfMeta['opinion_status'] ?? '') === 'For Second Endorsement'
+    );
+    assert_test(
+        'E2E: the audit event also retains the submitted opinion remarks',
+        ($wfMeta['remarks'] ?? '') === 'Office is not in favour; compliance submitted.'
     );
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1685,6 +1693,39 @@ try {
         $p['total'] === 1 && $p['cleared'] === 0
             && $p['offices'][1]['endorsement_number'] === 2
             && $p['offices'][1]['pending_action'] === 'SUBMIT_OPINION'
+    );
+    assert_test(
+        'PROGRESS: an open #2 shows the last submitted outcome instead of masking the office as Pending',
+        $p['offices'][1]['display_status_name'] === 'For Second Endorsement'
+            && $p['offices'][1]['display_opinion_type'] === 'UNFAVORABLE'
+            && $p['offices'][1]['awaiting_current_opinion'] === true
+            && $p['offices'][1]['last_submitted_endorsement_number'] === 1
+    );
+
+    // A saved submission's outcome still displays if an older row has a stale Pending status.
+    $p = $ruleController->summarizeOpinionProgress([
+        $endorsementRow([
+            'submission_id'       => 31,
+            'opinion_type'        => 'FAVORABLE',
+            'opinion_status_name' => 'Pending',
+        ]),
+    ]);
+    assert_test(
+        'PROGRESS: a submitted Favorable outcome is not rendered as Pending when its status row is stale',
+        $p['offices'][1]['display_status_name'] === 'Favorable'
+    );
+
+    $p = $ruleController->summarizeOpinionProgress([
+        $endorsementRow([
+            'submission_id'       => 32,
+            'opinion_type'        => 'UNFAVORABLE',
+            'opinion_status_name' => 'Pending',
+        ]),
+    ]);
+    assert_test(
+        'PROGRESS: a stale Pending status does not block the second-endorsement action after an Unfavorable submission',
+        $p['offices'][1]['display_status_name'] === 'For Second Endorsement'
+            && $p['offices'][1]['pending_action'] === 'SECOND_ENDORSEMENT'
     );
 
     // 4. Favorable → cleared, no pending action, indicator advances.

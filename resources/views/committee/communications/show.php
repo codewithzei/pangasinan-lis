@@ -35,6 +35,14 @@ $hearingApproved = $hearingOutcome === 'APPROVED';
 $hearingOutcomeLabel = $hearingOutcome === 'COMPLETED_TERMINATED'
     ? 'Completed/Terminated'
     : ucfirst(strtolower(str_replace('_', ' ', (string)$hearingOutcome)));
+$communicationsBackUrl = match ($hearingOutcome) {
+    'APPROVED' => BASE_URL . '/committee/hearing?tab=approved',
+    'DEFERRED' => BASE_URL . '/committee/hearing?tab=deferred',
+    'REMANDED' => BASE_URL . '/committee/hearing?tab=remanded',
+    'WITHDRAWN' => BASE_URL . '/committee/hearing?tab=withdrawn',
+    'COMPLETED_TERMINATED' => BASE_URL . '/committee/communications?tab=completed_terminated',
+    default => BASE_URL . '/committee/communications',
+};
 
 ob_start();
 ?>
@@ -43,7 +51,7 @@ ob_start();
 
     <!-- Back + header --------------------------------------------------------->
     <div class="flex items-center gap-4">
-        <a href="<?= BASE_URL ?>/committee/communications"
+        <a href="<?= htmlspecialchars($communicationsBackUrl) ?>"
            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200
                   bg-white text-gray-500 hover:bg-gray-50 transition">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -437,15 +445,14 @@ ob_start();
                     </div>
 
                 <?php elseif ($hasHearing && $hearingApproved && !$hasReport): ?>
-                    <!-- Step 4: Create Committee Report -->
                     <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
                         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-600">
-                            Next Step
+                            Hearing Completed
                         </p>
                         <p class="mb-4 text-sm text-emerald-800">
-                            Hearing approved. Create the Committee Report.
+                            Hearing approved. Create and manage the Committee Report from the Hearings page.
                         </p>
-                        <a href="<?= BASE_URL ?>/committee/communications/report?id=<?= $commId ?>"
+                        <a href="<?= BASE_URL ?>/committee/hearing?tab=approved"
                            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600
                                   px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -453,7 +460,7 @@ ob_start();
                                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0
                                          00.707-.293l5.414-5.414A1 1 0 0121 4.586V19a2 2 0 01-2 2z"/>
                             </svg>
-                            Create Committee Report
+                            Go to Approved Hearings
                         </a>
                     </div>
 
@@ -508,7 +515,7 @@ ob_start();
                 <?php endif; ?>
 
                 <!-- Back to communications list --------------------------------->
-                <a href="<?= BASE_URL ?>/committee/communications"
+                <a href="<?= htmlspecialchars($communicationsBackUrl) ?>"
                    class="inline-flex w-full items-center justify-center gap-2 rounded-xl border
                           border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600
                           hover:bg-gray-50 transition">

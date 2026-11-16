@@ -47,8 +47,6 @@ ob_start();
     <?php require __DIR__ . '/_overview_cards.php'; ?>
 
     <!-- Navigation tabs -------------------------------------------------------->
-    <?php require __DIR__ . '/_outcome_nav.php'; ?>
-
     <!-- Cases table ---------------------------------------------------------->
     <section class="rounded-2xl border border-gray-200 bg-white">
 

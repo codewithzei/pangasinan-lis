@@ -936,16 +936,11 @@ $inboxViewSrc = (string) file_get_contents(__DIR__ . '/../resources/views/commit
 $inboxCtrlSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Committee/CommitteeInboxController.php');
 $casesViewSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/index.php');
 $casesOverviewSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/_overview_cards.php');
-$casesNavSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/_outcome_nav.php');
-$caseOutcomeViewSrc = [];
-foreach (['for-report', 'deferred', 'withdrawn', 'noted'] as $outcomeView) {
-    $caseOutcomeViewSrc[] = (string) file_get_contents(
-        __DIR__ . '/../resources/views/committee/cases/' . $outcomeView . '.php'
-    );
-}
 $casesCreateSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/create.php');
 $casesShowSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/show.php');
 $casesCtrlSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Committee/CommitteeCasesController.php');
+$hearingCtrlSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Committee/CommitteeHearingController.php');
+$hearingViewSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/hearing/index.php');
 $routesSrc    = (string) file_get_contents(__DIR__ . '/../routes/web.php');
 
 // ── Inbox: button is still a POST form action, not a link to Create Case ──
@@ -977,24 +972,42 @@ check('cases index does NOT render complete-details-btn elements',
     !str_contains($casesViewSrc, 'complete-details-btn'));
 check('cases index View Details link navigates to committee/cases/show',
     str_contains($casesViewSrc, 'committee/cases/show?id='));
+check('Hearing View Case preserves the current tab, search, and page for returning',
+    str_contains($hearingViewSrc, "'return_to' => 'hearing'")
+    && str_contains($hearingViewSrc, "'hearing_tab' => \$tab")
+    && str_contains($hearingViewSrc, "'hearing_search'")
+    && str_contains($hearingViewSrc, "'hearing_page'"));
+check('case detail back button returns to the validated Hearing list when opened there',
+    str_contains($casesCtrlSrc, "\$_GET['return_to']")
+    && str_contains($casesCtrlSrc, '$caseBackUrl = BASE_URL . \'/committee/hearing\'')
+    && str_contains($casesCtrlSrc, 'http_build_query($hearingReturnParams)')
+    && str_contains($casesShowSrc, 'href="<?= htmlspecialchars($caseBackUrl) ?>"')
+    && str_contains($casesShowSrc, 'htmlspecialchars($caseBackLabel)'));
 check('cases index does not contain the caseDetailsModal div',
     !str_contains($casesViewSrc, 'id="caseDetailsModal"'));
-check('overview cards render on every case outcome tab',
+check('Cases page keeps only active-workflow navigation and overview cards',
     str_contains($casesViewSrc, "_overview_cards.php")
-    && count(array_filter(
-        $caseOutcomeViewSrc,
-        static fn (string $view): bool => str_contains($view, "_overview_cards.php")
-    )) === 4);
-check('overview cards include active, pending, and final outcome counts',
+    && !str_contains($casesViewSrc, "_outcome_nav.php"));
+check('Cases overview cards only include active and pending-details counts',
     str_contains($casesOverviewSrc, "'active_cases'")
     && str_contains($casesOverviewSrc, "'details_pending'")
-    && str_contains($casesOverviewSrc, "'approved'")
-    && str_contains($casesOverviewSrc, "'deferred'")
-    && str_contains($casesOverviewSrc, "'withdrawn'")
-    && str_contains($casesOverviewSrc, "'noted'"));
-check('outcome tabs display their case counters',
-    str_contains($casesNavSrc, "'count' =>")
-    && str_contains($casesNavSrc, 'number_format($tab[\'count\'])'));
+    && !str_contains($casesOverviewSrc, "'approved'")
+    && !str_contains($casesOverviewSrc, "'deferred'")
+    && !str_contains($casesOverviewSrc, "'withdrawn'")
+    && !str_contains($casesOverviewSrc, "'noted'"));
+check('finalized case outcomes redirect into the matching Hearing tabs',
+    str_contains($casesCtrlSrc, "redirect('committee/hearing?tab=' . \$hearingTab)")
+    && str_contains($hearingCtrlSrc, "'noted' => \$this->queryOutcomeTab")
+    && str_contains($hearingViewSrc, "'noted'     => ['Noted'"));
+check('Hearing list queries include finalized cases without agenda entries',
+    str_contains($hearingCtrlSrc, 'cc.final_outcome IS NOT NULL')
+    && str_contains($hearingCtrlSrc, 'AS is_case_outcome')
+    && str_contains($hearingCtrlSrc, 'countFinalCaseDocuments'));
+check('legacy Cases outcome routes redirect to Hearing outcome tabs',
+    str_contains($casesCtrlSrc, "redirect('committee/hearing?tab=approved')")
+    && str_contains($casesCtrlSrc, "redirect('committee/hearing?tab=deferred')")
+    && str_contains($casesCtrlSrc, "redirect('committee/hearing?tab=withdrawn')")
+    && str_contains($casesCtrlSrc, "redirect('committee/hearing?tab=noted')"));
 check('Needs Details card filters active cases to incomplete records',
     str_contains($casesOverviewSrc, 'details_pending=1')
     && str_contains($casesCtrlSrc, "\$_GET['details_pending']")

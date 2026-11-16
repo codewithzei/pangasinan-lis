@@ -46,10 +46,8 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *                                     status: "On Going"
  *  3. Record hearing outcome        → reuses committee_hearings table
  *                                     status: "Hearing Completed" (if APPROVED)
- *  4. Create committee report       → reuses committee_reports /
- *                                     committee_report_documents /
- *                                     committee_report_committees tables
- *                                     status: "Committee Report Created"
+ *  4. Create committee report       → managed from Committee Hearings
+ *                                     using the shared report workflow
  *  5. Return to Plenary             → handled by CommitteeReportsController
  *                                     (same as all other report types)
  *
@@ -91,6 +89,10 @@ class CommitteeCommunicationsController
 
         // Filters
         $search = trim($_GET['search'] ?? '');
+        $tab = (string) ($_GET['tab'] ?? 'active');
+        if (!in_array($tab, ['active', 'completed_terminated'], true)) {
+            $tab = 'active';
+        }
 
         // Pagination
         $page    = max(1, (int) ($_GET['page'] ?? 1));
@@ -100,6 +102,14 @@ class CommitteeCommunicationsController
         // Only show communications created by the current user.
         $where  = ['cc.assigned_by = ?'];
         $params = [$userId];
+
+        if ($tab === 'completed_terminated') {
+            $where[] = "ch.outcome = 'COMPLETED_TERMINATED'";
+        } else {
+            // Recorded hearing outcomes continue in Hearings, except for
+            // Completed/Terminated records which remain available in their tab.
+            $where[] = 'ch.outcome IS NULL';
+        }
 
         if ($search !== '') {
             $where[]  = '(d.tracking_number LIKE ? OR cc.subject LIKE ? OR cc.sender_details LIKE ?)';
@@ -115,6 +125,13 @@ class CommitteeCommunicationsController
             SELECT COUNT(*) AS total
             FROM committee_communications cc
             INNER JOIN documents d ON cc.document_id = d.id
+            LEFT JOIN committee_hearings ch
+                ON ch.id = COALESCE(
+                    cc.hearing_id,
+                    (SELECT MAX(ch2.id)
+                     FROM committee_hearings ch2
+                     WHERE ch2.document_id = cc.document_id)
+                )
             WHERE {$whereClause}
         ");
         $countStmt->execute($params);
@@ -130,7 +147,8 @@ class CommitteeCommunicationsController
                 cc.subject,
                 cc.sender_details,
                 cc.agenda_id,
-                cc.hearing_id,
+                COALESCE(cc.hearing_id, ch.id) AS hearing_id,
+                ch.outcome AS hearing_outcome,
                 cc.report_id,
                 cc.created_at,
                 d.tracking_number,
@@ -141,6 +159,13 @@ class CommitteeCommunicationsController
                 ds.badge_color    AS status_badge_color
             FROM committee_communications cc
             INNER JOIN documents         d  ON cc.document_id        = d.id
+            LEFT JOIN committee_hearings ch
+                ON ch.id = COALESCE(
+                    cc.hearing_id,
+                    (SELECT MAX(ch2.id)
+                     FROM committee_hearings ch2
+                     WHERE ch2.document_id = cc.document_id)
+                )
             LEFT  JOIN document_types    dt ON d.document_type_id    = dt.id
             LEFT  JOIN document_statuses ds ON d.current_status_id   = ds.id
             WHERE {$whereClause}
@@ -149,6 +174,30 @@ class CommitteeCommunicationsController
         ");
         $listStmt->execute([...$params, $perPage, $offset]);
         $communications = $listStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $tabCountsStmt = $this->pdo->prepare("
+            SELECT
+                SUM(CASE WHEN ch.outcome IS NULL THEN 1 ELSE 0 END) AS active_count,
+                SUM(CASE WHEN ch.outcome = 'COMPLETED_TERMINATED' THEN 1 ELSE 0 END) AS completed_terminated_count
+            FROM committee_communications cc
+            INNER JOIN documents d ON cc.document_id = d.id
+            LEFT JOIN committee_hearings ch
+                ON ch.id = COALESCE(
+                    cc.hearing_id,
+                    (SELECT MAX(ch2.id)
+                     FROM committee_hearings ch2
+                     WHERE ch2.document_id = cc.document_id)
+                )
+            WHERE cc.assigned_by = ?
+              AND (? = '' OR d.tracking_number LIKE ? OR cc.subject LIKE ? OR cc.sender_details LIKE ?)
+        ");
+        $searchLike = $search !== '' ? "%{$search}%" : '';
+        $tabCountsStmt->execute([$userId, $search, $searchLike, $searchLike, $searchLike]);
+        $tabCounts = $tabCountsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $tabCounts = [
+            'active' => (int) ($tabCounts['active_count'] ?? 0),
+            'completed_terminated' => (int) ($tabCounts['completed_terminated_count'] ?? 0),
+        ];
 
         // Summary stat — total communications created by this user
         $statsStmt = $this->pdo->prepare("
@@ -1029,17 +1078,22 @@ class CommitteeCommunicationsController
         old_clear();
 
         if ($outcome === 'APPROVED') {
-            flash_set('success', 'Hearing outcome: Approved. Please create the Committee Report.');
-            redirect('committee/communications/report?id=' . $commId);
+            flash_set('success', 'Hearing outcome: Approved. Continue to the Hearings page to create the Committee Report.');
+            redirect('committee/hearing?tab=approved');
         }
 
         if ($outcome === 'COMPLETED_TERMINATED') {
             flash_set('success', 'Completed/Terminated recorded. No further committee action or report is required.');
-            redirect('committee/communications/show?id=' . $commId);
+            redirect('committee/communications?tab=completed_terminated');
         }
 
         flash_set('success', "Hearing outcome recorded: {$outcome}.");
-        redirect('committee/communications/show?id=' . $commId);
+        $hearingTab = [
+            'DEFERRED' => 'deferred',
+            'REMANDED' => 'remanded',
+            'WITHDRAWN' => 'withdrawn',
+        ][$outcome] ?? 'all';
+        redirect('committee/hearing?tab=' . $hearingTab);
     }
 
     // =========================================================================

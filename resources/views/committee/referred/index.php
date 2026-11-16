@@ -475,26 +475,25 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                     <?php endif; ?>
                                 </td>
 
-                                <!-- Opinion office chips -->
+                                <!-- Opinion office actions -->
                                 <td class="px-6 py-4">
                                     <?php if (empty($officeMap)): ?>
                                         <span class="text-xs text-gray-400">—</span>
                                     <?php else: ?>
-                                        <div class="flex flex-wrap gap-1.5">
+                                        <div class="min-w-[210px] space-y-1.5">
                                             <?php foreach ($officeMap as $end):
-                                                $abbr      = trim($end['office_abbr'] ?? '');
                                                 $oFullName = $end['office_name']      ?? '—';
-                                                $oLabel    = $abbr !== '' ? $abbr : $oFullName;
                                                 $endNum    = (int) ($end['endorsement_number'] ?? 1);
                                                 $endId     = (int) ($end['endorsement_id']     ?? 0);
                                                 $opType    = $end['opinion_type'] ?? null;
+                                                $displayOpType = $end['display_opinion_type'] ?? $opType;
                                                 $isCleared = !empty($end['cleared']);
                                                 $awaiting  = !empty($end['awaiting_second_endorsement']);
+                                                $awaitingCurrent = !empty($end['awaiting_current_opinion']);
+                                                $lastSubmittedNumber = $end['last_submitted_endorsement_number'] ?? null;
                                                 $pending   = $end['pending_action'] ?? null;
 
-                                                // The opinion_statuses row is the source of truth
-                                                // for the label — never a derived free-text value.
-                                                $statusLabel = trim((string) ($end['opinion_status_name'] ?? '')) ?: match($opType) {
+                                                $statusLabel = trim((string) ($end['display_status_name'] ?? '')) ?: match($displayOpType) {
                                                     'FAVORABLE'   => 'Favorable',
                                                     'UNFAVORABLE' => 'Unfavorable',
                                                     default       => 'Pending',
@@ -503,30 +502,49 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                                 [$chipBg, $chipText] = match(true) {
                                                     $awaiting                => ['bg-amber-50 border-amber-200',    'text-amber-700'],
                                                     $isCleared               => ['bg-emerald-50 border-emerald-200','text-emerald-700'],
-                                                    $opType === 'UNFAVORABLE' => ['bg-red-50 border-red-200',      'text-red-700'],
+                                                    $statusLabel === 'For Second Endorsement'
+                                                                              => ['bg-amber-50 border-amber-200',    'text-amber-700'],
+                                                    $displayOpType === 'UNFAVORABLE'
+                                                                              => ['bg-red-50 border-red-200',      'text-red-700'],
                                                     default                  => ['bg-gray-50 border-gray-200',     'text-gray-600'],
                                                 };
                                             ?>
-                                                <div class="inline-flex items-center gap-1 rounded-lg border
-                                                            <?= $chipBg ?> px-2 py-1 text-xs <?= $chipText ?>"
-                                                     title="<?= htmlspecialchars($oFullName) ?> — Endorsement #<?= $endNum ?>">
-                                                    <span class="font-medium"><?= htmlspecialchars($oLabel) ?></span>
-                                                    <?php if ($endNum === 2): ?>
-                                                        <span class="rounded-full bg-amber-100 px-1 text-[9px]
-                                                                     font-bold text-amber-700 leading-tight">#2</span>
-                                                    <?php endif; ?>
-                                                    <span class="text-gray-300">·</span>
-                                                    <span><?= htmlspecialchars($statusLabel) ?></span>
+                                                <div class="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-2.5 py-2">
+                                                    <div class="min-w-0">
+                                                        <p class="truncate text-xs font-medium text-gray-800"
+                                                           title="<?= htmlspecialchars($oFullName) ?>">
+                                                            <?= htmlspecialchars($oFullName) ?>
+                                                        </p>
+                                                        <div class="mt-1 flex items-center gap-1.5">
+                                                            <span class="text-[10px] text-gray-500">#<?= $endNum ?></span>
+                                                            <span class="inline-flex rounded-full border px-1.5 py-0.5
+                                                                         text-[10px] font-medium <?= $chipBg ?> <?= $chipText ?>">
+                                                                <?= htmlspecialchars($statusLabel) ?>
+                                                            </span>
+                                                        </div>
+                                                        <?php if ($awaitingCurrent): ?>
+                                                            <p class="mt-1 text-[10px] text-gray-500">
+                                                                Awaiting opinion #<?= $endNum ?>
+                                                                <?php if ($lastSubmittedNumber !== null): ?>
+                                                                    &middot; last submitted #<?= (int) $lastSubmittedNumber ?>
+                                                                <?php endif; ?>
+                                                            </p>
+                                                        <?php endif; ?>
+                                                    </div>
                                                     <?php if ($pending === 'SUBMIT_OPINION' && $endId > 0): ?>
-                                                        <span class="text-gray-300">·</span>
                                                         <a href="<?= BASE_URL ?>/committee/referred/opinion?endorsement_id=<?= $endId ?>"
-                                                           class="font-medium underline underline-offset-1 hover:opacity-70 transition">
+                                                           class="shrink-0 rounded-md bg-primary px-2.5 py-1.5 text-[11px]
+                                                                  font-semibold text-white transition hover:bg-indigo-700
+                                                                  focus:outline-none focus:ring-2 focus:ring-primary
+                                                                  focus:ring-offset-1">
                                                             Submit
                                                         </a>
                                                     <?php elseif ($pending === 'SECOND_ENDORSEMENT' && $endId > 0): ?>
-                                                        <span class="text-gray-300">·</span>
                                                         <a href="<?= BASE_URL ?>/committee/referred/opinion?endorsement_id=<?= $endId ?>"
-                                                           class="font-medium underline underline-offset-1 hover:opacity-70 transition">
+                                                           class="shrink-0 rounded-md border border-amber-300 bg-amber-50
+                                                                  px-2.5 py-1.5 text-[11px] font-semibold text-amber-800
+                                                                  transition hover:bg-amber-100 focus:outline-none
+                                                                  focus:ring-2 focus:ring-amber-500 focus:ring-offset-1">
                                                             Review
                                                         </a>
                                                     <?php endif; ?>

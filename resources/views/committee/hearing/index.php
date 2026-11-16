@@ -10,7 +10,7 @@
  *   $page        int
  *   $perPage     int
  *   $search      string
- *   $counts      array    {all, scheduled, approved, deferred, remanded, withdrawn, reset}
+ *   $counts     array    {all, scheduled, approved, deferred, remanded, withdrawn, noted, reset}
  *   $success     string|null
  *   $error       string|null
  */
@@ -22,7 +22,21 @@ $totalPages = $totalPages ?? 1;
 $page       = $page       ?? 1;
 $perPage    = $perPage    ?? 20;
 $search     = $search     ?? '';
-$counts     = $counts     ?? ['all' => 0, 'scheduled' => 0, 'approved' => 0, 'deferred' => 0, 'remanded' => 0, 'withdrawn' => 0, 'reset' => 0];
+$counts     = $counts     ?? ['all' => 0, 'scheduled' => 0, 'approved' => 0, 'deferred' => 0, 'remanded' => 0, 'withdrawn' => 0, 'noted' => 0, 'reset' => 0];
+$caseReturnParams = [
+    'return_to' => 'hearing',
+    'hearing_tab' => $tab,
+];
+if ($search !== '') {
+    $caseReturnParams['hearing_search'] = $search;
+}
+if ($page > 1) {
+    $caseReturnParams['hearing_page'] = $page;
+}
+$outcomeCount = array_sum(array_map(
+    static fn (string $key): int => (int) ($counts[$key] ?? 0),
+    ['approved', 'deferred', 'remanded', 'withdrawn', 'noted', 'reset']
+));
 
 // Tab configuration: key => [label, inactive badge class]
 $tabConfig = [
@@ -32,6 +46,7 @@ $tabConfig = [
     'deferred'  => ['Deferred',     'bg-amber-100 text-amber-700'],
     'remanded'  => ['Remanded',     'bg-red-100 text-red-700'],
     'withdrawn' => ['Withdrawn',    'bg-gray-100 text-gray-600'],
+    'noted'     => ['Noted',        'bg-cyan-100 text-cyan-700'],
     'reset'     => ['Reset',        'bg-blue-100 text-blue-700'],
 ];
 
@@ -41,6 +56,7 @@ $outcomeBadge = [
     'DEFERRED'  => 'bg-amber-100 text-amber-800',
     'REMANDED'  => 'bg-red-100 text-red-800',
     'WITHDRAWN' => 'bg-gray-100 text-gray-700',
+    'NOTED'     => 'bg-cyan-100 text-cyan-800',
     'COMPLETED_TERMINATED' => 'bg-slate-100 text-slate-800',
     'RESET'     => 'bg-blue-100 text-blue-800',
 ];
@@ -62,7 +78,14 @@ function hearingUrl(string $newTab = '', string $newSearch = '', int $newPage = 
 // Count documents on this page that can be shared in a report.
 $eligibleCount = 0;
 foreach ($documents as $d) {
-    if (empty($d['report_id']) && ($d['hearing_outcome'] ?? null) !== 'RESET') {
+    $isCaseOutcome = !empty($d['is_case_outcome']);
+    $isCaseOwner = (int) ($d['case_owner_id'] ?? 0) === (int) ($userId ?? 0);
+    $isApprovedCase = $isCaseOutcome && $isCaseOwner && ($d['hearing_outcome'] ?? null) === 'APPROVED';
+    $isShareableHearing = !$isCaseOutcome
+        && !empty($d['hearing_outcome'])
+        && $d['hearing_outcome'] !== 'RESET';
+
+    if (empty($d['report_id']) && ($isApprovedCase || $isShareableHearing)) {
         $eligibleCount++;
     }
 }
@@ -74,14 +97,14 @@ ob_start();
 
     <!-- ── Page header ───────────────────────────────────────────────────── -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-7 sm:px-8">
+        <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10">
                 <p class="text-sm font-medium text-blue-100">COMMITTEE / HEARINGS</p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     Committee Hearings
                 </h1>
-                <p class="mt-1 text-sm text-blue-100">
-                    Manage hearing outcomes for documents that have been scheduled for committee hearing.
+                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
+                    Manage scheduled hearings and finalized outcomes entered from Cases.
                 </p>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full bg-white/10"></div>
@@ -89,28 +112,68 @@ ob_start();
         </div>
     </section>
 
+    <!-- Overview stats -->
+    <section class="grid grid-cols-1 gap-4 sm:grid-cols-3" aria-label="Hearing overview">
+        <div class="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">All Hearings & Cases</p>
+                <p class="text-2xl font-bold text-gray-900"><?= number_format((int) ($counts['all'] ?? 0)) ?></p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                          d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Scheduled</p>
+                <p class="text-2xl font-bold text-gray-900"><?= number_format((int) ($counts['scheduled'] ?? 0)) ?></p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Outcomes Recorded</p>
+                <p class="text-2xl font-bold text-gray-900"><?= number_format($outcomeCount) ?></p>
+            </div>
+        </div>
+    </section>
+
     <!-- ── Tab navigation ────────────────────────────────────────────────── -->
+    <section>
     <div class="border-b border-gray-200">
-        <nav class="-mb-px flex gap-1 overflow-x-auto" aria-label="Hearing tabs">
+        <nav class="-mb-px flex flex-wrap gap-6" aria-label="Hearing tabs">
             <?php foreach ($tabConfig as $key => [$label, $badgeClass]): ?>
                 <a href="<?= hearingUrl($key, $search) ?>"
-                   class="group inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium
-                          transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+                   class="inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium
+                          transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary
                           <?= $tab === $key
-                              ? 'border-blue-600 text-blue-700'
+                              ? 'border-primary text-primary'
                               : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>"
                    <?= $tab === $key ? 'aria-current="page"' : '' ?>>
                     <?= htmlspecialchars($label) ?>
-                    <?php if (($counts[$key] ?? 0) > 0): ?>
-                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold
-                                     <?= $tab === $key ? 'bg-blue-100 text-blue-700' : $badgeClass ?>">
-                            <?= number_format($counts[$key]) ?>
-                        </span>
-                    <?php endif; ?>
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold
+                                 <?= $tab === $key ? 'bg-primary text-white' : $badgeClass ?>">
+                        <?= number_format((int) ($counts[$key] ?? 0)) ?>
+                    </span>
                 </a>
             <?php endforeach; ?>
         </nav>
     </div>
+    </section>
 
     <!-- ── Main list card ────────────────────────────────────────────────── -->
     <section class="rounded-2xl border border-gray-200 bg-white">
@@ -161,32 +224,32 @@ ob_start();
          <!-- Shared report selection toolbar -->
          <?php if (!empty($documents)): ?>
              <div id="hearingToolbar"
-               class="flex flex-col gap-3 border-b border-emerald-100 bg-emerald-50 px-6 py-3
+               class="flex flex-col gap-3 border-b border-gray-100 bg-gray-50 px-6 py-3
                         sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-3">
-                    <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-emerald-800 select-none
+                    <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700 select-none
                                   <?= $eligibleCount === 0 ? 'opacity-40 cursor-not-allowed' : '' ?>">
                    <input type="checkbox" id="selectAllDocuments"
-                               class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                       aria-label="Select all available hearing documents on this page"
+                               class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                       aria-label="Select all available hearing documents and approved cases on this page"
                                <?= $eligibleCount === 0 ? 'disabled' : '' ?>>
                    Select All Available
                         <?php if ($eligibleCount > 0): ?>
-                            <span class="ml-1 rounded-full bg-emerald-200 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
+                            <span class="ml-1 rounded-full bg-gray-200 px-1.5 py-0.5 text-xs font-semibold text-gray-700">
                                 <?= $eligibleCount ?>
                             </span>
                         <?php endif; ?>
                     </label>
                     <span id="selectionCounter"
-                          class="rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-semibold text-white hidden"
+                          class="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white hidden"
                           aria-live="polite">
                         0 selected
                     </span>
                 </div>
                 <a href="#" id="openSharePageBtn"
-                   class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2
-                          text-sm font-semibold text-white hover:bg-emerald-700 transition
-                          focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500
+                   class="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2
+                          text-sm font-semibold text-white hover:bg-indigo-700 transition
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-primary
                           opacity-50 pointer-events-none"
                    aria-disabled="true"
                    role="button">
@@ -242,6 +305,8 @@ ob_start();
                                         No remanded hearings.
                                     <?php elseif ($tab === 'withdrawn'): ?>
                                         No withdrawn hearings.
+                                    <?php elseif ($tab === 'noted'): ?>
+                                        No noted cases or hearings.
                                     <?php elseif ($tab === 'reset'): ?>
                                         No documents are waiting to be rescheduled.
                                     <?php else: ?>
@@ -251,11 +316,11 @@ ob_start();
                                 <p class="mt-1 text-xs text-gray-500">
                                     <?php if ($search !== ''): ?>
                                         Try a different search term or
-                                        <a href="<?= hearingUrl($tab) ?>" class="text-blue-600 hover:underline">clear the search</a>.
+                                        <a href="<?= hearingUrl($tab) ?>" class="text-primary hover:underline">clear the search</a>.
                                     <?php elseif ($tab === 'scheduled'): ?>
                                         Documents will appear here once an agenda is scheduled and their status is <strong>On Going</strong>.
                                     <?php elseif ($tab === 'all'): ?>
-                                        Documents with a scheduled agenda will appear here.
+                                        Documents with a scheduled agenda and finalized cases without an agenda will appear here.
                                     <?php elseif ($tab === 'reset'): ?>
                                         Documents reset from a hearing will appear here until a new agenda is scheduled.
                                     <?php else: ?>
@@ -279,8 +344,13 @@ ob_start();
                             $isScheduled    = ($outcomeLabel === null);
                             $isApproved     = ($outcomeLabel === 'APPROVED');
                             $isReset        = ($outcomeLabel === 'RESET');
+                            $isCaseOutcome  = !empty($doc['is_case_outcome']);
+                            $isCaseOwner    = $isCaseOutcome
+                                && (int) ($doc['case_owner_id'] ?? 0) === (int) ($userId ?? 0);
                             $hasReport      = !empty($doc['report_id']);
-                            $isEligible     = !$hasReport && !$isReset;
+                            $isEligible     = !$hasReport
+                                && (($isCaseOutcome && $isCaseOwner && $isApproved)
+                                    || (!$isCaseOutcome && !$isScheduled && !$isReset));
 
                             // ── Formatted dates ───────────────────────────────────────────
                             $agendaDate = !empty($doc['agenda_date'])
@@ -297,11 +367,11 @@ ob_start();
                                 data-tracking="<?= htmlspecialchars($doc['tracking_number'] ?? '') ?>"
                                 data-has-report="<?= $hasReport ? '1' : '0' ?>">
 
-                                <!-- ── Checkbox: any hearing status ───────────────────── -->
+                                <!-- ── Checkbox: eligible hearing or case item ───────── -->
                                 <td class="px-4 py-4">
                                     <?php if ($isEligible): ?>
                                         <input type="checkbox"
-                                               class="doc-checkbox h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                               class="doc-checkbox h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                                                value="<?= (int) $doc['document_id'] ?>"
                                                aria-label="Select document <?= htmlspecialchars($doc['tracking_number'] ?? '') ?>">
                                     <?php endif; ?>
@@ -310,7 +380,7 @@ ob_start();
                                 <!-- ── Document: tracking number + type badge ──────────── -->
                                 <td class="px-6 py-4">
                                     <div class="flex flex-col gap-1">
-                                        <span class="font-mono text-sm font-bold text-blue-700">
+                                        <span class="font-mono text-sm font-bold text-primary">
                                             <?= htmlspecialchars($doc['tracking_number'] ?? '—') ?>
                                         </span>
                                         <?php if (!empty($doc['document_type_name'])): ?>
@@ -447,27 +517,58 @@ ob_start();
 
                                 <!-- ── Actions ────────────────────────────────────────── -->
                                 <td class="px-6 py-4 text-right">
-                                    <div class="flex items-center justify-end gap-1 flex-wrap">
+                                    <div class="flex items-center justify-end gap-2">
 
-                                        <?php if ($isScheduled): ?>
-                                            <!-- Record Outcome (primary CTA for scheduled) -->
+                                        <?php if ($isCaseOutcome): ?>
+                                            <?php if ($isCaseOwner): ?>
+                                                <a href="<?= BASE_URL ?>/committee/cases/show?id=<?= (int) $doc['case_id'] ?>&<?= htmlspecialchars(http_build_query($caseReturnParams)) ?>"
+                                                   class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200
+                                                          bg-white text-gray-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600
+                                                          focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                                   title="View Case"
+                                                   aria-label="View case">
+                                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                    </svg>
+                                                </a>
+                                            <?php endif; ?>
+                                            <?php if ($isCaseOwner && $isApproved && empty($doc['report_id'])): ?>
+                                                <a href="<?= BASE_URL ?>/committee/cases/report?case_id=<?= (int) $doc['case_id'] ?>"
+                                                   class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200
+                                                          bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100
+                                                          focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                                                   title="Create Committee Report"
+                                                   aria-label="Create Committee Report">
+                                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                    </svg>
+                                                </a>
+                                            <?php endif; ?>
+
+                                        <?php elseif ($isScheduled): ?>
                                             <a href="<?= BASE_URL ?>/committee/hearing/show?id=<?= (int) $doc['document_id'] ?>"
-                                               class="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5
-                                                      text-xs font-semibold text-white hover:bg-blue-700 transition
-                                                      focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
-                                                      whitespace-nowrap">
-                                                Record Outcome
-                                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                               class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-primary
+                                                      bg-primary text-white transition hover:bg-indigo-700
+                                                      focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                                               title="Record Hearing Outcome"
+                                               aria-label="Record Hearing Outcome">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                          d="M8 5h8a2 2 0 012 2v13H6V7a2 2 0 012-2zm2-2h4v4h-4zM9 12h6m-6 4h6"/>
                                                 </svg>
                                             </a>
 
                                         <?php elseif ($isApproved && empty($doc['report_id'])): ?>
-                                            <!-- View + Create Report -->
                                             <a href="<?= BASE_URL ?>/committee/hearing/show?id=<?= (int) $doc['document_id'] ?>"
-                                               class="rounded-lg border border-gray-200 p-1.5 text-gray-500
-                                                      hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition"
-                                               title="View Hearing">
+                                               class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200
+                                                      bg-white text-gray-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600
+                                                      focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                               title="View Hearing Details"
+                                               aria-label="View Hearing Details">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                           d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -477,9 +578,11 @@ ob_start();
                                             </a>
                                             <?php if (!empty($doc['hearing_id'])): ?>
                                                 <a href="<?= BASE_URL ?>/committee/hearing/report?document_id=<?= (int) $doc['document_id'] ?>&hearing_id=<?= (int) $doc['hearing_id'] ?>"
-                                                   class="rounded-lg border border-gray-200 p-1.5 text-gray-500
-                                                          hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 transition"
-                                                   title="Create Report">
+                                                   class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200
+                                                          bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100
+                                                          focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                                                   title="Create Committee Report"
+                                                   aria-label="Create Committee Report">
                                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -488,11 +591,12 @@ ob_start();
                                             <?php endif; ?>
 
                                         <?php elseif ($isApproved && !empty($doc['report_id'])): ?>
-                                            <!-- View Hearing + View Report -->
                                             <a href="<?= BASE_URL ?>/committee/hearing/show?id=<?= (int) $doc['document_id'] ?>"
-                                               class="rounded-lg border border-gray-200 p-1.5 text-gray-500
-                                                      hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition"
-                                               title="View Hearing">
+                                               class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200
+                                                      bg-white text-gray-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600
+                                                      focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                               title="View Hearing Details"
+                                               aria-label="View Hearing Details">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                           d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -501,9 +605,11 @@ ob_start();
                                                 </svg>
                                             </a>
                                             <a href="<?= BASE_URL ?>/committee/hearing/report/show?id=<?= (int) $doc['report_id'] ?>"
-                                               class="rounded-lg border border-emerald-200 p-1.5 text-emerald-600
-                                                      hover:border-emerald-400 hover:bg-emerald-50 transition"
-                                               title="View Report">
+                                               class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200
+                                                      bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100
+                                                      focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                                               title="View Committee Report"
+                                               aria-label="View Committee Report">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                           d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -512,19 +618,22 @@ ob_start();
 
                                         <?php elseif ($isReset): ?>
                                             <a href="<?= BASE_URL ?>/committee/referred/agenda?id=<?= (int) $doc['document_id'] ?>"
-                                               class="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5
-                                                      text-xs font-semibold text-white hover:bg-blue-700 transition
-                                                      whitespace-nowrap"
-                                               title="Set a new agenda date and time">
-                                                Reschedule Agenda
-                                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5.64 18.36A9 9 0 0118.36 5.64"/>
+                                               class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-200
+                                                      bg-blue-50 text-blue-700 transition hover:bg-blue-100
+                                                      focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                               title="Reschedule Agenda"
+                                               aria-label="Reschedule Agenda">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                          d="M4 4v6h6M20 20v-6h-6M5.64 18.36A9 9 0 0118.36 5.64"/>
                                                 </svg>
                                             </a>
                                             <a href="<?= BASE_URL ?>/committee/hearing/show?id=<?= (int) $doc['document_id'] ?>"
-                                               class="rounded-lg border border-gray-200 p-1.5 text-gray-500
-                                                      hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition"
-                                               title="View Details">
+                                               class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200
+                                                      bg-white text-gray-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600
+                                                      focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                               title="View Hearing Details"
+                                               aria-label="View Hearing Details">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                           d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -534,11 +643,12 @@ ob_start();
                                             </a>
 
                                         <?php else: ?>
-                                            <!-- View Details (deferred / remanded / withdrawn) -->
                                             <a href="<?= BASE_URL ?>/committee/hearing/show?id=<?= (int) $doc['document_id'] ?>"
-                                               class="rounded-lg border border-gray-200 p-1.5 text-gray-500
-                                                      hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600 transition"
-                                               title="View Details">
+                                               class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200
+                                                      bg-white text-gray-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600
+                                                      focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                               title="View Hearing Details"
+                                               aria-label="View Hearing Details">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                           d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
