@@ -142,7 +142,9 @@ $renderRelatedEditors = static function (string $title, array $tables) use (
                                                         <?php endif; ?>
                                                         <?php if (is_array($options)): ?>
                                                             <?php foreach ($options as $option): ?>
-                                                                <option value="<?= (int)$option['id'] ?>" <?= (string)$value === (string)$option['id'] ? 'selected' : '' ?>><?= $h($option['name']) ?></option>
+                                                                <option value="<?= (int)$option['id'] ?>" <?= (string)$value === (string)$option['id'] ? 'selected' : '' ?><?= isset($option['is_current_member']) && !(int)$option['is_current_member'] && (string)$value !== (string)$option['id'] ? ' disabled' : '' ?>>
+                                                                    <?= $h($option['name']) ?><?= isset($option['is_current_member']) && !(int)$option['is_current_member'] ? ' (inactive/current record)' : '' ?>
+                                                                </option>
                                                             <?php endforeach; ?>
                                                         <?php elseif ($isBoolean): ?>
                                                             <option value="0" <?= (string)$value === '0' ? 'selected' : '' ?>>No</option>
@@ -310,19 +312,27 @@ $renderLegislativeEditors = static function (string $title, array $tables) use (
                                     $inputType = $type === 'date' ? 'date'
                                         : ($type === 'time' ? 'time'
                                             : ($isDateTime ? 'datetime-local'
-                                                : (preg_match('/^(tinyint|smallint|mediumint|int|bigint)/', $type)
+                                                : (preg_match('/^(tinyint|smallint|mediumint|int|bigint|decimal|float|double)/', $type)
                                                     ? 'number' : 'text')));
+                                    $required = ($column['Null'] ?? 'NO') !== 'YES';
+                                    $maxLength = preg_match('/^(?:var)?char\((\d+)\)/', $type, $lengthMatch)
+                                        ? (int)$lengthMatch[1] : null;
+                                    $numberStep = preg_match('/^(?:decimal|float|double)\(\d+,([1-9]\d*)\)/', $type, $scaleMatch)
+                                        ? '0.' . str_repeat('0', max(0, (int)$scaleMatch[1] - 1)) . '1'
+                                        : (preg_match('/^(tinyint|smallint|mediumint|int|bigint|decimal)/', $type) ? '1' : 'any');
                                     ?>
                                     <label class="block text-sm font-medium text-gray-700 <?= $isText ? 'md:col-span-2' : '' ?>">
                                         <?= $h($fieldLabels[$field] ?? ucwords(str_replace('_', ' ', $field))) ?>
                                         <?php if (is_array($options) || $enumOptions !== []): ?>
-                                            <select name="fields[<?= $h($field) ?>]" class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                            <select name="fields[<?= $h($field) ?>]" <?= $required ? 'required' : '' ?> class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                                 <?php if (($column['Null'] ?? 'NO') === 'YES'): ?>
                                                     <option value="">Not specified</option>
                                                 <?php endif; ?>
                                                 <?php if (is_array($options)): ?>
                                                     <?php foreach ($options as $option): ?>
-                                                        <option value="<?= (int)$option['id'] ?>" <?= (string)$value === (string)$option['id'] ? 'selected' : '' ?>><?= $h($option['name']) ?></option>
+                                                        <option value="<?= (int)$option['id'] ?>" <?= (string)$value === (string)$option['id'] ? 'selected' : '' ?><?= isset($option['is_current_member']) && !(int)$option['is_current_member'] && (string)$value !== (string)$option['id'] ? ' disabled' : '' ?>>
+                                                            <?= $h($option['name']) ?><?= isset($option['is_current_member']) && !(int)$option['is_current_member'] ? ' (inactive/current record)' : '' ?>
+                                                        </option>
                                                     <?php endforeach; ?>
                                                 <?php else: ?>
                                                     <?php foreach ($enumOptions as $option): ?>
@@ -331,9 +341,9 @@ $renderLegislativeEditors = static function (string $title, array $tables) use (
                                                 <?php endif; ?>
                                             </select>
                                         <?php elseif ($isText): ?>
-                                            <textarea name="fields[<?= $h($field) ?>]" rows="3" class="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"><?= $h($value) ?></textarea>
+                                            <textarea name="fields[<?= $h($field) ?>]" rows="3" <?= $required ? 'required' : '' ?><?= $maxLength !== null ? ' maxlength="' . $maxLength . '"' : '' ?> class="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"><?= $h($value) ?></textarea>
                                         <?php else: ?>
-                                            <input type="<?= $h($inputType) ?>" name="fields[<?= $h($field) ?>]" value="<?= $h($value) ?>" class="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                            <input type="<?= $h($inputType) ?>" name="fields[<?= $h($field) ?>]" value="<?= $h($value) ?>" <?= $required ? 'required' : '' ?><?= $maxLength !== null ? ' maxlength="' . $maxLength . '"' : '' ?><?= $inputType === 'number' ? ' step="' . $numberStep . '"' : '' ?> class="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                         <?php endif; ?>
                                     </label>
                                 <?php endforeach; ?>
@@ -355,29 +365,54 @@ $renderLegislativeEditors = static function (string $title, array $tables) use (
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="flex flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-8">
             <div>
-                <p class="text-sm font-medium text-blue-100">SUPER ADMIN · <?= $h($document['tracking_number']) ?></p>
-                <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl"><?= htmlspecialchars($pageTitle) ?></h1>
-                <p class="mt-2 text-sm leading-6 text-blue-100"><?= htmlspecialchars($pageSubtitle) ?></p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-100">Super Admin · Document Registry</p>
+                <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">Correction Workspace</h1>
+                <p class="mt-2 text-sm leading-6 text-blue-100"><?= $h($document['tracking_number']) ?> · Correct accidental spelling or selection errors while preserving workflow history.</p>
             </div>
-            <a href="<?= BASE_URL ?>/master/documents" class="inline-flex justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary hover:bg-blue-50">Back to registry</a>
+            <div class="flex flex-wrap items-center gap-3">
+                <span class="rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">
+                    <?= $h($document['status_name'] ?? 'Status unavailable') ?>
+                </span>
+                <a href="<?= BASE_URL ?>/master/documents" class="inline-flex justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition hover:bg-blue-50">Back to registry</a>
+            </div>
         </div>
     </section>
 
-    <?php if ($success): ?>
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars($success) ?></div>
-    <?php endif; ?>
-    <?php if ($error): ?>
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
+    <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Tracking number</p>
+            <p class="mt-1 text-sm font-semibold text-gray-900"><?= $h($document['tracking_number']) ?></p>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Document type</p>
+            <p class="mt-1 text-sm font-semibold text-gray-900"><?= $h($document['document_type_name'] ?? 'Not assigned') ?></p>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Current division</p>
+            <p class="mt-1 text-sm font-semibold text-gray-900"><?= $h(str_replace('_', ' ', $document['current_phase'])) ?></p>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Date received</p>
+            <p class="mt-1 text-sm font-semibold text-gray-900"><?= $h($document['date_received']) ?></p>
+        </div>
+    </section>
+
+    <div class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a1.99 1.99 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+        <p><span class="font-semibold">Correction only:</span> Document status, routing, assignments, and finalized or filed workflow state are protected here. Every saved correction is recorded in the document timeline and audit history.</p>
+    </div>
 
     <form method="POST" action="<?= BASE_URL ?>/master/documents/update" class="space-y-6">
         <input type="hidden" name="id" value="<?= (int)$document['id'] ?>">
-        <section class="rounded-2xl border border-gray-200 bg-white p-6">
-            <div class="mb-5">
-                <h2 class="text-lg font-semibold text-gray-900">Document details</h2>
+        <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div class="border-b border-gray-100 bg-gray-50/80 px-6 py-5">
+                <p class="text-xs font-semibold uppercase tracking-wide text-primary">Core record</p>
+                <h2 class="mt-1 text-lg font-semibold text-gray-900">Document details</h2>
                 <p class="mt-1 text-sm text-gray-500">Correct the document classification, receipt details, and source information. Tracking number and workflow state are protected.</p>
             </div>
-            <div class="grid gap-5 md:grid-cols-2">
+            <div class="grid gap-5 p-6 md:grid-cols-2">
                 <label class="block text-sm font-medium text-gray-700">
                     Tracking number <span class="ml-1 text-xs font-normal text-gray-400">system generated</span>
                     <input type="text" value="<?= $h($document['tracking_number']) ?>" readonly class="mt-1.5 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
@@ -487,7 +522,8 @@ $renderLegislativeEditors = static function (string $title, array $tables) use (
                 <div id="contactFields" class="hidden gap-5 md:col-span-2 md:grid-cols-2">
                     <label class="block text-sm font-medium text-gray-700">
                         Contact number
-                        <input type="text" id="source_contact_number" name="source_contact_number" maxlength="50" value="<?= $h($formData['source_contact_number']) ?>" class="mt-1.5 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        <input type="tel" id="source_contact_number" name="source_contact_number" inputmode="numeric" pattern="[0-9]{7,15}" maxlength="15" title="Enter 7 to 15 digits." value="<?= $h($formData['source_contact_number']) ?>" class="mt-1.5 w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        <span class="mt-1 block text-xs font-normal text-gray-500">7 to 15 digits, numbers only.</span>
                     </label>
                     <label class="block text-sm font-medium text-gray-700">
                         Liaison name
@@ -505,7 +541,7 @@ $renderLegislativeEditors = static function (string $title, array $tables) use (
             </div>
             <div class="mt-6 flex flex-col-reverse gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
                 <a href="<?= BASE_URL ?>/master/documents" class="rounded-xl border border-gray-200 px-5 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</a>
-                <button type="submit" class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark">Save corrections</button>
+                <button type="submit" class="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark">Save document corrections</button>
             </div>
         </section>
     </form>
@@ -550,6 +586,8 @@ $renderLegislativeEditors = static function (string $title, array $tables) use (
             <p class="rounded-xl border border-gray-200 bg-white px-5 py-4 text-sm text-gray-500">No Plenary or Committee legislative records are linked to this document yet.</p>
         <?php endif; ?>
     </section>
+
+    <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
 
     <section class="rounded-2xl border border-gray-200 bg-white">
         <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm">

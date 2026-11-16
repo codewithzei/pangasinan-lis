@@ -67,8 +67,8 @@ class TermController
         $totalTerms = (int)$this->pdo->query("SELECT COUNT(*) FROM terms WHERE is_deleted = 0")->fetchColumn();
         $totalLegislators = (int)$this->pdo->query("SELECT COUNT(DISTINCT sp_member_id) FROM term_legislators")->fetchColumn();
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Legislative Terms Management';
         $pageSubtitle = 'Manage congressional sessions and SP member assignments';
@@ -465,8 +465,8 @@ class TermController
         $availStmt->execute([$id]);
         $availableMembers = $availStmt->fetchAll();
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Term Details: ' . htmlspecialchars($term['name']);
         $pageSubtitle = $term['description'] ?? 'Manage SP member assignments for this legislative session';

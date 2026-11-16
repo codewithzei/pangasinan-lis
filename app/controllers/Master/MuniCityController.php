@@ -66,8 +66,8 @@ class MuniCityController
         $activeMunicipalities = (int)$this->pdo->query("SELECT COUNT(*) FROM municities WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveMunicipalities = $totalMunicipalities - $activeMunicipalities;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
         $search = $search;
         $filterStatus = $filterStatus;
         $districtFilter = (string)($districtFilter ?? '');

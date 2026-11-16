@@ -53,8 +53,8 @@ class DocumentStatusController
         $activeDocumentStatuses = (int)$this->pdo->query("SELECT COUNT(*) FROM document_statuses WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveDocumentStatuses = $totalDocumentStatuses - $activeDocumentStatuses;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Document Statuses Management';
         $pageSubtitle = 'Manage document statuses and badge colors used for visual tagging';

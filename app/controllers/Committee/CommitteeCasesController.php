@@ -34,16 +34,15 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  *
  * DOCKET-NUMBER ENTRY
  * ─────────────────────────────────────────────────────────────────────────────
- *  The docket number is now entered manually by the committee user when
- *  creating a case (store()) or when completing pending case details
- *  (detailsStore()). The system validates:
- *    • Required (non-empty).
- *    • Max 100 characters.
- *    • Unique — checked against committee_cases.docket_number before INSERT
+ *  The committee user enters only the docket sequence when creating a case
+ *  (store()) or completing pending case details (detailsStore()). The server
+ *  adds the DKT prefix and year, then validates:
+ *    • Required positive numeric sequence (up to 10 digits).
+ *    • Unique full docket number — checked before INSERT
  *      and again by the UNIQUE KEY uq_docket_number at the database level.
  *  Duplicate-key violations (MySQL error 1062) produce a clear error message
  *  that is redisplayed on the form; the user is never silently given a
- *  different number. No automatic generation occurs anywhere in this controller.
+ *  different number. Only the DKT prefix and year are generated automatically.
  *
  *  Cases docketed via "Proceed to Cases" from the Committee Inbox
  *  (CommitteeInboxController::doProceedToCases()) are created with an empty
@@ -85,6 +84,7 @@ class CommitteeCasesController
 
         // Filters
         $search = trim($_GET['search'] ?? '');
+        $detailsPendingFilter = ($_GET['details_pending'] ?? '') === '1';
 
         // Pagination
         $page    = max(1, (int) ($_GET['page'] ?? 1));
@@ -102,6 +102,15 @@ class CommitteeCasesController
             $params[] = "%{$search}%";
             $params[] = "%{$search}%";
             $params[] = "%{$search}%";
+        }
+
+        if ($detailsPendingFilter) {
+            $where[] = "(
+                COALESCE(TRIM(cc.docket_number), '') = ''
+                OR COALESCE(TRIM(cc.nature_of_case), '') = ''
+                OR COALESCE(TRIM(cc.complainant_details), '') = ''
+                OR COALESCE(TRIM(cc.respondents), '') = ''
+            )";
         }
 
         $whereClause = implode(' AND ', $where);
@@ -141,8 +150,9 @@ class CommitteeCasesController
                     -- blank identifying details (including docket_number) that
                     -- are entered from the Cases show page.
                     COALESCE(TRIM(cc.docket_number), '') = ''
-                    OR TRIM(cc.nature_of_case) = ''
-                    OR TRIM(cc.respondents) = ''
+                    OR COALESCE(TRIM(cc.nature_of_case), '') = ''
+                    OR COALESCE(TRIM(cc.complainant_details), '') = ''
+                    OR COALESCE(TRIM(cc.respondents), '') = ''
                 )                 AS details_pending,
                 (
                     SELECT COUNT(*)
@@ -160,15 +170,7 @@ class CommitteeCasesController
         $listStmt->execute([...$params, $perPage, $offset]);
         $cases = $listStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Summary stats for this user
-        $statsStmt = $this->pdo->prepare("
-            SELECT COUNT(*) AS total_cases
-            FROM committee_cases cc
-            WHERE cc.assigned_by = ?
-              AND cc.final_outcome IS NULL
-        ");
-        $statsStmt->execute([$userId]);
-        $totalCases = (int) $statsStmt->fetch(PDO::FETCH_ASSOC)['total_cases'];
+        $caseStats = $this->getCaseStatusCounts($userId);
 
         // (The ?complete= query param was previously used to auto-open a modal.
         // It is now ignored — case details are entered from the show page.)
@@ -230,7 +232,8 @@ class CommitteeCasesController
         }
 
         // ── Collect + validate inputs ─────────────────────────────────────────
-        $docketNumber            = trim($_POST['docket_number']            ?? '');
+        $docketSequence          = trim($_POST['docket_sequence']          ?? '');
+        $docketNumber            = $this->buildDocketNumber($docketSequence, (int) date('Y'));
         $dateAssigned            = trim($_POST['date_assigned']            ?? '');
         $natureOfCase            = trim($_POST['nature_of_case']           ?? '');
         $complainantDetails      = trim($_POST['complainant_details']      ?? '');
@@ -239,10 +242,10 @@ class CommitteeCasesController
 
         $errors = [];
 
-        if ($docketNumber === '') {
-            $errors[] = 'Docket number is required.';
-        } elseif (mb_strlen($docketNumber) > 100) {
-            $errors[] = 'Docket number must not exceed 100 characters.';
+        if ($docketSequence === '') {
+            $errors[] = 'Docket sequence number is required.';
+        } elseif (!preg_match('/^\d{1,10}$/D', $docketSequence) || (int) $docketSequence < 1) {
+            $errors[] = 'Docket sequence number must be a positive number with up to 10 digits.';
         }
 
         if ($dateAssigned === '') {
@@ -274,7 +277,7 @@ class CommitteeCasesController
         }
 
         // Check for duplicate docket number only when the field itself is valid.
-        if (empty($errors) || ($docketNumber !== '' && mb_strlen($docketNumber) <= 100)) {
+        if ($docketSequence !== '' && preg_match('/^\d{1,10}$/D', $docketSequence) && (int) $docketSequence > 0) {
             if ($docketNumber !== '') {
                 $dupCheckStmt = $this->pdo->prepare(
                     "SELECT id FROM committee_cases WHERE docket_number = ? LIMIT 1"
@@ -469,12 +472,14 @@ class CommitteeCasesController
 
         // ── Collect + validate inputs ─────────────────────────────────────────
         // The "Proceed to Cases" inbox path inserts a blank docket_number.
-        // The user must supply it here. If the case already has a non-empty
-        // docket_number the user can also update it (correcting a typo in the
-        // placeholder stored by the inbox action). Uniqueness is checked only
+        // The user supplies the sequence here. The DKT prefix and year are
+        // assembled by the server, preserving an existing docket year.
+        // Uniqueness is checked only
         // when the submitted value differs from the current stored value so
         // an unchanged round-trip does not report a spurious duplicate.
-        $docketNumber            = trim($_POST['docket_number']            ?? '');
+        $docketSequence          = trim($_POST['docket_sequence']          ?? '');
+        $docketYear              = $this->docketYearFromNumber($case['docket_number'] ?? null);
+        $docketNumber            = $this->buildDocketNumber($docketSequence, $docketYear);
         $dateAssigned            = trim($_POST['date_assigned']            ?? '');
         $natureOfCase            = trim($_POST['nature_of_case']           ?? '');
         $complainantDetails      = trim($_POST['complainant_details']      ?? '');
@@ -485,10 +490,10 @@ class CommitteeCasesController
 
         $errors = [];
 
-        if ($docketNumber === '') {
-            $errors[] = 'Docket number is required.';
-        } elseif (mb_strlen($docketNumber) > 100) {
-            $errors[] = 'Docket number must not exceed 100 characters.';
+        if ($docketSequence === '') {
+            $errors[] = 'Docket sequence number is required.';
+        } elseif (!preg_match('/^\d{1,10}$/D', $docketSequence) || (int) $docketSequence < 1) {
+            $errors[] = 'Docket sequence number must be a positive number with up to 10 digits.';
         }
 
         if ($dateAssigned === '') {
@@ -521,7 +526,7 @@ class CommitteeCasesController
 
         // Duplicate docket check — only when the value is non-empty, valid,
         // and differs from the currently stored value for this case.
-        if ($docketNumber !== '' && mb_strlen($docketNumber) <= 100) {
+        if ($docketSequence !== '' && preg_match('/^\d{1,10}$/D', $docketSequence) && (int) $docketSequence > 0) {
             if ($docketNumber !== $existingDocketNumber) {
                 $dupCheckStmt = $this->pdo->prepare(
                     "SELECT id FROM committee_cases WHERE docket_number = ? AND id != ? LIMIT 1"
@@ -725,9 +730,7 @@ class CommitteeCasesController
             $relatedMotions = $this->docService->getRelatedMotions((int) $case['document_id']);
         }
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
-        $errors  = flash_get('errors', []);
+        $errors  = flash_peek('errors', []);
         $old     = old_get();
 
         require __DIR__ . '/../../../resources/views/committee/cases/show.php';
@@ -757,10 +760,11 @@ class CommitteeCasesController
 
         // ── Guard: case details must be complete before recording actions ─────
         if (trim((string) ($case['nature_of_case'] ?? '')) === ''
+            || trim((string) ($case['complainant_details'] ?? '')) === ''
             || trim((string) ($case['respondents'] ?? '')) === ''
             || trim((string) ($case['docket_number'] ?? '')) === ''
         ) {
-            flash_set('error', 'Save the required case details (docket number, nature of case, and respondents) before adding proceedings.');
+            flash_set('error', 'Save the required case details (docket number, nature of case, complainant details, and respondents) before adding proceedings.');
             redirect('committee/cases/show?id=' . $caseId);
         }
 
@@ -979,10 +983,11 @@ class CommitteeCasesController
 
         // ── Guard: case details must be complete before setting an outcome ────
         if (trim((string) ($case['nature_of_case'] ?? '')) === ''
+            || trim((string) ($case['complainant_details'] ?? '')) === ''
             || trim((string) ($case['respondents'] ?? '')) === ''
             || trim((string) ($case['docket_number'] ?? '')) === ''
         ) {
-            flash_set('error', 'Save the required case details (docket number, nature of case, and respondents) before setting a final outcome.');
+            flash_set('error', 'Save the required case details (docket number, nature of case, complainant details, and respondents) before setting a final outcome.');
             redirect('committee/cases/show?id=' . $caseId);
         }
 
@@ -1710,9 +1715,30 @@ class CommitteeCasesController
         return $row ?: null;
     }
 
+    private function buildDocketNumber(string $sequence, int $year): string
+    {
+        return sprintf('DKT-%s-%04d', $sequence, $year);
+    }
+
+    private function docketYearFromNumber(?string $docketNumber): int
+    {
+        if (is_string($docketNumber)
+            && preg_match('/^DKT-(\d+)-(\d+)$/i', trim($docketNumber), $matches)
+        ) {
+            if (preg_match('/^(19|20|21)\d{2}$/', $matches[2])) {
+                return (int) $matches[2];
+            }
+            if (preg_match('/^(19|20|21)\d{2}$/', $matches[1])) {
+                return (int) $matches[1];
+            }
+        }
+
+        return (int) date('Y');
+    }
+
     /**
      * Return the formatted next docket number for the given year WITHOUT
-     * allocating the sequence. Used only for display in the creation form.
+     * allocating the sequence.
      */
     private function previewNextDocketNumber(int $year): string
     {
@@ -1722,7 +1748,7 @@ class CommitteeCasesController
         $stmt->execute([$year]);
         $row  = $stmt->fetch(PDO::FETCH_ASSOC);
         $next = $row ? ((int) $row['last_sequence']) + 1 : 1;
-        return sprintf('DKT-%d-%04d', $year, $next);
+        return $this->buildDocketNumber((string) $next, $year);
     }
 
     /**
@@ -1874,6 +1900,7 @@ class CommitteeCasesController
         string $pageTitle,
         int    $userId
     ): void {
+        $caseStats = $this->getCaseStatusCounts($userId);
         $search  = trim($_GET['search'] ?? '');
         $page    = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 20;
@@ -1942,5 +1969,42 @@ class CommitteeCasesController
         $cases = $listStmt->fetchAll(PDO::FETCH_ASSOC);
 
         require __DIR__ . "/../../../resources/views/committee/cases/{$viewSlug}.php";
+    }
+
+    /**
+     * Shared case counts for the Cases overview cards and outcome navigation.
+     */
+    private function getCaseStatusCounts(int $userId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN cc.final_outcome IS NULL THEN 1 ELSE 0 END), 0) AS active_cases,
+                COALESCE(SUM(CASE
+                    WHEN cc.final_outcome IS NULL
+                     AND (
+                        COALESCE(TRIM(cc.docket_number), '') = ''
+                        OR COALESCE(TRIM(cc.nature_of_case), '') = ''
+                        OR COALESCE(TRIM(cc.complainant_details), '') = ''
+                        OR COALESCE(TRIM(cc.respondents), '') = ''
+                     )
+                    THEN 1 ELSE 0
+                END), 0) AS details_pending,
+                COALESCE(SUM(CASE WHEN cc.final_outcome = 'APPROVED' THEN 1 ELSE 0 END), 0) AS approved,
+                COALESCE(SUM(CASE WHEN cc.final_outcome = 'DEFERRED' THEN 1 ELSE 0 END), 0) AS deferred,
+                COALESCE(SUM(CASE WHEN cc.final_outcome = 'WITHDRAWN' THEN 1 ELSE 0 END), 0) AS withdrawn,
+                COALESCE(SUM(CASE WHEN cc.final_outcome = 'NOTED' THEN 1 ELSE 0 END), 0) AS noted
+            FROM committee_cases cc
+            WHERE cc.assigned_by = ?
+        ");
+        $stmt->execute([$userId]);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [
+            'active_cases' => 0,
+            'details_pending' => 0,
+            'approved' => 0,
+            'deferred' => 0,
+            'withdrawn' => 0,
+            'noted' => 0,
+        ];
     }
 }

@@ -53,8 +53,8 @@ class CommitteeController
         $activeCommittees = (int)$this->pdo->query("SELECT COUNT(*) FROM committees WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveCommittees = $totalCommittees - $activeCommittees;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Committees Management';
         $pageSubtitle = 'Manage legislative committees and their availability in dropdowns';

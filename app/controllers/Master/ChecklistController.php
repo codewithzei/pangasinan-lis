@@ -55,8 +55,8 @@ class ChecklistController
         $activeChecklists = (int)$this->pdo->query("SELECT COUNT(*) FROM checklists WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveChecklists = $totalChecklists - $activeChecklists;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Checklist/Requirements Management';
         $pageSubtitle = 'Manage document checklist items and requirements for legislative processes';
@@ -311,8 +311,8 @@ class ChecklistController
         $availableStmt->execute([$id]);
         $availableDocumentTypes = $availableStmt->fetchAll();
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Checklist Details: ' . htmlspecialchars($checklist['name']);
         $pageSubtitle = $checklist['description'] ?? 'Manage document type assignments for this checklist item';

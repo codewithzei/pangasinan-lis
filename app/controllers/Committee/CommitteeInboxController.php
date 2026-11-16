@@ -1828,7 +1828,7 @@ class CommitteeInboxController
                 document_id, docket_year, docket_sequence, docket_number,
                 date_assigned, nature_of_case, complainant_details,
                 complainant_municipality, respondents, assigned_by
-            ) VALUES (?, NULL, NULL, NULL, CURDATE(), '', '', NULL, '', ?)
+            ) VALUES (?, NULL, NULL, NULL, NULL, '', '', NULL, '', ?)
         ")->execute([
             $documentId,
             $userId,

@@ -184,19 +184,50 @@ class DocumentRegistryController
     public function index(): void
     {
         $search = trim($_GET['search'] ?? '');
+        $filterType = trim($_GET['type'] ?? '');
+        $filterStatus = trim($_GET['status'] ?? '');
+        $filterEditedByMe = ($_GET['edited_by'] ?? '') === 'me';
         $page = max(1, (int)($_GET['page'] ?? 1));
         $perPage = 20;
-        $where = '';
+        $whereClauses = [];
         $params = [];
 
         if ($search !== '') {
-            $where = "WHERE d.tracking_number LIKE ?
+            $whereClauses[] = "(d.tracking_number LIKE ?
                 OR d.subject_matter LIKE ?
                 OR d.source_name LIKE ?
-                OR dt.name LIKE ?";
+                OR dt.name LIKE ?)";
             $like = '%' . $search . '%';
             $params = [$like, $like, $like, $like];
         }
+
+        if (ctype_digit($filterType) && (int)$filterType > 0) {
+            $whereClauses[] = 'd.document_type_id = ?';
+            $params[] = (int)$filterType;
+        } else {
+            $filterType = '';
+        }
+
+        if (ctype_digit($filterStatus) && (int)$filterStatus > 0) {
+            $whereClauses[] = 'd.current_status_id = ?';
+            $params[] = (int)$filterStatus;
+        } else {
+            $filterStatus = '';
+        }
+
+        if ($filterEditedByMe) {
+            $whereClauses[] = "EXISTS (
+                SELECT 1
+                FROM audit_logs edited_log
+                WHERE edited_log.entity_type = 'Document'
+                  AND BINARY edited_log.entity_id = BINARY CAST(d.id AS CHAR)
+                  AND edited_log.action = 'UPDATE'
+                  AND edited_log.user_id = ?
+            )";
+            $params[] = auth_id();
+        }
+
+        $where = $whereClauses !== [] ? 'WHERE ' . implode(' AND ', $whereClauses) : '';
 
         $count = $this->pdo->prepare("
             SELECT COUNT(*)
@@ -213,11 +244,29 @@ class DocumentRegistryController
         $stmt = $this->pdo->prepare("
             SELECT d.id, d.tracking_number, d.subject_matter, d.date_received,
                    d.document_type_id, d.current_phase, dt.name AS document_type_name,
-                   ds.name AS status_name, st.name AS source_type_name, d.source_name
+                   dt.badge_color AS document_type_badge_color,
+                   ds.name AS status_name, ds.badge_color AS status_badge_color,
+                   st.name AS source_type_name, d.source_name,
+                   latest_route.from_phase AS route_from_phase,
+                   latest_route.to_phase AS route_to_phase,
+                   latest_route.remarks AS route_remarks,
+                   latest_route.created_at AS routed_at,
+                   routed_to_role.name AS routed_to_role_name,
+                   routed_to_user.username AS routed_to_username,
+                   routed_by_user.username AS routed_by_username
             FROM documents d
             LEFT JOIN document_types dt ON dt.id = d.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             LEFT JOIN source_types st ON st.id = d.source_type_id
+            LEFT JOIN (
+                SELECT dr.document_id, MAX(dr.id) AS latest_route_id
+                FROM document_routes dr
+                GROUP BY dr.document_id
+            ) latest_route_id ON latest_route_id.document_id = d.id
+            LEFT JOIN document_routes latest_route ON latest_route.id = latest_route_id.latest_route_id
+            LEFT JOIN roles routed_to_role ON routed_to_role.id = latest_route.routed_to_role_id
+            LEFT JOIN user_accounts routed_to_user ON routed_to_user.id = latest_route.routed_to_user_id
+            LEFT JOIN user_accounts routed_by_user ON routed_by_user.id = latest_route.routed_by
             {$where}
             ORDER BY d.created_at DESC, d.id DESC
             LIMIT {$perPage} OFFSET {$offset}
@@ -226,10 +275,35 @@ class DocumentRegistryController
         $documents = $stmt->fetchAll();
 
         $totalDocuments = (int)$this->pdo->query("SELECT COUNT(*) FROM documents")->fetchColumn();
-        $missingTypeCount = (int)$this->pdo->query("SELECT COUNT(*) FROM documents WHERE document_type_id IS NULL")->fetchColumn();
+        $modifiedDocumentsStmt = $this->pdo->prepare("
+            SELECT COUNT(*)
+            FROM documents d
+            WHERE EXISTS (
+                SELECT 1
+                FROM audit_logs edited_log
+                WHERE edited_log.entity_type = 'Document'
+                  AND BINARY edited_log.entity_id = BINARY CAST(d.id AS CHAR)
+                  AND edited_log.action = 'UPDATE'
+                  AND edited_log.user_id = ?
+            )
+        ");
+        $modifiedDocumentsStmt->execute([auth_id()]);
+        $modifiedDocumentsCount = (int)$modifiedDocumentsStmt->fetchColumn();
+        $documentTypes = $this->pdo->query("
+            SELECT id, name
+            FROM document_types
+            WHERE is_deleted = 0
+            ORDER BY sort_order ASC, name ASC
+        ")->fetchAll();
+        $documentStatuses = $this->pdo->query("
+            SELECT id, name
+            FROM document_statuses
+            WHERE is_deleted = 0
+            ORDER BY sort_order ASC, name ASC
+        ")->fetchAll();
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
         $pageTitle = 'Document Registry';
         $pageSubtitle = 'Track and correct document details across the system.';
 
@@ -624,25 +698,38 @@ class DocumentRegistryController
         ");
         $documentAttachmentOptionsStmt->execute([$id]);
         $documentAttachmentOptions = $documentAttachmentOptionsStmt->fetchAll();
+        $relatedSpMembersStmt = $this->pdo->prepare("
+            SELECT sm.sp_member_id AS id,
+                   TRIM(CONCAT_WS(' ', NULLIF(sm.first_name, ''), NULLIF(sm.middle_name, ''),
+                       NULLIF(sm.last_name, ''), NULLIF(sm.suffix, ''))) AS name,
+                   (sm.is_active = 1 AND sm.is_deleted = 0 AND EXISTS (
+                       SELECT 1
+                       FROM term_legislators tl
+                       INNER JOIN terms t ON t.id = tl.term_id
+                       WHERE tl.sp_member_id = sm.sp_member_id
+                         AND t.is_active = 1 AND t.is_deleted = 0
+                   )) AS is_current_member
+            FROM sp_members sm
+            WHERE (sm.is_active = 1 AND sm.is_deleted = 0
+                   AND EXISTS (
+                       SELECT 1
+                       FROM term_legislators tl
+                       INNER JOIN terms t ON t.id = tl.term_id
+                       WHERE tl.sp_member_id = sm.sp_member_id
+                         AND t.is_active = 1 AND t.is_deleted = 0
+                   ))
+               OR EXISTS (
+                   SELECT 1 FROM document_authors da
+                   WHERE da.document_id = ? AND da.sp_member_id = sm.sp_member_id
+               )
+            ORDER BY sm.last_name, sm.first_name
+        ");
+        $relatedSpMembersStmt->execute([$id]);
         $relatedSelectOptions = [
             'committee_id' => $this->pdo->query("
                 SELECT id, name FROM committees ORDER BY name
             ")->fetchAll(),
-            'sp_member_id' => $this->pdo->query("
-                SELECT sm.sp_member_id AS id,
-                       TRIM(CONCAT_WS(' ', NULLIF(sm.first_name, ''), NULLIF(sm.middle_name, ''),
-                           NULLIF(sm.last_name, ''), NULLIF(sm.suffix, ''))) AS name
-                FROM sp_members sm
-                WHERE sm.is_active = 1 AND sm.is_deleted = 0
-                  AND EXISTS (
-                      SELECT 1
-                      FROM term_legislators tl
-                      INNER JOIN terms t ON t.id = tl.term_id
-                      WHERE tl.sp_member_id = sm.sp_member_id
-                        AND t.is_active = 1 AND t.is_deleted = 0
-                  )
-                ORDER BY sm.last_name, sm.first_name
-            ")->fetchAll(),
+            'sp_member_id' => $relatedSpMembersStmt->fetchAll(),
             'opinion_office_id' => $this->pdo->query("
                 SELECT id, name FROM opinion_offices ORDER BY name
             ")->fetchAll(),
@@ -651,7 +738,7 @@ class DocumentRegistryController
         ];
         $documentEvents = $this->fetchDocumentRows("
             SELECT de.event_type, de.phase, de.remarks, de.metadata, de.created_at,
-                   ui.first_name, ui.last_name
+                   TRIM(CONCAT_WS(' ', NULLIF(ui.first_name, ''), NULLIF(ui.last_name, ''))) AS performed_by_name
             FROM document_events de
             LEFT JOIN user_info ui ON ui.user_account_id = de.performed_by
             WHERE de.document_id = ?
@@ -707,8 +794,8 @@ class DocumentRegistryController
             'created_at', 'updated_at',
         ]));
         old_clear();
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
         $pageTitle = 'Correct Document Details';
         $pageSubtitle = 'Review the document record and save corrections. Changes are recorded in the audit history.';
 
@@ -724,11 +811,11 @@ class DocumentRegistryController
         }
 
         $data = [
-            'document_type_id' => (int)$this->postString('document_type_id'),
+            'document_type_id' => $this->nullableId($this->postString('document_type_id')) ?? 0,
             'subject_matter' => $this->postString('subject_matter'),
             'date_received' => $this->postString('date_received'),
             'time_received' => $this->postString('time_received'),
-            'source_type_id' => (int)$this->postString('source_type_id'),
+            'source_type_id' => $this->nullableId($this->postString('source_type_id')) ?? 0,
             'external_office_id' => $this->nullableId($this->postString('external_office_id')),
             'hospital_id' => $this->nullableId($this->postString('hospital_id')),
             'municipality_id' => $this->nullableId($this->postString('municipality_id')),
@@ -787,6 +874,10 @@ class DocumentRegistryController
 
         try {
             $this->pdo->beginTransaction();
+            $phaseStmt = $this->pdo->prepare("SELECT current_phase FROM documents WHERE id = ? FOR UPDATE");
+            $phaseStmt->execute([$id]);
+            $eventPhase = (string)$phaseStmt->fetchColumn();
+
             $stmt = $this->pdo->prepare("
                 UPDATE documents
                 SET document_type_id = ?, subject_matter = ?, date_received = ?,
@@ -829,6 +920,23 @@ class DocumentRegistryController
                 client_ip(),
                 mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500) ?: null,
                 'Super Admin corrected document ' . $original['tracking_number'],
+            ]);
+
+            $event = $this->pdo->prepare("
+                INSERT INTO document_events
+                    (document_id, event_type, phase, performed_by, remarks, metadata)
+                VALUES (?, 'DOCUMENT_EDITED', ?, ?, ?, ?)
+            ");
+            $event->execute([
+                $id,
+                $eventPhase,
+                auth_id(),
+                'Document Registry correction. Updated fields: ' . implode(', ', array_keys($newValues)),
+                json_encode([
+                    'source' => 'document_registry',
+                    'tracking_number' => $original['tracking_number'],
+                    'updated_fields' => array_keys($newValues),
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             ]);
             $this->pdo->commit();
             flash_set('success', 'Document details updated. The correction was added to the audit history.');
@@ -902,6 +1010,9 @@ class DocumentRegistryController
             $type = strtolower($rawType);
             if ($value === '' && $column['Null'] === 'YES') {
                 $value = null;
+            } elseif ($value === '') {
+                flash_set('error', ucfirst(str_replace('_', ' ', $field)) . ' is required.');
+                redirect('master/documents/edit?id=' . $documentId);
             } elseif (preg_match('/^enum\((.*)\)$/i', $rawType, $enumMatch)) {
                 preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $enumMatch[1], $enumValues);
                 if (!in_array($value, $enumValues[1], true)) {
@@ -910,9 +1021,26 @@ class DocumentRegistryController
                 }
             } elseif (preg_match('/^(tinyint|smallint|mediumint|int|bigint|decimal|float|double)/', $type)) {
                 $isInteger = preg_match('/^(tinyint|smallint|mediumint|int|bigint)/', $type) === 1;
-                if (!is_numeric($value) || ($isInteger && !preg_match('/^-?\d+$/', $value))) {
+                $isDecimal = str_starts_with($type, 'decimal');
+                if (!is_numeric($value)
+                    || ($isInteger && !preg_match('/^-?\d+$/', $value))
+                    || ($isDecimal && !preg_match('/^-?\d+(?:\.\d+)?$/', $value))) {
                     flash_set('error', 'Enter a valid number for ' . str_replace('_', ' ', $field) . '.');
                     redirect('master/documents/edit?id=' . $documentId);
+                }
+                if (str_contains($type, 'unsigned') && (float)$value < 0) {
+                    flash_set('error', ucfirst(str_replace('_', ' ', $field)) . ' cannot be negative.');
+                    redirect('master/documents/edit?id=' . $documentId);
+                }
+                if (preg_match('/^(?:decimal|float|double)\((\d+),(\d+)\)/', $type, $precision)) {
+                    $parts = explode('.', ltrim((string)$value, '-'), 2);
+                    $integerDigits = strlen(ltrim($parts[0], '0'));
+                    $fractionDigits = strlen($parts[1] ?? '');
+                    if ($integerDigits > (int)$precision[1] - (int)$precision[2]
+                        || $fractionDigits > (int)$precision[2]) {
+                        flash_set('error', 'Enter a number within the allowed precision for ' . str_replace('_', ' ', $field) . '.');
+                        redirect('master/documents/edit?id=' . $documentId);
+                    }
                 }
             } elseif (
                 ($type === 'date' || $type === 'time' || str_starts_with($type, 'datetime') || str_starts_with($type, 'timestamp'))
@@ -930,16 +1058,55 @@ class DocumentRegistryController
                 }
             }
 
+            if ($value !== null && preg_match('/^(?:var)?char\((\d+)\)/', $type, $length)
+                && mb_strlen($value) > (int)$length[1]) {
+                flash_set('error', ucfirst(str_replace('_', ' ', $field)) . ' must be ' . (int)$length[1] . ' characters or fewer.');
+                redirect('master/documents/edit?id=' . $documentId);
+            }
+            $textByteLimit = match (true) {
+                str_starts_with($type, 'tinytext') => 255,
+                str_starts_with($type, 'text') => 65535,
+                str_starts_with($type, 'mediumtext') => 16777215,
+                str_starts_with($type, 'longtext') => 4294967295,
+                default => null,
+            };
+            if ($value !== null && $textByteLimit !== null && strlen($value) > $textByteLimit) {
+                flash_set('error', ucfirst(str_replace('_', ' ', $field)) . ' exceeds the maximum length for its database field.');
+                redirect('master/documents/edit?id=' . $documentId);
+            }
+
             if ($value !== null && in_array($field, ['opinion_office_id', 'committee_id', 'sp_member_id'], true)) {
-                $reference = match ($field) {
-                    'opinion_office_id' => ['opinion_offices', 'id'],
-                    'committee_id' => ['committees', 'id'],
-                    default => ['sp_members', 'sp_member_id'],
-                };
-                $referenceQuery = $this->pdo->prepare(
-                    "SELECT 1 FROM `{$reference[0]}` WHERE `{$reference[1]}` = ? LIMIT 1"
-                );
-                $referenceQuery->execute([(int)$value]);
+                if ($field === 'sp_member_id') {
+                    $referenceQuery = $this->pdo->prepare("
+                        SELECT 1
+                        FROM sp_members sm
+                        WHERE sm.sp_member_id = ?
+                          AND (
+                              (sm.is_active = 1 AND sm.is_deleted = 0 AND EXISTS (
+                                  SELECT 1
+                                  FROM term_legislators tl
+                                  INNER JOIN terms t ON t.id = tl.term_id
+                                  WHERE tl.sp_member_id = sm.sp_member_id
+                                    AND t.is_active = 1 AND t.is_deleted = 0
+                              ))
+                              OR EXISTS (
+                                  SELECT 1 FROM document_authors da
+                                  WHERE da.id = ? AND da.document_id = ?
+                                    AND da.sp_member_id = sm.sp_member_id
+                              )
+                          )
+                        LIMIT 1
+                    ");
+                    $referenceQuery->execute([(int)$value, $recordId, $documentId]);
+                } else {
+                    $reference = $field === 'opinion_office_id'
+                        ? ['opinion_offices', 'id']
+                        : ['committees', 'id'];
+                    $referenceQuery = $this->pdo->prepare(
+                        "SELECT 1 FROM `{$reference[0]}` WHERE `{$reference[1]}` = ? LIMIT 1"
+                    );
+                    $referenceQuery->execute([(int)$value]);
+                }
                 if (!$referenceQuery->fetchColumn()) {
                     flash_set('error', 'Choose a valid ' . str_replace('_', ' ', $field) . '.');
                     redirect('master/documents/edit?id=' . $documentId);
@@ -982,6 +1149,10 @@ class DocumentRegistryController
 
         try {
             $this->pdo->beginTransaction();
+            $phaseStmt = $this->pdo->prepare("SELECT current_phase FROM documents WHERE id = ? FOR UPDATE");
+            $phaseStmt->execute([$documentId]);
+            $eventPhase = (string)$phaseStmt->fetchColumn();
+
             $assignments = implode(', ', array_map(
                 static fn(string $field): string => "`{$field}` = ?",
                 array_keys($updates)
@@ -1003,6 +1174,25 @@ class DocumentRegistryController
                 client_ip(),
                 mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500) ?: null,
                 'Super Admin corrected ' . str_replace('_', ' ', $table) . ' for document #' . $documentId,
+            ]);
+
+            $event = $this->pdo->prepare("
+                INSERT INTO document_events
+                    (document_id, event_type, phase, performed_by, remarks, metadata)
+                VALUES (?, 'DOCUMENT_EDITED', ?, ?, ?, ?)
+            ");
+            $event->execute([
+                $documentId,
+                $eventPhase,
+                auth_id(),
+                'Document Registry correction: ' . str_replace('_', ' ', $table)
+                    . ' record #' . $recordId . '. Updated fields: ' . implode(', ', array_keys($newValues)),
+                json_encode([
+                    'source' => 'document_registry',
+                    'table' => $table,
+                    'record_id' => $recordId,
+                    'updated_fields' => array_keys($newValues),
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             ]);
             $this->pdo->commit();
             flash_set('success', 'Related Plenary or Committee details updated and recorded in the correction history.');
@@ -1060,12 +1250,15 @@ class DocumentRegistryController
         }
         foreach ([
             'source_name' => 255,
-            'source_contact_number' => 50,
             'source_liaison_name' => 255,
         ] as $field => $maxLength) {
             if (mb_strlen($data[$field]) > $maxLength) {
                 $errors[] = ucfirst(str_replace('_', ' ', $field)) . " must be {$maxLength} characters or fewer.";
             }
+        }
+        if ($data['source_contact_number'] !== ''
+            && !preg_match('/^\d{7,15}$/', $data['source_contact_number'])) {
+            $errors[] = 'Contact number must contain 7 to 15 digits only.';
         }
 
         return $errors;

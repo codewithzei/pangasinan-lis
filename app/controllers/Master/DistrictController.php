@@ -53,8 +53,8 @@ class DistrictController
         $activeDistricts = (int)$this->pdo->query("SELECT COUNT(*) FROM districts WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveDistricts = $totalDistricts - $activeDistricts;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Districts Management';
         $pageSubtitle = 'Manage Pangasinan legislative districts and their availability in dropdowns';

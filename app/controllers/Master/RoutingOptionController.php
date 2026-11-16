@@ -53,8 +53,8 @@ class RoutingOptionController
         $activeRoutingOptions = (int)$this->pdo->query("SELECT COUNT(*) FROM routing_options WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveRoutingOptions = $totalRoutingOptions - $activeRoutingOptions;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Routing Options Management';
         $pageSubtitle = 'Manage routing destinations and workflow stages for document movement';

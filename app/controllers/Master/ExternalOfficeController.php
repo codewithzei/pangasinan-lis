@@ -53,8 +53,8 @@ class ExternalOfficeController
         $activeExternalOffices = (int)$this->pdo->query("SELECT COUNT(*) FROM provincial_government_offices WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveExternalOffices = $totalExternalOffices - $activeExternalOffices;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Provincial Government Offices Management';
         $pageSubtitle = 'Manage provincial government offices and their availability in dropdowns';

@@ -635,7 +635,7 @@ $proceedToCases = function (
             document_id, docket_year, docket_sequence, docket_number,
             date_assigned, nature_of_case, complainant_details,
             complainant_municipality, respondents, assigned_by
-        ) VALUES (?, NULL, NULL, '', CURDATE(), '', '', NULL, '', ?)
+        ) VALUES (?, NULL, NULL, '', NULL, '', '', NULL, '', ?)
     ")->execute([$docId, $userId]);
 
     $caseId = (int) $pdo->lastInsertId();
@@ -718,7 +718,7 @@ $completeCaseDetails = function (
  */
 $caseDetailsPending = function (PDO $pdo, int $docId): bool {
     $stmt = $pdo->prepare("
-        SELECT (docket_number = '' OR nature_of_case = '' OR respondents = '')
+        SELECT (docket_number = '' OR nature_of_case = '' OR complainant_details = '' OR respondents = '')
         FROM committee_cases
         WHERE document_id = ?
         LIMIT 1
@@ -865,6 +865,14 @@ $runProceedToCasesGroup = function (
         $caseCountStmt = $pdo->prepare("SELECT COUNT(*) FROM committee_cases WHERE document_id = ?");
         $caseCountStmt->execute([$docId]);
         check("Exactly one committee_cases row created", (int) $caseCountStmt->fetchColumn() === 1);
+        $dateAssignedStmt = $pdo->prepare(
+            'SELECT date_assigned FROM committee_cases WHERE document_id = ? LIMIT 1'
+        );
+        $dateAssignedStmt->execute([$docId]);
+        check(
+            'Assignment date remains blank until case details are confirmed',
+            $dateAssignedStmt->fetchColumn() === null
+        );
 
         $eventStmt = $pdo->prepare("
             SELECT COUNT(*) FROM document_events
@@ -927,6 +935,15 @@ section('Group 11: Wiring — Proceed to Cases opens Cases page (no modal auto-o
 $inboxViewSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/inbox/show.php');
 $inboxCtrlSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Committee/CommitteeInboxController.php');
 $casesViewSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/index.php');
+$casesOverviewSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/_overview_cards.php');
+$casesNavSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/_outcome_nav.php');
+$caseOutcomeViewSrc = [];
+foreach (['for-report', 'deferred', 'withdrawn', 'noted'] as $outcomeView) {
+    $caseOutcomeViewSrc[] = (string) file_get_contents(
+        __DIR__ . '/../resources/views/committee/cases/' . $outcomeView . '.php'
+    );
+}
+$casesCreateSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/create.php');
 $casesShowSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/show.php');
 $casesCtrlSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Committee/CommitteeCasesController.php');
 $routesSrc    = (string) file_get_contents(__DIR__ . '/../routes/web.php');
@@ -962,17 +979,63 @@ check('cases index View Details link navigates to committee/cases/show',
     str_contains($casesViewSrc, 'committee/cases/show?id='));
 check('cases index does not contain the caseDetailsModal div',
     !str_contains($casesViewSrc, 'id="caseDetailsModal"'));
+check('overview cards render on every case outcome tab',
+    str_contains($casesViewSrc, "_overview_cards.php")
+    && count(array_filter(
+        $caseOutcomeViewSrc,
+        static fn (string $view): bool => str_contains($view, "_overview_cards.php")
+    )) === 4);
+check('overview cards include active, pending, and final outcome counts',
+    str_contains($casesOverviewSrc, "'active_cases'")
+    && str_contains($casesOverviewSrc, "'details_pending'")
+    && str_contains($casesOverviewSrc, "'approved'")
+    && str_contains($casesOverviewSrc, "'deferred'")
+    && str_contains($casesOverviewSrc, "'withdrawn'")
+    && str_contains($casesOverviewSrc, "'noted'"));
+check('outcome tabs display their case counters',
+    str_contains($casesNavSrc, "'count' =>")
+    && str_contains($casesNavSrc, 'number_format($tab[\'count\'])'));
+check('Needs Details card filters active cases to incomplete records',
+    str_contains($casesOverviewSrc, 'details_pending=1')
+    && str_contains($casesCtrlSrc, "\$_GET['details_pending']")
+    && str_contains($casesCtrlSrc, 'COALESCE(TRIM(cc.complainant_details), \'\') = \'\''));
 
 // ── Cases show: inline details-entry form for pending cases ──
 check('cases show page has inline form posting to committee/cases/details',
-    str_contains($casesShowSrc, '/committee/cases/details')
-    && str_contains($casesShowSrc, 'pendingDetailsForm'));
+    str_contains($casesShowSrc, 'action="<?= BASE_URL ?>/committee/cases/details"')
+    && str_contains($casesShowSrc, 'name="case_id"'));
 check('cases show page detects detailsPending state (nature_of_case empty)',
-    str_contains($casesShowSrc, 'nature_of_case') && str_contains($casesShowSrc, 'detailsPending'));
+    str_contains($casesShowSrc, '$caseDetailsComplete')
+    && str_contains($casesShowSrc, "\$case['complainant_details'] ?? '"));
 check('cases show page inline form has required fields (nature, complainant, respondents)',
-    str_contains($casesShowSrc, 'pd_nature_of_case')
-    && str_contains($casesShowSrc, 'pd_complainant_details')
-    && str_contains($casesShowSrc, 'pd_respondents'));
+    str_contains($casesShowSrc, 'name="nature_of_case"')
+    && str_contains($casesShowSrc, 'name="complainant_details"')
+    && str_contains($casesShowSrc, 'name="respondents"'));
+check('both docket forms keep the DKT prefix and year outside the sequence input',
+    str_contains($casesShowSrc, 'name="docket_sequence"')
+    && str_contains($casesShowSrc, 'DKT -')
+    && str_contains($casesShowSrc, '<?= htmlspecialchars($docketYear) ?>')
+    && str_contains($casesCreateSrc, 'name="docket_sequence"')
+    && str_contains($casesCreateSrc, 'DKT -')
+    && str_contains($casesCreateSrc, '<?= htmlspecialchars($docketYear) ?>'));
+check('controller builds the docket number from sequence and year',
+    str_contains($casesCtrlSrc, "\$_POST['docket_sequence']")
+    && str_contains($casesCtrlSrc, "sprintf('DKT-%s-%04d', \$sequence, \$year)")
+    && str_contains($casesCtrlSrc, "preg_match('/^\\d{1,10}\$/D', \$docketSequence)"));
+check('cases show details form provides placeholders and restores saved field values',
+    str_contains($casesShowSrc, 'placeholder="Describe the nature of this case')
+    && str_contains($casesShowSrc, 'placeholder="Full name and details of the complainant')
+    && str_contains($casesShowSrc, "\$case['nature_of_case'] ?? ''")
+    && str_contains($casesShowSrc, "\$case['complainant_details'] ?? ''"));
+check('pending case date field does not default to today',
+    str_contains($casesShowSrc, "\$case['date_assigned'] ?? ''")
+    && !str_contains($casesShowSrc, "\$case['date_assigned'] ?? date('Y-m-d')"));
+check('new case date field requires an explicit date',
+    str_contains($casesCreateSrc, "casesCreateOld(\$old, 'date_assigned')")
+    && !str_contains($casesCreateSrc, "casesCreateOld(\$old, 'date_assigned', date('Y-m-d'))"));
+check('Case Details Required heading uses the standard page font',
+    str_contains($casesShowSrc, '<h1 class="text-xl font-bold text-gray-900">')
+    && !str_contains($casesShowSrc, '<h1 class="font-mono text-xl font-bold text-gray-900">'));
 
 // ── Shared infrastructure (unchanged) ──
 check('cases controller implements detailsStore',
@@ -1021,23 +1084,29 @@ $casesCtrlSrc13 = (string) file_get_contents(__DIR__ . '/../app/controllers/Comm
 // storeAction must block when case details are pending.
 check('storeAction has details-pending guard before processing input',
     str_contains($casesCtrlSrc13,
-        "nature_of_case'] ?? '') === '' || (\$case['respondents'] ?? '') === '' || (\$case['docket_number'] ?? '') === ''")
+        "trim((string) (\$case['nature_of_case'] ?? '')) === ''")
+    && str_contains($casesCtrlSrc13,
+        "trim((string) (\$case['complainant_details'] ?? '')) === ''")
+    && str_contains($casesCtrlSrc13,
+        "trim((string) (\$case['respondents'] ?? '')) === ''")
+    && str_contains($casesCtrlSrc13,
+        "trim((string) (\$case['docket_number'] ?? '')) === ''")
     && str_contains($casesCtrlSrc13,
         'Save the required case details'));
 // The guard must appear before any input reading — confirm it follows requireCaseOwnership.
 $storeActionPos  = strpos($casesCtrlSrc13, 'public function storeAction');
 $guardInStorePos = strpos($casesCtrlSrc13,
-    "Save the required case details (docket number, nature of case, and respondents) before adding proceedings");
+    "Save the required case details (docket number, nature of case, complainant details, and respondents) before adding proceedings");
 check('storeAction details-pending guard appears after ownership check',
     $storeActionPos !== false && $guardInStorePos !== false && $guardInStorePos > $storeActionPos);
 
 // outcomeStore must block when case details are pending.
 check('outcomeStore has details-pending guard before processing input',
     str_contains($casesCtrlSrc13,
-        'Save the required case details (docket number, nature of case, and respondents) before setting a final outcome'));
+        'Save the required case details (docket number, nature of case, complainant details, and respondents) before setting a final outcome'));
 $outcomeStorePos  = strpos($casesCtrlSrc13, 'public function outcomeStore');
 $guardInOutcomePos = strpos($casesCtrlSrc13,
-    'Save the required case details (docket number, nature of case, and respondents) before setting a final outcome');
+    'Save the required case details (docket number, nature of case, complainant details, and respondents) before setting a final outcome');
 check('outcomeStore details-pending guard appears after ownership check',
     $outcomeStorePos !== false && $guardInOutcomePos !== false && $guardInOutcomePos > $outcomeStorePos);
 
@@ -1048,51 +1117,16 @@ section('Group 14: Required processing order — view gates in show page');
 
 $casesShowSrc14 = (string) file_get_contents(__DIR__ . '/../resources/views/committee/cases/show.php');
 
-// When $detailsPending is true, timeline and outcome sections show locked notices
-// instead of the interactive Add Action / outcome form.
-check('show page gates timeline (addActionBtn) behind not-detailsPending check',
-    // addActionBtn must appear inside the else branch of the $detailsPending gate,
-    // i.e. AFTER the locked-timeline div's opening and BEFORE the gate's endif.
-    (function () use ($casesShowSrc14): bool {
-        // The locked notice marker comes first (inside if-detailsPending block).
-        $lockedPos    = strpos($casesShowSrc14, 'before recording proceedings');
-        // The addActionBtn is in the else branch.
-        $addActionPos = strpos($casesShowSrc14, 'id="addActionBtn"');
-        // The timeline gate endif closes the whole if/else.
-        $gateEndPos   = strpos($casesShowSrc14, 'end $detailsPending timeline gate');
-        // Order must be: locked notice < addActionBtn < gate endif
-        return $lockedPos    !== false
-            && $addActionPos !== false
-            && $gateEndPos   !== false
-            && $lockedPos    < $addActionPos
-            && $addActionPos < $gateEndPos;
-    })());
+// Incomplete details disable processing controls and render a corrective notice.
+check('show page disables timeline actions until case details are complete',
+    str_contains($casesShowSrc14, "<?= !\$caseDetailsComplete ? 'disabled' : '' ?>")
+    && str_contains($casesShowSrc14, 'Complete Case Details First'));
 check('show page renders locked notice for timeline when details pending',
-    str_contains($casesShowSrc14,
-        'Case Details Required') &&
-    // The locked notice for timeline must exist
-    str_contains($casesShowSrc14,
-        'Save the case details above') &&
-    str_contains($casesShowSrc14,
-        'before recording proceedings'));
-check('show page gates final outcome section behind not-detailsPending check',
-    (function () use ($casesShowSrc14): bool {
-        // Locked outcome notice comes first (inside if-detailsPending block).
-        $lockedPos    = strpos($casesShowSrc14, 'before setting a final outcome');
-        // The outcome form is in the else branch.
-        $outcomeFormPos = strpos($casesShowSrc14, 'id="outcomeForm"');
-        // The outcome gate endif closes the whole if/else.
-        $gateEndPos   = strpos($casesShowSrc14, 'end $detailsPending outcome gate');
-        // Order must be: locked notice < outcomeForm < gate endif
-        return $lockedPos    !== false
-            && $outcomeFormPos !== false
-            && $gateEndPos    !== false
-            && $lockedPos     < $outcomeFormPos
-            && $outcomeFormPos < $gateEndPos;
-    })());
+    str_contains($casesShowSrc14, 'Save the required case details above to enable proceedings.'));
+check('show page disables final outcome until details and a timeline action exist',
+    str_contains($casesShowSrc14, "<?= \$actionCount === 0 || !\$caseDetailsComplete ? 'disabled' : '' ?>"));
 check('show page renders locked notice for outcome when details pending',
-    str_contains($casesShowSrc14,
-        'before setting a final outcome'));
+    str_contains($casesShowSrc14, 'Complete and save the required case details before setting a final outcome.'));
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Group 15 — DB: backend guards block storeAction / outcomeStore when pending
@@ -1121,16 +1155,16 @@ try {
 
     check("Case created with blank details (docket: {$docketNumber15})", $caseId15 > 0);
 
-    // Verify the docket_number, nature_of_case, and respondents are all blank.
+    // Verify a required case detail is blank.
     $blankStmt = $pdo->prepare(
-        "SELECT (docket_number = '' OR nature_of_case = '' OR respondents = '') AS is_pending FROM committee_cases WHERE id = ?"
+        "SELECT (docket_number = '' OR nature_of_case = '' OR complainant_details = '' OR respondents = '') AS is_pending FROM committee_cases WHERE id = ?"
     );
     $blankStmt->execute([$caseId15]);
     check('Case details are blank (details_pending = true)', (bool) $blankStmt->fetchColumn());
 
     // Simulate storeAction guard: does it fire when details are blank?
     $caseForGuard = $pdo->prepare("
-        SELECT cc.docket_number, cc.nature_of_case, cc.respondents
+        SELECT cc.docket_number, cc.nature_of_case, cc.complainant_details, cc.respondents
         FROM committee_cases cc WHERE cc.id = ?
     ");
     $caseForGuard->execute([$caseId15]);
@@ -1138,6 +1172,7 @@ try {
 
     $storeActionBlocked = ($caseData15['docket_number']  ?? '') === ''
                        || ($caseData15['nature_of_case'] ?? '') === ''
+                       || ($caseData15['complainant_details'] ?? '') === ''
                        || ($caseData15['respondents']    ?? '') === '';
     check('storeAction guard would block (details still blank)',   $storeActionBlocked);
     check('outcomeStore guard would block (details still blank)',  $storeActionBlocked);
@@ -1150,6 +1185,7 @@ try {
 
     $storeActionAllowed = ($caseDataFilled['docket_number']  ?? '') !== ''
                        && ($caseDataFilled['nature_of_case'] ?? '') !== ''
+                       && ($caseDataFilled['complainant_details'] ?? '') !== ''
                        && ($caseDataFilled['respondents']    ?? '') !== '';
     check('storeAction guard would pass (details now filled)',   $storeActionAllowed);
     check('outcomeStore guard would pass (details now filled)',  $storeActionAllowed);

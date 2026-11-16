@@ -161,27 +161,26 @@ function methodBadgeClass(string $method): string {
     </section>
 
     <section class="rounded-2xl border border-gray-200 bg-white">
-        <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5">
             <div>
                 <h2 class="font-semibold text-gray-900">System Logs List</h2>
                 <p class="mt-1 text-xs text-gray-500">
                     <?= $totalRows ?> record<?= $totalRows !== 1 ? 's' : '' ?> found
                 </p>
             </div>
-            <form method="GET" action="<?= BASE_URL ?>/master/system-logs" class="flex flex-col gap-3 lg:items-end">
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    <div class="lg:col-span-2">
-                        <div class="relative">
-                            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                            </svg>
-                            <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search message, URL, IP..."
-                                class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                        </div>
-                    </div>
-                    <select name="level" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+            <form method="GET" action="<?= BASE_URL ?>/master/system-logs" class="grid w-full grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,2fr)_minmax(7.5rem,1fr)_minmax(7.5rem,1fr)_minmax(8rem,1.1fr)_minmax(8rem,1.1fr)_auto]">
+                <div class="relative min-w-0 sm:col-span-2 xl:col-span-1">
+                    <label for="system-log-search" class="sr-only">Search system logs</label>
+                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input id="system-log-search" type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search message, URL, IP..."
+                        class="w-full min-w-0 rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                </div>
+                <label class="sr-only" for="system-log-level">Log level</label>
+                <select id="system-log-level" name="level" class="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         <option value="">All Levels</option>
                         <option value="DEBUG" <?= $filterLevel === 'DEBUG' ? 'selected' : '' ?>>DEBUG</option>
                         <option value="INFO" <?= $filterLevel === 'INFO' ? 'selected' : '' ?>>INFO</option>
@@ -189,37 +188,31 @@ function methodBadgeClass(string $method): string {
                         <option value="WARNING" <?= $filterLevel === 'WARNING' ? 'selected' : '' ?>>WARNING</option>
                         <option value="ERROR" <?= $filterLevel === 'ERROR' ? 'selected' : '' ?>>ERROR</option>
                         <option value="CRITICAL" <?= $filterLevel === 'CRITICAL' ? 'selected' : '' ?>>CRITICAL</option>
-                    </select>
-                    <select name="method" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                </select>
+                <label class="sr-only" for="system-log-method">Request method</label>
+                <select id="system-log-method" name="method" class="min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                         <option value="">All Methods</option>
                         <option value="GET" <?= $filterMethod === 'GET' ? 'selected' : '' ?>>GET</option>
                         <option value="POST" <?= $filterMethod === 'POST' ? 'selected' : '' ?>>POST</option>
                         <option value="PUT" <?= $filterMethod === 'PUT' ? 'selected' : '' ?>>PUT</option>
                         <option value="DELETE" <?= $filterMethod === 'DELETE' ? 'selected' : '' ?>>DELETE</option>
-                    </select>
-                </div>
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <div>
-                        <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-gray-400">From</label>
-                        <input type="date" name="date_from" value="<?= htmlspecialchars($filterDateFrom) ?>"
-                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-40">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-gray-400">To</label>
-                        <input type="date" name="date_to" value="<?= htmlspecialchars($filterDateTo) ?>"
-                            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-40">
-                    </div>
-                    <div class="flex items-center gap-2 pt-3 sm:pt-5">
-                        <button type="submit" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-                            Filter
-                        </button>
-                        <?php if ($search !== '' || $filterLevel !== '' || $filterMethod !== '' || $filterDateFrom !== '' || $filterDateTo !== ''): ?>
-                            <a href="<?= BASE_URL ?>/master/system-logs"
-                               class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition text-center">
-                                Clear
-                            </a>
-                        <?php endif; ?>
-                    </div>
+                </select>
+                <label class="sr-only" for="system-log-date-from">From date</label>
+                <input id="system-log-date-from" type="date" name="date_from" value="<?= htmlspecialchars($filterDateFrom) ?>"
+                    class="min-w-0 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                <label class="sr-only" for="system-log-date-to">To date</label>
+                <input id="system-log-date-to" type="date" name="date_to" value="<?= htmlspecialchars($filterDateTo) ?>"
+                    class="min-w-0 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                <div class="flex items-center gap-2 sm:col-span-2 xl:col-span-1">
+                    <button type="submit" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                        Filter
+                    </button>
+                    <?php if ($search !== '' || $filterLevel !== '' || $filterMethod !== '' || $filterDateFrom !== '' || $filterDateTo !== ''): ?>
+                        <a href="<?= BASE_URL ?>/master/system-logs"
+                           class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition text-center">
+                            Clear
+                        </a>
+                    <?php endif; ?>
                 </div>
             </form>
         </div>

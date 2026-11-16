@@ -83,8 +83,8 @@ class SpMemberController
             "SELECT id, name FROM positions WHERE is_deleted = 0 AND is_active = 1 ORDER BY sort_order ASC, name ASC"
         )->fetchAll();
 
-        $success = flash_get('success');
-        $error   = flash_get('error');
+        $success = null;
+        $error   = null;
 
         $pageTitle    = 'SP Members Management';
         $pageSubtitle = 'Manage Sangguniang Panlalawigan members and their district assignments';

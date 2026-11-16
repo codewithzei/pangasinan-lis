@@ -8,7 +8,7 @@
  *   $totalPages   int
  *   $total        int
  *   $search       string
- *   $totalCases   int     total cases created by this user (unfiltered)
+ *   $caseStats    array   case status counts for this user
  *   $success      string|null
  *   $error        string|null
  *   $errors       array
@@ -19,7 +19,8 @@ $page       = $page       ?? 1;
 $totalPages = $totalPages ?? 1;
 $total      = $total      ?? 0;
 $search     = $search     ?? '';
-$totalCases = $totalCases ?? 0;
+$caseStats = $caseStats ?? [];
+$detailsPendingFilter = $detailsPendingFilter ?? false;
 
 ob_start();
 ?>
@@ -43,48 +44,7 @@ ob_start();
         </div>
     </section>
 
-    <!-- Stats cards ---------------------------------------------------------->
-    <section>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
-                <div class="flex items-start justify-between">
-                    <div>
-                        <p class="text-sm text-gray-500">Total Cases</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalCases) ?></p>
-                    </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                  d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-blue-600">Docketed by you</span>
-                </div>
-            </div>
-
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
-                <div class="flex items-start justify-between">
-                    <div>
-                        <p class="text-sm text-gray-500">Showing</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($total) ?></p>
-                    </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-50 text-gray-500">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-                                  d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-600">
-                        <?= $search !== '' ? 'Filtered results' : 'All records' ?>
-                    </span>
-                </div>
-            </div>
-        </div>
-    </section>
+    <?php require __DIR__ . '/_overview_cards.php'; ?>
 
     <!-- Navigation tabs -------------------------------------------------------->
     <?php require __DIR__ . '/_outcome_nav.php'; ?>
@@ -102,6 +62,9 @@ ob_start();
             </div>
             <form method="GET" action="<?= BASE_URL ?>/committee/cases"
                   class="flex flex-col gap-3 lg:flex-row lg:items-center">
+                <?php if ($detailsPendingFilter): ?>
+                    <input type="hidden" name="details_pending" value="1">
+                <?php endif; ?>
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,7 +83,7 @@ ob_start();
                     Filter
                 </button>
                 <?php if ($search !== ''): ?>
-                    <a href="<?= BASE_URL ?>/committee/cases"
+                    <a href="<?= BASE_URL ?>/committee/cases<?= $detailsPendingFilter ? '?details_pending=1' : '' ?>"
                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700
                               hover:bg-gray-50 transition text-center">
                         Clear
@@ -245,7 +208,7 @@ ob_start();
                 </p>
                 <nav class="flex items-center gap-1">
                     <?php if ($page > 1): ?>
-                        <a href="<?= BASE_URL ?>/committee/cases?page=<?= $page - 1 ?><?= $search !== '' ? '&search=' . urlencode($search) : '' ?>"
+                        <a href="<?= BASE_URL ?>/committee/cases?page=<?= $page - 1 ?><?= $search !== '' ? '&search=' . urlencode($search) : '' ?><?= $detailsPendingFilter ? '&details_pending=1' : '' ?>"
                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
@@ -258,7 +221,7 @@ ob_start();
                     $rangeEnd   = min($totalPages, $page + 2);
                     for ($p = $rangeStart; $p <= $rangeEnd; $p++):
                     ?>
-                        <a href="<?= BASE_URL ?>/committee/cases?page=<?= $p ?><?= $search !== '' ? '&search=' . urlencode($search) : '' ?>"
+                        <a href="<?= BASE_URL ?>/committee/cases?page=<?= $p ?><?= $search !== '' ? '&search=' . urlencode($search) : '' ?><?= $detailsPendingFilter ? '&details_pending=1' : '' ?>"
                            class="flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-medium transition
                                   <?= $p === $page
                                       ? 'border-primary bg-primary text-white'
@@ -268,7 +231,7 @@ ob_start();
                     <?php endfor; ?>
 
                     <?php if ($page < $totalPages): ?>
-                        <a href="<?= BASE_URL ?>/committee/cases?page=<?= $page + 1 ?><?= $search !== '' ? '&search=' . urlencode($search) : '' ?>"
+                        <a href="<?= BASE_URL ?>/committee/cases?page=<?= $page + 1 ?><?= $search !== '' ? '&search=' . urlencode($search) : '' ?><?= $detailsPendingFilter ? '&details_pending=1' : '' ?>"
                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>

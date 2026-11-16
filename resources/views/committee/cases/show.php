@@ -6,9 +6,7 @@
  *   $case                 array   committee_cases row + joined document / creator fields
  *   $actions              array   committee_case_actions rows ordered by action_date ASC
  *   $attachmentsByAction  array   [ action_id => [ attachment rows ] ]
- *   $success              string|null
- *   $error                string|null
- *   $errors               array
+ *   $errors               array   Peeked validation errors (header renders flash toasts)
  */
 
 $case                = $case                ?? [];
@@ -16,16 +14,26 @@ $actions             = $actions             ?? [];
 $attachmentsByAction = $attachmentsByAction ?? [];
 $finalizedByName     = $finalizedByName     ?? null;
 $linkedReport        = $linkedReport        ?? null;
-$success             = $success             ?? null;
-$error               = $error               ?? null;
 $errors              = $errors              ?? [];
 $old                 = $old                 ?? [];
 
 $caseId       = (int)   ($case['id']              ?? 0);
 $docketNumber = (string)($case['docket_number']   ?? '');
+$docketSequence = (string) ($old['docket_sequence'] ?? '');
+$docketYear = date('Y');
+if (preg_match('/^DKT-(\d+)-(\d+)$/i', $docketNumber, $docketMatch)) {
+    if (preg_match('/^(19|20|21)\d{2}$/', $docketMatch[2])) {
+        $docketSequence = $docketSequence !== '' ? $docketSequence : $docketMatch[1];
+        $docketYear = $docketMatch[2];
+    } elseif (preg_match('/^(19|20|21)\d{2}$/', $docketMatch[1])) {
+        $docketSequence = $docketSequence !== '' ? $docketSequence : $docketMatch[2];
+        $docketYear = $docketMatch[1];
+    }
+}
 $documentId   = (int)   ($case['document_id']     ?? 0);
 $caseDetailsComplete = trim($docketNumber) !== ''
     && trim((string) ($case['nature_of_case'] ?? '')) !== ''
+    && trim((string) ($case['complainant_details'] ?? '')) !== ''
     && trim((string) ($case['respondents'] ?? '')) !== '';
 
 // Respondents: split comma-separated string for display.
@@ -95,31 +103,11 @@ ob_start();
             <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Committee / Cases / Details
             </p>
-            <h1 class="font-mono text-xl font-bold text-gray-900">
+            <h1 class="text-xl font-bold text-gray-900">
                 <?= htmlspecialchars($caseDetailsComplete ? $docketNumber : 'Case Details Required') ?>
             </h1>
         </div>
     </div>
-
-    <?php if (!empty($success)): ?>
-        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            <?= htmlspecialchars($success) ?>
-        </div>
-    <?php endif; ?>
-    <?php if (!empty($error)): ?>
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            <?= htmlspecialchars($error) ?>
-        </div>
-    <?php endif; ?>
-    <?php if (!empty($errors)): ?>
-        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            <ul class="list-disc list-inside space-y-1">
-                <?php foreach ($errors as $validationError): ?>
-                    <li><?= htmlspecialchars($validationError) ?></li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
-    <?php endif; ?>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
 
@@ -139,13 +127,19 @@ ob_start();
                         <input type="hidden" name="case_id" value="<?= $caseId ?>">
 
                         <div>
-                            <label for="docket_number" class="block text-sm font-medium text-gray-700">
+                            <label for="docket_sequence" class="block text-sm font-medium text-gray-700">
                                 Docket Number <span class="text-red-500">*</span>
                             </label>
-                            <input type="text" id="docket_number" name="docket_number" required maxlength="100"
-                                   value="<?= htmlspecialchars($old['docket_number'] ?? $docketNumber) ?>"
-                                   placeholder="e.g. DKT-2026-0001"
-                                   class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                            <div class="mt-1 flex items-center gap-2 font-mono text-sm">
+                                <span class="shrink-0 text-gray-600">DKT -</span>
+                                <input type="text" id="docket_sequence" name="docket_sequence" required maxlength="10"
+                                       inputmode="numeric" pattern="[0-9]{1,10}"
+                                       value="<?= htmlspecialchars($docketSequence) ?>"
+                                       placeholder="e.g. 1234"
+                                       autocomplete="off"
+                                       class="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                                <span class="shrink-0 text-gray-600">- <?= htmlspecialchars($docketYear) ?></span>
+                            </div>
                         </div>
 
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -154,8 +148,8 @@ ob_start();
                                     Date Assigned <span class="text-red-500">*</span>
                                 </label>
                                 <input type="date" id="date_assigned" name="date_assigned" required
-                                       value="<?= htmlspecialchars($old['date_assigned'] ?? ($case['date_assigned'] ?? date('Y-m-d'))) ?>"
-                                       class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                                       value="<?= htmlspecialchars((string) ($old['date_assigned'] ?? ($case['date_assigned'] ?? ''))) ?>"
+                                       class="mt-1 block w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
                             </div>
                             <div>
                                 <label for="complainant_municipality" class="block text-sm font-medium text-gray-700">
@@ -163,7 +157,8 @@ ob_start();
                                 </label>
                                 <input type="text" id="complainant_municipality" name="complainant_municipality" maxlength="255"
                                        value="<?= htmlspecialchars($old['complainant_municipality'] ?? ($case['complainant_municipality'] ?? '')) ?>"
-                                       class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                                       placeholder="Municipality or city (if applicable)"
+                                       class="mt-1 block w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary">
                             </div>
                         </div>
 
@@ -172,7 +167,8 @@ ob_start();
                                 Nature of Case <span class="text-red-500">*</span>
                             </label>
                             <textarea id="nature_of_case" name="nature_of_case" rows="3" required maxlength="10000"
-                                      class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"><?= htmlspecialchars($old['nature_of_case'] ?? ($case['nature_of_case'] ?? '')) ?></textarea>
+                                      placeholder="Describe the nature of this case…"
+                                      class="mt-1 block w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"><?= htmlspecialchars($old['nature_of_case'] ?? ($case['nature_of_case'] ?? '')) ?></textarea>
                         </div>
 
                         <div>
@@ -180,7 +176,8 @@ ob_start();
                                 Complainant Details <span class="text-red-500">*</span>
                             </label>
                             <textarea id="complainant_details" name="complainant_details" rows="3" required maxlength="5000"
-                                      class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"><?= htmlspecialchars($old['complainant_details'] ?? ($case['complainant_details'] ?? '')) ?></textarea>
+                                      placeholder="Full name and details of the complainant…"
+                                      class="mt-1 block w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"><?= htmlspecialchars($old['complainant_details'] ?? ($case['complainant_details'] ?? '')) ?></textarea>
                         </div>
 
                         <div>
@@ -189,7 +186,7 @@ ob_start();
                             </label>
                             <textarea id="respondents" name="respondents" rows="3" required maxlength="5000"
                                       placeholder="Enter respondent names, separated by commas."
-                                      class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"><?= htmlspecialchars($old['respondents'] ?? ($case['respondents'] ?? '')) ?></textarea>
+                                      class="mt-1 block w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary"><?= htmlspecialchars($old['respondents'] ?? ($case['respondents'] ?? '')) ?></textarea>
                         </div>
 
                         <div class="flex justify-end border-t border-amber-200 pt-4">

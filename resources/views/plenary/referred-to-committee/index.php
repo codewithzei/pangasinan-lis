@@ -254,7 +254,8 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <?php if ($canAdvance): ?>
-                                        <?php if (!empty($row['is_plenary_cases_referred'])): ?>
+                                        <?php $hearingApproved = ($row['committee_hearing_outcome'] ?? '') === 'APPROVED'; ?>
+                                        <?php if ($hearingApproved && !empty($row['is_plenary_cases_referred'])): ?>
                                             <!-- Cases/Petitions returned from Committee: Adopt Committee Report -->
                                             <button type="button"
                                                     onclick="openAdoptCasesModal(<?= (int) $row['document_id'] ?>, <?= htmlspecialchars(json_encode((string) $row['tracking_number'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"
@@ -265,7 +266,7 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                                 </svg>
                                                 Adopted Committee Report
                                             </button>
-                                        <?php elseif (!empty($row['is_plenary_comm_referred'])): ?>
+                                        <?php elseif ($hearingApproved && !empty($row['is_plenary_comm_referred'])): ?>
                                             <!-- Communication returned from Committee: Adopt Committee Report -->
                                             <button type="button"
                                                     onclick="openAdoptModal(<?= (int) $row['document_id'] ?>, <?= htmlspecialchars(json_encode((string) $row['tracking_number'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"
@@ -276,7 +277,6 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                                 Adopted Committee Report
                                             </button>
                                         <?php else: ?>
-                                            <?php $hearingApproved = ($row['committee_hearing_outcome'] ?? '') === 'APPROVED'; ?>
                                             <!-- Adoption follows the latest Committee hearing outcome. -->
                                             <button type="button"
                                                     class="open-report-adoption-confirmation inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition <?= $hearingApproved ? 'bg-violet-600 text-white hover:bg-violet-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50' ?>"

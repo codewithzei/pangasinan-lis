@@ -48,8 +48,8 @@ class UserRoleController
         $activeRoles = (int)$this->pdo->query("SELECT COUNT(*) FROM roles WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveRoles = $totalRoles - $activeRoles;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'User Roles Management';
         $pageSubtitle = 'Manage user roles and their permissions';

@@ -1,28 +1,28 @@
 <?php
 /**
- * Tests — Committee Cases: manual docket-number entry
+ * Tests — Committee Cases: docket sequence entry
  *
  * WHAT IS TESTED
  * ──────────────────────────────────────────────────────────────────────────
  * Group 1 — Validation logic (pure PHP, no DB):
  *   Mirrors the server-side validation in CommitteeCasesController::store()
- *   and ::detailsStore() to verify every required-field and length rule.
+ *   and ::detailsStore() to verify sequence validation and docket formatting.
  *
  * Group 2 — DB integration: store() path (via CommitteeInboxController &
  *   CommitteeCasesController).
- *   a) A valid manual docket number is accepted and saved to committee_cases.
- *   b) Submitting without a docket number produces a validation error.
- *   c) Submitting with a docket number that already exists produces a
+ *   a) A docket assembled from the entered sequence and year is saved.
+ *   b) Submitting without a sequence produces a validation error.
+ *   c) Submitting a sequence that creates a docket number that already exists produces a
  *      duplicate error (simulated at the uniqueness-check layer).
- *   d) An overly-long docket number (> 100 chars) is rejected.
+ *   d) An overly-long sequence is rejected.
  *
  * Group 3 — DB integration: detailsStore() path.
- *   a) Entering a new docket number for a blank-docket case saves correctly.
+ *   a) Entering a new sequence for a blank-docket case saves correctly.
  *   b) Submitting a docket number already used by a DIFFERENT case is rejected
  *      as a duplicate.
  *   c) Re-submitting the same docket number that is already on THIS case is
  *      accepted (not a duplicate against itself).
- *   d) Leaving docket_number blank is rejected.
+ *   d) Leaving the sequence blank is rejected.
  *
  * Group 4 — details_pending flag:
  *   Verifies the flag is true when docket_number is blank, and false after
@@ -74,20 +74,25 @@ function check(string $label, bool $condition): void
 // ── Mirrors of CommitteeCasesController validation logic ──────────────────
 
 /**
- * Validate a docket_number value using the same rules as the controller.
+ * Validate a docket sequence value using the same rules as the controller.
  *
  * @return string[]  Error messages; empty array means valid.
  */
-function validate_docket_number(string $value): array
+function validate_docket_sequence(string $value): array
 {
     $errors = [];
     $value = trim($value);
     if ($value === '') {
-        $errors[] = 'Docket number is required.';
-    } elseif (mb_strlen($value) > 100) {
-        $errors[] = 'Docket number must not exceed 100 characters.';
+        $errors[] = 'Docket sequence number is required.';
+    } elseif (!preg_match('/^\d{1,10}$/D', $value) || (int) $value < 1) {
+        $errors[] = 'Docket sequence number must be a positive number with up to 10 digits.';
     }
     return $errors;
+}
+
+function format_docket_number(string $sequence, int $year): string
+{
+    return sprintf('DKT-%s-%04d', $sequence, $year);
 }
 
 /**
@@ -117,6 +122,7 @@ function is_details_pending(array $case): bool
 {
     return trim((string) ($case['docket_number'] ?? '')) === ''
         || trim((string) ($case['nature_of_case'] ?? '')) === ''
+        || trim((string) ($case['complainant_details'] ?? '')) === ''
         || trim((string) ($case['respondents'] ?? '')) === '';
 }
 
@@ -129,8 +135,9 @@ function processing_order_guard(array $case): ?string
 {
     if (trim((string) ($case['docket_number'] ?? '')) === ''
         || trim((string) ($case['nature_of_case'] ?? '')) === ''
+        || trim((string) ($case['complainant_details'] ?? '')) === ''
         || trim((string) ($case['respondents'] ?? '')) === '') {
-        return 'Save the required case details (docket number, nature of case, and respondents) before adding proceedings.';
+        return 'Save the required case details (docket number, nature of case, complainant details, and respondents) before adding proceedings.';
     }
     return null;
 }
@@ -187,38 +194,37 @@ function insert_case_fixture(PDO $pdo, string $docketNumber, array $overrides = 
 // ═══════════════════════════════════════════════════════════════════════════
 // GROUP 1 — Pure-logic validation
 // ═══════════════════════════════════════════════════════════════════════════
-section('Group 1 — Required-field and length validation (pure logic)');
+section('Group 1 — Docket sequence validation and formatting');
 
 check(
-    'Empty docket_number produces required-field error',
-    count(validate_docket_number('')) === 1
-        && str_contains(validate_docket_number('')[0], 'required')
+    'Empty docket sequence produces required-field error',
+    count(validate_docket_sequence('')) === 1
+        && str_contains(validate_docket_sequence('')[0], 'required')
 );
 
 check(
-    'Whitespace-only docket_number: trim() makes it empty → required error',
-    count(validate_docket_number(trim('   '))) === 1
+    'Whitespace-only docket sequence produces required-field error',
+    count(validate_docket_sequence(trim('   '))) === 1
 );
 
 check(
-    'Docket number of exactly 100 chars is accepted',
-    count(validate_docket_number(str_repeat('A', 100))) === 0
+    'Positive numeric sequence is accepted',
+    count(validate_docket_sequence('12')) === 0
 );
 
 check(
-    'Docket number of 101 chars is rejected with length error',
-    count(validate_docket_number(str_repeat('A', 101))) === 1
-        && str_contains(validate_docket_number(str_repeat('A', 101))[0], '100')
+    'Non-numeric sequence is rejected',
+    count(validate_docket_sequence('12A')) === 1
 );
 
 check(
-    'Typical docket number DKT-2026-0001 is accepted',
-    count(validate_docket_number('DKT-2026-0001')) === 0
+    'Zero is rejected as a sequence number',
+    count(validate_docket_sequence('0')) === 1
 );
 
 check(
-    'Free-form docket number with slashes is accepted',
-    count(validate_docket_number('ADM-CASE-2026/01')) === 0
+    'Sequence formats as DKT - sequence - year',
+    format_docket_number('12', 2026) === 'DKT-12-2026'
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -245,7 +251,7 @@ try {
     );
 
     // 2b — Blank docket number produces validation error before any INSERT
-    $errorsEmpty = validate_docket_number('');
+    $errorsEmpty = validate_docket_sequence('');
     check(
         '2b: Blank docket_number caught by validation before DB write',
         !empty($errorsEmpty)
@@ -263,9 +269,9 @@ try {
     );
 
     // 2d — Overly-long docket number rejected
-    $longErrors = validate_docket_number(str_repeat('X', 101));
+    $longErrors = validate_docket_sequence(str_repeat('1', 11));
     check(
-        '2d: 101-char docket number rejected by validation',
+        '2d: 11-digit sequence rejected by validation',
         !empty($longErrors)
     );
 
@@ -287,12 +293,13 @@ try {
     ]);
 
     // 3a — Enter valid docket number for the blank case
-    $newDocket = 'DKT-DETAILS-2001';
-    $errors3a = validate_docket_number($newDocket);
+    $sequence = '2001';
+    $newDocket = format_docket_number($sequence, (int) date('Y'));
+    $errors3a = validate_docket_sequence($sequence);
     $isDup3a  = docket_number_in_use($pdo, $newDocket, $blankCaseId);
 
     check(
-        '3a: Valid docket number passes validation',
+        '3a: Valid docket sequence passes validation',
         empty($errors3a)
     );
     check(
@@ -329,7 +336,7 @@ try {
     );
 
     // 3d — Blank docket on detailsStore → rejected
-    $errorsBlank = validate_docket_number('');
+    $errorsBlank = validate_docket_sequence('');
     check(
         '3d: Blank docket_number on detailsStore is rejected',
         !empty($errorsBlank)
@@ -372,11 +379,22 @@ check(
 );
 
 check(
-    'Case with all three fields filled is NOT details_pending',
+    'Case with blank complainant_details is details_pending=true',
+    is_details_pending([
+        'docket_number'       => 'DKT-2026-0001',
+        'nature_of_case'      => 'Some nature',
+        'complainant_details' => '',
+        'respondents'         => 'Respondent A',
+    ])
+);
+
+check(
+    'Case with all required fields filled is NOT details_pending',
     !is_details_pending([
-        'docket_number'  => 'DKT-2026-0001',
-        'nature_of_case' => 'Some nature',
-        'respondents'    => 'Respondent A',
+        'docket_number'       => 'DKT-2026-0001',
+        'nature_of_case'      => 'Some nature',
+        'complainant_details' => 'Complainant A',
+        'respondents'         => 'Respondent A',
     ])
 );
 
@@ -413,37 +431,51 @@ section('Group 5 — Processing-order guard includes docket_number');
 check(
     'Guard fires when docket_number is blank (even if nature/respondents filled)',
     processing_order_guard([
-        'docket_number'  => '',
-        'nature_of_case' => 'Filled',
-        'respondents'    => 'Filled',
+        'docket_number'       => '',
+        'nature_of_case'      => 'Filled',
+        'complainant_details' => 'Filled',
+        'respondents'         => 'Filled',
     ]) !== null
 );
 
 check(
     'Guard fires when nature_of_case is blank (docket_number filled)',
     processing_order_guard([
-        'docket_number'  => 'DKT-2026-0001',
-        'nature_of_case' => '',
-        'respondents'    => 'Filled',
+        'docket_number'       => 'DKT-2026-0001',
+        'nature_of_case'      => '',
+        'complainant_details' => 'Filled',
+        'respondents'         => 'Filled',
     ]) !== null
 );
 
 check(
     'Guard fires when respondents is blank (docket_number filled)',
     processing_order_guard([
-        'docket_number'  => 'DKT-2026-0001',
-        'nature_of_case' => 'Filled',
-        'respondents'    => '',
+        'docket_number'       => 'DKT-2026-0001',
+        'nature_of_case'      => 'Filled',
+        'complainant_details' => 'Filled',
+        'respondents'         => '',
     ]) !== null
 );
 
 check(
-    'Guard passes when all three fields are filled',
+    'Guard passes when all required fields are filled',
     processing_order_guard([
-        'docket_number'  => 'DKT-2026-0001',
-        'nature_of_case' => 'Filled',
-        'respondents'    => 'Filled',
+        'docket_number'       => 'DKT-2026-0001',
+        'nature_of_case'      => 'Filled',
+        'complainant_details' => 'Filled',
+        'respondents'         => 'Filled',
     ]) === null
+);
+
+check(
+    'Guard fires when complainant_details is blank',
+    processing_order_guard([
+        'docket_number'       => 'DKT-2026-0001',
+        'nature_of_case'      => 'Filled',
+        'complainant_details' => '',
+        'respondents'         => 'Filled',
+    ]) !== null
 );
 
 // DB round-trip: guard blocks action on a blank-docket case
@@ -522,9 +554,10 @@ function require_case_ownership_mirror(array $case, int $userId): ?string
 function outcome_details_guard(array $case): ?string
 {
     if (trim((string) ($case['nature_of_case'] ?? '')) === ''
+        || trim((string) ($case['complainant_details'] ?? '')) === ''
         || trim((string) ($case['respondents'] ?? '')) === ''
         || trim((string) ($case['docket_number'] ?? '')) === '') {
-        return 'Save the required case details (docket number, nature of case, and respondents) before setting a final outcome.';
+        return 'Save the required case details (docket number, nature of case, complainant details, and respondents) before setting a final outcome.';
     }
     return null;
 }
@@ -664,6 +697,7 @@ if (!$canRunG6) {
             'assigned_by'      => $g6OwnerUserId,
             'docket_number'    => 'DKT-G6-' . $g6DocumentId,
             'nature_of_case'   => 'Illegal Dismissal',
+            'complainant_details' => 'Maria Dela Cruz',
             'respondents'      => 'Juan Dela Cruz',
             'final_outcome'    => null,
             'document_type_name' => 'Administrative Cases',

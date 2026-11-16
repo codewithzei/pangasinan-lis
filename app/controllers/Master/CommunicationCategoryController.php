@@ -53,8 +53,8 @@ class CommunicationCategoryController
         $activeCommunicationCategories = (int)$this->pdo->query("SELECT COUNT(*) FROM communication_categories WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveCommunicationCategories = $totalCommunicationCategories - $activeCommunicationCategories;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Communication Categories Management';
         $pageSubtitle = 'Manage communication categories for document movement';

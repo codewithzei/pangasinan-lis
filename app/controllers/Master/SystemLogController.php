@@ -76,8 +76,8 @@ class SystemLogController
         $warningLogs = (int)$this->pdo->query("SELECT COUNT(*) FROM system_logs WHERE log_level = 'WARNING'")->fetchColumn();
         $infoLogs = (int)$this->pdo->query("SELECT COUNT(*) FROM system_logs WHERE log_level = 'INFO'")->fetchColumn();
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'System Logs';
         $pageSubtitle = 'Monitor system events, errors, and request activity across the platform';

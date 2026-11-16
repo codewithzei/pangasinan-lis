@@ -16,7 +16,6 @@ class AuditLogController
     {
         $search = trim($_GET['search'] ?? '');
         $filterAction = $_GET['action'] ?? '';
-        $filterEntity = $_GET['entity'] ?? '';
         $filterDateFrom = $_GET['date_from'] ?? '';
         $filterDateTo = $_GET['date_to'] ?? '';
         $page = max(1, (int)($_GET['page'] ?? 1));
@@ -35,11 +34,6 @@ class AuditLogController
         if ($filterAction !== '') {
             $whereClauses[] = 'al.action = ?';
             $params[] = $filterAction;
-        }
-
-        if ($filterEntity !== '') {
-            $whereClauses[] = 'al.entity_type = ?';
-            $params[] = $filterEntity;
         }
 
         if ($filterDateFrom !== '') {
@@ -76,11 +70,8 @@ class AuditLogController
         $updateLogs = (int)$this->pdo->query("SELECT COUNT(*) FROM audit_logs WHERE action = 'UPDATE'")->fetchColumn();
         $deleteLogs = (int)$this->pdo->query("SELECT COUNT(*) FROM audit_logs WHERE action = 'DELETE'")->fetchColumn();
 
-        $stmtEntities = $this->pdo->query("SELECT DISTINCT entity_type FROM audit_logs WHERE entity_type IS NOT NULL AND entity_type != '' ORDER BY entity_type ASC LIMIT 50");
-        $entityTypes = $stmtEntities->fetchAll(PDO::FETCH_COLUMN);
-
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Audit Logs';
         $pageSubtitle = 'Track user actions, data changes, and accountability across the system';
@@ -138,7 +129,6 @@ class AuditLogController
     {
         $search = trim($_GET['search'] ?? '');
         $filterAction = $_GET['action'] ?? '';
-        $filterEntity = $_GET['entity'] ?? '';
         $filterDateFrom = $_GET['date_from'] ?? '';
         $filterDateTo = $_GET['date_to'] ?? '';
 
@@ -155,11 +145,6 @@ class AuditLogController
         if ($filterAction !== '') {
             $whereClauses[] = 'al.action = ?';
             $params[] = $filterAction;
-        }
-
-        if ($filterEntity !== '') {
-            $whereClauses[] = 'al.entity_type = ?';
-            $params[] = $filterEntity;
         }
 
         if ($filterDateFrom !== '') {

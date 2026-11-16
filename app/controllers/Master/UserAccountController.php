@@ -86,8 +86,8 @@ class UserAccountController
         )->fetchAll();
 
         $currentUserId = auth_id();
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'User Accounts Management';
         $pageSubtitle = 'Manage system user accounts, credentials, and access status';

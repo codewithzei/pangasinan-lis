@@ -866,7 +866,7 @@ ob_start();
                                                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943
                                                      9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
-                                        View Case (<?= htmlspecialchars($existingCase['docket_number']) ?>)
+                                        View Case (<?= htmlspecialchars($existingCase['docket_number'] ?? 'Pending details') ?>)
                                     </a>
                                 <?php endif; ?>
 
@@ -964,7 +964,7 @@ ob_start();
                         <p class="mb-1 text-xs text-purple-700">
                             Docket No.:
                             <span class="font-mono font-semibold">
-                                <?= htmlspecialchars($existingCase['docket_number']) ?>
+                                <?= htmlspecialchars($existingCase['docket_number'] ?? 'Pending details') ?>
                             </span>
                         </p>
                         <a href="<?= BASE_URL ?>/committee/cases/show?id=<?= (int) $existingCase['id'] ?>"

@@ -54,8 +54,8 @@ class PositionController
         $activePositions = (int)$this->pdo->query("SELECT COUNT(*) FROM positions WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactivePositions = $totalPositions - $activePositions;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Positions Management';
         $pageSubtitle = 'Manage Sanggunian position designations and their availability in dropdowns';

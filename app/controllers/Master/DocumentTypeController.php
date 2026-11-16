@@ -53,8 +53,8 @@ class DocumentTypeController
         $activeDocumentTypes = (int)$this->pdo->query("SELECT COUNT(*) FROM document_types WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveDocumentTypes = $totalDocumentTypes - $activeDocumentTypes;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Document Types Management';
         $pageSubtitle = 'Manage document categories and the badge colors used for classification and visual tagging';

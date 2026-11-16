@@ -7,6 +7,9 @@ $headerInitial = strtoupper(mb_substr($user['first_name'] ?? $headerName, 0, 1) 
 $toastSuccess = flash_get('success');
 $toastError = flash_get('error');
 $toastErrors = flash_get('errors', []);
+if (is_string($toastError)) {
+    $toastError = str_replace(['<br>', '<br/>', '<br />'], "\n", $toastError);
+}
 ?>
 
 <header class="sticky top-0 z-40 h-20 border-b border-gray-200 bg-white">
@@ -69,7 +72,7 @@ $toastErrors = flash_get('errors', []);
                     </div>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-semibold text-red-800">Error</p>
-                        <p class="text-xs text-red-700 break-words"><?= htmlspecialchars($toastError) ?></p>
+                        <p class="text-xs text-red-700 break-words whitespace-pre-line"><?= htmlspecialchars($toastError) ?></p>
                     </div>
                 </div>
             <?php endif; ?>

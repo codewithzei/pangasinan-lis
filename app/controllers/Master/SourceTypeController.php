@@ -53,8 +53,8 @@ class SourceTypeController
         $activeSourceTypes = (int)$this->pdo->query("SELECT COUNT(*) FROM source_types WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveSourceTypes = $totalSourceTypes - $activeSourceTypes;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Source Types Management';
         $pageSubtitle = 'Manage source types for organizing your data';

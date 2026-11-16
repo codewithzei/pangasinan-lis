@@ -53,8 +53,8 @@ class OpinionOfficeController
         $activeOpinionOffices = (int)$this->pdo->query("SELECT COUNT(*) FROM opinion_offices WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveOpinionOffices = $totalOpinionOffices - $activeOpinionOffices;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Opinion Offices Management';
         $pageSubtitle = 'Manage opinion offices and their availability in dropdowns';

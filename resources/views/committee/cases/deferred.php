@@ -11,6 +11,7 @@ $page       = $page       ?? 1;
 $totalPages = $totalPages ?? 1;
 $total      = $total      ?? 0;
 $search     = $search     ?? '';
+$caseStats  = $caseStats  ?? [];
 
 ob_start();
 ?>
@@ -33,6 +34,8 @@ ob_start();
             <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
     </section>
+
+    <?php require __DIR__ . '/_overview_cards.php'; ?>
 
     <!-- Navigation tabs -------------------------------------------------------->
     <?php require __DIR__ . '/_outcome_nav.php'; ?>

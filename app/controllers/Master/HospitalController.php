@@ -52,8 +52,8 @@ class HospitalController
         $activeHospitals = (int)$this->pdo->query("SELECT COUNT(*) FROM hospitals WHERE is_deleted = 0 AND is_active = 1")->fetchColumn();
         $inactiveHospitals = $totalHospitals - $activeHospitals;
 
-        $success = flash_get('success');
-        $error = flash_get('error');
+        $success = null;
+        $error = null;
 
         $pageTitle = 'Hospitals Management';
         $pageSubtitle = 'Manage recognized hospitals and their availability in the system';

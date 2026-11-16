@@ -5,7 +5,7 @@
  * Variables supplied by CommitteeCasesController::create():
  *   $document        array   Full document row with joins
  *   $assignment      array   The ACCEPTED Committee assignment row
- *   $docketPreview   string  Next DKT-YYYY-NNNN (informational, not committed)
+ *   $docketPreview   string  Next docket number (informational, not committed)
  *   $success         string|null
  *   $error           string|null
  *   $errors          array
@@ -15,6 +15,7 @@
 $document      = $document      ?? [];
 $assignment    = $assignment    ?? [];
 $docketPreview = $docketPreview ?? '';
+$docketYear = date('Y');
 $old           = $old           ?? [];
 
 $documentId     = (int)  ($document['id']              ?? 0);
@@ -139,25 +140,31 @@ ob_start();
                 <div class="rounded-2xl border border-gray-200 bg-white p-6 space-y-5">
                     <h2 class="text-base font-semibold text-gray-900">Case Details</h2>
 
-                    <!-- Docket No. (manual entry) ---------------------------->
+                    <!-- Docket No. (sequence entry) ------------------------->
                     <div>
-                        <label for="docket_number"
+                        <label for="docket_sequence"
                                class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                             Docket No. <span class="text-red-500">*</span>
                         </label>
-                        <input type="text"
-                               id="docket_number"
-                               name="docket_number"
-                               value="<?= casesCreateOld($old, 'docket_number') ?>"
-                               required
-                               maxlength="100"
-                               placeholder="e.g. DKT-2026-0001"
-                               autocomplete="off"
-                               class="block w-full rounded-xl border border-gray-300 px-3 py-2
-                                      font-mono text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                        <div class="flex items-center gap-2 font-mono text-sm">
+                            <span class="shrink-0 text-gray-600">DKT -</span>
+                            <input type="text"
+                                   id="docket_sequence"
+                                   name="docket_sequence"
+                                   value="<?= casesCreateOld($old, 'docket_sequence') ?>"
+                                   required
+                                   maxlength="10"
+                                   inputmode="numeric"
+                                   pattern="[0-9]{1,10}"
+                                   placeholder="e.g. 1234"
+                                   autocomplete="off"
+                                   class="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2
+                                          font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+                            <span class="shrink-0 text-gray-600">- <?= htmlspecialchars($docketYear) ?></span>
+                        </div>
                         <p class="mt-1.5 text-xs text-gray-400">
-                            Enter the docket number as recorded in your committee records.
-                            It must be unique — the system will reject a number already in use.
+                            Enter the sequence number only. DKT and the current year are added automatically.
+                            The completed docket number must be unique.
                         </p>
                     </div>
 
@@ -170,7 +177,7 @@ ob_start();
                         <input type="date"
                                id="date_assigned"
                                name="date_assigned"
-                               value="<?= casesCreateOld($old, 'date_assigned', date('Y-m-d')) ?>"
+                               value="<?= casesCreateOld($old, 'date_assigned') ?>"
                                required
                                class="block w-full rounded-xl border border-gray-300 px-3 py-2 text-sm
                                       focus:border-primary focus:ring-1 focus:ring-primary">
@@ -301,12 +308,11 @@ ob_start();
                         <p class="text-sm font-semibold text-purple-900">Docket Number</p>
                     </div>
                     <p class="text-xs text-purple-700 leading-relaxed">
-                        Enter the docket number exactly as it appears in your committee
-                        records. The number must be unique — the system will show an error
-                        if it is already assigned to another case.
+                        Enter the sequence number only. The DKT prefix and current year
+                        are added automatically, and the full docket number must be unique.
                     </p>
                     <p class="mt-2 text-xs font-semibold text-purple-800">
-                        Common format: <span class="font-mono">DKT-YYYY-NNNN</span>
+                        Format: <span class="font-mono">DKT - [sequence] - YYYY</span>
                     </p>
                 </div>
 

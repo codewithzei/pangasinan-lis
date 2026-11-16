@@ -1672,17 +1672,33 @@ class PlenaryReadingController
             if ((int) $document['current_status_id'] !== $returnedStatusId) {
                 throw new RuntimeException('This document has not been returned from Committee yet.');
             }
-            if ($this->isCommDocument($document) || $this->isCasesDocument($document)) {
+            $isCommDocument = $this->isCommDocument($document);
+            $isCasesDocument = $this->isCasesDocument($document);
+            if ($decision === 'APPROVED' && ($isCommDocument || $isCasesDocument)) {
                 throw new RuntimeException('Use the document-specific adoption form for Communications, MFRs, Complaints, and Administrative Cases.');
             }
 
-            $referralStmt = $this->pdo->prepare("
-                SELECT id
-                FROM plenary_readings
-                WHERE document_id = ? AND reading_number = 1
-                  AND action = 'REFERRED_TO_COMMITTEE'
-                LIMIT 1
-            ");
+            if ($isCommDocument) {
+                $referralStmt = $this->pdo->prepare("
+                    SELECT id FROM plenary_comm_first_reading
+                    WHERE document_id = ? AND decision = 'REFER_TO_COMMITTEE'
+                    LIMIT 1
+                ");
+            } elseif ($isCasesDocument) {
+                $referralStmt = $this->pdo->prepare("
+                    SELECT id FROM plenary_cases_first_reading
+                    WHERE document_id = ? AND decision = 'REFER_TO_COMMITTEE'
+                    LIMIT 1
+                ");
+            } else {
+                $referralStmt = $this->pdo->prepare("
+                    SELECT id
+                    FROM plenary_readings
+                    WHERE document_id = ? AND reading_number = 1
+                      AND action = 'REFERRED_TO_COMMITTEE'
+                    LIMIT 1
+                ");
+            }
             $referralStmt->execute([$documentId]);
             if (!$referralStmt->fetch()) {
                 throw new RuntimeException('No First Reading Committee referral was found for this document.');
@@ -2938,12 +2954,11 @@ class PlenaryReadingController
     }
 
     // =========================================================================
-    // ADOPT COMMITTEE REPORT — for returned Communications
+    // APPROVE COMMITTEE REPORT — for returned Communications
     //
-    // When the existing Committee process returns a Communication (sets status
-    // to "Returned to Plenary"), the Plenary can "Adopt Committee Report".
-    // This finalizes the Communication and shows it in Finalized Documents >
-    // Communications tab.
+    // Approved reports finalize the Communication and show it in Finalized
+    // Documents > Communications. Disapproved reports use the shared
+    // adoptCommitteeReportStore() copy-only flow.
     //
     // POST plenary/referred-to-committee/adopt-comm
     // =========================================================================
@@ -3977,11 +3992,11 @@ class PlenaryReadingController
     // =========================================================================
     // CASES ADOPT COMMITTEE REPORT
     //
-    // After Committee returns a Complaints / Administrative Cases document
-    // (status = "Returned to Plenary"), Plenary finalizes it by adopting the
-    // committee report, capturing Resolution/Ordinance No., optional Proposed Number,
-    // and one or more mandatory attachment files (stored in
-    // plenary_cases_adoption_files).
+    // For approved reports, Plenary finalizes a returned Complaints /
+    // Administrative Cases document, capturing Resolution/Ordinance No.,
+    // optional Proposed Number, and mandatory attachment files (stored in
+    // plenary_cases_adoption_files). Disapproved reports use the shared
+    // adoptCommitteeReportStore() copy-only flow.
     //
     // POST plenary/cases-first-reading/adopt-report   (multipart/form-data)
     // =========================================================================
