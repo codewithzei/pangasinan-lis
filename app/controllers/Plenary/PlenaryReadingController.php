@@ -396,11 +396,24 @@ class PlenaryReadingController
                 d.current_status_id,
                 ds.name            AS status,
                 ds.badge_color     AS status_badge_color,
-                (SELECT ch.outcome
-                 FROM committee_hearings ch
-                 WHERE ch.document_id = d.id
-                 ORDER BY ch.id DESC
-                 LIMIT 1) AS committee_hearing_outcome,
+                CASE
+                    WHEN LOWER(COALESCE(dt.name, '')) LIKE '%complaint%'
+                      OR LOWER(COALESCE(dt.name, '')) LIKE '%administrative case%'
+                    THEN (
+                        SELECT cc.final_outcome
+                        FROM committee_cases cc
+                        WHERE cc.document_id = d.id
+                        ORDER BY cc.id DESC
+                        LIMIT 1
+                    )
+                    ELSE (
+                        SELECT ch.outcome
+                        FROM committee_hearings ch
+                        WHERE ch.document_id = d.id
+                        ORDER BY ch.id DESC
+                        LIMIT 1
+                    )
+                END AS committee_hearing_outcome,
                 dt.name            AS document_type_name,
                 dt.badge_color     AS document_type_badge_color,
                 pdd.proposed_number,
@@ -460,8 +473,8 @@ class PlenaryReadingController
 
         // Per-row flag: the "Proceed to 2nd Reading" OR "Adopt Committee Report" button
         // is available only after the committee workflow has actually returned the document.
-        // For Communication documents: show "Adopted Committee Report" instead.
-        // For Cases documents: show "Adopt Committee Report" modal.
+        // For Communication and Cases documents, use their document-specific
+        // adoption forms; Cases outcomes are sourced from committee_cases.
         foreach ($documents as &$row) {
             $row['can_advance']   = ((int) $row['current_status_id'] === $returnedStatusId);
             $typeName = strtolower(trim($row['document_type_name'] ?? ''));

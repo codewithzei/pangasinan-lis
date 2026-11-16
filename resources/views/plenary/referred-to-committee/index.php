@@ -253,6 +253,31 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                     <?php endif; ?>
                                 </td>
                                 <td class="px-6 py-4 text-right">
+                                    <?php
+                                    $detailsPayload = [
+                                        'trackingNumber' => $row['tracking_number'] ?? '—',
+                                        'proposedNumber' => $row['proposed_number'] ?? '—',
+                                        'subjectMatter' => $row['subject_matter'] ?? '—',
+                                        'documentType' => $row['document_type_name'] ?? '—',
+                                        'committees' => $row['committee_names'] ?? '—',
+                                        'dateReceived' => !empty($row['date_received']) ? date('M j, Y', strtotime($row['date_received'])) : '—',
+                                        'referredDate' => !empty($row['referred_date']) ? date('M j, Y', strtotime($row['referred_date'])) : '—',
+                                        'returnedAt' => !empty($row['returned_at']) ? date('M j, Y', strtotime($row['returned_at'])) : '—',
+                                        'status' => $row['status'] ?? '—',
+                                        'committeeOutcome' => $row['committee_hearing_outcome'] ?? '—',
+                                        'referralRemarks' => $row['referral_remarks'] ?? '—',
+                                    ];
+                                    ?>
+                                    <button type="button"
+                                            class="rtc-document-details mb-2 ml-auto flex w-fit items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+                                            data-rtc-details="<?= htmlspecialchars(json_encode($detailsPayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>"
+                                            aria-label="View details for <?= htmlspecialchars($row['tracking_number'], ENT_QUOTES, 'UTF-8') ?>">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.065 7-9.542 7s-8.268-2.943-9.542-7z"/>
+                                        </svg>
+                                        View details
+                                    </button>
                                     <?php if ($canAdvance): ?>
                                         <?php $hearingApproved = ($row['committee_hearing_outcome'] ?? '') === 'APPROVED'; ?>
                                         <?php if ($hearingApproved && !empty($row['is_plenary_cases_referred'])): ?>
@@ -387,6 +412,71 @@ ob_start();
                 </button>
             </form>
         </div>
+    </div>
+</div>
+
+<div id="rtcDocumentDetailsModal"
+     class="fixed inset-0 z-[100] hidden items-center justify-center p-4"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="rtcDocumentDetailsTitle">
+    <div id="rtcDocumentDetailsBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm"></div>
+    <div class="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-2xl">
+        <div class="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
+            <div>
+                <h2 id="rtcDocumentDetailsTitle" class="text-lg font-semibold text-gray-900">Document details</h2>
+                <p id="rtcDetailsTrackingNumber" class="mt-1 font-mono text-sm text-gray-500"></p>
+            </div>
+            <button type="button" id="rtcDocumentDetailsClose"
+                    class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    aria-label="Close document details">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <dl class="grid grid-cols-1 gap-x-6 gap-y-5 px-6 py-5 sm:grid-cols-2">
+            <div class="sm:col-span-2">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Subject matter</dt>
+                <dd id="rtcDetailsSubjectMatter" class="mt-1 whitespace-pre-wrap text-sm text-gray-900"></dd>
+            </div>
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Document type</dt>
+                <dd id="rtcDetailsDocumentType" class="mt-1 text-sm text-gray-900"></dd>
+            </div>
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Proposed number</dt>
+                <dd id="rtcDetailsProposedNumber" class="mt-1 text-sm text-gray-900"></dd>
+            </div>
+            <div class="sm:col-span-2">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Committee(s)</dt>
+                <dd id="rtcDetailsCommittees" class="mt-1 text-sm text-gray-900"></dd>
+            </div>
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Date received</dt>
+                <dd id="rtcDetailsDateReceived" class="mt-1 text-sm text-gray-900"></dd>
+            </div>
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Referred on</dt>
+                <dd id="rtcDetailsReferredDate" class="mt-1 text-sm text-gray-900"></dd>
+            </div>
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Returned to Plenary</dt>
+                <dd id="rtcDetailsReturnedAt" class="mt-1 text-sm text-gray-900"></dd>
+            </div>
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Current status</dt>
+                <dd id="rtcDetailsStatus" class="mt-1 inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700"></dd>
+            </div>
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Committee outcome</dt>
+                <dd id="rtcDetailsCommitteeOutcome" class="mt-1 text-sm text-gray-900"></dd>
+            </div>
+            <div class="sm:col-span-2">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Referral remarks</dt>
+                <dd id="rtcDetailsReferralRemarks" class="mt-1 whitespace-pre-wrap text-sm text-gray-900"></dd>
+            </div>
+        </dl>
     </div>
 </div>
 
@@ -1370,6 +1460,54 @@ ob_start();
         submitted = true;
         confirmButton.disabled = true;
         confirmButton.textContent = 'Processing…';
+    });
+}());
+</script>
+<script>
+(function () {
+    var modal = document.getElementById('rtcDocumentDetailsModal');
+    var backdrop = document.getElementById('rtcDocumentDetailsBackdrop');
+    var closeButton = document.getElementById('rtcDocumentDetailsClose');
+    var activeTrigger = null;
+    var fields = {
+        trackingNumber: 'rtcDetailsTrackingNumber',
+        subjectMatter: 'rtcDetailsSubjectMatter',
+        documentType: 'rtcDetailsDocumentType',
+        proposedNumber: 'rtcDetailsProposedNumber',
+        committees: 'rtcDetailsCommittees',
+        dateReceived: 'rtcDetailsDateReceived',
+        referredDate: 'rtcDetailsReferredDate',
+        returnedAt: 'rtcDetailsReturnedAt',
+        status: 'rtcDetailsStatus',
+        committeeOutcome: 'rtcDetailsCommitteeOutcome',
+        referralRemarks: 'rtcDetailsReferralRemarks'
+    };
+
+    function closeModal() {
+        if (modal.classList.contains('hidden')) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        if (activeTrigger) activeTrigger.focus();
+        activeTrigger = null;
+    }
+
+    document.querySelectorAll('.rtc-document-details').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var details = JSON.parse(button.dataset.rtcDetails);
+            activeTrigger = button;
+            Object.keys(fields).forEach(function (key) {
+                document.getElementById(fields[key]).textContent = details[key] || '—';
+            });
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            closeButton.focus();
+        });
+    });
+
+    closeButton.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closeModal();
     });
 }());
 </script>
