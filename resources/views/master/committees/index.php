@@ -201,7 +201,7 @@ $accent = $accent ?? 'primary';
                                                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                         </svg>
                                     </button>
-                                    <button type="button" onclick="toggleStatus(<?= $c['id'] ?>, '<?= htmlspecialchars($c['name']) ?>')"
+                                    <button type="button" onclick="toggleStatus(<?= (int) $c['id'] ?>, <?= htmlspecialchars(json_encode($c['name'], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 transition"
                                         title="<?= $c['is_active'] ? 'Set Inactive' : 'Set Active' ?>">
                                         <?php if ($c['is_active']): ?>
@@ -216,7 +216,7 @@ $accent = $accent ?? 'primary';
                                         </svg>
                                         <?php endif; ?>
                                     </button>
-                                    <button type="button" onclick="deleteCommittee(<?= $c['id'] ?>, '<?= htmlspecialchars($c['name']) ?>')"
+                                    <button type="button" onclick="deleteCommittee(<?= (int) $c['id'] ?>, <?= htmlspecialchars(json_encode($c['name'], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-red-400 hover:bg-red-50 hover:text-red-600 transition"
                                         title="Delete">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -301,8 +301,8 @@ $accent = $accent ?? 'primary';
                     </label>
                     <input type="text" name="name" id="committeeName" value="<?= old('name') ?>"
                         class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                        placeholder="e.g. Committee on Rules" required maxlength="50">
-                    <p class="mt-1 text-[11px] text-gray-500">Maximum 50 characters.</p>
+                        placeholder="e.g. Committee on Rules" required maxlength="255">
+                    <p class="mt-1 text-[11px] text-gray-500">Maximum 255 characters.</p>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-xs font-semibold text-gray-700">Description / Notes</label>
@@ -415,8 +415,8 @@ function validateCommitteeForm() {
     if (name.value.trim() === '') {
         setFieldError('committeeName', 'Committee name is required.');
         valid = false;
-    } else if (name.value.length > 50) {
-        setFieldError('committeeName', 'Committee name must not exceed 50 characters.');
+    } else if (name.value.length > 255) {
+        setFieldError('committeeName', 'Committee name must not exceed 255 characters.');
         valid = false;
     } else clearFieldError('committeeName');
 

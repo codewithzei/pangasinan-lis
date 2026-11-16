@@ -1457,6 +1457,14 @@ return [
         ],
     ],
 
+    // View all issue history, remarks, and submitted opinion files for a document
+    'committee/referred/opinion-details' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeReferredController',
+        'action'     => 'opinionDetailsShow',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // Resolve a cycle: Proceed to Agenda or Withdraw Document (GET = form, POST = process)
     'committee/referred/resolve' => [
         [

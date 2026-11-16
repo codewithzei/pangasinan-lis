@@ -8,7 +8,8 @@
  *   $document          array        The documents row (with status join)
  *   $office            array        opinion_offices row {id, name, abbreviation}
  *   $alreadySubmitted  bool         Whether a submission already exists for this endorsement
- *   $canSecondEndorse  bool         Whether a second endorsement can be issued
+ *   $canIssueNextEndorsement bool    Whether the next endorsement can be issued
+ *   $nextEndorsementExists bool     Whether the next numbered endorsement exists
  *   $submittedFiles    array        ['opinion' => [...], 'compliance' => [...]] previously submitted
  *   $submission        array|null   The saved submission, including its remarks
  *   $otherAttachments  array        Other files attached to the document
@@ -22,7 +23,8 @@ $cycle            = $cycle            ?? [];
 $document         = $document         ?? [];
 $office           = $office           ?? [];
 $alreadySubmitted = $alreadySubmitted ?? false;
-$canSecondEndorse = $canSecondEndorse ?? false;
+$canIssueNextEndorsement = $canIssueNextEndorsement ?? false;
+$nextEndorsementExists = $nextEndorsementExists ?? false;
 $submittedFiles   = $submittedFiles   ?? ['opinion' => [], 'compliance' => []];
 $submission       = $submission       ?? null;
 $otherAttachments = $otherAttachments ?? [];
@@ -35,9 +37,9 @@ $oldSelected = $oldData['selected_files'] ?? ['opinion' => [], 'compliance' => [
 $endorsementId     = (int) ($endorsement['id']                ?? 0);
 $documentId        = (int) ($cycle['document_id']             ?? 0);
 $endorsementNumber = (int) ($endorsement['endorsement_number'] ?? 1);
-// Endorsement #2 is the second (final) review: its Unfavorable outcome also
-// requires Compliance documents, which is what moves the cycle to Resolve.
-$isSecondReview    = $endorsementNumber > 1;
+// Follow-up endorsements keep the same Opinion and Compliance requirements.
+$isFollowUpReview  = $endorsementNumber > 1;
+$nextEndorsementNumber = $endorsementNumber + 1;
 
 // The opinion_statuses row is the source of truth for the workflow state.
 $opinionStatusName = trim((string) ($endorsement['opinion_status_name'] ?? ''));
@@ -109,9 +111,9 @@ ob_start();
                         </span>
                     </p>
                 <?php endif; ?>
-                <?php if ($endorsementNumber === 2): ?>
+                <?php if ($isFollowUpReview): ?>
                     <span class="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                        Second Endorsement
+                        Endorsement #<?= $endorsementNumber ?>
                     </span>
                 <?php endif; ?>
                 <?php if (trim((string) ($endorsement['remarks'] ?? '')) !== ''): ?>
@@ -135,21 +137,27 @@ ob_start();
                             Current status: <strong><?= htmlspecialchars($opinionStatusName) ?></strong>.
                         <?php endif; ?>
                         A submission has already been recorded for this endorsement.
-                        <?php if ($canSecondEndorse): ?>
-                            You may issue a second endorsement below.
+                        <?php if ($canIssueNextEndorsement): ?>
+                            You may issue endorsement #<?= $nextEndorsementNumber ?> below.
+                        <?php elseif ($nextEndorsementExists): ?>
+                            Endorsement #<?= $nextEndorsementNumber ?> has already been issued and is awaiting an opinion.
+                        <?php elseif (($submission['opinion_type'] ?? '') === 'FAVORABLE'): ?>
+                            This office's opinion is Favorable; no further endorsement is needed.
                         <?php else: ?>
-                            No further endorsements are permitted for this office and cycle.
+                            The next endorsement cannot be issued from this submission.
                         <?php endif; ?>
                     </p>
                 </div>
 
-                <?php if ($canSecondEndorse): ?>
-                    <!-- Second endorsement trigger -->
+                <?php if ($canIssueNextEndorsement): ?>
+                    <!-- Next endorsement trigger -->
                     <div class="rounded-2xl border border-indigo-200 bg-white p-5">
-                        <p class="text-sm font-semibold text-gray-800 mb-3">Issue Second Endorsement</p>
+                        <p class="text-sm font-semibold text-gray-800 mb-3">
+                            Issue Endorsement #<?= $nextEndorsementNumber ?>
+                        </p>
                         <p class="text-xs text-gray-500 mb-4">
-                            The first opinion was Unfavorable. You may issue a second endorsement
-                            to this office (endorsement #2). A third endorsement is not permitted.
+                            The opinion was Unfavorable. You may continue this office's review with
+                            endorsement #<?= $nextEndorsementNumber ?>.
                         </p>
                         <form method="POST" action="<?= BASE_URL ?>/committee/referred/second-endorse"
                               id="secondEndorseForm">
@@ -167,7 +175,7 @@ ob_start();
                                     class="w-full inline-flex items-center justify-center gap-2 rounded-xl
                                            bg-indigo-600 px-4 py-2 text-sm font-semibold text-white
                                            hover:bg-indigo-700 transition">
-                                Issue Second Endorsement
+                                Issue Endorsement #<?= $nextEndorsementNumber ?>
                             </button>
                         </form>
                     </div>
@@ -338,15 +346,13 @@ ob_start();
                             </p>
                         </div>
 
-                        <?php if ($isSecondReview): ?>
+                        <?php if ($isFollowUpReview): ?>
                             <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                                 <p class="text-xs font-medium text-amber-800">
-                                    This is the second review of this office's opinion. A
-                                    <strong>Favorable</strong> opinion follows the usual favorable
-                                    workflow. An <strong>Unfavorable</strong> opinion requires
-                                    <strong>Compliance</strong> documents and moves the cycle to
-                                    <strong>Resolve</strong> — another Compliance &rarr; Second Endorsement
-                                    cycle is not permitted.
+                                    This is endorsement #<?= $endorsementNumber ?> for this office.
+                                    A <strong>Favorable</strong> opinion completes the review. An
+                                    <strong>Unfavorable</strong> opinion with <strong>Compliance</strong>
+                                    documents may be followed by another numbered endorsement.
                                 </p>
                             </div>
                         <?php endif; ?>
@@ -382,8 +388,8 @@ ob_start();
                                     <div>
                                         <p class="text-sm font-semibold text-gray-800">Unfavorable</p>
                                         <p class="text-xs text-gray-500">
-                                            <?= $isSecondReview
-                                                ? 'Compliance file required; moves the cycle to Resolve.'
+                                            <?= $isFollowUpReview
+                                                ? 'Compliance file required; another endorsement may follow if still Unfavorable.'
                                                 : 'Compliance file required.' ?>
                                         </p>
                                     </div>
@@ -731,11 +737,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // --- Opinion type → compliance requirement -----------------------------
-    // The Compliance upload area is offered for every Unfavorable outcome —
-    // including the second (final) review, where the Compliance submission is
-    // what hands the exhausted cycle over to Resolve. For any other outcome it
-    // is hidden and its input disabled, so a hidden selection can never be
-    // posted (the server rejects it anyway).
+    // The Compliance upload area is offered for every Unfavorable outcome.
+    // For any other outcome it is hidden and disabled, so a hidden selection
+    // can never be posted (the server rejects it anyway).
     const complianceSection = document.getElementById('complianceSection');
     const complianceInput   = document.getElementById('complianceFiles');
 

@@ -9,7 +9,7 @@ class CreateCommitteeOpinionTables
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             cycle_id BIGINT UNSIGNED NOT NULL,
             opinion_office_id BIGINT NOT NULL,
-            endorsement_number TINYINT NOT NULL CHECK (endorsement_number IN (1, 2)),
+            endorsement_number BIGINT UNSIGNED NOT NULL,
             opinion_status_id INT NOT NULL,
             requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             submitted_at TIMESTAMP NULL,

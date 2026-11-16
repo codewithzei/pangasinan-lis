@@ -1,10 +1,12 @@
 <?php
 $receiptUser = auth();
 $receiptDefaultDestination = $receiptDefaultDestination ?? 'ADMIN';
+$receiptAutoCheckRouting = $receiptAutoCheckRouting ?? true;
 ?>
 
 <article id="trackingSlip" class="tracking-slip-print"
          data-default-destination="<?= htmlspecialchars($receiptDefaultDestination, ENT_QUOTES, 'UTF-8') ?>"
+         data-auto-check-routing="<?= $receiptAutoCheckRouting ? 'true' : 'false' ?>"
          data-received-by="<?= htmlspecialchars((string) ($receiptUser['full_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
     <div class="tracking-slip">
         <p class="tracking-slip-reference">
@@ -476,7 +478,7 @@ document.addEventListener('DOMContentLoaded', function () {
         routeBoxes.forEach(function (box) {
             const key = box.dataset.route;
             const checked = key === routeKey || (key === 'ADMIN' && routeKey === 'ADMININBOX');
-            box.classList.toggle('is-checked', checked);
+            box.classList.toggle('is-checked', slip.dataset.autoCheckRouting === 'true' && checked);
         });
         const knownRoutes = ['VTNP', 'PLENARY', 'COMMITTEE', 'ADMIN', 'RECORDS', 'PERSONNEL', 'POSTING'];
         const otherRoute = knownRoutes.includes(routeKey) || !destination ? '' : destination;

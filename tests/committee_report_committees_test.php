@@ -4,14 +4,15 @@
  *
  * Verifies the hearing-workflow report creation form now lets authorized
  * committee users add additional Committees in Charge while preserving
- * existing assignments. Covers the six required scenarios:
+ * existing assignments. Covers the seven required scenarios:
  *
  *   1. Existing committees are pre-checked when the form loads.
  *   2. Submitted checkbox selections survive validation errors.
  *   3. Authorized users can add committees without removing existing assignments.
  *   4. Duplicate / inactive / invalid committee selections are handled.
- *   5. Unauthorized users cannot add committees.
- *   6. The report and relevant views show all assigned committees.
+ *   5. Existing report committee selections can be updated.
+ *   6. Unauthorized users cannot add committees.
+ *   7. The report and relevant views show all assigned committees.
  *
  * Strategy
  * --------
@@ -412,26 +413,97 @@ try {
     );
 
     // ══════════════════════════════════════════════════════════════════════
-    // SCENARIO 5 — Unauthorized users cannot add committees
+    // SCENARIO 5 — Existing report committee selections can be updated
+    // ══════════════════════════════════════════════════════════════════════
+    // Mirror shareToReport()'s existing-report transaction: save the exact
+    // checkbox selection so committees may be unchecked before submission.
+    $pdo->prepare(
+        "DELETE FROM committee_report_committees WHERE committee_report_id = ?"
+    )->execute([$reportId4]);
+    $replaceCommittee = $pdo->prepare(
+        "INSERT INTO committee_report_committees (committee_report_id, committee_id) VALUES (?, ?)"
+    );
+    $selectedReportCommitteeIds = [$commB, $commE];
+    $documentCommitteeStmt = $pdo->prepare(
+        "SELECT DISTINCT c.id
+         FROM documents d
+         LEFT JOIN agendas ag
+             ON ag.document_id = d.id
+            AND ag.id = (SELECT MAX(ag2.id) FROM agendas ag2 WHERE ag2.document_id = d.id)
+         LEFT JOIN committee_cases cc
+             ON cc.document_id = d.id
+            AND cc.id = (SELECT MAX(cc2.id) FROM committee_cases cc2 WHERE cc2.document_id = d.id)
+         LEFT JOIN agenda_committees ac
+             ON ac.agenda_id = ag.id
+            AND cc.final_outcome IS NULL
+         LEFT JOIN document_committees dc
+             ON dc.document_id = d.id
+            AND cc.final_outcome IS NOT NULL
+         INNER JOIN committees c
+             ON c.id = COALESCE(ac.committee_id, dc.committee_id)
+            AND c.is_active = 1
+            AND c.is_deleted = 0
+         WHERE d.id = ?"
+    );
+    $documentCommitteeStmt->execute([$documentId]);
+    $selectedDocumentCommitteeIds = array_map('intval', array_column(
+        $documentCommitteeStmt->fetchAll(PDO::FETCH_ASSOC),
+        'id'
+    ));
+    foreach ($selectedReportCommitteeIds as $committeeId) {
+        $replaceCommittee->execute([$reportId4, $committeeId]);
+    }
+    $pdo->prepare(
+        "UPDATE committee_reports SET report_type = ? WHERE id = ?"
+    )->execute(['JOINT_COMMITTEE_REPORT', $reportId4]);
+
+    $existingCommitteeStmt = $pdo->prepare(
+        "SELECT committee_id FROM committee_report_committees
+         WHERE committee_report_id = ? ORDER BY committee_id"
+    );
+    $existingCommitteeStmt->execute([$reportId4]);
+    $existingCommitteeIds = array_map('intval', array_column(
+        $existingCommitteeStmt->fetchAll(PDO::FETCH_ASSOC),
+        'committee_id'
+    ));
+    $expectedExistingCommitteeIds = [$commB, $commE];
+    sort($expectedExistingCommitteeIds);
+    $updatedReportTypeStmt = $pdo->prepare(
+        "SELECT report_type FROM committee_reports WHERE id = ?"
+    );
+    $updatedReportTypeStmt->execute([$reportId4]);
+    assert_test(
+        'SC5a: Existing report saves selected committees and honors unchecked document committees',
+        $existingCommitteeIds === $expectedExistingCommitteeIds
+        && in_array($commA, $selectedDocumentCommitteeIds, true)
+        && !in_array($commA, $existingCommitteeIds, true)
+    );
+    assert_test(
+        'SC5b: Existing report becomes a joint report when multiple committees are selected',
+        $updatedReportTypeStmt->fetchColumn() === 'JOINT_COMMITTEE_REPORT'
+    );
+
+    // ══════════════════════════════════════════════════════════════════════
+    // SCENARIO 6 — Unauthorized users cannot add committees
     // ══════════════════════════════════════════════════════════════════════
     // RoleMiddleware gates 'committee/hearing/report' to Super Admin + Committee.
     $route    = 'committee/hearing/report';
     $allowed  = allowed_roles_for_route($route);
 
     assert_test(
-        'SC5a: Committee role is authorized for the report route',
+        'SC6a: Committee role is authorized for the report route',
         in_array('Committee', $allowed, true)
     );
     assert_test(
-        'SC5b: Super Admin role is authorized for the report route',
+        'SC6b: Super Admin role is authorized for the report route',
         in_array('Super Admin', $allowed, true)
     );
     assert_test(
-        'SC5c: Receiving Staff role is NOT authorized for the report route',
+        'SC6c: Receiving Staff role is NOT authorized for the report route',
         !in_array('Receiving Staff', $allowed, true)
     );
     assert_test(
-        'SC5d: Plenary role is NOT authorized for the report route',
+        'SC6d: Plenary role is NOT authorized for the report route',
         !in_array('Plenary', $allowed, true)
     );
 
@@ -443,12 +515,12 @@ try {
     $receivingRoleName->execute([$receivingUser]);
     $receivingRole = (string) $receivingRoleName->fetchColumn();
     assert_test(
-        'SC5e: Receiving Staff user would be blocked by RoleMiddleware',
+        'SC6e: Receiving Staff user would be blocked by RoleMiddleware',
         !in_array($receivingRole, $allowed, true)
     );
 
     // ══════════════════════════════════════════════════════════════════════
-    // SCENARIO 6 — The report and relevant views show all assigned committees
+    // SCENARIO 7 — The report and relevant views show all assigned committees
     // ══════════════════════════════════════════════════════════════════════
     // CommitteeReportsController::show() loads committees from
     // committee_report_committees — assert all assigned committees are
@@ -465,7 +537,7 @@ try {
     $shownIds  = array_map('intval', array_column($shownRows, 'id'));
 
     assert_test(
-        'SC6a: Report show view returns all assigned committees (A,B,C,E)',
+        'SC7a: Report show view returns all assigned committees (A,B,C,E)',
         count($shownIds) === 4
         && count(array_intersect([$commA, $commB, $commC, $commE], $shownIds)) === 4
     );
@@ -492,7 +564,7 @@ try {
         }
     }
     assert_test(
-        'SC6b: Report list view (GROUP_CONCAT) includes every assigned committee',
+        'SC7b: Report list view (GROUP_CONCAT) includes every assigned committee',
         $allPresent
     );
 

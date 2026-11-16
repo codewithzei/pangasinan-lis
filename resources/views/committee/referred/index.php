@@ -427,13 +427,19 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                             $officeMap     = $progress['offices'] ?? [];
                             $totalOffices  = (int) ($progress['total'] ?? 0);
                             // Progress advances on *cleared* (Favorable) offices only.
-                            // An Unfavorable opinion — awaiting its second endorsement
-                            // or moved to Resolve — never advances the indicator.
+                            // An Unfavorable opinion awaiting another numbered endorsement
+                            // never advances the indicator.
                             $clearedCount  = (int) ($progress['cleared'] ?? 0);
                             $stColor       = htmlspecialchars($doc['status_badge_color'] ?? '#6B7280');
 
                             $progressPct   = $totalOffices > 0 ? round(($clearedCount / $totalOffices) * 100) : 0;
                             $allCleared    = $totalOffices > 0 && $clearedCount >= $totalOffices;
+                            $hasUnfavorable = (bool) array_filter(
+                                $officeMap,
+                                static fn(array $office): bool =>
+                                    strtoupper((string) ($office['display_opinion_type'] ?? $office['opinion_type'] ?? ''))
+                                        === 'UNFAVORABLE'
+                            );
                             ?>
                             <tr class="hover:bg-gray-50/50 transition align-top">
 
@@ -481,14 +487,15 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                         <span class="text-xs text-gray-400">—</span>
                                     <?php else: ?>
                                         <div class="min-w-[210px] space-y-1.5">
-                                            <?php foreach ($officeMap as $end):
+                                            <?php foreach ($officeMap as $officeId => $end):
+                                                $officeId  = (int) $officeId;
                                                 $oFullName = $end['office_name']      ?? '—';
                                                 $endNum    = (int) ($end['endorsement_number'] ?? 1);
                                                 $endId     = (int) ($end['endorsement_id']     ?? 0);
                                                 $opType    = $end['opinion_type'] ?? null;
                                                 $displayOpType = $end['display_opinion_type'] ?? $opType;
                                                 $isCleared = !empty($end['cleared']);
-                                                $awaiting  = !empty($end['awaiting_second_endorsement']);
+                                                $awaiting  = !empty($end['awaiting_next_endorsement']);
                                                 $awaitingCurrent = !empty($end['awaiting_current_opinion']);
                                                 $lastSubmittedNumber = $end['last_submitted_endorsement_number'] ?? null;
                                                 $pending   = $end['pending_action'] ?? null;
@@ -502,15 +509,16 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                                 [$chipBg, $chipText] = match(true) {
                                                     $awaiting                => ['bg-amber-50 border-amber-200',    'text-amber-700'],
                                                     $isCleared               => ['bg-emerald-50 border-emerald-200','text-emerald-700'],
-                                                    $statusLabel === 'For Second Endorsement'
+                                                    str_starts_with($statusLabel, 'For ')
                                                                               => ['bg-amber-50 border-amber-200',    'text-amber-700'],
                                                     $displayOpType === 'UNFAVORABLE'
                                                                               => ['bg-red-50 border-red-200',      'text-red-700'],
                                                     default                  => ['bg-gray-50 border-gray-200',     'text-gray-600'],
                                                 };
                                             ?>
-                                                <div class="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-2.5 py-2">
-                                                    <div class="min-w-0">
+                                                <div class="flex w-full items-center gap-2">
+                                                    <div class="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg bg-gray-50 px-2.5 py-2">
+                                                        <div class="min-w-0">
                                                         <p class="truncate text-xs font-medium text-gray-800"
                                                            title="<?= htmlspecialchars($oFullName) ?>">
                                                             <?= htmlspecialchars($oFullName) ?>
@@ -530,24 +538,32 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                                                 <?php endif; ?>
                                                             </p>
                                                         <?php endif; ?>
-                                                    </div>
-                                                    <?php if ($pending === 'SUBMIT_OPINION' && $endId > 0): ?>
-                                                        <a href="<?= BASE_URL ?>/committee/referred/opinion?endorsement_id=<?= $endId ?>"
-                                                           class="shrink-0 rounded-md bg-primary px-2.5 py-1.5 text-[11px]
-                                                                  font-semibold text-white transition hover:bg-indigo-700
-                                                                  focus:outline-none focus:ring-2 focus:ring-primary
-                                                                  focus:ring-offset-1">
-                                                            Submit
-                                                        </a>
-                                                    <?php elseif ($pending === 'SECOND_ENDORSEMENT' && $endId > 0): ?>
-                                                        <a href="<?= BASE_URL ?>/committee/referred/opinion?endorsement_id=<?= $endId ?>"
-                                                           class="shrink-0 rounded-md border border-amber-300 bg-amber-50
-                                                                  px-2.5 py-1.5 text-[11px] font-semibold text-amber-800
-                                                                  transition hover:bg-amber-100 focus:outline-none
-                                                                  focus:ring-2 focus:ring-amber-500 focus:ring-offset-1">
-                                                            Review
-                                                        </a>
-                                                    <?php endif; ?>
+                                                        </div>
+                                                        <?php if ($pending === 'SUBMIT_OPINION' && $endId > 0): ?>
+                                                            <a href="<?= BASE_URL ?>/committee/referred/opinion?endorsement_id=<?= $endId ?>"
+                                                               class="shrink-0 rounded-md bg-primary px-2.5 py-1.5 text-[11px]
+                                                                      font-semibold text-white transition hover:bg-indigo-700
+                                                                      focus:outline-none focus:ring-2 focus:ring-primary
+                                                                      focus:ring-offset-1">
+                                                                Submit
+                                                            </a>
+                                                        <?php elseif ($pending === 'NEXT_ENDORSEMENT' && $endId > 0): ?>
+                                                            <a href="<?= BASE_URL ?>/committee/referred/opinion?endorsement_id=<?= $endId ?>"
+                                                               class="shrink-0 rounded-md border border-amber-300 bg-amber-50
+                                                                      px-2.5 py-1.5 text-[11px] font-semibold text-amber-800
+                                                                      transition hover:bg-amber-100 focus:outline-none
+                                                                      focus:ring-2 focus:ring-amber-500 focus:ring-offset-1">
+                                                                Issue #<?= $endNum + 1 ?>
+                                                            </a>
+                                                        <?php endif; ?>
+                                                </div>
+                                                <a href="<?= BASE_URL ?>/committee/referred/opinion-details?id=<?= (int) $doc['document_id'] ?>&amp;office_id=<?= $officeId ?>"
+                                                   class="inline-flex shrink-0 items-center gap-1 rounded-md border border-gray-200 bg-white
+                                                          px-2.5 py-1.5 text-[11px] font-semibold text-gray-700
+                                                          transition hover:border-primary hover:text-primary
+                                                          focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1">
+                                                    View
+                                                </a>
                                                 </div>
                                             <?php endforeach; ?>
                                         </div>
@@ -570,16 +586,38 @@ $hasFilter = $search !== '' || $filterDocType > 0;
 
                                 <!-- Action -->
                                 <td class="px-6 py-4 text-right">
-                                    <a href="<?= BASE_URL ?>/committee/referred/resolve?id=<?= (int) $doc['document_id'] ?>"
-                                       class="inline-flex items-center gap-1.5 rounded-lg border border-orange-200
-                                              bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700
-                                              hover:bg-orange-100 transition">
-                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                  d="M5 13l4 4L19 7"/>
-                                        </svg>
-                                        Resolve
-                                    </a>
+                                    <div class="flex flex-col items-end gap-2">
+                                        <?php if ($allCleared): ?>
+                                            <form method="POST" action="<?= BASE_URL ?>/committee/referred/resolve">
+                                                <input type="hidden" name="document_id" value="<?= (int) $doc['document_id'] ?>">
+                                                <input type="hidden" name="cycle_id" value="<?= (int) $doc['cycle_id'] ?>">
+                                                <input type="hidden" name="resolution" value="PROCEED_TO_AGENDA">
+                                                <button type="submit"
+                                                        class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600
+                                                               px-3 py-1.5 text-xs font-semibold text-white shadow-sm
+                                                               transition hover:bg-emerald-700 focus:outline-none
+                                                               focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1">
+                                                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                              d="M5 13l4 4L19 7"/>
+                                                    </svg>
+                                                    Proceed to Agenda
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
+                                        <?php if ($hasUnfavorable): ?>
+                                            <a href="<?= BASE_URL ?>/committee/referred/resolve?id=<?= (int) $doc['document_id'] ?>"
+                                               class="inline-flex items-center gap-1.5 rounded-lg border border-orange-200
+                                                      bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700
+                                                      hover:bg-orange-100 transition">
+                                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                          d="M5 13l4 4L19 7"/>
+                                                </svg>
+                                                Resolve
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
 
                             </tr>

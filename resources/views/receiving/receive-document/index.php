@@ -427,7 +427,10 @@ ob_start();
         </div>
     </form>
 
-    <?php $receiptDefaultDestination = 'ADMIN'; ?>
+    <?php
+    $receiptDefaultDestination = 'ADMIN';
+    $receiptAutoCheckRouting = false;
+    ?>
     <?php require __DIR__ . '/../../partials/tracking-slip.php'; ?>
 
 </div>

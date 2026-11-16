@@ -13,15 +13,16 @@
  *   $documentCommittees   array    [ document_id => [ ['id'=>.., 'name'=>..], ... ] ]
  *                                  Per-document assignment from agenda_committees or
  *                                  document_committees, depending on source.
- *   $availableCommittees  array    [{id, name}] unique committees across all selected docs
+ *   $availableCommittees  array    [{id, name}] active committees
  *   $defaultCommIds       int[]    Committee IDs pre-selected on first page load
  *   $existingReports      array    [{id, report_number, report_type, created_at,
- *                                    committee_names, document_count}] eligible reports
+ *                                    committee_ids, committee_names, document_count}] eligible reports
  *   $oldMode              string   Repopulate: 'existing' | 'new'
  *   $oldExistingId        int      Repopulate: existing_report_id
  *   $oldReportNum         string   Repopulate: report_number
  *   $oldSummary           string   Repopulate: summary_of_findings
  *   $oldCommIds           int[]    Repopulate: committee_ids (or $defaultCommIds on first load)
+ *   $oldExistingCommIds  int[]    Repopulate: selected existing-report committees
  *   $success              string|null
  *   $error                string|null
  *   $errors               array
@@ -38,6 +39,7 @@ $oldExistingId       = $oldExistingId       ?? 0;
 $oldReportNum        = $oldReportNum        ?? '';
 $oldSummary          = $oldSummary          ?? '';
 $oldCommIds          = $oldCommIds          ?? [];
+$oldExistingCommIds  = $oldExistingCommIds  ?? [];
 
 // Identify documents that have no committee assigned through their workflow source.
 $docsWithoutCommittee = [];
@@ -274,6 +276,7 @@ ob_start();
                             </div>
                         <?php else: ?>
                             <select name="existing_report_id" id="existing_report_id"
+                                    data-document-committee-ids="<?= htmlspecialchars(json_encode(array_map('intval', $defaultCommIds)), ENT_QUOTES, 'UTF-8') ?>"
                                     class="block w-full rounded-xl border border-gray-200 px-3 py-2 text-sm
                                            focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                                     aria-required="true">
@@ -289,11 +292,46 @@ ob_start();
                                         : '';
                                     ?>
                                     <option value="<?= (int) $rpt['id'] ?>"
+                                            data-committee-ids="<?= htmlspecialchars(json_encode($rpt['committee_ids'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                                             <?= $isSelected ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($typeLabel . ' #' . $rpt['report_number'] . $committees . $docLabel) ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
+
+                            <?php if (empty($availableCommittees)): ?>
+                                <p class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                                    No committees are available. Contact an administrator to review committee setup.
+                                </p>
+                            <?php else: ?>
+                                <div class="mt-4">
+                                    <p class="mb-2 text-sm font-semibold text-gray-700">Committees in this report</p>
+                                    <p class="mb-2 text-xs text-gray-400">
+                                        Active committees already assigned to this report and committees of the selected documents are included.
+                                    </p>
+                                    <div id="existingReportCommittees"
+                                         class="rounded-xl border border-gray-200 p-3 space-y-1.5 max-h-48 overflow-y-auto">
+                                        <?php foreach ($availableCommittees as $comm): ?>
+                                            <?php $isChecked = in_array((int) $comm['id'], $oldExistingCommIds, true); ?>
+                                            <?php $isDocumentCommittee = in_array((int) $comm['id'], $defaultCommIds, true); ?>
+                                            <label class="flex flex-wrap items-start gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700">
+                                                <input type="checkbox"
+                                                       name="existing_committee_ids[]"
+                                                       class="existing-report-committee-cb mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-emerald-600"
+                                                       value="<?= (int) $comm['id'] ?>"
+                                                       data-document-committee="<?= $isDocumentCommittee ? 'true' : 'false' ?>"
+                                                       <?= $isChecked ? 'checked' : '' ?>>
+                                                <span class="min-w-0 whitespace-normal break-words">
+                                                    <?= htmlspecialchars($comm['name']) ?>
+                                                </span>
+                                                <?php if ($isDocumentCommittee): ?>
+                                                    <span class="text-xs text-gray-400">(selected document)</span>
+                                                <?php endif; ?>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
 
@@ -307,8 +345,8 @@ ob_start();
                                 <span class="text-red-500" aria-hidden="true">*</span>
                             </p>
                             <p class="text-xs text-gray-400 mb-2">
-                                Pre-populated from the committees assigned to each selected document or agenda.
-                                Select at least one. Multiple committees produce a
+                                All active committees are listed. Committees assigned to the selected documents
+                                or agenda are pre-selected. Select at least one. Multiple committees produce a
                                 <strong>Joint Committee Report</strong>.
                             </p>
 
@@ -337,22 +375,23 @@ ob_start();
 
                             <?php if (empty($availableCommittees)): ?>
                                 <p class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-                                    No committees found for the selected documents.
-                                    Ensure the selected documents have at least one committee assigned.
+                                    No committees are available. Contact an administrator to review committee setup.
                                 </p>
                             <?php else: ?>
                                 <div class="rounded-xl border border-gray-200 p-3 space-y-1.5 max-h-48 overflow-y-auto">
                                     <?php foreach ($availableCommittees as $comm): ?>
                                         <?php $isChecked = in_array((int) $comm['id'], $oldCommIds, true); ?>
-                                        <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5
+                                        <label class="flex cursor-pointer flex-wrap items-start gap-2 rounded-lg px-2 py-1.5
                                                       hover:bg-gray-50 transition text-sm text-gray-700">
                                             <input type="checkbox"
                                                    name="committee_ids[]"
                                                    value="<?= (int) $comm['id'] ?>"
-                                                   class="share-committee-cb h-4 w-4 rounded border-gray-300
+                                                   class="share-committee-cb mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300
                                                           text-emerald-600 focus:ring-emerald-500"
                                                    <?= $isChecked ? 'checked' : '' ?>>
-                                            <?= htmlspecialchars($comm['name']) ?>
+                                            <span class="min-w-0 whitespace-normal break-words">
+                                                <?= htmlspecialchars($comm['name']) ?>
+                                            </span>
                                         </label>
                                     <?php endforeach; ?>
                                 </div>
@@ -482,6 +521,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const modeNewLabel      = document.getElementById('modeNewLabel');
     const existingPanel     = document.getElementById('existingReportPanel');
     const newPanel          = document.getElementById('newReportPanel');
+    const existingReportSelect = document.getElementById('existing_report_id');
+    const existingCommitteeCheckboxes = document.querySelectorAll('.existing-report-committee-cb');
     const typeIndicator     = document.getElementById('reportTypeIndicator');
     const summaryTextarea   = document.getElementById('summary_of_findings');
     const summaryCounter    = document.getElementById('summaryCharCount');
@@ -522,6 +563,28 @@ document.addEventListener('DOMContentLoaded', function () {
     if (modeExisting) modeExisting.addEventListener('change', syncMode);
     if (modeNew)      modeNew.addEventListener('change', syncMode);
     syncMode(); // apply initial state
+
+    if (existingReportSelect) {
+        existingReportSelect.addEventListener('change', function () {
+            const selectedOption = this.options[this.selectedIndex];
+            let committeeIds = [];
+            const documentCommitteeIds = JSON.parse(this.dataset.documentCommitteeIds || '[]').map(Number);
+            if (selectedOption && selectedOption.value) {
+                try {
+                    committeeIds = JSON.parse(selectedOption.getAttribute('data-committee-ids') || '[]')
+                        .map(Number);
+                } catch (error) {
+                    console.error('Unable to load committees for the selected report.', error);
+                }
+            }
+            committeeIds = Array.from(new Set(committeeIds.concat(documentCommitteeIds)));
+            existingCommitteeCheckboxes.forEach(function (checkbox) {
+                const isDocumentCommittee = checkbox.dataset.documentCommittee === 'true';
+                checkbox.checked = isDocumentCommittee || committeeIds.includes(Number(checkbox.value));
+            });
+        });
+        existingReportSelect.dispatchEvent(new Event('change'));
+    }
 
     /* ── Committee checkboxes → live report-type indicator ───────────────── */
     function updateReportTypeIndicator() {
@@ -679,6 +742,21 @@ document.addEventListener('DOMContentLoaded', function () {
                         hint.className = 'mt-1 text-xs font-medium text-red-600';
                         hint.textContent = 'Please select a Committee Report.';
                         select.parentNode.appendChild(hint);
+                    }
+                }
+                if (document.querySelectorAll('.existing-report-committee-cb:checked').length === 0) {
+                    e.preventDefault();
+                    const firstCommittee = document.querySelector('.existing-report-committee-cb:not(:disabled)');
+                    if (firstCommittee) firstCommittee.focus();
+                    valid = false;
+                    let hint = document.getElementById('existingCommitteeHint');
+                    if (!hint) {
+                        hint = document.createElement('p');
+                        hint.id = 'existingCommitteeHint';
+                        hint.className = 'mt-1 text-xs font-medium text-red-600';
+                        hint.textContent = 'Select at least one committee for this report.';
+                        const list = document.getElementById('existingReportCommittees');
+                        if (list) list.parentNode.appendChild(hint);
                     }
                 }
             } else {

@@ -51,19 +51,45 @@ class CommitteeReferredController
 
     public function opinionStatusNameFor(string $opinionType, int $endorsementNumber): string
     {
-        return match ([$opinionType, $endorsementNumber]) {
-            ['FAVORABLE', 1], ['FAVORABLE', 2] => 'Favorable',
-            ['UNFAVORABLE', 1] => 'For Second Endorsement',
-            ['UNFAVORABLE', 2] => 'Resolve',
-            default => throw new InvalidArgumentException('Invalid opinion type or endorsement number.'),
-        };
+        if ($endorsementNumber < 1) {
+            throw new InvalidArgumentException('Endorsement number must be positive.');
+        }
+        if ($opinionType === 'FAVORABLE') {
+            return 'Favorable';
+        }
+        if ($opinionType !== 'UNFAVORABLE' || $endorsementNumber === PHP_INT_MAX) {
+            throw new InvalidArgumentException('Invalid opinion type or endorsement number.');
+        }
+
+        $nextNumber = $endorsementNumber + 1;
+        $nextLabel = $nextNumber === 2 ? 'Second' : $this->endorsementOrdinal($nextNumber);
+        return "For {$nextLabel} Endorsement";
+    }
+
+    public function endorsementOrdinal(int $number): string
+    {
+        if ($number < 1) {
+            throw new InvalidArgumentException('Endorsement number must be positive.');
+        }
+
+        $lastTwoDigits = $number % 100;
+        $suffix = ($lastTwoDigits >= 11 && $lastTwoDigits <= 13)
+            ? 'th'
+            : match ($number % 10) {
+                1 => 'st',
+                2 => 'nd',
+                3 => 'rd',
+                default => 'th',
+            };
+
+        return $number . $suffix;
     }
 
     /**
      * Summarize the latest endorsement for each office for the For Opinion tab.
      *
      * @return array{
-     *     total:int, reviewed:int, cleared:int, awaiting_second:int, pending:int,
+     *     total:int, reviewed:int, cleared:int, awaiting_next:int, pending:int,
      *     offices:array<int, array<string, mixed>>
      * }
      */
@@ -101,8 +127,38 @@ class CommitteeReferredController
 
         $reviewed = 0;
         $cleared = 0;
-        $awaitingSecond = 0;
+        $awaitingNext = 0;
         $offices = [];
+        $historyByOffice = [];
+
+        foreach ($endorsements as $endorsement) {
+            $officeId = (int) ($endorsement['opinion_office_id'] ?? 0);
+            if ($officeId <= 0) {
+                continue;
+            }
+
+            $opinionType = strtoupper(trim((string) ($endorsement['opinion_type'] ?? '')));
+            $statusName = trim((string) ($endorsement['opinion_status_name'] ?? ''));
+            if ($statusName === '' || $statusName === 'Pending') {
+                $statusName = $opinionType !== ''
+                    ? $this->opinionStatusNameFor(
+                        $opinionType,
+                        (int) ($endorsement['endorsement_number'] ?? 1)
+                    )
+                    : 'Pending';
+            }
+
+            $files = $endorsement['issue_files'] ?? ['opinion' => [], 'compliance' => []];
+            $historyByOffice[$officeId][] = [
+                'endorsement_number' => (int) ($endorsement['endorsement_number'] ?? 1),
+                'opinion_type' => $opinionType,
+                'status_name' => $statusName,
+                'submitted_at' => $endorsement['submission_submitted_at'] ?? null,
+                'submission_remarks' => trim((string) ($endorsement['submission_remarks'] ?? '')),
+                'endorsement_remarks' => trim((string) ($endorsement['endorsement_remarks'] ?? '')),
+                'files' => $files,
+            ];
+        }
 
         foreach ($latestByOffice as $officeId => $endorsement) {
             $hasSubmission = !empty($endorsement['submission_id']);
@@ -114,40 +170,34 @@ class CommitteeReferredController
             $displayOpinionType = $opinionType;
 
             if ($hasSubmission && ($displayStatusName === '' || $displayStatusName === 'Pending')) {
-                $displayStatusName = match ([$opinionType, $endorsementNumber]) {
-                    ['FAVORABLE', 1], ['FAVORABLE', 2] => 'Favorable',
-                    ['UNFAVORABLE', 1] => 'For Second Endorsement',
-                    ['UNFAVORABLE', 2] => 'Resolve',
-                    default => $displayStatusName,
-                };
+                $displayStatusName = $opinionType !== ''
+                    ? $this->opinionStatusNameFor($opinionType, $endorsementNumber)
+                    : $displayStatusName;
             } elseif (!$hasSubmission && $lastSubmitted !== null) {
                 $displayStatusName = trim((string) ($lastSubmitted['opinion_status_name'] ?? ''));
                 $displayOpinionType = strtoupper(trim((string) ($lastSubmitted['opinion_type'] ?? '')));
 
                 if ($displayStatusName === '' || $displayStatusName === 'Pending') {
                     $lastSubmittedNumber = (int) ($lastSubmitted['endorsement_number'] ?? 1);
-                    $displayStatusName = match ([$displayOpinionType, $lastSubmittedNumber]) {
-                        ['FAVORABLE', 1], ['FAVORABLE', 2] => 'Favorable',
-                        ['UNFAVORABLE', 1] => 'For Second Endorsement',
-                        ['UNFAVORABLE', 2] => 'Resolve',
-                        default => $displayStatusName,
-                    };
+                    $displayStatusName = $displayOpinionType !== ''
+                        ? $this->opinionStatusNameFor($displayOpinionType, $lastSubmittedNumber)
+                        : $displayStatusName;
                 }
             }
             $isCleared = $hasSubmission && $opinionType === 'FAVORABLE';
-            $isAwaitingSecond = $hasSubmission
+            $isAwaitingNext = $hasSubmission
                 && $opinionType === 'UNFAVORABLE'
-                && $endorsementNumber === 1
-                && $displayStatusName === 'For Second Endorsement';
+                && $displayStatusName === $this->opinionStatusNameFor('UNFAVORABLE', $endorsementNumber);
 
             $reviewed += $hasSubmission ? 1 : 0;
             $cleared += $isCleared ? 1 : 0;
-            $awaitingSecond += $isAwaitingSecond ? 1 : 0;
+            $awaitingNext += $isAwaitingNext ? 1 : 0;
 
             $offices[$officeId] = $endorsement + [
+                'issue_history' => $historyByOffice[$officeId] ?? [],
                 'cleared' => $isCleared,
                 'reviewed' => $hasSubmission,
-                'awaiting_second_endorsement' => $isAwaitingSecond,
+                'awaiting_next_endorsement' => $isAwaitingNext,
                 'display_status_name' => $displayStatusName,
                 'display_opinion_type' => $displayOpinionType,
                 'awaiting_current_opinion' => !$hasSubmission && (int) ($endorsement['endorsement_id'] ?? 0) > 0,
@@ -156,7 +206,7 @@ class CommitteeReferredController
                     : null,
                 'pending_action' => !$hasSubmission
                     ? 'SUBMIT_OPINION'
-                    : ($isAwaitingSecond ? 'SECOND_ENDORSEMENT' : null),
+                    : ($isAwaitingNext ? 'NEXT_ENDORSEMENT' : null),
             ];
         }
 
@@ -165,7 +215,7 @@ class CommitteeReferredController
             'total' => $total,
             'reviewed' => $reviewed,
             'cleared' => $cleared,
-            'awaiting_second' => $awaitingSecond,
+            'awaiting_next' => $awaitingNext,
             'pending' => $total - $cleared,
             'offices' => $offices,
         ];
@@ -530,25 +580,27 @@ class CommitteeReferredController
             $otherAttachments = $otherFilesStmt->fetchAll();
         }
 
-        // Determine if second endorsement is available
-        $canSecondEndorse = false;
-        if ($alreadySubmitted) {
-            // Check submission outcome
-            $subData = $this->pdo->prepare("
-                SELECT opinion_type FROM committee_endorsement_submissions
-                WHERE endorsement_id = ? ORDER BY id DESC LIMIT 1
+        // Any Unfavorable submission may be followed by another numbered endorsement.
+        $canIssueNextEndorsement = false;
+        $nextEndorsementExists = false;
+        $nextEndorsementNumber = (int) $endorsement['endorsement_number'] + 1;
+        if ($alreadySubmitted && $submission['opinion_type'] === 'UNFAVORABLE') {
+            $expectedNextStatus = $this->opinionStatusNameFor(
+                'UNFAVORABLE',
+                (int) $endorsement['endorsement_number']
+            );
+            $statusIsAwaitingNext = ($endorsement['opinion_status_name'] ?? '') === $expectedNextStatus;
+            $hasNext = $this->pdo->prepare("
+                SELECT id FROM committee_cycle_endorsements
+                WHERE cycle_id = ? AND opinion_office_id = ? AND endorsement_number = ? LIMIT 1
             ");
-            $subData->execute([$endorsementId]);
-            $sub = $subData->fetch();
-            if ($sub && $sub['opinion_type'] === 'UNFAVORABLE' && (int) $endorsement['endorsement_number'] === 1) {
-                // Check no second endorsement already exists
-                $hasSecond = $this->pdo->prepare("
-                    SELECT id FROM committee_cycle_endorsements
-                    WHERE cycle_id = ? AND opinion_office_id = ? AND endorsement_number = 2 LIMIT 1
-                ");
-                $hasSecond->execute([$cycle['id'], $endorsement['opinion_office_id']]);
-                $canSecondEndorse = !$hasSecond->fetch();
-            }
+            $hasNext->execute([
+                $cycle['id'],
+                $endorsement['opinion_office_id'],
+                $nextEndorsementNumber,
+            ]);
+            $nextEndorsementExists = (bool) $hasNext->fetch();
+            $canIssueNextEndorsement = $statusIsAwaitingNext && !$nextEndorsementExists;
         }
 
         $officeRow = $this->pdo->prepare("
@@ -559,6 +611,38 @@ class CommitteeReferredController
 
         $pageTitle = 'Submit Opinion';
         require __DIR__ . '/../../../resources/views/committee/referred/opinion.php';
+    }
+
+    /** Show issue history, remarks, and submitted files for one opinion office. */
+    public function opinionDetailsShow(): void
+    {
+        $userId = auth_id();
+        if ($userId === null) {
+            flash_set('error', 'You must be logged in.');
+            redirect('login');
+        }
+
+        $documentId = (int) ($_GET['id'] ?? 0);
+        $officeId = (int) ($_GET['office_id'] ?? 0);
+        if ($documentId <= 0 || $officeId <= 0) {
+            flash_set('error', 'Invalid document or opinion office.');
+            redirect('committee/referred?tab=for_opinion');
+        }
+
+        [$document, $cycle] = $this->requireReferredDocument($documentId);
+        $endorsements = $this->latestCycleEndorsementsWithOffice((int) $cycle['id']);
+        $endorsements = $this->loadOpinionIssueFiles($endorsements, $documentId);
+        $progress = $this->summarizeOpinionProgress($endorsements);
+        if (!isset($progress['offices'][$officeId])) {
+            flash_set('error', 'The selected opinion office is not part of this Committee cycle.');
+            redirect('committee/referred?tab=for_opinion');
+        }
+        $progress['offices'] = [$officeId => $progress['offices'][$officeId]];
+        $progress['total'] = 1;
+        $progress['cleared'] = !empty($progress['offices'][$officeId]['cleared']) ? 1 : 0;
+
+        $pageTitle = 'Opinion Office Details';
+        require __DIR__ . '/../../../resources/views/committee/referred/opinion-details.php';
     }
 
     // =========================================================================
@@ -623,7 +707,7 @@ class CommitteeReferredController
         ");
         $dupCheck->execute([$endorsementId]);
         if ($dupCheck->fetch()) {
-            flash_set('error', 'Opinion already submitted for this endorsement. To re-endorse, use the second endorsement option.');
+            flash_set('error', 'Opinion already submitted for this endorsement. Issue the next endorsement to continue.');
             redirect('committee/referred?tab=for_opinion');
         }
 
@@ -668,16 +752,15 @@ class CommitteeReferredController
             redirect('committee/referred/opinion?endorsement_id=' . $endorsementId);
         }
 
-        // ── Look up statuses ──────────────────────────────────────────────────
         $opinionStatusName  = $this->opinionStatusNameFor(
             $opinionType,
             (int) $endorsement['endorsement_number']
         );
-        $opinionStatus      = $this->requireOpinionStatus($opinionStatusName);
 
         $auditData = null;
         try {
             $this->pdo->beginTransaction();
+            $opinionStatus = $this->ensureOpinionStatus($opinionStatusName);
 
             // 1. Insert opinion file attachment
             $opPendingLogs = $this->docService->insertStagedAttachments(
@@ -800,19 +883,17 @@ class CommitteeReferredController
         }
 
         old_clear();
-        $successMessage = match ($opinionStatusName) {
-            'For Second Endorsement' => 'Opinion submitted. This office is now awaiting a second endorsement.',
-            'Resolve' => 'Opinion submitted. The cycle is ready for resolution.',
-            default => "Opinion submitted successfully ({$opinionType}).",
-        };
+        $successMessage = $opinionType === 'UNFAVORABLE'
+            ? 'Opinion submitted. This office is now awaiting endorsement #'
+                . ((int) $endorsement['endorsement_number'] + 1) . '.'
+            : "Opinion submitted successfully ({$opinionType}).";
         flash_set('success', $successMessage);
         redirect('committee/referred?tab=for_opinion');
     }
 
     // =========================================================================
-    // 6. Second endorsement — store
-    //    Triggered from For Opinion tab when office is UNFAVORABLE on attempt 1.
-    //    Uses endorseStore() logic but for endorsement_number = 2.
+    // 6. Next endorsement — store
+    //    Triggered from For Opinion after any Unfavorable submission.
     // =========================================================================
 
     public function secondEndorseStore(): void
@@ -832,34 +913,36 @@ class CommitteeReferredController
         $cycle            = $this->requireCycle($firstEndorsement['cycle_id']);
         $documentId       = (int) $cycle['document_id'];
 
-        // Validate: first endorsement must be UNFAVORABLE and endorsement_number = 1
-        if ((int) $firstEndorsement['endorsement_number'] !== 1) {
-            flash_set('error', 'Second endorsement can only be created from the first endorsement.');
+        $sourceNumber = (int) $firstEndorsement['endorsement_number'];
+        if ($sourceNumber < 1 || $sourceNumber >= PHP_INT_MAX) {
+            flash_set('error', 'Unable to issue another endorsement because the endorsement number is invalid.');
             redirect('committee/referred?tab=for_opinion');
         }
+        $nextNumber = $sourceNumber + 1;
         $subCheck = $this->pdo->prepare("
             SELECT opinion_type FROM committee_endorsement_submissions
             WHERE endorsement_id = ? ORDER BY id DESC LIMIT 1
         ");
         $subCheck->execute([$endorsementId]);
-        $firstSub = $subCheck->fetch();
-        if (!$firstSub || $firstSub['opinion_type'] !== 'UNFAVORABLE') {
-            flash_set('error', 'Second endorsement is only allowed after an Unfavorable first opinion.');
+        $sourceSubmission = $subCheck->fetch();
+        if (!$sourceSubmission || $sourceSubmission['opinion_type'] !== 'UNFAVORABLE') {
+            flash_set('error', 'A next endorsement is only allowed after an Unfavorable opinion.');
             redirect('committee/referred?tab=for_opinion');
         }
-        if (($firstEndorsement['opinion_status_name'] ?? '') !== 'For Second Endorsement') {
-            flash_set('error', 'This office is not awaiting a second endorsement.');
+        $expectedNextStatus = $this->opinionStatusNameFor('UNFAVORABLE', $sourceNumber);
+        if (($firstEndorsement['opinion_status_name'] ?? '') !== $expectedNextStatus) {
+            flash_set('error', 'This office is not awaiting another endorsement.');
             redirect('committee/referred?tab=for_opinion');
         }
 
-        // Prevent duplicate second endorsement
+        // Prevent duplicate next endorsement
         $dupStmt = $this->pdo->prepare("
             SELECT id FROM committee_cycle_endorsements
-            WHERE cycle_id = ? AND opinion_office_id = ? AND endorsement_number = 2 LIMIT 1
+            WHERE cycle_id = ? AND opinion_office_id = ? AND endorsement_number = ? LIMIT 1
         ");
-        $dupStmt->execute([$cycle['id'], $firstEndorsement['opinion_office_id']]);
+        $dupStmt->execute([$cycle['id'], $firstEndorsement['opinion_office_id'], $nextNumber]);
         if ($dupStmt->fetch()) {
-            flash_set('error', 'A second endorsement already exists for this office and cycle.');
+            flash_set('error', "Endorsement #{$nextNumber} already exists for this office and cycle.");
             redirect('committee/referred?tab=for_opinion');
         }
 
@@ -871,8 +954,13 @@ class CommitteeReferredController
                 INSERT INTO committee_cycle_endorsements
                     (cycle_id, opinion_office_id, endorsement_number,
                      opinion_status_id, requested_at, remarks)
-                VALUES (?, ?, 2, NULL, NOW(), ?)
-            ")->execute([$cycle['id'], $firstEndorsement['opinion_office_id'], $remarks !== '' ? $remarks : null]);
+                VALUES (?, ?, ?, NULL, NOW(), ?)
+            ")->execute([
+                $cycle['id'],
+                $firstEndorsement['opinion_office_id'],
+                $nextNumber,
+                $remarks !== '' ? $remarks : null,
+            ]);
 
             $newEndorsementId = (int) $this->pdo->lastInsertId();
 
@@ -893,12 +981,13 @@ class CommitteeReferredController
                 $userId,
                 $docRow['current_status_id'],
                 $docRow['current_status_id'],
-                'Second endorsement issued to opinion office.' . ($remarks !== '' ? "\nRemarks: {$remarks}" : ''),
+                "Endorsement #{$nextNumber} issued to opinion office."
+                    . ($remarks !== '' ? "\nRemarks: {$remarks}" : ''),
                 json_encode([
                     'original_endorsement_id' => $endorsementId,
                     'new_endorsement_id'       => $newEndorsementId,
                     'cycle_id'                 => $cycle['id'],
-                    'endorsement_number'       => 2,
+                    'endorsement_number'       => $nextNumber,
                     'office_id'                => $firstEndorsement['opinion_office_id'],
                     'remarks'                  => $remarks,
                     'issued_by'                => $userId,
@@ -910,13 +999,14 @@ class CommitteeReferredController
             $this->pdo->commit();
 
             audit_log('UPDATE', 'Document', (string) $documentId, null, [
-                'action'            => 'committee_second_endorsement',
+                'action'            => 'committee_next_opinion_endorsement',
                 'new_endorsement_id'=> $newEndorsementId,
                 'original_endorsement_id' => $endorsementId,
+                'endorsement_number' => $nextNumber,
                 'office_id'         => $firstEndorsement['opinion_office_id'],
                 'cycle_id'          => $cycle['id'],
                 'remarks'           => $remarks,
-            ], "Second endorsement issued for document ID {$documentId} by {$username}");
+            ], "Endorsement #{$nextNumber} issued for document ID {$documentId} by {$username}");
 
         } catch (Throwable $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
@@ -925,7 +1015,7 @@ class CommitteeReferredController
             redirect('committee/referred?tab=for_opinion');
         }
 
-        flash_set('success', 'Second endorsement issued. Opinion can now be submitted.');
+        flash_set('success', "Endorsement #{$nextNumber} issued. Opinion can now be submitted.");
         redirect('committee/referred/opinion?endorsement_id=' . $newEndorsementId);
     }
 
@@ -956,7 +1046,7 @@ class CommitteeReferredController
         }
 
         // Load endorsements for this cycle to show status summary
-        $endorsements = $this->latestCycleEndorsements($cycle['id']);
+        $endorsements = $this->latestCycleEndorsementsWithOffice((int) $cycle['id']);
         $submissions  = $this->loadSubmissionsForEndorsements($endorsements);
 
         $pageTitle = 'Resolve Committee Cycle';
@@ -1905,6 +1995,37 @@ class CommitteeReferredController
         return $row;
     }
 
+    /**
+     * Resolve an opinion status and create its workflow label if this is a new
+     * numbered follow-up state (for example, "For 3rd Endorsement").
+     */
+    private function ensureOpinionStatus(string $name): array
+    {
+        if ($name === 'Favorable') {
+            return $this->requireOpinionStatus($name);
+        }
+
+        $description = "Unfavorable opinion submitted; awaiting {$name}.";
+
+        $sortOrder = preg_match('/^For (\d+)(?:st|nd|rd|th) Endorsement$/', $name, $matches)
+            ? 20 + min((int) $matches[1], 1000000)
+            : 30;
+
+        $this->pdo->prepare("
+            INSERT INTO opinion_statuses
+                (name, description, sort_order, is_active, is_deleted)
+            VALUES (?, ?, ?, 1, 0)
+            ON DUPLICATE KEY UPDATE
+                id = LAST_INSERT_ID(id),
+                description = VALUES(description),
+                sort_order = VALUES(sort_order),
+                is_active = 1,
+                is_deleted = 0
+        ")->execute([$name, $description, $sortOrder]);
+
+        return $this->requireOpinionStatus($name);
+    }
+
     /** Require and return the Committee role ID; redirect if not found. */
     private function requireCommitteeRoleId(): int
     {
@@ -1945,6 +2066,7 @@ class CommitteeReferredController
     {
         $stmt = $this->pdo->prepare("
             SELECT
+                cce.id              AS id,
                 cce.id              AS endorsement_id,
                 cce.cycle_id,
                 cce.opinion_office_id,
@@ -1957,6 +2079,8 @@ class CommitteeReferredController
                 os.name             AS opinion_status_name,
                 ces.id              AS submission_id,
                 ces.opinion_type,
+                ces.opinion_file_attachment_id,
+                ces.compliance_file_attachment_id,
                 ces.submitted_by,
                 ces.submitted_at    AS submission_submitted_at,
                 ces.remarks         AS submission_remarks
@@ -1969,6 +2093,99 @@ class CommitteeReferredController
         ");
         $stmt->execute([$cycleId]);
         return $stmt->fetchAll();
+    }
+
+    /** Load each issue's Opinion and Compliance files, including legacy file links. */
+    private function loadOpinionIssueFiles(array $endorsements, int $documentId): array
+    {
+        $submissionIds = [];
+        $legacyLinks = [];
+        $attachmentIds = [];
+
+        foreach ($endorsements as $endorsement) {
+            $submissionId = (int) ($endorsement['submission_id'] ?? 0);
+            if ($submissionId <= 0) {
+                continue;
+            }
+            $submissionIds[] = $submissionId;
+
+            foreach ([
+                'opinion' => 'opinion_file_attachment_id',
+                'compliance' => 'compliance_file_attachment_id',
+            ] as $fileType => $column) {
+                $attachmentId = (int) ($endorsement[$column] ?? 0);
+                if ($attachmentId > 0) {
+                    $legacyLinks[] = [
+                        'submission_id' => $submissionId,
+                        'attachment_id' => $attachmentId,
+                        'file_type' => $fileType,
+                    ];
+                    $attachmentIds[] = $attachmentId;
+                }
+            }
+        }
+
+        $filesBySubmission = [];
+        $submissionIds = array_values(array_unique($submissionIds));
+        if ($submissionIds !== []) {
+            $placeholders = implode(',', array_fill(0, count($submissionIds), '?'));
+            $filesStmt = $this->pdo->prepare("
+                SELECT cesf.submission_id, cesf.file_type,
+                       da.id, da.file_name, da.stored_path, da.file_size
+                FROM committee_endorsement_submission_files cesf
+                INNER JOIN document_attachments da ON da.id = cesf.attachment_id
+                WHERE cesf.submission_id IN ({$placeholders})
+                ORDER BY cesf.id
+            ");
+            $filesStmt->execute($submissionIds);
+            foreach ($filesStmt->fetchAll() as $file) {
+                $fileType = strtolower((string) $file['file_type']);
+                $filesBySubmission[(int) $file['submission_id']][$fileType][] = $file;
+            }
+        }
+
+        $attachmentIds = array_values(array_unique($attachmentIds));
+        if ($attachmentIds !== []) {
+            $placeholders = implode(',', array_fill(0, count($attachmentIds), '?'));
+            $legacyStmt = $this->pdo->prepare("
+                SELECT id, file_name, stored_path, file_size
+                FROM document_attachments
+                WHERE id IN ({$placeholders}) AND document_id = ?
+            ");
+            $legacyStmt->execute([...$attachmentIds, $documentId]);
+            $attachmentsById = [];
+            foreach ($legacyStmt->fetchAll() as $file) {
+                $attachmentsById[(int) $file['id']] = $file;
+            }
+
+            foreach ($legacyLinks as $link) {
+                $file = $attachmentsById[$link['attachment_id']] ?? null;
+                if ($file === null) {
+                    continue;
+                }
+                $existingIds = array_map(
+                    'intval',
+                    array_column(
+                        $filesBySubmission[$link['submission_id']][$link['file_type']] ?? [],
+                        'id'
+                    )
+                );
+                if (!in_array($link['attachment_id'], $existingIds, true)) {
+                    $filesBySubmission[$link['submission_id']][$link['file_type']][] = $file;
+                }
+            }
+        }
+
+        foreach ($endorsements as &$endorsement) {
+            $submissionId = (int) ($endorsement['submission_id'] ?? 0);
+            $endorsement['issue_files'] = [
+                'opinion' => $filesBySubmission[$submissionId]['opinion'] ?? [],
+                'compliance' => $filesBySubmission[$submissionId]['compliance'] ?? [],
+            ];
+        }
+        unset($endorsement);
+
+        return $endorsements;
     }
 
     /** Load submission rows keyed by endorsement_id. */

@@ -11,23 +11,20 @@
  * 4. Invalid file types, oversized files, partial upload failures and
  *    unauthorized submissions are handled safely.
  * 5. Existing review (listing) and download behaviour still resolves.
- * 6. The UI shows the Compliance upload area whenever the outcome is
- *    Unfavorable — including the second (final) endorsement — and hides it for
- *    any other outcome.
+ * 6. The UI shows the Compliance upload area for every Unfavorable endorsement
+ *    and hides it for any other outcome.
  * 7. A direct POST that attaches Compliance files for any other outcome is
  *    rejected server-side (hiding the control is not the only guard).
  * 8. Changing the outcome to Favorable never deletes earlier Compliance files.
  * 9. End-to-end: a first Unfavorable opinion plus Compliance persists every file
  *    row and moves the endorsement to "For Second Endorsement".
- * 10. End-to-end: the second review may be Favorable (existing favourable
- *     workflow) or Unfavorable + Compliance (moves to "Resolve"), and the
- *     second Unfavorable never starts another endorsement cycle.
- * 11. opinion_statuses is the only source of truth — no duplicate rows and no
- *     rows inserted by a submission.
+ * 10. End-to-end: repeated Unfavorable + Compliance opinions allow the next
+ *     numbered endorsement, with Favorable completing the office review.
+ * 11. opinion_statuses is the only source of truth — dynamically numbered
+ *     states are reused and duplicate status rows are never created.
  * 12. The For Opinion progress indicator advances only for a *cleared*
- *     (Favorable) office — an Unfavorable opinion, whether it is awaiting its
- *     second endorsement or has moved to Resolve, never advances it, and the
- *     office exposes the correct pending action instead.
+ *     (Favorable) office — every Unfavorable opinion can continue to the next
+ *     numbered endorsement and never advances the indicator.
  *
  * Strategy
  * --------
@@ -403,8 +400,10 @@ $dirs[]    = $tmpDir;
 echo "Committee — Referred Documents: multiple Opinion / Compliance uploads" . PHP_EOL;
 
 try {
-    // Baseline for "submissions must never insert into opinion_statuses".
-    $statusRowsBefore = (int) $pdo->query("SELECT COUNT(*) FROM opinion_statuses")->fetchColumn();
+    $opinionStatusNamesBefore = array_column(
+        $pdo->query("SELECT name FROM opinion_statuses")->fetchAll(),
+        'name'
+    );
 
     // ══════════════════════════════════════════════════════════════════════
     section('1. SCHEMA');
@@ -465,6 +464,26 @@ try {
     assert_test(
         "SCHEMA: document_attachments.attachment_type includes OPINION_FILE and COMPLIANCE_FILE",
         stripos($attTypeCol, "'OPINION_FILE'") !== false && stripos($attTypeCol, "'COMPLIANCE_FILE'") !== false
+    );
+
+    $endorsementNumberColumn = $pdo->query(
+        "SHOW COLUMNS FROM committee_cycle_endorsements LIKE 'endorsement_number'"
+    )->fetch();
+    $endorsementChecks = $pdo->query("
+        SELECT COUNT(*)
+        FROM information_schema.CHECK_CONSTRAINTS cc
+        JOIN information_schema.TABLE_CONSTRAINTS tc
+          ON tc.CONSTRAINT_SCHEMA = cc.CONSTRAINT_SCHEMA
+         AND tc.CONSTRAINT_NAME = cc.CONSTRAINT_NAME
+        WHERE tc.TABLE_SCHEMA = DATABASE()
+          AND tc.TABLE_NAME = 'committee_cycle_endorsements'
+          AND cc.CHECK_CLAUSE LIKE '%endorsement_number%'
+    ")->fetchColumn();
+    assert_test(
+        'SCHEMA: endorsement_number supports repeated endorsements without a 1-or-2 check',
+        $endorsementNumberColumn !== false
+            && stripos((string) $endorsementNumberColumn['Type'], 'bigint unsigned') !== false
+            && (int) $endorsementChecks === 0
     );
 
     $attIdx  = $pdo->query("SHOW INDEX FROM document_attachments")->fetchAll();
@@ -1019,10 +1038,10 @@ try {
         strpos($view, 'complianceInput.disabled = !offered;') !== false
     );
     assert_test(
-        'UI: a second review offers the Compliance step too — its Unfavorable outcome requires it',
+        'UI: follow-up endorsements offer the Compliance step — every Unfavorable outcome requires it',
         strpos($view, 'data-second-review') === false
-            && strpos($view, 'Compliance file required; moves the cycle to Resolve.') !== false
-            && strpos($view, '$isSecondReview    = $endorsementNumber > 1;') !== false
+            && strpos($view, 'Compliance file required; another endorsement may follow if still Unfavorable.') !== false
+            && strpos($view, '$isFollowUpReview  = $endorsementNumber > 1;') !== false
     );
     assert_test(
         'UI: the client pre-flight only demands a compliance file when the step is offered',
@@ -1348,13 +1367,7 @@ try {
         SELECT id FROM opinion_statuses
          WHERE name = 'For Second Endorsement' AND is_active = 1 AND is_deleted = 0 LIMIT 1
     ")->fetchColumn();
-    $resolveId = (int) $pdo->query("
-        SELECT id FROM opinion_statuses
-         WHERE name = 'Resolve' AND is_active = 1 AND is_deleted = 0 LIMIT 1
-    ")->fetchColumn();
-
     assert_test('E2E: opinion_statuses provides a "For Second Endorsement" row', $forSecondEndorsementId > 0);
-    assert_test('E2E: opinion_statuses provides a "Resolve" row', $resolveId > 0);
 
     [$wfDocId, $wfCycleId] = $newReferredDocument();
     $wfEndorsement1        = $endorsementOn($wfCycleId, 1);
@@ -1374,8 +1387,8 @@ try {
         $probeRound1['error'] === '' && $probeRound1['errors'] === []
     );
     assert_test(
-        'E2E: the success flash announces the move to For Second Endorsement',
-        strpos($probeRound1['success'], 'second endorsement') !== false
+        'E2E: the success flash announces the next numbered endorsement',
+        strpos($probeRound1['success'], 'awaiting endorsement #2') !== false
     );
 
     $wfSub = $pdo->prepare("SELECT * FROM committee_endorsement_submissions WHERE endorsement_id = ? LIMIT 1");
@@ -1437,7 +1450,7 @@ try {
     );
 
     // ══════════════════════════════════════════════════════════════════════
-    section('12. E2E — SECOND REVIEW: FAVORABLE OR UNFAVORABLE → RESOLVE');
+    section('12. E2E — UNLIMITED NUMBERED ENDORSEMENTS');
     // ══════════════════════════════════════════════════════════════════════
     [$wf2DocId, $wf2CycleId] = $newReferredDocument();
     $wf2Endorsement1         = $endorsementOn($wf2CycleId, 1);
@@ -1461,78 +1474,32 @@ try {
             === $forSecondEndorsementId
     );
 
-    // ── 12a. The second review is FAVORABLE ───────────────────────────────
-    $wf2Endorsement2Fav = $endorsementOn($wf2CycleId, 2);
-    $probeFav = opinion_store_e2e_probe($root, $userId, [
-        'endorsement_id' => $wf2Endorsement2Fav,
-        'opinion_type'   => 'FAVORABLE',
-    ], ['opinion_files' => $e2eFiles(['Opinion Y2.pdf'], [$pdfPath])]);
-
-    assert_test(
-        'E2E: a second review may be recorded as Favorable',
-        $probeFav['error'] === '' && $probeFav['errors'] === []
-    );
-    assert_test(
-        'E2E: a Favorable second review follows the existing favorable workflow status',
-        (int) $pdo->query("SELECT opinion_status_id FROM committee_cycle_endorsements WHERE id = {$wf2Endorsement2Fav}")->fetchColumn()
-            === $favStatusId
-    );
-    $favLinks = load_submission_files($pdo, $wf2Endorsement2Fav);
-    assert_test(
-        'E2E: a Favorable second review keeps its opinion file and no compliance file',
-        count($favLinks['opinion']) === 1 && count($favLinks['compliance']) === 0
-    );
-
-    // ── 12b. The second review is UNFAVORABLE + Compliance → Resolve ──────
-    $wf2Endorsement2Unf = $endorsementOn($wf2CycleId, 2);
-    $probeUnfav = opinion_store_e2e_probe($root, $userId, [
-        'endorsement_id' => $wf2Endorsement2Unf,
+    // ── 12a. Second review is Unfavorable → endorsement #3 ────────────────
+    $wf2Endorsement2 = $endorsementOn($wf2CycleId, 2);
+    $probeUnfav2 = opinion_store_e2e_probe($root, $userId, [
+        'endorsement_id' => $wf2Endorsement2,
         'opinion_type'   => 'UNFAVORABLE',
     ], [
-        'opinion_files'    => $e2eFiles(['Opinion Y3.pdf'], [$pdfPath]),
-        'compliance_files' => $e2eFiles(['Compliance Y3-a.pdf', 'Compliance Y3-b.png'], [$pdfPath, $pngPath]),
+        'opinion_files'    => $e2eFiles(['Opinion Y2.pdf'], [$pdfPath]),
+        'compliance_files' => $e2eFiles(['Compliance Y2.pdf'], [$pdfPath]),
     ]);
-
     assert_test(
-        'E2E: a second review may be recorded as Unfavorable with its Compliance files',
-        $probeUnfav['error'] === '' && $probeUnfav['errors'] === []
+        'E2E: a second Unfavorable review is saved with Compliance files',
+        $probeUnfav2['error'] === '' && $probeUnfav2['errors'] === []
+    );
+    $thirdStatusId = (int) $pdo->query("
+        SELECT id FROM opinion_statuses
+        WHERE name = 'For 3rd Endorsement' AND is_active = 1 AND is_deleted = 0 LIMIT 1
+    ")->fetchColumn();
+    assert_test(
+        'E2E: a second Unfavorable status is "For 3rd Endorsement"',
+        $thirdStatusId > 0
+            && (int) $pdo->query("SELECT opinion_status_id FROM committee_cycle_endorsements WHERE id = {$wf2Endorsement2}")->fetchColumn()
+                === $thirdStatusId
     );
     assert_test(
-        'E2E: the second Unfavorable moves the endorsement to the "Resolve" status row',
-        (int) $pdo->query("SELECT opinion_status_id FROM committee_cycle_endorsements WHERE id = {$wf2Endorsement2Unf}")->fetchColumn()
-            === $resolveId
-    );
-    assert_test(
-        'E2E: the second Unfavorable redirects to the Resolve workflow',
-        strpos($probeUnfav['success'], 'resolution') !== false
-    );
-
-    $unfLinks = load_submission_files($pdo, $wf2Endorsement2Unf);
-    assert_test(
-        'E2E: every second-review file is its own record (1 opinion, 2 compliance)',
-        count($unfLinks['opinion']) === 1 && count($unfLinks['compliance']) === 2
-    );
-
-    // The first review's Compliance files must survive the second submission.
-    $firstLinks = load_submission_files($pdo, $wf2Endorsement1);
-    assert_test(
-        'E2E: the first review keeps its own Compliance record — nothing is replaced',
-        count($firstLinks['compliance']) === 1
-            && $firstLinks['compliance'][0]['id'] !== $unfLinks['compliance'][0]['id']
-    );
-    $unfDownloadable = true;
-    foreach (array_merge($unfLinks['opinion'], $unfLinks['compliance'], $firstLinks['compliance']) as $f) {
-        if (!is_file($root . '/public/' . ltrim((string) $f['stored_path'], '/'))) {
-            $unfDownloadable = false;
-        }
-    }
-    assert_test(
-        'E2E: old and new Compliance records all resolve to a file on disk (downloadable)',
-        $unfDownloadable
-    );
-    assert_test(
-        'E2E: the second Unfavorable + Compliance created no further endorsement row (no new cycle)',
-        (int) $pdo->query("SELECT COUNT(*) FROM committee_cycle_endorsements WHERE cycle_id = {$wf2CycleId}")->fetchColumn() === 3
+        'E2E: the second Unfavorable review offers another endorsement instead of Resolve',
+        strpos($probeUnfav2['success'], 'awaiting endorsement #3') !== false
     );
 
     $unfMeta = $pdo->prepare("
@@ -1541,40 +1508,65 @@ try {
     ");
     $unfMeta->execute([$wf2DocId]);
     assert_test(
-        'E2E: the audit event for the second Unfavorable records the Resolve status',
-        (json_decode((string) $unfMeta->fetchColumn(), true)['opinion_status'] ?? '') === 'Resolve'
+        'E2E: the audit event records the dynamically numbered next status',
+        (json_decode((string) $unfMeta->fetchColumn(), true)['opinion_status'] ?? '') === 'For 3rd Endorsement'
     );
 
-    // ── 12c. A third endorsement / cycle is impossible ────────────────────
-    $probeThird = second_endorse_probe($root, $userId, $wf2Endorsement1);
+    // ── 12b. Issue endorsement #3, then continue to #4 ────────────────────
+    $probeThird = second_endorse_probe($root, $userId, $wf2Endorsement2);
     assert_test(
-        'E2E: a third endorsement for the same cycle is refused (probe: ' . $probeThird['error'] . ')',
-        strpos($probeThird['error'], 'second endorsement already exists') !== false
-            && $probeThird['success'] === ''
+        'E2E: a third endorsement is successfully issued after the second Unfavorable',
+        strpos($probeThird['success'], 'Endorsement #3 issued') !== false && $probeThird['error'] === ''
+    );
+    $wf2Endorsement3Stmt = $pdo->prepare("
+        SELECT id FROM committee_cycle_endorsements
+        WHERE cycle_id = ? AND opinion_office_id = ? AND endorsement_number = 3 LIMIT 1
+    ");
+    $wf2Endorsement3Stmt->execute([$wf2CycleId, $officeId]);
+    $wf2Endorsement3 = (int) $wf2Endorsement3Stmt->fetchColumn();
+
+    $probeUnfav3 = opinion_store_e2e_probe($root, $userId, [
+        'endorsement_id' => $wf2Endorsement3,
+        'opinion_type'   => 'UNFAVORABLE',
+    ], [
+        'opinion_files'    => $e2eFiles(['Opinion Y3.pdf'], [$pdfPath]),
+        'compliance_files' => $e2eFiles(['Compliance Y3.pdf'], [$pdfPath]),
+    ]);
+    assert_test(
+        'E2E: endorsement #3 also accepts Unfavorable + Compliance',
+        $probeUnfav3['error'] === '' && $probeUnfav3['errors'] === []
     );
     assert_test(
-        'E2E: the refused third attempt created no endorsement row',
-        (int) $pdo->query("SELECT COUNT(*) FROM committee_cycle_endorsements WHERE cycle_id = {$wf2CycleId}")->fetchColumn() === 3
+        'E2E: endorsement #3 creates the "For 4th Endorsement" status',
+        (int) $pdo->query("
+            SELECT COUNT(*) FROM opinion_statuses
+            WHERE name = 'For 4th Endorsement' AND is_active = 1 AND is_deleted = 0
+        ")->fetchColumn() === 1
+        && (int) $pdo->query("SELECT COUNT(*) FROM committee_cycle_endorsements WHERE cycle_id = {$wf2CycleId}")->fetchColumn() === 3
     );
 
-    // ── 12d. Server-side eligibility for the second endorsement ───────────
-    // The eligibility rule is enforced by the controller, not by hiding the
-    // button. Even with the Unfavorable submission on record, issuing a second
-    // endorsement is refused while the endorsement's opinion_statuses row is
-    // not "For Second Endorsement".
+    $probeFourth = second_endorse_probe($root, $userId, $wf2Endorsement3);
+    assert_test(
+        'E2E: endorsement #4 can be issued, with no configured workflow maximum',
+        strpos($probeFourth['success'], 'Endorsement #4 issued') !== false
+            && $probeFourth['error'] === ''
+            && (int) $pdo->query("SELECT COUNT(*) FROM committee_cycle_endorsements WHERE cycle_id = {$wf2CycleId}")->fetchColumn() === 4
+    );
+
+    // ── 12c. Server-side eligibility is enforced at every number ──────────
     $pdo->prepare("UPDATE committee_cycle_endorsements SET opinion_status_id = ? WHERE id = ?")
-        ->execute([$unfavStatusId, $wf2Endorsement1]);
+        ->execute([$unfavStatusId, $wf2Endorsement3]);
 
-    $probeIneligible = second_endorse_probe($root, $userId, $wf2Endorsement1);
+    $probeIneligible = second_endorse_probe($root, $userId, $wf2Endorsement3);
     assert_test(
-        'ELIGIBILITY: a second endorsement is refused unless the office is awaiting one (probe: '
+        'ELIGIBILITY: the next endorsement is refused unless the office is awaiting it (probe: '
             . $probeIneligible['error'] . ')',
-        stripos($probeIneligible['error'], 'not awaiting a second endorsement') !== false
+        stripos($probeIneligible['error'], 'not awaiting another endorsement') !== false
             && $probeIneligible['success'] === ''
     );
     assert_test(
-        'ELIGIBILITY: the refused ineligible attempt created no endorsement row',
-        (int) $pdo->query("SELECT COUNT(*) FROM committee_cycle_endorsements WHERE cycle_id = {$wf2CycleId}")->fetchColumn() === 3
+        'ELIGIBILITY: the refused attempt created no extra endorsement row',
+        (int) $pdo->query("SELECT COUNT(*) FROM committee_cycle_endorsements WHERE cycle_id = {$wf2CycleId}")->fetchColumn() === 4
     );
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1593,13 +1585,11 @@ try {
         'name'
     );
     assert_test(
-        'STATUS: every status the workflow resolves exists in opinion_statuses',
-        empty(array_diff(['Favorable', 'Unfavorable', 'For Second Endorsement', 'Resolve'], $activeStatuses))
-    );
-
-    assert_test(
-        'STATUS: neither submission inserted into opinion_statuses (row count unchanged)',
-        (int) $pdo->query("SELECT COUNT(*) FROM opinion_statuses")->fetchColumn() === $statusRowsBefore
+        'STATUS: the core and dynamically numbered workflow statuses exist in opinion_statuses',
+        empty(array_diff(
+            ['Favorable', 'Unfavorable', 'For Second Endorsement', 'For 3rd Endorsement', 'For 4th Endorsement'],
+            $activeStatuses
+        ))
     );
 
     $statusNameUnique = false;
@@ -1613,8 +1603,8 @@ try {
         $statusNameUnique
     );
     assert_test(
-        'STATUS: the required workflow statuses are guaranteed by an idempotent migration',
-        is_file($root . '/database/migrations/073_normalize_second_endorsement_opinion_statuses.php')
+        'STATUS: the unbounded endorsement schema is provided by migration 101',
+        is_file($root . '/database/migrations/101_unlimited_committee_opinion_endorsements.php')
     );
 
     require_once $root . '/app/controllers/Committee/CommitteeReferredController.php';
@@ -1622,15 +1612,26 @@ try {
     assert_test(
         'STATUS: FAVORABLE maps to "Favorable" on any review',
         $ruleController->opinionStatusNameFor('FAVORABLE', 1) === 'Favorable'
-            && $ruleController->opinionStatusNameFor('FAVORABLE', 2) === 'Favorable'
+            && $ruleController->opinionStatusNameFor('FAVORABLE', 4) === 'Favorable'
     );
     assert_test(
         'STATUS: a first UNFAVORABLE maps to "For Second Endorsement"',
         $ruleController->opinionStatusNameFor('UNFAVORABLE', 1) === 'For Second Endorsement'
     );
     assert_test(
-        'STATUS: a second UNFAVORABLE maps to "Resolve"',
-        $ruleController->opinionStatusNameFor('UNFAVORABLE', 2) === 'Resolve'
+        'STATUS: a second UNFAVORABLE maps to "For 3rd Endorsement"',
+        $ruleController->opinionStatusNameFor('UNFAVORABLE', 2) === 'For 3rd Endorsement'
+    );
+    assert_test(
+        'STATUS: a third UNFAVORABLE maps to "For 4th Endorsement"',
+        $ruleController->opinionStatusNameFor('UNFAVORABLE', 3) === 'For 4th Endorsement'
+    );
+    assert_test(
+        'STATUS: ordinal suffixes remain correct after the teens',
+        $ruleController->endorsementOrdinal(21) === '21st'
+            && $ruleController->endorsementOrdinal(22) === '22nd'
+            && $ruleController->endorsementOrdinal(23) === '23rd'
+            && $ruleController->endorsementOrdinal(111) === '111th'
     );
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1668,12 +1669,12 @@ try {
         ]),
     ]);
     assert_test(
-        'PROGRESS: an Unfavorable opinion awaiting its second endorsement does NOT advance the indicator',
-        $p['cleared'] === 0 && $p['reviewed'] === 1 && $p['awaiting_second'] === 1 && $p['pending'] === 1
+        'PROGRESS: an Unfavorable opinion awaiting another endorsement does NOT advance the indicator',
+        $p['cleared'] === 0 && $p['reviewed'] === 1 && $p['awaiting_next'] === 1 && $p['pending'] === 1
     );
     assert_test(
         'PROGRESS: that office exposes the second-endorsement action (resubmission entry point)',
-        $p['offices'][1]['pending_action'] === 'SECOND_ENDORSEMENT'
+        $p['offices'][1]['pending_action'] === 'NEXT_ENDORSEMENT'
             && $p['offices'][1]['cleared'] === false
             && $p['offices'][1]['reviewed'] === true
     );
@@ -1723,9 +1724,9 @@ try {
         ]),
     ]);
     assert_test(
-        'PROGRESS: a stale Pending status does not block the second-endorsement action after an Unfavorable submission',
+        'PROGRESS: a stale Pending status does not block the next-endorsement action after an Unfavorable submission',
         $p['offices'][1]['display_status_name'] === 'For Second Endorsement'
-            && $p['offices'][1]['pending_action'] === 'SECOND_ENDORSEMENT'
+            && $p['offices'][1]['pending_action'] === 'NEXT_ENDORSEMENT'
     );
 
     // 4. Favorable → cleared, no pending action, indicator advances.
@@ -1743,7 +1744,46 @@ try {
             && $p['offices'][1]['pending_action'] === null
     );
 
-    // 5. Second Unfavorable → Resolve: still not cleared, no further action.
+    $p = $ruleController->summarizeOpinionProgress([
+        $endorsementRow([
+            'endorsement_id' => 60,
+            'endorsement_number' => 1,
+            'submission_id' => 61,
+            'opinion_type' => 'UNFAVORABLE',
+            'submission_remarks' => 'Please revise section 2.',
+            'endorsement_remarks' => 'Initial issue note.',
+            'issue_files' => [
+                'opinion' => [['file_name' => 'issue-1-opinion.pdf']],
+                'compliance' => [['file_name' => 'issue-1-compliance.pdf']],
+            ],
+        ]),
+        $endorsementRow([
+            'endorsement_id' => 62,
+            'endorsement_number' => 2,
+            'submission_id' => 63,
+            'opinion_type' => 'FAVORABLE',
+            'submission_remarks' => 'Revisions are satisfactory.',
+            'issue_files' => [
+                'opinion' => [['file_name' => 'issue-2-opinion.pdf']],
+                'compliance' => [],
+            ],
+        ]),
+    ]);
+    $issueHistory = $p['offices'][1]['issue_history'] ?? [];
+    assert_test(
+        'PROGRESS: office history retains every issue outcome, remarks and its own Opinion / Compliance files',
+        count($issueHistory) === 2
+            && $issueHistory[0]['opinion_type'] === 'UNFAVORABLE'
+            && $issueHistory[0]['submission_remarks'] === 'Please revise section 2.'
+            && $issueHistory[0]['endorsement_remarks'] === 'Initial issue note.'
+            && $issueHistory[0]['files']['opinion'][0]['file_name'] === 'issue-1-opinion.pdf'
+            && $issueHistory[0]['files']['compliance'][0]['file_name'] === 'issue-1-compliance.pdf'
+            && $issueHistory[1]['opinion_type'] === 'FAVORABLE'
+            && $issueHistory[1]['submission_remarks'] === 'Revisions are satisfactory.'
+            && $issueHistory[1]['files']['opinion'][0]['file_name'] === 'issue-2-opinion.pdf'
+    );
+
+    // 5. A repeated Unfavorable remains uncleared and offers the next endorsement.
     $p = $ruleController->summarizeOpinionProgress([
         $endorsementRow([
             'endorsement_id'      => 40,
@@ -1756,14 +1796,13 @@ try {
             'endorsement_number'  => 2,
             'submission_id'       => 43,
             'opinion_type'        => 'UNFAVORABLE',
-            'opinion_status_name' => 'Resolve',
+            'opinion_status_name' => 'For 3rd Endorsement',
         ]),
     ]);
     assert_test(
-        'PROGRESS: a second Unfavorable moves the office to Resolve without advancing the indicator'
-            . ' and without offering another cycle',
-        $p['total'] === 1 && $p['cleared'] === 0 && $p['awaiting_second'] === 0
-            && $p['offices'][1]['pending_action'] === null
+        'PROGRESS: a second Unfavorable does not advance the indicator and offers another numbered endorsement',
+        $p['total'] === 1 && $p['cleared'] === 0 && $p['awaiting_next'] === 1
+            && $p['offices'][1]['pending_action'] === 'NEXT_ENDORSEMENT'
     );
 
     // 6. Two offices, one cleared and one awaiting: 50 %, not 100 %.
@@ -1779,8 +1818,11 @@ try {
     // ── The views must expose those same rules ────────────────────────────
     $indexView   = (string) file_get_contents($root . '/resources/views/committee/referred/index.php');
     $opinionView = (string) file_get_contents($root . '/resources/views/committee/referred/opinion.php');
+    $opinionDetailsView = (string) file_get_contents($root . '/resources/views/committee/referred/opinion-details.php');
+    $attachmentPreviewScript = (string) file_get_contents($root . '/public/assets/js/document-attachment-preview.js');
     $endorseView = (string) file_get_contents($root . '/resources/views/committee/referred/endorse.php');
     $referredController = (string) file_get_contents($root . '/app/controllers/Committee/CommitteeReferredController.php');
+    $routes = (string) file_get_contents($root . '/routes/web.php');
     $requireDocumentBlock = '';
     if (preg_match(
         '/private function requireDocument\(.*?(?=\n    private function isResetReadyForAgenda)/s',
@@ -1796,14 +1838,72 @@ try {
             && strpos($indexView, '$submittedCount') === false
     );
     assert_test(
-        'UI: a chip whose office is For Second Endorsement renders the review link (resubmission works)',
-        strpos($indexView, "SECOND_ENDORSEMENT") !== false
+        'UI: a chip awaiting another numbered endorsement renders the continuation link',
+        strpos($indexView, "NEXT_ENDORSEMENT") !== false
             && strpos($indexView, 'committee/referred/opinion?endorsement_id=') !== false
     );
     assert_test(
-        'UI: the review screen still offers the second endorsement route',
+        'UI: For Opinion provides a separate View page for the office issue history',
+        strpos($indexView, 'committee/referred/opinion-details?id=') !== false
+            && strpos($indexView, 'office_id=<?= $officeId ?>') !== false
+            && strpos($indexView, 'View') !== false
+            && strpos($indexView, '<details') === false
+            && strpos($routes, "'committee/referred/opinion-details'") !== false
+            && strpos($routes, "'action'     => 'opinionDetailsShow'") !== false
+    );
+    assert_test(
+        'UI: the separate issue history page displays outcomes, remarks, and both file types',
+        strpos($opinionDetailsView, 'Opinion Office Details') !== false
+            && strpos($opinionDetailsView, 'Opinion files') !== false
+            && strpos($opinionDetailsView, 'Compliance files') !== false
+            && strpos($opinionDetailsView, 'submission_remarks') !== false
+            && strpos($opinionDetailsView, 'endorsement_remarks') !== false
+    );
+    assert_test(
+        'UI: document metadata is available in a collapsed, expandable details panel',
+        strpos($opinionDetailsView, '<details class="group') !== false
+            && strpos($opinionDetailsView, 'Document Details') !== false
+            && strpos($opinionDetailsView, 'Date Received') !== false
+            && strpos($opinionDetailsView, 'Source Address') !== false
+            && strpos($opinionDetailsView, 'Document Remarks') !== false
+            && strpos($opinionDetailsView, '$document[\'current_phase\']') !== false
+    );
+    assert_test(
+        'UI: office issue details are filtered to the selected office',
+        strpos($referredController, "\$_GET['office_id']") !== false
+            && strpos($referredController, "isset(\$progress['offices'][\$officeId])") !== false
+            && strpos($referredController, "\$progress['offices'] = [\$officeId => \$progress['offices'][\$officeId]]") !== false
+    );
+    assert_test(
+        'UI: issue files use the shared attachment preview modal',
+        strpos($opinionDetailsView, 'data-attachment-preview') !== false
+            && strpos($opinionDetailsView, 'data-preview-url') !== false
+            && strpos($opinionDetailsView, 'data-preview-name') !== false
+            && strpos($attachmentPreviewScript, "extension === 'docx'") !== false
+            && strpos($attachmentPreviewScript, "extension === 'pdf'") !== false
+    );
+    assert_test(
+        'UI: each office View button is placed in the same right-aligned office row',
+        strpos($indexView, 'flex min-w-0 flex-1 items-center justify-between') !== false
+            && strpos($indexView, 'inline-flex shrink-0 items-center gap-1 rounded-md') !== false
+    );
+    assert_test(
+        'UI: Proceed to Agenda is offered only when all selected opinion offices are Favorable',
+        strpos($indexView, 'if ($allCleared):') !== false
+            && strpos($indexView, 'name="resolution" value="PROCEED_TO_AGENDA"') !== false
+            && strpos($indexView, 'Proceed to Agenda') !== false
+            && strpos($indexView, 'committee/referred/resolve') !== false
+    );
+    assert_test(
+        'UI: Resolve is shown only when at least one selected office remains Unfavorable',
+        strpos($indexView, '$hasUnfavorable = (bool) array_filter(') !== false
+            && strpos($indexView, "=== 'UNFAVORABLE'") !== false
+            && strpos($indexView, 'if ($hasUnfavorable):') !== false
+    );
+    assert_test(
+        'UI: the review screen offers the next numbered endorsement route',
         strpos($opinionView, 'committee/referred/second-endorse') !== false
-            && strpos($opinionView, 'Issue Second Endorsement') !== false
+            && strpos($opinionView, 'Issue Endorsement #<?= $nextEndorsementNumber ?>') !== false
     );
     assert_test(
         'UI: the second review screen offers the Compliance upload as well (no second-review guard)',
@@ -1844,6 +1944,16 @@ try {
         }
         foreach ($created['offices'] as $id) {
             $pdo->prepare("DELETE FROM opinion_offices WHERE id = ?")->execute([$id]);
+        }
+        $knownOpinionStatusNames = array_fill_keys($opinionStatusNamesBefore, true);
+        $dynamicStatuses = $pdo->query("
+            SELECT id, name FROM opinion_statuses
+            WHERE name REGEXP '^For [0-9]+(st|nd|rd|th) Endorsement$'
+        ")->fetchAll();
+        foreach ($dynamicStatuses as $status) {
+            if (!isset($knownOpinionStatusNames[$status['name']])) {
+                $pdo->prepare("DELETE FROM opinion_statuses WHERE id = ?")->execute([$status['id']]);
+            }
         }
         foreach ($created['ostatus'] as $id) {
             $pdo->prepare("DELETE FROM opinion_statuses WHERE id = ?")->execute([$id]);

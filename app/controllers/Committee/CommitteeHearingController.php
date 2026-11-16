@@ -595,6 +595,26 @@ class CommitteeHearingController
             }
         }
 
+        if (!empty($committeeIds) && $mode === 'existing') {
+            $committeePlaceholders = implode(',', array_fill(0, count($committeeIds), '?'));
+            $activeCommitteeStmt = $this->pdo->prepare("
+                SELECT c.id
+                FROM committees c
+                WHERE c.id IN ({$committeePlaceholders})
+                  AND c.is_active = 1
+                  AND c.is_deleted = 0
+            ");
+            $activeCommitteeStmt->execute($committeeIds);
+            $validCommitteeIds = array_map('intval', array_column(
+                $activeCommitteeStmt->fetchAll(PDO::FETCH_ASSOC),
+                'id'
+            ));
+
+            if (count($validCommitteeIds) !== count($committeeIds)) {
+                $errors[] = 'One or more selected committees are no longer active. Refresh the page and try again.';
+            }
+        }
+
         if ($summaryOfFindings === '') {
             $errors[] = 'Summary of Findings is required.';
         } elseif (mb_strlen($summaryOfFindings) > 10000) {
@@ -1653,6 +1673,8 @@ class CommitteeHearingController
                    AND cc.final_outcome IS NOT NULL
                 INNER JOIN committees c
                     ON c.id = COALESCE(ac.committee_id, dc.committee_id)
+                   AND c.is_active = 1
+                   AND c.is_deleted = 0
                 WHERE d.id IN ({$dcPh})
                 ORDER BY c.sort_order ASC, c.name ASC
             ");
@@ -1667,18 +1689,21 @@ class CommitteeHearingController
             }
         }
 
-        // ── Derive the unique committee list for the selection UI ──────────────
-        //
-        // Walk every document's committee list and collect unique committees by ID.
-        // Order is preserved by the query's ORDER BY (sort_order ASC, name ASC).
-        // This list is what populates the checkboxes in the "New Report" panel.
-        $availableCommittees = [];   // [ committee_id => ['id'=>.., 'name'=>..] ]
-        foreach ($documentCommittees as $docId => $committees) {
-            foreach ($committees as $committee) {
-                $availableCommittees[$committee['id']] = $committee;
-            }
+        // ── Load all committees for the report selection UI ──────────────────
+        // The selected documents' assignments determine which checkboxes start
+        // checked, but users may add any assignable committee to a new report.
+        $committeeStmt = $this->pdo->query("
+            SELECT id, name
+            FROM committees
+            WHERE is_active = 1
+              AND is_deleted = 0
+            ORDER BY sort_order ASC, name ASC
+        ");
+        $availableCommittees = $committeeStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($availableCommittees as &$committee) {
+            $committee['id'] = (int) $committee['id'];
         }
-        $availableCommittees = array_values($availableCommittees);
+        unset($committee);
 
         // Default pre-selected IDs = every committee found across all documents
         $defaultCommIds = array_keys(array_reduce(
@@ -1699,11 +1724,28 @@ class CommitteeHearingController
                 cr.report_number,
                 cr.report_type,
                 cr.created_at,
+                GROUP_CONCAT(DISTINCT report_committees.committee_id ORDER BY report_committees.committee_id) AS committee_ids,
                 GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') AS committee_names,
                 COUNT(DISTINCT crd.document_id)                              AS document_count
             FROM committee_reports cr
-            LEFT JOIN committee_report_committees crc ON crc.committee_report_id = cr.id
-            LEFT JOIN committees                    c ON c.id = crc.committee_id
+            LEFT JOIN (
+                SELECT committee_report_id, committee_id
+                FROM committee_report_committees
+                UNION
+                SELECT report.id AS committee_report_id, agenda_committee.committee_id
+                FROM committee_reports report
+                INNER JOIN agenda_committees agenda_committee
+                    ON agenda_committee.agenda_id = report.agenda_id
+                UNION
+                SELECT report_document.committee_report_id, document_committee.committee_id
+                FROM committee_report_documents report_document
+                INNER JOIN document_committees document_committee
+                    ON document_committee.document_id = report_document.document_id
+            ) report_committees ON report_committees.committee_report_id = cr.id
+            LEFT JOIN committees c
+                ON c.id = report_committees.committee_id
+               AND c.is_active = 1
+               AND c.is_deleted = 0
             LEFT JOIN committee_report_documents  crd ON crd.committee_report_id = cr.id
             GROUP BY cr.id, cr.report_number, cr.report_type, cr.created_at
             ORDER BY cr.created_at DESC
@@ -1712,6 +1754,9 @@ class CommitteeHearingController
         $existingReports = $rptStmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($existingReports as &$r) {
             $r['document_count'] = (int) $r['document_count'];
+            $r['committee_ids'] = !empty($r['committee_ids'])
+                ? array_map('intval', explode(',', $r['committee_ids']))
+                : [];
         }
         unset($r);
 
@@ -1722,11 +1767,30 @@ class CommitteeHearingController
         $oldReportNum  = $old['report_number']         ?? '';
         $oldSummary    = $old['summary_of_findings']   ?? '';
 
+        $selectedExistingCommitteeIds = [];
+        foreach ($existingReports as $existingReport) {
+            if ((int) $existingReport['id'] === $oldExistingId) {
+                $selectedExistingCommitteeIds = $existingReport['committee_ids'];
+                break;
+            }
+        }
+        $activeCommitteeIds = array_column($availableCommittees, 'id');
+        $selectedExistingCommitteeIds = array_values(array_intersect(
+            $selectedExistingCommitteeIds,
+            $activeCommitteeIds
+        ));
+
         // $oldCommIds: on repopulation use the user's previous selection;
         // on first load fall back to $defaultCommIds (pre-selected from agendas).
-        $oldCommIds = isset($old['committee_ids'])
+        $oldCommIds = isset($old['committee_ids']) && ($old['share_mode'] ?? '') === 'new'
             ? array_map('intval', (array) $old['committee_ids'])
             : $defaultCommIds;
+        $oldExistingCommIds = isset($old['committee_ids']) && ($old['share_mode'] ?? '') === 'existing'
+            ? array_map('intval', (array) $old['committee_ids'])
+            : array_values(array_unique(array_merge(
+                $selectedExistingCommitteeIds,
+                array_map('intval', $defaultCommIds)
+            )));
 
         $pageTitle = 'Share to Committee Report';
         require __DIR__ . '/../../../resources/views/committee/hearing/share-to-report.php';
@@ -1760,7 +1824,10 @@ class CommitteeHearingController
         $existingRptId     = (int) ($_POST['existing_report_id'] ?? 0);
         $reportNumber      = trim($_POST['report_number']        ?? '');
         $summaryOfFindings = trim($_POST['summary_of_findings']  ?? '');
-        $committeeIds      = array_values(array_filter(array_map('intval', (array) ($_POST['committee_ids'] ?? []))));
+        $committeeInputKey = $mode === 'existing' ? 'existing_committee_ids' : 'committee_ids';
+        $committeeIds      = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($_POST[$committeeInputKey] ?? []))
+        )));
         $uploadedFiles     = $_FILES['attachments'] ?? [];
         $hasFiles          = !empty($uploadedFiles['name'][0]);
         $uploadService     = new DocumentService($this->pdo);
@@ -1795,6 +1862,9 @@ class CommitteeHearingController
         if ($mode === 'existing') {
             if ($existingRptId <= 0) {
                 $errors[] = 'Please select an existing Committee Report.';
+            }
+            if (empty($committeeIds)) {
+                $errors[] = 'Select at least one committee for this report.';
             }
         } else {
             if ($reportNumber === '') {
@@ -1973,7 +2043,9 @@ class CommitteeHearingController
 
             $reportId     = (int) $existingReport['id'];
             $reportNumber = $existingReport['report_number'] ?? ('RPT-' . $reportId);
-            $reportType   = $existingReport['report_type'];
+            $reportType   = count($committeeIds) > 1
+                ? 'JOINT_COMMITTEE_REPORT'
+                : 'COMMITTEE_REPORT';
 
             // Additional guard: none of the submitted docs should already be in THIS report either
             $dupInReportStmt = $this->pdo->prepare("
@@ -2053,6 +2125,22 @@ class CommitteeHearingController
                     );
                     redirect($redirectBack);
                 }
+
+                $this->pdo->prepare(
+                    "DELETE FROM committee_report_committees WHERE committee_report_id = ?"
+                )->execute([$reportId]);
+
+                $insertReportCommittee = $this->pdo->prepare("
+                    INSERT INTO committee_report_committees (committee_report_id, committee_id)
+                    VALUES (?, ?)
+                ");
+                foreach ($committeeIds as $committeeId) {
+                    $insertReportCommittee->execute([$reportId, $committeeId]);
+                }
+
+                $this->pdo->prepare(
+                    "UPDATE committee_reports SET report_type = ? WHERE id = ?"
+                )->execute([$reportType, $reportId]);
 
                 $insDoc = $this->pdo->prepare("
                     INSERT INTO committee_report_documents (committee_report_id, document_id)
@@ -2158,6 +2246,8 @@ class CommitteeHearingController
                     'action'        => 'bulk_share_documents',
                     'report_id'     => $reportId,
                     'report_number' => $reportNumber,
+                    'report_type'   => $reportType,
+                    'committee_ids' => $committeeIds,
                     'document_ids'  => $sharedDocIds,
                     'shared_by'     => $userId,
                 ],
@@ -2166,6 +2256,8 @@ class CommitteeHearingController
             system_log('INFO', 'Bulk share to existing committee report', [
                 'report_id'    => $reportId,
                 'report_number'=> $reportNumber,
+                'report_type'  => $reportType,
+                'committee_ids'=> $committeeIds,
                 'shared_count' => $docCount,
                 'shared_by'    => $userId,
             ]);

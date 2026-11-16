@@ -280,8 +280,8 @@ class CommitteeController
 
         if ($data['name'] === '') {
             $errors[] = 'Committee name is required.';
-        } elseif (mb_strlen($data['name']) > 50) {
-            $errors[] = 'Committee name must not exceed 50 characters.';
+        } elseif (mb_strlen($data['name']) > 255) {
+            $errors[] = 'Committee name must not exceed 255 characters.';
         }
 
         if ($data['sort_order'] < 0) {
