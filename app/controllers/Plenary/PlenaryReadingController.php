@@ -280,6 +280,429 @@ class PlenaryReadingController
         redirect('plenary/first-reading');
     }
 
+    public function referredToCommitteeShow(): void
+    {
+        $userId = auth_id();
+        if ($userId === null) {
+            flash_set('error', 'You must be logged in.');
+            redirect('login');
+        }
+
+        $documentId = (int) ($_GET['id'] ?? 0);
+        if ($documentId <= 0) {
+            flash_set('error', 'Invalid document ID.');
+            redirect('plenary/referred-to-committee');
+        }
+
+        $documentStmt = $this->pdo->prepare("
+            SELECT d.id AS document_id, d.tracking_number, d.subject_matter,
+                   d.date_received, d.time_received, d.current_phase, d.created_at,
+                   d.source_name, d.source_contact_number, d.source_address,
+                   d.source_liaison_name, st.name AS source_type_name,
+                   dt.name AS document_type_name,
+                   ds.name AS document_status,
+                   pdd.proposed_number, pdd.target_first_reading_date, pdd.session_type
+            FROM documents d
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN source_types st ON st.id = d.source_type_id
+            LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
+            WHERE d.id = ?
+              AND (
+                  EXISTS (SELECT 1 FROM plenary_readings pr
+                          WHERE pr.document_id = d.id AND pr.reading_number = 1
+                            AND pr.action = 'REFERRED_TO_COMMITTEE')
+                  OR EXISTS (SELECT 1 FROM plenary_comm_first_reading pcfr
+                             WHERE pcfr.document_id = d.id AND pcfr.decision = 'REFER_TO_COMMITTEE')
+                  OR EXISTS (SELECT 1 FROM plenary_cases_first_reading pcfr
+                             WHERE pcfr.document_id = d.id AND pcfr.decision = 'REFER_TO_COMMITTEE')
+              )
+            LIMIT 1
+        ");
+        $documentStmt->execute([$documentId]);
+        $document = $documentStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$document) {
+            flash_set('error', 'Referred document not found.');
+            redirect('plenary/referred-to-committee');
+        }
+
+        $timeline = [];
+        $eventStmt = $this->pdo->prepare("
+            SELECT de.event_type, de.phase, de.remarks, de.metadata, de.created_at,
+                   from_status.name AS from_status,
+                   to_status.name AS to_status,
+                   COALESCE(NULLIF(CONCAT_WS(' ', NULLIF(ui.first_name, ''), NULLIF(ui.last_name, '')), ''),
+                            ua.username, '—') AS performed_by_name
+            FROM document_events de
+            LEFT JOIN document_statuses from_status ON from_status.id = de.from_status_id
+            LEFT JOIN document_statuses to_status ON to_status.id = de.to_status_id
+            LEFT JOIN user_accounts ua ON ua.id = de.performed_by
+            LEFT JOIN user_info ui ON ui.user_account_id = de.performed_by
+            WHERE de.document_id = ?
+            ORDER BY de.created_at ASC, de.id ASC
+        ");
+        $eventStmt->execute([$documentId]);
+        foreach ($eventStmt->fetchAll(PDO::FETCH_ASSOC) as $event) {
+            $event['record_type'] = 'event';
+            $event['title'] = ucwords(strtolower(str_replace('_', ' ', (string) $event['event_type'])));
+            $metadata = json_decode((string) ($event['metadata'] ?? ''), true);
+            $event['metadata'] = is_array($metadata) ? $metadata : [];
+            $timeline[] = $event;
+        }
+
+        $readingStmt = $this->pdo->prepare("
+            SELECT CONCAT('Plenary ', CASE reading_number WHEN 1 THEN 'First' WHEN 2 THEN 'Second'
+                           ELSE CONCAT(reading_number, 'th') END, ' Reading — ',
+                           REPLACE(action, '_', ' ')) AS title,
+                   reading_date AS occurred_at, performed_at, remarks,
+                   COALESCE(NULLIF(CONCAT_WS(' ', NULLIF(ui.first_name, ''), NULLIF(ui.last_name, '')), ''),
+                            ua.username, '—') AS performed_by_name
+            FROM plenary_readings pr
+            LEFT JOIN user_accounts ua ON ua.id = pr.performed_by
+            LEFT JOIN user_info ui ON ui.user_account_id = pr.performed_by
+            WHERE pr.document_id = ?
+            ORDER BY pr.reading_date ASC, pr.id ASC
+        ");
+        $readingStmt->execute([$documentId]);
+        foreach ($readingStmt->fetchAll(PDO::FETCH_ASSOC) as $reading) {
+            $timeline[] = [
+                'record_type' => 'reading',
+                'title' => ucwords(strtolower((string) $reading['title'])),
+                'created_at' => $reading['occurred_at'] ?: $reading['performed_at'],
+                'phase' => 'PLENARY',
+                'performed_by_name' => $reading['performed_by_name'],
+                'remarks' => $reading['remarks'],
+                'from_status' => null,
+                'to_status' => null,
+                'metadata' => [],
+            ];
+        }
+
+        foreach ([
+            ['plenary_comm_first_reading', 'decision', 'reading_date', 'remarks', 'performed_by', 'Communication First Reading'],
+            ['plenary_cases_first_reading', 'decision', 'reading_date', 'remarks', 'performed_by', 'Cases First Reading'],
+        ] as [$table, $decisionColumn, $dateColumn, $remarksColumn, $userColumn, $label]) {
+            $stmt = $this->pdo->prepare("
+                SELECT {$decisionColumn} AS decision, {$dateColumn} AS occurred_at,
+                       {$remarksColumn} AS remarks, performed_at,
+                       COALESCE(NULLIF(CONCAT_WS(' ', NULLIF(ui.first_name, ''), NULLIF(ui.last_name, '')), ''),
+                                ua.username, '—') AS performed_by_name
+                FROM {$table} fr
+                LEFT JOIN user_accounts ua ON ua.id = fr.{$userColumn}
+                LEFT JOIN user_info ui ON ui.user_account_id = fr.{$userColumn}
+                WHERE fr.document_id = ? AND fr.decision = 'REFER_TO_COMMITTEE'
+                ORDER BY fr.id ASC
+            ");
+            $stmt->execute([$documentId]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $firstReading) {
+                $timeline[] = [
+                    'record_type' => 'reading',
+                    'title' => $label . ' — ' . ucwords(strtolower(str_replace('_', ' ', (string) $firstReading['decision']))),
+                    'created_at' => $firstReading['occurred_at'] ?: $firstReading['performed_at'],
+                    'phase' => 'PLENARY',
+                    'performed_by_name' => $firstReading['performed_by_name'],
+                    'remarks' => $firstReading['remarks'],
+                    'from_status' => null,
+                    'to_status' => null,
+                    'metadata' => [],
+                ];
+            }
+        }
+
+        $hearingStmt = $this->pdo->prepare("
+            SELECT ch.outcome, ch.remarks, ch.performed_at,
+                   ag.agenda_date, ag.agenda_time, ag.venue,
+                   COALESCE(NULLIF(CONCAT_WS(' ', NULLIF(ui.first_name, ''), NULLIF(ui.last_name, '')), ''),
+                            ua.username, '—') AS performed_by_name,
+                   (SELECT GROUP_CONCAT(c.name ORDER BY c.name SEPARATOR ', ')
+                    FROM agenda_committees ac
+                    INNER JOIN committees c ON c.id = ac.committee_id
+                    WHERE ac.agenda_id = ag.id) AS committee_names
+            FROM committee_hearings ch
+            LEFT JOIN agendas ag ON ag.id = ch.agenda_id
+            LEFT JOIN user_accounts ua ON ua.id = ch.performed_by
+            LEFT JOIN user_info ui ON ui.user_account_id = ch.performed_by
+            WHERE ch.document_id = ?
+            ORDER BY ch.performed_at ASC, ch.id ASC
+        ");
+        $hearingStmt->execute([$documentId]);
+        $hearings = $hearingStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($hearings as $hearing) {
+            $metadata = [];
+            if (!empty($hearing['agenda_date'])) {
+                $metadata[] = 'Agenda: ' . date('M j, Y', strtotime($hearing['agenda_date']));
+            }
+            if (!empty($hearing['agenda_time'])) {
+                $metadata[] = 'Time: ' . date('g:i A', strtotime($hearing['agenda_time']));
+            }
+            if (!empty($hearing['venue'])) {
+                $metadata[] = 'Venue: ' . $hearing['venue'];
+            }
+            if (!empty($hearing['committee_names'])) {
+                $metadata[] = 'Committee(s): ' . $hearing['committee_names'];
+            }
+            $timeline[] = [
+                'record_type' => 'hearing',
+                'title' => 'Committee Hearing — ' . ucwords(strtolower((string) $hearing['outcome'])),
+                'created_at' => $hearing['performed_at'],
+                'phase' => 'COMMITTEE',
+                'performed_by_name' => $hearing['performed_by_name'],
+                'remarks' => $hearing['remarks'],
+                'from_status' => null,
+                'to_status' => null,
+                'metadata' => $metadata,
+            ];
+        }
+
+        $reportStmt = $this->pdo->prepare("
+            SELECT cr.id, cr.report_type, cr.report_number, cr.summary_of_findings,
+                   cr.created_at, cr.returned_to_plenary_at,
+                   COALESCE(NULLIF(CONCAT_WS(' ', NULLIF(created_user.first_name, ''), NULLIF(created_user.last_name, '')), ''),
+                            created_account.username, '—') AS created_by_name,
+                   COALESCE(NULLIF(CONCAT_WS(' ', NULLIF(returned_user.first_name, ''), NULLIF(returned_user.last_name, '')), ''),
+                            returned_account.username, '—') AS returned_by_name,
+                   (SELECT GROUP_CONCAT(c.name ORDER BY c.name SEPARATOR ', ')
+                    FROM committee_report_committees crc
+                    INNER JOIN committees c ON c.id = crc.committee_id
+                    WHERE crc.committee_report_id = cr.id) AS committee_names
+            FROM committee_report_documents crd
+            INNER JOIN committee_reports cr ON cr.id = crd.committee_report_id
+            LEFT JOIN user_accounts created_account ON created_account.id = cr.created_by
+            LEFT JOIN user_info created_user ON created_user.user_account_id = cr.created_by
+            LEFT JOIN user_accounts returned_account ON returned_account.id = cr.returned_to_plenary_by
+            LEFT JOIN user_info returned_user ON returned_user.user_account_id = cr.returned_to_plenary_by
+            WHERE crd.document_id = ?
+            ORDER BY cr.created_at ASC, cr.id ASC
+        ");
+        $reportStmt->execute([$documentId]);
+        $reports = $reportStmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($reports as $report) {
+            $reportLabel = ($report['report_type'] ?? '') === 'JOINT_COMMITTEE_REPORT'
+                ? 'Joint Committee Report'
+                : 'Committee Report';
+            $timeline[] = [
+                'record_type' => 'report',
+                'title' => $reportLabel . ' prepared' . (!empty($report['report_number']) ? ' — #' . $report['report_number'] : ''),
+                'created_at' => $report['created_at'],
+                'phase' => 'COMMITTEE',
+                'performed_by_name' => $report['created_by_name'],
+                'remarks' => $report['summary_of_findings'],
+                'from_status' => null,
+                'to_status' => null,
+                'metadata' => !empty($report['committee_names']) ? ['Committee(s): ' . $report['committee_names']] : [],
+            ];
+            if (!empty($report['returned_to_plenary_at'])) {
+                $timeline[] = [
+                    'record_type' => 'report',
+                    'title' => $reportLabel . ' returned to Plenary',
+                    'created_at' => $report['returned_to_plenary_at'],
+                    'phase' => 'COMMITTEE',
+                    'performed_by_name' => $report['returned_by_name'],
+                    'remarks' => null,
+                    'from_status' => null,
+                    'to_status' => null,
+                    'metadata' => !empty($report['report_number']) ? ['Report number: ' . $report['report_number']] : [],
+                ];
+            }
+        }
+
+        $caseStmt = $this->pdo->prepare("
+            SELECT cc.*,
+                   COALESCE(NULLIF(CONCAT_WS(' ', NULLIF(assigned_user.first_name, ''), NULLIF(assigned_user.last_name, '')), ''),
+                            assigned_account.username, '—') AS assigned_by_name,
+                   COALESCE(NULLIF(CONCAT_WS(' ', NULLIF(final_user.first_name, ''), NULLIF(final_user.last_name, '')), ''),
+                            final_account.username, '—') AS finalized_by_name
+            FROM committee_cases cc
+            LEFT JOIN user_accounts assigned_account ON assigned_account.id = cc.assigned_by
+            LEFT JOIN user_info assigned_user ON assigned_user.user_account_id = cc.assigned_by
+            LEFT JOIN user_accounts final_account ON final_account.id = cc.finalized_by
+            LEFT JOIN user_info final_user ON final_user.user_account_id = cc.finalized_by
+            WHERE cc.document_id = ?
+            ORDER BY cc.id DESC LIMIT 1
+        ");
+        $caseStmt->execute([$documentId]);
+        $caseRecord = $caseStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        $caseActions = [];
+        $caseActionAttachments = [];
+        if ($caseRecord) {
+            $caseActionStmt = $this->pdo->prepare("
+                SELECT cca.id, cca.action_type, cca.action_date, cca.description, cca.notes, cca.created_at,
+                       COALESCE(NULLIF(CONCAT_WS(' ', NULLIF(ui.first_name, ''), NULLIF(ui.last_name, '')), ''),
+                                ua.username, '—') AS created_by_name
+                FROM committee_case_actions cca
+                LEFT JOIN user_accounts ua ON ua.id = cca.created_by
+                LEFT JOIN user_info ui ON ui.user_account_id = cca.created_by
+                WHERE cca.case_id = ?
+                ORDER BY cca.action_date ASC, cca.created_at ASC, cca.id ASC
+            ");
+            $caseActionStmt->execute([(int) $caseRecord['id']]);
+            $caseActions = $caseActionStmt->fetchAll(PDO::FETCH_ASSOC);
+            $caseActionAttachmentStmt = $this->pdo->prepare("
+                SELECT action_id, file_name, stored_path, mime_type, file_size, created_at
+                FROM committee_case_action_attachments
+                WHERE action_id IN (
+                    SELECT id FROM committee_case_actions WHERE case_id = ?
+                )
+                ORDER BY created_at ASC, id ASC
+            ");
+            $caseActionAttachmentStmt->execute([(int) $caseRecord['id']]);
+            foreach ($caseActionAttachmentStmt->fetchAll(PDO::FETCH_ASSOC) as $attachment) {
+                $caseActionAttachments[(int) $attachment['action_id']][] = $attachment;
+            }
+            foreach ($caseActions as $caseAction) {
+                $actionDetails = [];
+                if (!empty($caseAction['description'])) {
+                    $actionDetails[] = $caseAction['description'];
+                }
+                if (!empty($caseAction['notes'])) {
+                    $actionDetails[] = $caseAction['notes'];
+                }
+                $timeline[] = [
+                    'record_type' => 'case_action',
+                    'title' => 'Case Action — ' . $caseAction['action_type'],
+                    'created_at' => $caseAction['action_date'] ?: $caseAction['created_at'],
+                    'phase' => 'COMMITTEE',
+                    'performed_by_name' => $caseAction['created_by_name'],
+                    'remarks' => implode("\n\n", $actionDetails),
+                    'from_status' => null,
+                    'to_status' => null,
+                    'metadata' => array_map(
+                        static fn(array $file): string => 'Action attachment: ' . $file['file_name'],
+                        $caseActionAttachments[(int) $caseAction['id']] ?? []
+                    ),
+                ];
+            }
+            if (!empty($caseRecord['finalized_at'])) {
+                $timeline[] = [
+                    'record_type' => 'case_outcome',
+                    'title' => 'Case Final Outcome — ' . ucwords(strtolower((string) $caseRecord['final_outcome'])),
+                    'created_at' => $caseRecord['finalized_at'],
+                    'phase' => 'COMMITTEE',
+                    'performed_by_name' => $caseRecord['finalized_by_name'],
+                    'remarks' => $caseRecord['final_outcome_remarks'],
+                    'from_status' => null,
+                    'to_status' => null,
+                    'metadata' => [],
+                ];
+            }
+        }
+
+        foreach ([
+            ['plenary_committee_report_adoptions', 'decision', 'remarks', 'adopted_at', 'adopted_by', 'Committee Report adopted'],
+            ['plenary_comm_adoptions', 'resolution_number', 'remarks', 'adopted_at', 'adopted_by', 'Communication finalized'],
+            ['plenary_cases_adoptions', 'resolution_number', 'remarks', 'adopted_at', 'adopted_by', 'Cases Committee Report adopted'],
+        ] as [$table, $valueColumn, $remarksColumn, $dateColumn, $userColumn, $label]) {
+            $adoptionStmt = $this->pdo->prepare("
+                SELECT adoption.{$valueColumn} AS adoption_value,
+                       adoption.{$remarksColumn} AS remarks,
+                       adoption.{$dateColumn} AS adopted_at,
+                       COALESCE(NULLIF(CONCAT_WS(' ', NULLIF(ui.first_name, ''), NULLIF(ui.last_name, '')), ''),
+                                ua.username, '—') AS adopted_by_name
+                FROM {$table} adoption
+                LEFT JOIN user_accounts ua ON ua.id = adoption.{$userColumn}
+                LEFT JOIN user_info ui ON ui.user_account_id = adoption.{$userColumn}
+                WHERE adoption.document_id = ?
+            ");
+            $adoptionStmt->execute([$documentId]);
+            foreach ($adoptionStmt->fetchAll(PDO::FETCH_ASSOC) as $adoption) {
+                $value = trim((string) ($adoption['adoption_value'] ?? ''));
+                $timeline[] = [
+                    'record_type' => 'adoption',
+                    'title' => $label . ($value !== '' ? ' — ' . ucwords(strtolower(str_replace('_', ' ', $value))) : ''),
+                    'created_at' => $adoption['adopted_at'],
+                    'phase' => 'PLENARY',
+                    'performed_by_name' => $adoption['adopted_by_name'],
+                    'remarks' => $adoption['remarks'],
+                    'from_status' => null,
+                    'to_status' => null,
+                    'metadata' => [],
+                ];
+            }
+        }
+
+        usort($timeline, static function (array $a, array $b): int {
+            $aTime = strtotime((string) ($a['created_at'] ?? '')) ?: 0;
+            $bTime = strtotime((string) ($b['created_at'] ?? '')) ?: 0;
+            return $aTime <=> $bTime;
+        });
+
+        $committeeStmt = $this->pdo->prepare("
+            SELECT c.name
+            FROM document_committees dc
+            INNER JOIN committees c ON c.id = dc.committee_id
+            WHERE dc.document_id = ?
+            ORDER BY c.name
+        ");
+        $committeeStmt->execute([$documentId]);
+        $committees = $committeeStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        $authorStmt = $this->pdo->prepare("
+            SELECT CONCAT_WS(' ', NULLIF(sm.first_name, ''), NULLIF(sm.middle_name, ''),
+                                  NULLIF(sm.last_name, ''), NULLIF(sm.suffix, '')) AS full_name,
+                   da.author_role
+            FROM document_authors da
+            INNER JOIN sp_members sm ON sm.sp_member_id = da.sp_member_id
+            WHERE da.document_id = ?
+            ORDER BY da.sort_order ASC, da.id ASC
+        ");
+        $authorStmt->execute([$documentId]);
+        $authors = $authorStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $documentAttachmentStmt = $this->pdo->prepare("
+            SELECT file_name, stored_path, mime_type, file_size, phase, attachment_type, created_at
+            FROM document_attachments
+            WHERE document_id = ?
+            ORDER BY created_at ASC, id ASC
+        ");
+        $documentAttachmentStmt->execute([$documentId]);
+        $documentAttachments = $documentAttachmentStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $adoptionFiles = [];
+        foreach ([
+            ['plenary_comm_resolution_files', 'original_filename', 'file_path', 'uploaded_at'],
+            ['plenary_cases_adoption_files', 'original_filename', 'file_path', 'uploaded_at'],
+        ] as [$table, $nameColumn, $pathColumn, $dateColumn]) {
+            $fileStmt = $this->pdo->prepare("
+                SELECT {$nameColumn} AS file_name, {$pathColumn} AS stored_path,
+                       mime_type, file_size, {$dateColumn} AS created_at
+                FROM {$table}
+                WHERE document_id = ?
+                ORDER BY {$dateColumn} ASC, id ASC
+            ");
+            $fileStmt->execute([$documentId]);
+            foreach ($fileStmt->fetchAll(PDO::FETCH_ASSOC) as $file) {
+                $adoptionFiles[] = $file;
+            }
+        }
+
+        $secondReadingDetailsStmt = $this->pdo->prepare("
+            SELECT approved_no, date_finalized, approved_subject_matter,
+                   date_deferred, deferred_remarks, date_withdrawn, withdrawal_remark,
+                   compliance_file_name, compliance_file_path, compliance_mime_type,
+                   compliance_file_size, compliance_uploaded_at
+            FROM plenary_second_reading_details
+            WHERE document_id = ?
+            ORDER BY id ASC
+        ");
+        $secondReadingDetailsStmt->execute([$documentId]);
+        $secondReadingDetails = $secondReadingDetailsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $attachmentStmt = $this->pdo->prepare("
+            SELECT cr.id AS report_id, cra.file_name, cra.stored_path, cra.mime_type,
+                   cra.file_size, cra.created_at
+            FROM committee_report_documents crd
+            INNER JOIN committee_reports cr ON cr.id = crd.committee_report_id
+            INNER JOIN committee_report_attachments cra ON cra.committee_report_id = cr.id
+            WHERE crd.document_id = ?
+            ORDER BY cra.created_at ASC, cra.id ASC
+        ");
+        $attachmentStmt->execute([$documentId]);
+        $reportAttachments = $attachmentStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $pageTitle = 'Legislative Document History — ' . $document['tracking_number'];
+        require __DIR__ . '/../../../resources/views/plenary/referred-to-committee/show.php';
+    }
+
     // =========================================================================
     // REFERRED TO COMMITTEE — tracking list (documents referred at First Reading)
     //
@@ -310,9 +733,18 @@ class PlenaryReadingController
             $tab = 'in_committee';
         }
         $search  = trim($_GET['search'] ?? '');
+        $documentTypeId = max(0, (int) ($_GET['doc_type'] ?? 0));
         $page    = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 20;
         $offset  = ($page - 1) * $perPage;
+
+        $documentTypesStmt = $this->pdo->query("
+            SELECT id, name
+            FROM document_types
+            WHERE is_active = 1 AND is_deleted = 0
+            ORDER BY name ASC
+        ");
+        $documentTypes = $documentTypesStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Shared statuses — resolved by name at runtime (never hardcoded).
         $returnedStatusId  = $this->requireStatusId('Returned to Plenary');
@@ -374,6 +806,10 @@ class PlenaryReadingController
             $whereParams[] = "%{$search}%";
             $whereParams[] = "%{$search}%";
         }
+        if ($documentTypeId > 0) {
+            $whereExtra .= " AND d.document_type_id = ? ";
+            $whereParams[] = $documentTypeId;
+        }
 
         // ── Count for the active tab ─────────────────────────────────────────
         $countStmt = $this->pdo->prepare("
@@ -395,7 +831,6 @@ class PlenaryReadingController
                 d.current_phase,
                 d.current_status_id,
                 ds.name            AS status,
-                ds.badge_color     AS status_badge_color,
                 CASE
                     WHEN LOWER(COALESCE(dt.name, '')) LIKE '%complaint%'
                       OR LOWER(COALESCE(dt.name, '')) LIKE '%administrative case%'

@@ -15,6 +15,8 @@
  *   $totalPages         int
  *   $total              int
  *   $search             string
+ *   $documentTypeId     int
+ *   $documentTypes      array
  *   $tab                string  ('in_committee' | 'returned')
  *   $inCommitteeCount   int
  *   $returnedCount      int
@@ -28,6 +30,8 @@ $page             = $page             ?? 1;
 $totalPages       = $totalPages       ?? 1;
 $total            = $total            ?? 0;
 $search           = $search           ?? '';
+$documentTypeId   = (int) ($documentTypeId ?? 0);
+$documentTypes    = $documentTypes    ?? [];
 $tab              = $tab              ?? 'in_committee';
 $inCommitteeCount = $inCommitteeCount ?? 0;
 $returnedCount    = $returnedCount    ?? 0;
@@ -45,20 +49,26 @@ function rtcSessionLabel(string $type): string {
     };
 }
 
-function rtcBuildTabUrl(string $targetTab, string $search): string {
-    $qs = 'tab=' . $targetTab;
+function rtcBuildTabUrl(string $targetTab, string $search, int $documentTypeId): string {
+    $params = ['tab' => $targetTab];
     if ($search !== '') {
-        $qs .= '&search=' . urlencode($search);
+        $params['search'] = $search;
     }
-    return BASE_URL . '/plenary/referred-to-committee?' . $qs;
+    if ($documentTypeId > 0) {
+        $params['doc_type'] = $documentTypeId;
+    }
+    return BASE_URL . '/plenary/referred-to-committee?' . http_build_query($params);
 }
 
-function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
-    $qs = 'tab=' . $tab . '&page=' . $pageNum;
+function rtcBuildPageUrl(string $tab, int $pageNum, string $search, int $documentTypeId): string {
+    $params = ['tab' => $tab, 'page' => $pageNum];
     if ($search !== '') {
-        $qs .= '&search=' . urlencode($search);
+        $params['search'] = $search;
     }
-    return BASE_URL . '/plenary/referred-to-committee?' . $qs;
+    if ($documentTypeId > 0) {
+        $params['doc_type'] = $documentTypeId;
+    }
+    return BASE_URL . '/plenary/referred-to-committee?' . http_build_query($params);
 }
 ?>
 
@@ -125,12 +135,12 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
     <!-- Tabs -->
     <div class="border-b border-gray-200">
         <nav class="-mb-px flex gap-1" aria-label="Referred to Committee tabs">
-            <a href="<?= htmlspecialchars(rtcBuildTabUrl('in_committee', $search)) ?>"
+            <a href="<?= htmlspecialchars(rtcBuildTabUrl('in_committee', $search, $documentTypeId)) ?>"
                class="inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition <?= $tab === 'in_committee' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>">
                 In Committee
                 <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 <?= $tab === 'in_committee' ? 'bg-primary/10 text-primary' : '' ?>"><?= number_format($inCommitteeCount) ?></span>
             </a>
-            <a href="<?= htmlspecialchars(rtcBuildTabUrl('returned', $search)) ?>"
+            <a href="<?= htmlspecialchars(rtcBuildTabUrl('returned', $search, $documentTypeId)) ?>"
                class="inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition <?= $tab === 'returned' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>">
                 Returned — Awaiting 2nd Reading
                 <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 <?= $tab === 'returned' ? 'bg-primary/10 text-primary' : '' ?>"><?= number_format($returnedCount) ?></span>
@@ -149,6 +159,7 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
             </div>
             <form method="GET" action="<?= BASE_URL ?>/plenary/referred-to-committee" class="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
+                <input type="hidden" name="page" value="1">
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -156,29 +167,39 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                     <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search tracking # or subject…"
                            class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:w-64">
                 </div>
+                <select name="doc_type"
+                        aria-label="Filter by document type"
+                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    <option value="0">All document types</option>
+                    <?php foreach ($documentTypes as $documentType): ?>
+                        <option value="<?= (int) $documentType['id'] ?>"
+                            <?= $documentTypeId === (int) $documentType['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($documentType['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
                 <button type="submit" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Filter</button>
-                <?php if ($search !== ''): ?>
-                    <a href="<?= htmlspecialchars(rtcBuildTabUrl($tab, '')) ?>" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition text-center">Clear</a>
+                <?php if ($search !== '' || $documentTypeId > 0): ?>
+                    <a href="<?= htmlspecialchars(rtcBuildTabUrl($tab, '', 0)) ?>" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition text-center">Clear</a>
                 <?php endif; ?>
             </form>
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+            <table class="w-full min-w-[900px] table-fixed text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="px-6 py-3 font-medium">Tracking Number</th>
-                        <th class="px-6 py-3 font-medium">Subject Matter / Type</th>
-                        <th class="px-6 py-3 font-medium">Committee(s)</th>
-                        <th class="px-6 py-3 font-medium">Referred On</th>
-                        <th class="px-6 py-3 font-medium">Current Status</th>
-                        <th class="px-6 py-3 font-medium text-right">Action</th>
+                        <th class="w-[18%] px-5 py-3 font-medium">Tracking Number</th>
+                        <th class="w-[38%] px-5 py-3 font-medium">Subject Matter</th>
+                        <th class="w-[20%] px-5 py-3 font-medium">Committee(s)</th>
+                        <th class="w-[12%] px-5 py-3 font-medium">Hearing Status</th>
+                        <th class="w-[12%] px-5 py-3 font-medium text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php if (empty($documents)): ?>
                         <tr>
-                            <td colspan="6" class="px-6 py-16 text-center">
+                            <td colspan="5" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a4 4 0 11-8 0 4 4 0 018 0z"/>
@@ -197,9 +218,21 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                     <?php else: ?>
                         <?php foreach ($documents as $row): ?>
                             <?php
-                                $statusColor  = $row['status_badge_color'] ?? '#6B7280';
                                 $typeColor    = $row['document_type_badge_color'] ?? '#2563EB';
                                 $canAdvance   = !empty($row['can_advance']);
+                                $committeeOutcome = strtoupper(trim((string) ($row['committee_hearing_outcome'] ?? '')));
+                                $committeeOutcomeLabel = $committeeOutcome !== ''
+                                    ? ucwords(strtolower(str_replace('_', ' ', $committeeOutcome)))
+                                    : 'Pending';
+                                $committeeOutcomeColors = [
+                                    'APPROVED' => '#16A34A',
+                                    'DEFERRED' => '#D97706',
+                                    'REMANDED' => '#2563EB',
+                                    'WITHDRAWN' => '#6B7280',
+                                    'NOTED' => '#7C3AED',
+                                    'TERMINATED' => '#DC2626',
+                                ];
+                                $committeeOutcomeColor = $committeeOutcomeColors[$committeeOutcome] ?? '#6B7280';
                             ?>
                             <tr class="hover:bg-gray-50/50 transition">
                                 <td class="px-6 py-4">
@@ -212,8 +245,8 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <div class="max-w-xs">
-                                        <p class="line-clamp-2 font-medium text-gray-900"><?= htmlspecialchars($row['subject_matter']) ?></p>
+                                    <div class="max-w-2xl">
+                                        <p class="whitespace-pre-wrap break-words text-base font-semibold leading-6 text-gray-900"><?= htmlspecialchars($row['subject_matter']) ?></p>
                                         <?php if (!empty($row['document_type_name'])): ?>
                                             <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
                                                   style="background-color: <?= htmlspecialchars($typeColor) ?>1a; color: <?= htmlspecialchars($typeColor) ?>;">
@@ -232,52 +265,22 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
                                         <div class="text-xs text-gray-400">Accepted by <?= htmlspecialchars($row['accepted_by_username']) ?></div>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-700">
-                                    <?php if (!empty($row['referred_date'])): ?>
-                                        <?= htmlspecialchars(date('M j, Y', strtotime($row['referred_date']))) ?>
-                                    <?php else: ?>
-                                        <span class="text-xs italic text-gray-400">—</span>
-                                    <?php endif; ?>
-                                    <?php if ($tab === 'returned' && !empty($row['returned_at'])): ?>
-                                        <div class="text-xs text-violet-600">Returned <?= htmlspecialchars(date('M j, Y', strtotime($row['returned_at']))) ?></div>
-                                    <?php endif; ?>
-                                </td>
                                 <td class="px-6 py-4">
-                                    <?php if (!empty($row['status'])): ?>
-                                        <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
-                                              style="background-color: <?= htmlspecialchars($statusColor) ?>1a; color: <?= htmlspecialchars($statusColor) ?>;">
-                                            <?= htmlspecialchars($row['status']) ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-xs italic text-gray-400">—</span>
-                                    <?php endif; ?>
+                                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
+                                          style="background-color: <?= htmlspecialchars($committeeOutcomeColor) ?>1a; color: <?= htmlspecialchars($committeeOutcomeColor) ?>;">
+                                        <?= htmlspecialchars($committeeOutcomeLabel) ?>
+                                    </span>
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <?php
-                                    $detailsPayload = [
-                                        'trackingNumber' => $row['tracking_number'] ?? '—',
-                                        'proposedNumber' => $row['proposed_number'] ?? '—',
-                                        'subjectMatter' => $row['subject_matter'] ?? '—',
-                                        'documentType' => $row['document_type_name'] ?? '—',
-                                        'committees' => $row['committee_names'] ?? '—',
-                                        'dateReceived' => !empty($row['date_received']) ? date('M j, Y', strtotime($row['date_received'])) : '—',
-                                        'referredDate' => !empty($row['referred_date']) ? date('M j, Y', strtotime($row['referred_date'])) : '—',
-                                        'returnedAt' => !empty($row['returned_at']) ? date('M j, Y', strtotime($row['returned_at'])) : '—',
-                                        'status' => $row['status'] ?? '—',
-                                        'committeeOutcome' => $row['committee_hearing_outcome'] ?? '—',
-                                        'referralRemarks' => $row['referral_remarks'] ?? '—',
-                                    ];
-                                    ?>
-                                    <button type="button"
-                                            class="rtc-document-details mb-2 ml-auto flex w-fit items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
-                                            data-rtc-details="<?= htmlspecialchars(json_encode($detailsPayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>"
-                                            aria-label="View details for <?= htmlspecialchars($row['tracking_number'], ENT_QUOTES, 'UTF-8') ?>">
+                                    <a href="<?= BASE_URL ?>/plenary/referred-to-committee/show?id=<?= (int) $row['document_id'] ?>"
+                                       class="mb-2 ml-auto flex w-fit items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+                                       aria-label="View legislative history for <?= htmlspecialchars($row['tracking_number'], ENT_QUOTES, 'UTF-8') ?>">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.065 7-9.542 7s-8.268-2.943-9.542-7z"/>
                                         </svg>
                                         View details
-                                    </button>
+                                    </a>
                                     <?php if ($canAdvance): ?>
                                         <?php $hearingApproved = ($row['committee_hearing_outcome'] ?? '') === 'APPROVED'; ?>
                                         <?php if ($hearingApproved && !empty($row['is_plenary_cases_referred'])): ?>
@@ -338,11 +341,11 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search): string {
             <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
                 <p class="text-xs text-gray-500">Showing page <span class="font-medium"><?= $page ?></span> of <span class="font-medium"><?= $totalPages ?></span> (<?= $total ?> total)</p>
                 <div class="flex items-center gap-1">
-                    <?php if ($page > 1): ?><a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $page - 1, $search)) ?>" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Prev</a><?php endif; ?>
+                    <?php if ($page > 1): ?><a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $page - 1, $search, $documentTypeId)) ?>" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Prev</a><?php endif; ?>
                     <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
-                        <a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $i, $search)) ?>" class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>"><?= $i ?></a>
+                        <a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $i, $search, $documentTypeId)) ?>" class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>"><?= $i ?></a>
                     <?php endfor; ?>
-                    <?php if ($page < $totalPages): ?><a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $page + 1, $search)) ?>" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Next</a><?php endif; ?>
+                    <?php if ($page < $totalPages): ?><a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $page + 1, $search, $documentTypeId)) ?>" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Next</a><?php endif; ?>
                 </div>
             </div>
         <?php endif; ?>
@@ -412,71 +415,6 @@ ob_start();
                 </button>
             </form>
         </div>
-    </div>
-</div>
-
-<div id="rtcDocumentDetailsModal"
-     class="fixed inset-0 z-[100] hidden items-center justify-center p-4"
-     role="dialog"
-     aria-modal="true"
-     aria-labelledby="rtcDocumentDetailsTitle">
-    <div id="rtcDocumentDetailsBackdrop" class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm"></div>
-    <div class="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-100 bg-white shadow-2xl">
-        <div class="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
-            <div>
-                <h2 id="rtcDocumentDetailsTitle" class="text-lg font-semibold text-gray-900">Document details</h2>
-                <p id="rtcDetailsTrackingNumber" class="mt-1 font-mono text-sm text-gray-500"></p>
-            </div>
-            <button type="button" id="rtcDocumentDetailsClose"
-                    class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                    aria-label="Close document details">
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </div>
-        <dl class="grid grid-cols-1 gap-x-6 gap-y-5 px-6 py-5 sm:grid-cols-2">
-            <div class="sm:col-span-2">
-                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Subject matter</dt>
-                <dd id="rtcDetailsSubjectMatter" class="mt-1 whitespace-pre-wrap text-sm text-gray-900"></dd>
-            </div>
-            <div>
-                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Document type</dt>
-                <dd id="rtcDetailsDocumentType" class="mt-1 text-sm text-gray-900"></dd>
-            </div>
-            <div>
-                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Proposed number</dt>
-                <dd id="rtcDetailsProposedNumber" class="mt-1 text-sm text-gray-900"></dd>
-            </div>
-            <div class="sm:col-span-2">
-                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Committee(s)</dt>
-                <dd id="rtcDetailsCommittees" class="mt-1 text-sm text-gray-900"></dd>
-            </div>
-            <div>
-                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Date received</dt>
-                <dd id="rtcDetailsDateReceived" class="mt-1 text-sm text-gray-900"></dd>
-            </div>
-            <div>
-                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Referred on</dt>
-                <dd id="rtcDetailsReferredDate" class="mt-1 text-sm text-gray-900"></dd>
-            </div>
-            <div>
-                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Returned to Plenary</dt>
-                <dd id="rtcDetailsReturnedAt" class="mt-1 text-sm text-gray-900"></dd>
-            </div>
-            <div>
-                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Current status</dt>
-                <dd id="rtcDetailsStatus" class="mt-1 inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700"></dd>
-            </div>
-            <div>
-                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Committee outcome</dt>
-                <dd id="rtcDetailsCommitteeOutcome" class="mt-1 text-sm text-gray-900"></dd>
-            </div>
-            <div class="sm:col-span-2">
-                <dt class="text-xs font-semibold uppercase tracking-wide text-gray-500">Referral remarks</dt>
-                <dd id="rtcDetailsReferralRemarks" class="mt-1 whitespace-pre-wrap text-sm text-gray-900"></dd>
-            </div>
-        </dl>
     </div>
 </div>
 
@@ -1460,54 +1398,6 @@ ob_start();
         submitted = true;
         confirmButton.disabled = true;
         confirmButton.textContent = 'Processing…';
-    });
-}());
-</script>
-<script>
-(function () {
-    var modal = document.getElementById('rtcDocumentDetailsModal');
-    var backdrop = document.getElementById('rtcDocumentDetailsBackdrop');
-    var closeButton = document.getElementById('rtcDocumentDetailsClose');
-    var activeTrigger = null;
-    var fields = {
-        trackingNumber: 'rtcDetailsTrackingNumber',
-        subjectMatter: 'rtcDetailsSubjectMatter',
-        documentType: 'rtcDetailsDocumentType',
-        proposedNumber: 'rtcDetailsProposedNumber',
-        committees: 'rtcDetailsCommittees',
-        dateReceived: 'rtcDetailsDateReceived',
-        referredDate: 'rtcDetailsReferredDate',
-        returnedAt: 'rtcDetailsReturnedAt',
-        status: 'rtcDetailsStatus',
-        committeeOutcome: 'rtcDetailsCommitteeOutcome',
-        referralRemarks: 'rtcDetailsReferralRemarks'
-    };
-
-    function closeModal() {
-        if (modal.classList.contains('hidden')) return;
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-        if (activeTrigger) activeTrigger.focus();
-        activeTrigger = null;
-    }
-
-    document.querySelectorAll('.rtc-document-details').forEach(function (button) {
-        button.addEventListener('click', function () {
-            var details = JSON.parse(button.dataset.rtcDetails);
-            activeTrigger = button;
-            Object.keys(fields).forEach(function (key) {
-                document.getElementById(fields[key]).textContent = details[key] || '—';
-            });
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            closeButton.focus();
-        });
-    });
-
-    closeButton.addEventListener('click', closeModal);
-    backdrop.addEventListener('click', closeModal);
-    document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') closeModal();
     });
 }());
 </script>

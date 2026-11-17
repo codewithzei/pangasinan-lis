@@ -22,6 +22,14 @@ $checks = [
         "SELECT cc.final_outcome",
         "WHERE document_id = ? AND event_type = 'RETURNED_TO_PLENARY'",
         "private function recordAdoptedCommitteeReport(",
+        'public function referredToCommitteeShow(): void',
+        "\$_GET['doc_type']",
+        "AND d.document_type_id = ?",
+        'SELECT id, name',
+        'FROM document_events de',
+        'FROM committee_hearings ch',
+        'FROM committee_case_actions cca',
+        "resources/views/plenary/referred-to-committee/show.php",
         "redirect('plenary/second-reading');",
         "redirect('plenary/reports');",
     ],
@@ -40,9 +48,15 @@ $checks = [
         'Confirm Committee Report Adoption',
         'Approve &amp; Proceed to 2nd Reading',
         'Adopt Report Only (Disapproved)',
-        'data-rtc-details=',
-        'rtcDocumentDetailsModal',
-        'rtcDetailsStatus',
+        '/plenary/referred-to-committee/show?id=',
+        'Hearing Status',
+        'name="doc_type"',
+        'All document types',
+        'text-base font-semibold leading-6',
+        "rtcBuildPageUrl(\$tab, \$page + 1, \$search, \$documentTypeId)",
+        '$row[\'committee_hearing_outcome\']',
+        "'Pending'",
+        "'APPROVED' => '#16A34A'",
         '$hearingApproved && !empty($row[\'is_plenary_cases_referred\'])',
         '$hearingApproved && !empty($row[\'is_plenary_comm_referred\'])',
         'openAdoptModal(',
@@ -72,6 +86,7 @@ $checks = [
         '/public/',
     ],
     'routes/web.php' => [
+        "'plenary/referred-to-committee/show' => [",
         "'plenary/referred-to-committee/adopt-report' => [",
         "'plenary/reports' => [",
         "'plenary/reports/show' => [",
@@ -82,7 +97,17 @@ $checks = [
     ],
 ];
 
+$detailViewPath = $root . '/resources/views/plenary/referred-to-committee/show.php';
+$detailView = file_get_contents($detailViewPath);
 $failed = 0;
+if ($detailView === false
+    || !str_contains($detailView, 'Legislative history')
+    || !str_contains($detailView, 'Committee reports')
+    || !str_contains($detailView, 'Document attachments')) {
+    fwrite(STDERR, '[FAIL] Legislative document detail page is missing its full history sections.' . PHP_EOL);
+    $failed++;
+}
+
 foreach ($checks as $relativePath => $needles) {
     $path = $root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
     $contents = file_get_contents($path);
@@ -120,6 +145,16 @@ if ($safeTrackingArguments !== 2) {
 if (str_contains((string) $referredView, "if (dt) { fileInput.value = ''; }")
     || str_contains((string) $referredView, "if (casesDt) { casesFileInput.value = ''; }")) {
     fwrite(STDERR, '[FAIL] Adoption file inputs must retain the selected files after adding them to the accumulator.' . PHP_EOL);
+    $failed++;
+}
+
+if (str_contains((string) $referredView, '>Referred On</th>')) {
+    fwrite(STDERR, '[FAIL] Referred On should not be a column on the Plenary referred-to-committee table.' . PHP_EOL);
+    $failed++;
+}
+if (str_contains((string) $referredView, 'rtcDocumentDetailsModal')
+    || str_contains((string) $referredView, 'data-rtc-details=')) {
+    fwrite(STDERR, '[FAIL] Legislative document details should open as a separate page, not a modal.' . PHP_EOL);
     $failed++;
 }
 

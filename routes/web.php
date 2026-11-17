@@ -2038,6 +2038,13 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'plenary/referred-to-committee/show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReadingController',
+        'action'     => 'referredToCommitteeShow',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'plenary/referred-to-committee/adopt-report' => [
         'method'     => 'POST',
         'controller' => 'Plenary/PlenaryReadingController',
