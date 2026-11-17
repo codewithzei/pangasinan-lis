@@ -101,6 +101,10 @@ class RouteDocumentController
             'referenced_document_id' => !empty($_POST['referenced_document_id'])
                 ? (int) $_POST['referenced_document_id']
                 : 0,
+            'is_resubmission' => ($_POST['is_resubmission'] ?? '') === '1',
+            'resubmission_reference_id' => !empty($_POST['resubmission_reference_id'])
+                ? (int) $_POST['resubmission_reference_id']
+                : 0,
         ];
 
         // Include checklist items inside $data so DocumentService can persist them.
@@ -117,6 +121,16 @@ class RouteDocumentController
         // 3. Validate fields
         // ------------------------------------------------------------------
         $errors = $this->docService->validateSubmission($data);
+        if ($data['is_resubmission']) {
+            $reference = $this->docService->validateResubmissionReference(
+                $data['resubmission_reference_id']
+            );
+            if (!$reference['valid']) {
+                $errors[] = $reference['error'];
+            }
+        } else {
+            $data['resubmission_reference_id'] = 0;
+        }
 
         // ------------------------------------------------------------------
         // 4. Validate file uploads (at least one required)
@@ -232,6 +246,34 @@ class RouteDocumentController
             echo json_encode(['success' => true, 'cases' => $cases]);
         } catch (Throwable $e) {
             echo json_encode(['success' => false, 'cases' => [], 'error' => 'Failed to fetch eligible cases']);
+        }
+        exit;
+    }
+
+    // =========================================================================
+    // GET  receiving/receive-document/get-resubmission-references  (AJAX)
+    // =========================================================================
+
+    public function getResubmissionReferences(): void
+    {
+        header('Content-Type: application/json');
+
+        if (auth_id() === null) {
+            echo json_encode(['success' => false, 'documents' => [], 'error' => 'Unauthorized']);
+            exit;
+        }
+
+        try {
+            $search = trim((string) ($_GET['q'] ?? ''));
+            $documentId = isset($_GET['id']) ? (int) $_GET['id'] : null;
+            $documents = $this->docService->getEligibleResubmissionDocuments($search, $documentId);
+            echo json_encode(['success' => true, 'documents' => $documents]);
+        } catch (Throwable $e) {
+            system_log('ERROR', 'Failed to fetch resubmission reference documents', [
+                'error' => $e->getMessage(),
+                'user_id' => auth_id(),
+            ]);
+            echo json_encode(['success' => false, 'documents' => [], 'error' => 'Failed to fetch reference documents']);
         }
         exit;
     }

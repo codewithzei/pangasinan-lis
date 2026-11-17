@@ -234,6 +234,11 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                                          color: <?= htmlspecialchars($row['document_type_badge_color'] ?? '#2563EB') ?>;">
                                                 <?= htmlspecialchars($row['document_type_name'] ?? 'Unspecified') ?>
                                             </span>
+                                            <?php if (!empty($row['needs_resubmission'])): ?>
+                                                <span class="ml-1 inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">
+                                                    Resubmission needed
+                                                </span>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </td>

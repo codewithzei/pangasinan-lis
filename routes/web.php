@@ -1886,6 +1886,13 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'receiving/receive-document/get-resubmission-references' => [
+        'method' => 'GET',
+        'controller' => 'Receiving/RouteDocumentController',
+        'action' => 'getResubmissionReferences',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'receiving/route-document' => [
         'method' => 'GET',
         'controller' => 'Receiving/RouteDocumentController',

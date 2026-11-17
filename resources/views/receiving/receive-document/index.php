@@ -184,7 +184,41 @@ ob_start();
             <script>
                 window.__mfrTypeIds   = [<?= $mfrTypeIdList ?>];
                 window.__mfrSearchUrl = '<?= BASE_URL ?>/receiving/receive-document/get-eligible-cases';
+                window.__resubmissionSearchUrl = '<?= BASE_URL ?>/receiving/receive-document/get-resubmission-references';
             </script>
+
+            <!-- Resubmission Reference -->
+            <section id="resubmissionSection" class="rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Resubmission</h2>
+                <p class="mt-1 text-sm text-gray-600">
+                    Link this document to a prior document deferred, remanded, or withdrawn during a Committee hearing.
+                    Admin will decide where to route this resubmission.
+                </p>
+
+                <label class="mt-4 inline-flex items-center gap-3 text-sm font-medium text-gray-800">
+                    <input type="checkbox" name="is_resubmission" id="is_resubmission" value="1"
+                           <?= old('is_resubmission') === '1' ? 'checked' : '' ?>
+                           class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    This document is a resubmission
+                </label>
+
+                <div id="resubmissionReferenceWrapper" class="mt-4 hidden">
+                    <input type="hidden" name="resubmission_reference_id" id="resubmission_reference_id"
+                           value="<?= htmlspecialchars(old('resubmission_reference_id', '')) ?>">
+                    <label for="resubmissionSearch" class="block text-sm font-medium text-gray-700">
+                        Previous document <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" id="resubmissionSearch" autocomplete="off"
+                           placeholder="Search by tracking number, proposed number, document type, or title"
+                           class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    <select id="resubmissionResults" size="5"
+                            class="mt-2 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            aria-label="Select previous document">
+                        <option value="">Search for a deferred, remanded, or withdrawn document</option>
+                    </select>
+                    <p id="resubmissionNoResults" class="mt-2 hidden text-sm text-red-700" role="status"></p>
+                </div>
+            </section>
 
             <!-- Document Checklist -->
             <section id="checklistSection" class="rounded-2xl border border-gray-200 bg-white p-6 hidden">
@@ -492,6 +526,97 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 4500);
     }
 
+    const resubmissionToggle = document.getElementById('is_resubmission');
+    const resubmissionWrapper = document.getElementById('resubmissionReferenceWrapper');
+    const resubmissionSearch = document.getElementById('resubmissionSearch');
+    const resubmissionResults = document.getElementById('resubmissionResults');
+    const resubmissionReferenceId = document.getElementById('resubmission_reference_id');
+    const resubmissionNoResults = document.getElementById('resubmissionNoResults');
+    let resubmissionSearchTimer = null;
+    let resubmissionRequestId = 0;
+
+    function loadResubmissionReferences(query, documentId) {
+        const requestId = ++resubmissionRequestId;
+        const params = new URLSearchParams();
+        if (documentId) {
+            params.set('id', documentId);
+        } else if (query) {
+            params.set('q', query);
+        }
+
+        resubmissionNoResults.classList.add('hidden');
+        fetch(window.__resubmissionSearchUrl + '?' + params.toString())
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to fetch resubmission references');
+                return response.json();
+            })
+            .then(data => {
+                if (requestId !== resubmissionRequestId || !resubmissionToggle.checked) return;
+                if (!data.success) throw new Error(data.error || 'Failed to fetch resubmission references');
+
+                resubmissionResults.innerHTML = '';
+                const documents = Array.isArray(data.documents) ? data.documents : [];
+                if (!documents.length) {
+                    resubmissionResults.add(new Option('No eligible documents found', ''));
+                    resubmissionNoResults.textContent = 'No deferred, remanded, or withdrawn documents match your search.';
+                    resubmissionNoResults.classList.remove('hidden');
+                    return;
+                }
+
+                resubmissionResults.add(new Option('-- Select a previous document --', ''));
+                documents.forEach(document => {
+                    const proposedNumber = document.proposed_number ? ` | ${document.proposed_number}` : '';
+                    const label = `${document.tracking_number}${proposedNumber} | ${document.status_name} | ${document.subject_matter}`;
+                    resubmissionResults.add(new Option(label, document.id));
+                });
+                if (documentId) {
+                    resubmissionResults.value = String(documentId);
+                    resubmissionReferenceId.value = String(documentId);
+                }
+            })
+            .catch(error => {
+                if (requestId !== resubmissionRequestId || !resubmissionToggle.checked) return;
+                resubmissionNoResults.textContent = 'Unable to load previous documents. Please try again.';
+                resubmissionNoResults.classList.remove('hidden');
+                console.error(error);
+            });
+    }
+
+    resubmissionToggle.addEventListener('change', function() {
+        resubmissionWrapper.classList.toggle('hidden', !this.checked);
+        if (this.checked) {
+            if (resubmissionReferenceId.value) {
+                loadResubmissionReferences('', resubmissionReferenceId.value);
+            } else {
+                loadResubmissionReferences('', '');
+            }
+        } else {
+            resubmissionRequestId++;
+            resubmissionReferenceId.value = '';
+            resubmissionSearch.value = '';
+            resubmissionResults.innerHTML = '';
+            resubmissionResults.add(new Option('Search for a deferred, remanded, or withdrawn document', ''));
+            resubmissionNoResults.classList.add('hidden');
+        }
+    });
+
+    resubmissionSearch.addEventListener('input', function() {
+        resubmissionReferenceId.value = '';
+        clearTimeout(resubmissionSearchTimer);
+        resubmissionSearchTimer = setTimeout(() => {
+            loadResubmissionReferences(this.value.trim(), '');
+        }, 250);
+    });
+
+    resubmissionResults.addEventListener('change', function() {
+        resubmissionReferenceId.value = this.value;
+    });
+
+    if (resubmissionToggle.checked) {
+        resubmissionWrapper.classList.remove('hidden');
+        loadResubmissionReferences('', resubmissionReferenceId.value);
+    }
+
     // Document type change handler - Load checklists
     documentTypeSelect.addEventListener('change', function() {
         const documentTypeId = this.value;
@@ -740,6 +865,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 ]);
                 return false;
             }
+        }
+
+        if (resubmissionToggle.checked && !resubmissionReferenceId.value) {
+            e.preventDefault();
+            showReceiveValidationFlash(['Select the previous document that needs resubmission.']);
+            resubmissionSearch.focus();
+            return false;
         }
 
         submitBtn.disabled = true;

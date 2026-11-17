@@ -24,6 +24,7 @@ $routes           = $routes           ?? [];
 $events           = $events           ?? [];
 $revisions        = $revisions        ?? [];
 $commCategories   = $commCategories   ?? [];
+$resubmissionReference = $resubmissionReference ?? null;
 
 $documentId      = (int) ($document['id'] ?? 0);
 $trackingNumber  = $document['tracking_number'] ?? '';
@@ -183,6 +184,21 @@ ob_start();
                         </div>
                     <?php endif; ?>
                 </dl>
+                <?php if ($resubmissionReference !== null): ?>
+                    <div class="mt-5 rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                        <p class="text-sm font-semibold text-indigo-900">Resubmission needed</p>
+                        <p class="mt-1 text-sm text-indigo-800">
+                            Linked to
+                            <span class="font-semibold"><?= htmlspecialchars($resubmissionReference['tracking_number']) ?></span>
+                            <?php if (!empty($resubmissionReference['proposed_number'])): ?>
+                                (<?= htmlspecialchars($resubmissionReference['proposed_number']) ?>)
+                            <?php endif; ?>
+                            — <?= htmlspecialchars($resubmissionReference['status_name'] ?? 'Prior document') ?>.
+                        </p>
+                        <p class="mt-1 text-xs text-indigo-700"><?= escape_trimmed_text($resubmissionReference['subject_matter'] ?? '') ?></p>
+                        <p class="mt-2 text-xs font-medium text-indigo-700">Choose the destination when routing this document.</p>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <!-- Accountability / Ownership ---------------------------------------->

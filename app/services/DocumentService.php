@@ -395,12 +395,6 @@ class DocumentService
             $resubmissionReference = null;
 
             if ($isResubmission) {
-                if (!in_array($routingOptionId, [3, 4, 5], true)) {
-                    throw new RuntimeException(
-                        'Resubmission is available only when routing to SP Secretary, Plenary, or Committee.'
-                    );
-                }
-
                 $referenceId = (int) ($data['resubmission_reference_id'] ?? 0);
                 $resubmissionReference = $this->findEligibleResubmissionDocument($referenceId, true);
                 if ($resubmissionReference === null) {
@@ -638,14 +632,14 @@ class DocumentService
                 ]);
             }
 
-            // 7c. Persist resubmission relationship. Committee resubmissions
-            //     inherit their prior proposed number so they can bypass the
-            //     plenary's initial-numbering steps and enter the Committee inbox.
+            // 7c. Persist the resubmission reference at intake. Routing is
+            //     selected later by Admin; Committee routing inherits the
+            //     prior proposed number in the Admin routing workflow.
             if ($isResubmission && $resubmissionReference !== null) {
                 $this->linkResubmissionDocument(
                     $documentId,
                     (int) $resubmissionReference['id'],
-                    $routingOptionId,
+                    $routingOptionId > 0 ? $routingOptionId : null,
                     $userId
                 );
 
@@ -795,7 +789,7 @@ class DocumentService
                     json_encode(
                         array_merge($baseMetadata, [
                             'referenced_document_id' => (int) $resubmissionReference['id'],
-                            'routing_option_id' => $routingOptionId,
+                            'routing_option_id' => $routingOptionId > 0 ? $routingOptionId : null,
                             'adopted_proposed_number' => $routingOptionId === 5
                                 ? ($resubmissionReference['proposed_number'] ?: null)
                                 : null,
@@ -1877,7 +1871,7 @@ class DocumentService
     public function linkResubmissionDocument(
         int $resubmittedDocumentId,
         int $referencedDocumentId,
-        int $routingOptionId,
+        ?int $routingOptionId,
         int $userId
     ): void {
         $stmt = $this->pdo->prepare("

@@ -147,6 +147,11 @@ class AdminInboxController
                 d.current_phase,
                 d.date_received,
                 d.time_received,
+                EXISTS (
+                    SELECT 1
+                    FROM document_resubmission_links drl
+                    WHERE drl.resubmitted_document_id = d.id
+                )                            AS needs_resubmission,
                 ds.name                      AS status,
                 ds.badge_color               AS status_badge_color,
                 st.name                      AS source_type,
@@ -267,6 +272,23 @@ class AdminInboxController
             flash_set('error', 'Document not found.');
             redirect('admin/inbox');
         }
+
+        $resubmissionStmt = $this->pdo->prepare("
+            SELECT
+                ref.id,
+                ref.tracking_number,
+                ref.subject_matter,
+                refpdd.proposed_number,
+                refStatus.name AS status_name
+            FROM document_resubmission_links drl
+            INNER JOIN documents ref ON ref.id = drl.referenced_document_id
+            LEFT JOIN plenary_document_details refpdd ON refpdd.document_id = ref.id
+            LEFT JOIN document_statuses refStatus ON refStatus.id = ref.current_status_id
+            WHERE drl.resubmitted_document_id = ?
+            LIMIT 1
+        ");
+        $resubmissionStmt->execute([$documentId]);
+        $resubmissionReference = $resubmissionStmt->fetch() ?: null;
 
         // ── Find the current Admin assignment for this document ───────────────
         // We need to look for PENDING assignments visible to this user OR
@@ -1199,11 +1221,48 @@ class AdminInboxController
         $doc = $this->pdo->prepare("SELECT * FROM documents WHERE id = ? LIMIT 1");
         $doc->execute([$documentId]);
         $document = $doc->fetch();
+        if (!$document) {
+            throw new RuntimeException('Document not found.');
+        }
 
         // If Admin left the remarks field blank, fall back to the original
         // Receiving remarks stored in documents.remarks so the value is never
         // lost when the document is routed to Committee (or any other phase).
         $effectiveRemarks = trim($remarks) !== '' ? trim($remarks) : trim($document['remarks'] ?? '');
+
+        // A resubmission routed to Committee must carry the previous docket
+        // number along, even though Receiving no longer selects the destination.
+        if ($targetPhase === 'COMMITTEE') {
+            $referenceStmt = $this->pdo->prepare("
+                SELECT refpdd.proposed_number
+                FROM document_resubmission_links drl
+                LEFT JOIN plenary_document_details refpdd
+                    ON refpdd.document_id = drl.referenced_document_id
+                WHERE drl.resubmitted_document_id = ?
+                LIMIT 1
+            ");
+            $referenceStmt->execute([$documentId]);
+            $proposedNumber = $referenceStmt->fetchColumn();
+            if ($proposedNumber !== false) {
+                $detailsStmt = $this->pdo->prepare("
+                    SELECT id FROM plenary_document_details WHERE document_id = ? LIMIT 1
+                ");
+                $detailsStmt->execute([$documentId]);
+                if (!$detailsStmt->fetchColumn()) {
+                    $this->pdo->prepare("
+                        INSERT INTO plenary_document_details
+                            (document_id, proposed_number, status_id, created_by, updated_by)
+                        VALUES (?, ?, ?, ?, ?)
+                    ")->execute([
+                        $documentId,
+                        $proposedNumber ?: null,
+                        $pendingStatusId,
+                        $userId,
+                        $userId,
+                    ]);
+                }
+            }
+        }
 
         $revNum = $this->docService->nextRevisionNumber($documentId);
         $this->pdo->prepare("
