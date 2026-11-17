@@ -14,6 +14,24 @@ class DashboardController
 
     public function index(): void
     {
+        $termStmt = $this->pdo->query("
+            SELECT
+                t.id,
+                t.name,
+                t.session_number,
+                t.start_date,
+                t.end_date,
+                COUNT(tl.id) AS member_count
+            FROM terms t
+            LEFT JOIN term_legislators tl ON tl.term_id = t.id
+            WHERE t.is_deleted = 0
+              AND t.is_active = 1
+            GROUP BY t.id, t.name, t.session_number, t.start_date, t.end_date
+            ORDER BY t.start_date DESC
+            LIMIT 1
+        ");
+        $currentTerm = $termStmt->fetch() ?: null;
+
         $userCount = $this->pdo->query("SELECT COUNT(*) FROM user_accounts WHERE status = 'active' AND is_deleted = 0")->fetchColumn();
         $roleCount = $this->pdo->query("SELECT COUNT(*) FROM roles WHERE is_active = 1")->fetchColumn();
 
@@ -92,6 +110,15 @@ class DashboardController
             'system_logs' => (int)($logStats['total_sys'] ?? 0),
             'audit_logs' => (int)($logStats['total_audit'] ?? 0),
         ];
+        $termProgress = 0;
+        if ($currentTerm) {
+            $termStart = strtotime($currentTerm['start_date']);
+            $termEnd = strtotime($currentTerm['end_date']);
+            $today = strtotime(date('Y-m-d'));
+            if ($termStart !== false && $termEnd !== false && $termEnd > $termStart) {
+                $termProgress = (int) max(0, min(100, round((($today - $termStart) / ($termEnd - $termStart)) * 100)));
+            }
+        }
 
         require __DIR__ . '/../../../resources/views/master/dashboard.php';
     }

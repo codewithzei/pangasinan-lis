@@ -21,10 +21,20 @@ $acceptedCount   = 0;
 $returnedCount   = 0;
 $avgReviewDays   = 0;
 $recentDocuments = [];
+$currentTerm     = null;
 
 try {
     $database = new Database();
     $pdo      = $database->connect();
+
+    $termStmt = $pdo->query("
+        SELECT name, session_number, year, start_date, end_date
+        FROM terms
+        WHERE is_active = 1 AND is_deleted = 0
+        ORDER BY start_date DESC
+        LIMIT 1
+    ");
+    $currentTerm = $termStmt->fetch() ?: null;
 
     // Resolve Committee role ID
     $roleStmt = $pdo->query(
@@ -137,44 +147,68 @@ try {
     ]);
 }
 
+$termProgress = null;
+if ($currentTerm && !empty($currentTerm['start_date']) && !empty($currentTerm['end_date'])) {
+    $termStart = strtotime($currentTerm['start_date']);
+    $termEnd = strtotime($currentTerm['end_date']);
+    $today = strtotime(date('Y-m-d'));
+    if ($termStart !== false && $termEnd !== false && $termEnd > $termStart) {
+        $termProgress = (int) max(0, min(100, round((($today - $termStart) / ($termEnd - $termStart)) * 100)));
+    }
+}
+$workloadTotal = $forReviewCount + $acceptedCount;
+$workloadMax = max(1, $forReviewCount, $acceptedCount, $returnedCount);
+
 ob_start();
 ?>
 
 <div class="space-y-6">
 
     <!-- Page header ---------------------------------------------------------->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10 max-w-3xl">
-                <p class="text-sm font-medium text-blue-100">COMMITTEE REVIEW</p>
-                <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                    Greetings, <?= htmlspecialchars($userName) ?>
-                </h1>
-                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
-                    Review measures referred to your committee, conduct public hearings, consolidate committee
-                    reports with recommendations, and return documents to Admin for routing to Plenary.
-                </p>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-lg">
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
+        <div class="relative z-10 flex flex-col gap-6 px-6 py-7 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
+            <div class="flex items-start gap-4">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/5 text-blue-100">
+                    <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4" d="M3 21h18M4 18h16M5 18V9l7-5 7 5v9M9 10v5m6-5v5M2 9h20"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Pangasinan Provincial Legislature</p>
+                    <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">Committee Dashboard</h1>
+                    <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
+                        Good day, <?= htmlspecialchars($userName) ?>. Review referred measures, coordinate opinions and hearings, and prepare committee reports for Plenary.
+                    </p>
+                </div>
             </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
+            <div class="border-t border-white/10 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                <p class="text-xs font-medium text-white">Committee workspace</p>
+                <p class="mt-1 text-xs text-blue-100"><?= htmlspecialchars(date('l, F j, Y')) ?></p>
+            </div>
         </div>
     </section>
 
     <!-- Statistics cards ----------------------------------------------------->
-    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-labelledby="committee-overview-title">
+        <div class="mb-4">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">At a glance</p>
+            <h2 id="committee-overview-title" class="mt-1 text-xl font-semibold text-gray-900">Committee workload</h2>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 
         <!-- For Review (pending inbox) -->
         <a href="<?= BASE_URL ?>/committee/inbox?view=inbox"
-           class="rounded-2xl border border-gray-200 bg-white p-5 hover:border-primary hover:shadow-sm transition group">
+           class="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md">
             <div class="flex items-start justify-between">
                 <div>
-                    <p class="text-sm text-gray-500">For Review</p>
-                    <p class="mt-2 text-3xl font-bold text-gray-900">
+                    <p class="text-xs font-medium text-gray-500">For Review</p>
+                    <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900">
                         <?= number_format($forReviewCount) ?>
                     </p>
                 </div>
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary
-                            group-hover:bg-primary group-hover:text-white transition">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-primary transition">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -182,22 +216,21 @@ ob_start();
                 </div>
             </div>
             <div class="mt-4">
-                <span class="text-xs text-gray-400">Pending documents awaiting your action</span>
+                <span class="text-[11px] text-gray-400">Pending documents awaiting your action</span>
             </div>
         </a>
 
         <!-- Accepted / In Progress -->
         <a href="<?= BASE_URL ?>/committee/inbox?view=accepted"
-           class="rounded-2xl border border-gray-200 bg-white p-5 hover:border-primary hover:shadow-sm transition group">
+           class="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md">
             <div class="flex items-start justify-between">
                 <div>
-                    <p class="text-sm text-gray-500">Accepted</p>
-                    <p class="mt-2 text-3xl font-bold text-gray-900">
+                    <p class="text-xs font-medium text-gray-500">Accepted by You</p>
+                    <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900">
                         <?= number_format($acceptedCount) ?>
                     </p>
                 </div>
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600
-                            group-hover:bg-indigo-600 group-hover:text-white transition">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                               d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -205,20 +238,20 @@ ob_start();
                 </div>
             </div>
             <div class="mt-4">
-                <span class="text-xs text-gray-400">Documents currently owned by you</span>
+                <span class="text-[11px] text-gray-400">Documents currently owned by you</span>
             </div>
         </a>
 
         <!-- Returned to Admin -->
-        <div class="rounded-2xl border border-gray-200 bg-white p-5">
+        <div class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div class="flex items-start justify-between">
                 <div>
-                    <p class="text-sm text-gray-500">Returned to Admin</p>
-                    <p class="mt-2 text-3xl font-bold text-gray-900">
+                    <p class="text-xs font-medium text-gray-500">Returned to Admin</p>
+                    <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900">
                         <?= number_format($returnedCount) ?>
                     </p>
                 </div>
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-500">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                               d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
@@ -226,20 +259,20 @@ ob_start();
                 </div>
             </div>
             <div class="mt-4">
-                <span class="text-xs text-gray-400">Documents returned role-wide</span>
+                <span class="text-[11px] text-gray-400">Documents returned role-wide</span>
             </div>
         </div>
 
         <!-- Average Review Days -->
-        <div class="rounded-2xl border border-gray-200 bg-white p-5">
+        <div class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div class="flex items-start justify-between">
                 <div>
-                    <p class="text-sm text-gray-500">Avg. Review Days</p>
-                    <p class="mt-2 text-3xl font-bold text-gray-900">
+                    <p class="text-xs font-medium text-gray-500">Avg. Review Days</p>
+                    <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900">
                         <?= $avgReviewDays > 0 ? number_format($avgReviewDays, 1) : '—' ?>
                     </p>
                 </div>
-                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-50 text-sky-700">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
                               d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -247,24 +280,87 @@ ob_start();
                 </div>
             </div>
             <div class="mt-4">
-                <span class="text-xs text-gray-400">Based on completed assignments</span>
+                <span class="text-[11px] text-gray-400">Based on completed assignments</span>
             </div>
         </div>
 
+        </div>
     </section>
 
-    <!-- Main content grid: recent inbox + quick actions -------------------->
+    <section class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Current Legislative Term</p>
+            <?php if ($currentTerm): ?>
+                <h2 class="mt-2 text-lg font-semibold text-gray-900"><?= htmlspecialchars($currentTerm['name']) ?></h2>
+                <p class="mt-1 text-sm text-gray-500">
+                    <?= htmlspecialchars(trim(($currentTerm['session_number'] ? 'Session ' . $currentTerm['session_number'] . ' · ' : '') . ($currentTerm['year'] ?? ''))) ?>
+                </p>
+                <p class="mt-4 text-xs text-gray-500">
+                    <?= !empty($currentTerm['start_date']) ? htmlspecialchars(date('M j, Y', strtotime($currentTerm['start_date']))) : 'Start date unavailable' ?>
+                    <span class="px-1 text-gray-300">—</span>
+                    <?= !empty($currentTerm['end_date']) ? htmlspecialchars(date('M j, Y', strtotime($currentTerm['end_date']))) : 'End date unavailable' ?>
+                </p>
+                <?php if ($termProgress !== null): ?>
+                    <div class="mt-4">
+                        <div class="mb-1.5 flex items-center justify-between text-[11px]">
+                            <span class="font-medium text-gray-500">Term timeline</span>
+                            <span class="font-semibold tabular-nums text-primary"><?= $termProgress ?>%</span>
+                        </div>
+                        <div class="h-2 overflow-hidden rounded-full bg-gray-100">
+                            <div class="h-full rounded-full bg-primary transition-all" style="width: <?= $termProgress ?>%"></div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            <?php else: ?>
+                <p class="mt-3 text-sm font-medium text-gray-700">No active legislative term</p>
+                <p class="mt-1 text-xs text-gray-500">An active term will appear here when one is configured.</p>
+            <?php endif; ?>
+        </article>
+
+        <article class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 lg:col-span-2">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Assignment status</p>
+                    <h2 class="mt-1 font-semibold text-gray-900">Committee workflow snapshot</h2>
+                    <p class="mt-1 text-xs text-gray-500">Current and completed role-level assignment counts</p>
+                </div>
+                <span class="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                    <?= number_format($workloadTotal) ?> active
+                </span>
+            </div>
+            <div class="mt-5 space-y-4">
+                <?php foreach ([
+                    ['label' => 'For Review', 'count' => $forReviewCount, 'color' => 'bg-primary'],
+                    ['label' => 'Accepted by You', 'count' => $acceptedCount, 'color' => 'bg-indigo-500'],
+                    ['label' => 'Returned to Admin', 'count' => $returnedCount, 'color' => 'bg-slate-500'],
+                ] as $stage): ?>
+                    <div>
+                        <div class="mb-1.5 flex items-center justify-between text-xs">
+                            <span class="font-medium text-gray-600"><?= htmlspecialchars($stage['label']) ?></span>
+                            <span class="tabular-nums text-gray-500"><?= number_format($stage['count']) ?></span>
+                        </div>
+                        <div class="h-2 overflow-hidden rounded-full bg-gray-100">
+                            <div class="h-full rounded-full <?= $stage['color'] ?>" style="width: <?= (int) round(($stage['count'] / $workloadMax) * 100) ?>%"></div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </article>
+    </section>
+
+    <!-- Main content grid: recent inbox + committee workbench ---------------->
     <section class="grid grid-cols-1 gap-6 lg:grid-cols-5">
 
         <!-- Recent Committee Inbox (3/5 columns) ---------------------------->
-        <div class="rounded-2xl border border-gray-200 bg-white lg:col-span-3">
-            <div class="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-3">
+            <div class="flex items-center justify-between border-b border-gray-100 px-5 py-5 sm:px-6">
                 <div>
-                    <h2 class="font-semibold text-gray-900">Committee Inbox</h2>
-                    <p class="mt-1 text-xs text-gray-500">Your pending and accepted documents</p>
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Active assignments</p>
+                    <h2 class="mt-1 font-semibold text-gray-900">Recent Committee Inbox</h2>
+                    <p class="mt-1 text-xs text-gray-500">Pending items and documents accepted by you</p>
                 </div>
                 <a href="<?= BASE_URL ?>/committee/inbox"
-                   class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5
+                   class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2
                           text-xs font-medium text-gray-600 hover:border-primary hover:bg-blue-50
                           hover:text-primary transition">
                     View All
@@ -367,26 +463,26 @@ ob_start();
         </div>
 
         <!-- Quick actions sidebar (2/5 columns) ---------------------------->
-        <div class="rounded-2xl border border-gray-200 bg-white lg:col-span-2">
-            <div class="border-b border-gray-200 px-6 py-5">
-                <h2 class="font-semibold text-gray-900">Committee Actions</h2>
-                <p class="mt-1 text-xs text-gray-500">Navigate to key workflows</p>
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-2">
+            <div class="border-b border-gray-100 px-5 py-5 sm:px-6">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Committee workbench</p>
+                <h2 class="mt-1 font-semibold text-gray-900">Frequently used actions</h2>
+                <p class="mt-1 text-xs text-gray-500">Direct links to existing committee workflows</p>
             </div>
-            <div class="space-y-2 p-6">
+            <div class="space-y-2 p-5 sm:p-6">
 
                 <!-- Go to Inbox -->
                 <a href="<?= BASE_URL ?>/committee/inbox"
-                   class="flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3
-                          hover:border-primary hover:bg-blue-50 transition">
-                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-primary">
+                   class="group flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3 transition hover:border-primary hover:bg-blue-50/50">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary transition group-hover:bg-white">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
                         </svg>
                     </span>
-                    <div class="text-left">
-                        <p class="text-sm font-medium text-gray-800">Open Inbox</p>
-                        <p class="text-xs text-gray-400">
+                    <div>
+                        <p class="text-sm font-medium text-gray-800 group-hover:text-primary">Open Inbox</p>
+                        <p class="text-xs text-gray-500">
                             <?php if ($forReviewCount > 0): ?>
                                 <?= $forReviewCount ?> document<?= $forReviewCount !== 1 ? 's' : '' ?> pending
                             <?php else: ?>
@@ -403,49 +499,59 @@ ob_start();
 
                 <!-- Accepted documents -->
                 <a href="<?= BASE_URL ?>/committee/inbox?view=accepted"
-                   class="flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3
-                          hover:border-indigo-300 hover:bg-indigo-50 transition">
-                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+                   class="group flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3 transition hover:border-indigo-300 hover:bg-indigo-50/50">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition group-hover:bg-white">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     </span>
-                    <div class="text-left">
-                        <p class="text-sm font-medium text-gray-800">Accepted Documents</p>
-                        <p class="text-xs text-gray-400">
+                    <div>
+                        <p class="text-sm font-medium text-gray-800 group-hover:text-indigo-700">Accepted Documents</p>
+                        <p class="text-xs text-gray-500">
                             <?= $acceptedCount ?> document<?= $acceptedCount !== 1 ? 's' : '' ?> in progress
                         </p>
                     </div>
                 </a>
 
-                <!-- Return with objections note -->
-                <div class="flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3">
-                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                <a href="<?= BASE_URL ?>/committee/referred"
+                   class="group flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3 transition hover:border-sky-300 hover:bg-sky-50/50">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-700 transition group-hover:bg-white">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5h6m-6 4h6m-6 4h6m-6 4h4"/>
                         </svg>
                     </span>
-                    <div class="text-left">
-                        <p class="text-sm font-medium text-gray-700">Return with Objections</p>
-                        <p class="text-xs text-gray-400">Available inside each document's detail view</p>
+                    <div>
+                        <p class="text-sm font-medium text-gray-800 group-hover:text-sky-700">Referred Documents</p>
+                        <p class="text-xs text-gray-500">Manage opinions, agenda, and referrals</p>
                     </div>
-                </div>
+                </a>
 
-                <!-- Upload committee report note -->
-                <div class="flex w-full items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3">
-                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                <a href="<?= BASE_URL ?>/committee/hearing"
+                   class="group flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3 transition hover:border-slate-300 hover:bg-slate-50">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition group-hover:bg-white">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3l8.384-8.381M16 16l6-6m-.5.5-8-8M8 8l6-6m-5.5 5.5 8 8"/>
                         </svg>
                     </span>
-                    <div class="text-left">
-                        <p class="text-sm font-medium text-gray-700">Attach Committee Report</p>
-                        <p class="text-xs text-gray-400">Upload files from the document detail view</p>
+                    <div>
+                        <p class="text-sm font-medium text-gray-800 group-hover:text-slate-700">Hearings</p>
+                        <p class="text-xs text-gray-500">Review scheduled hearings and outcomes</p>
                     </div>
-                </div>
+                </a>
+
+                <a href="<?= BASE_URL ?>/committee/reports"
+                   class="group flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3 transition hover:border-blue-300 hover:bg-blue-50/50">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary transition group-hover:bg-white">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 22a2 2 0 01-2-2V4a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2zM14 2v6h6M8 13h8m-8 4h8"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <p class="text-sm font-medium text-gray-800 group-hover:text-primary">Committee Reports</p>
+                        <p class="text-xs text-gray-500">Prepare and track reports sent to Plenary</p>
+                    </div>
+                </a>
 
             </div>
         </div>

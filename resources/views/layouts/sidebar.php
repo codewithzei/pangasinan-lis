@@ -88,6 +88,13 @@ if ($userRoleId !== null) {
         <div class="mb-7">
             <p class="mb-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Document Processing</p>
             <nav class="space-y-1">
+                <a href="<?= BASE_URL ?>/receiving/receive-document" class="<?= $navBase ?> <?= isActiveNav('receiving/receive-document', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M12 5v14m-7-7h14"/>
+                    </svg>
+                    Receive Documents
+                </a>
                 <a href="<?= BASE_URL ?>/receiving/inbox" class="<?= $navBase ?> <?= isActiveNav('receiving/inbox', $currentRoute) ?>">
                     <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"

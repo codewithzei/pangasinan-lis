@@ -1791,8 +1791,8 @@ class DocumentService
     }
 
     /**
-     * Return documents that may be selected as resubmission references.
-     * Only documents currently marked Remanded, Deferred, or Withdrawn qualify.
+     * Return documents whose latest recorded Committee outcome is Remanded,
+     * Deferred, or Withdrawn, regardless of later workflow status changes.
      */
     public function getEligibleResubmissionDocuments(string $search = '', ?int $documentId = null): array
     {
@@ -1820,16 +1820,16 @@ class DocumentService
                 d.tracking_number,
                 d.subject_matter,
                 dt.name AS document_type_name,
-                ds.name AS status_name,
+                outcome_status.name AS status_name,
                 pdd.proposed_number
             FROM documents d
             INNER JOIN document_types dt ON dt.id = d.document_type_id
                                          AND dt.is_deleted = 0
-            INNER JOIN document_statuses ds ON ds.id = d.current_status_id
+            " . $this->resubmissionOutcomeJoinSql() . "
             LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
-            WHERE ds.name IN (?, ?, ?)
-              AND ds.is_active = 1
-              AND ds.is_deleted = 0
+            WHERE outcome_status.name IN (?, ?, ?)
+              AND outcome_status.is_active = 1
+              AND outcome_status.is_deleted = 0
               " . (!empty($filters) ? 'AND ' . implode(' AND ', $filters) : '') . "
             ORDER BY d.tracking_number DESC
             LIMIT 50
@@ -1839,7 +1839,7 @@ class DocumentService
     }
 
     /**
-     * Validate that a document is still in a resubmission-eligible status.
+     * Validate that the latest recorded Committee outcome is eligible for resubmission.
      *
      * @return array{valid:bool,error:string,document:array|null}
      */
@@ -1857,7 +1857,7 @@ class DocumentService
         if ($document === null) {
             return [
                 'valid' => false,
-                'error' => 'The selected document is not Remanded, Deferred, or Withdrawn.',
+                'error' => 'The selected document has no latest Committee outcome of Remanded, Deferred, or Withdrawn.',
                 'document' => null,
             ];
         }
@@ -1902,22 +1902,55 @@ class DocumentService
                 d.tracking_number,
                 d.subject_matter,
                 dt.name AS document_type_name,
-                ds.name AS status_name,
+                outcome_status.name AS status_name,
                 pdd.proposed_number
             FROM documents d
             INNER JOIN document_types dt ON dt.id = d.document_type_id
                                          AND dt.is_deleted = 0
-            INNER JOIN document_statuses ds ON ds.id = d.current_status_id
+            " . $this->resubmissionOutcomeJoinSql() . "
             LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
             WHERE d.id = ?
-              AND ds.name IN ('Remanded', 'Deferred', 'Withdrawn')
-              AND ds.is_active = 1
-              AND ds.is_deleted = 0
+              AND outcome_status.name IN ('Remanded', 'Deferred', 'Withdrawn')
+              AND outcome_status.is_active = 1
+              AND outcome_status.is_deleted = 0
             LIMIT 1" . ($forUpdate ? ' FOR UPDATE' : '')
         );
         $stmt->execute([$documentId]);
         $document = $stmt->fetch(PDO::FETCH_ASSOC);
         return $document ?: null;
+    }
+
+    /**
+     * Join the latest Committee hearing/case outcome status recorded in the
+     * workflow event history. Later non-hearing status changes must not erase
+     * the outcome that determines resubmission eligibility.
+     */
+    private function resubmissionOutcomeJoinSql(): string
+    {
+        return "
+            INNER JOIN (
+                SELECT outcome_event.document_id, outcome_event.to_status_id
+                FROM document_events outcome_event
+                INNER JOIN (
+                    SELECT document_id, MAX(id) AS latest_event_id
+                    FROM document_events
+                    WHERE phase = 'COMMITTEE'
+                      AND event_type IN (
+                          'HEARING_COMPLETED',
+                          'HEARING_DEFERRED',
+                          'HEARING_REMANDED',
+                          'HEARING_WITHDRAWN',
+                          'HEARING_AGENDA_RESET',
+                          'COMMITTEE_CASE_APPROVED',
+                          'COMMITTEE_CASE_NOTED'
+                      )
+                    GROUP BY document_id
+                ) latest_outcome
+                    ON latest_outcome.latest_event_id = outcome_event.id
+            ) committee_outcome ON committee_outcome.document_id = d.id
+            INNER JOIN document_statuses outcome_status
+                ON outcome_status.id = committee_outcome.to_status_id
+        ";
     }
 
     /**

@@ -250,6 +250,13 @@ class RoutedDocumentController
 
         $pageTitle = 'Document Details';
         $pageSubtitle = $document['tracking_number'];
+        $detailBackUrl = BASE_URL . '/receiving/routed-documents';
+        $detailBackLabel = 'Back to Routed Documents';
+
+        if (($_GET['return'] ?? '') === 'dashboard') {
+            $detailBackUrl = BASE_URL . '/receiving/dashboard';
+            $detailBackLabel = 'Back to Receiving Dashboard';
+        }
 
         // ── Motion for Reconsideration data ───────────────────────────────────
         // Detect document type name (already joined)

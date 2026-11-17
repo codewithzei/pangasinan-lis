@@ -41,10 +41,110 @@ class AdminDashboardController
             // Graceful degradation — show zeros
             $stats = $this->emptyStats();
             $recentQueue = [];
-            $this->render($stats, $recentQueue);
+            $this->render($stats, $recentQueue, null, $this->emptyLegislativeOverview());
             return;
         }
         $adminRoleId = (int) $adminRole['id'];
+
+        $termStmt = $this->pdo->query("
+            SELECT
+                t.id,
+                t.name,
+                t.session_number,
+                t.year,
+                t.start_date,
+                t.end_date,
+                t.description,
+                COUNT(tl.id) AS member_count,
+                (
+                    SELECT COUNT(*)
+                    FROM committees c
+                    WHERE c.is_active = 1
+                      AND c.is_deleted = 0
+                ) AS committee_count
+            FROM terms t
+            LEFT JOIN term_legislators tl ON tl.term_id = t.id
+            WHERE t.is_deleted = 0
+              AND t.is_active = 1
+            GROUP BY t.id, t.name, t.session_number, t.year, t.start_date, t.end_date, t.description
+            ORDER BY t.start_date DESC
+            LIMIT 1
+        ");
+        $currentTerm = $termStmt->fetch() ?: null;
+
+        $overviewStmt = $this->pdo->query("
+            SELECT
+                COUNT(*) AS total_documents,
+                SUM(CASE WHEN current_phase NOT IN ('FINALIZED', 'FILED') THEN 1 ELSE 0 END) AS in_workflow,
+                SUM(CASE WHEN current_phase IN ('FINALIZED', 'FILED') THEN 1 ELSE 0 END) AS completed_documents,
+                SUM(CASE
+                    WHEN date_received >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+                     AND date_received < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+                    THEN 1 ELSE 0
+                END) AS received_this_month
+            FROM documents
+        ");
+        $overviewCounts = $overviewStmt->fetch() ?: [];
+
+        $monthStmt = $this->pdo->query("
+            SELECT DATE_FORMAT(date_received, '%Y-%m') AS month_key, COUNT(*) AS document_count
+            FROM documents
+            WHERE date_received >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 5 MONTH)
+              AND date_received < DATE_ADD(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
+            GROUP BY DATE_FORMAT(date_received, '%Y-%m')
+            ORDER BY month_key ASC
+        ");
+        $monthlyCounts = [];
+        foreach ($monthStmt->fetchAll() as $row) {
+            $monthlyCounts[$row['month_key']] = (int) $row['document_count'];
+        }
+
+        $monthTrend = [];
+        $monthStart = new DateTimeImmutable('first day of this month');
+        for ($offset = 5; $offset >= 0; $offset--) {
+            $month = $monthStart->modify("-{$offset} months");
+            $monthKey = $month->format('Y-m');
+            $monthTrend[] = [
+                'label' => $month->format('M'),
+                'count' => $monthlyCounts[$monthKey] ?? 0,
+            ];
+        }
+
+        $phaseLabels = [
+            'RECEIVING' => 'Receiving',
+            'ADMIN' => 'Administration',
+            'SP_SECRETARY' => 'SP Secretary',
+            'PLENARY' => 'Plenary',
+            'COMMITTEE' => 'Committees',
+            'FINALIZED' => 'Finalized',
+            'FILED' => 'Filed',
+        ];
+        $phaseStmt = $this->pdo->query("
+            SELECT current_phase, COUNT(*) AS document_count
+            FROM documents
+            GROUP BY current_phase
+        ");
+        $phaseCounts = [];
+        foreach ($phaseStmt->fetchAll() as $row) {
+            $phaseCounts[$row['current_phase']] = (int) $row['document_count'];
+        }
+
+        $phaseBreakdown = [];
+        foreach ($phaseLabels as $phase => $label) {
+            $phaseBreakdown[] = [
+                'label' => $label,
+                'count' => $phaseCounts[$phase] ?? 0,
+            ];
+        }
+
+        $legislativeOverview = [
+            'total_documents' => (int) ($overviewCounts['total_documents'] ?? 0),
+            'in_workflow' => (int) ($overviewCounts['in_workflow'] ?? 0),
+            'completed_documents' => (int) ($overviewCounts['completed_documents'] ?? 0),
+            'received_this_month' => (int) ($overviewCounts['received_this_month'] ?? 0),
+            'month_trend' => $monthTrend,
+            'phase_breakdown' => $phaseBreakdown,
+        ];
 
         // ── User-scoped statistics ────────────────────────────────────────────
         //
@@ -139,7 +239,19 @@ class AdminDashboardController
         $recentQueue = $queueStmt->fetchAll();
 
         $pageTitle = 'Admin / Routing Dashboard';
-        $this->render($stats, $recentQueue);
+        $this->render($stats, $recentQueue, $currentTerm, $legislativeOverview);
+    }
+
+    private function emptyLegislativeOverview(): array
+    {
+        return [
+            'total_documents' => 0,
+            'in_workflow' => 0,
+            'completed_documents' => 0,
+            'received_this_month' => 0,
+            'month_trend' => [],
+            'phase_breakdown' => [],
+        ];
     }
 
     private function emptyStats(): array
@@ -152,7 +264,7 @@ class AdminDashboardController
         ];
     }
 
-    private function render(array $stats, array $recentQueue): void
+    private function render(array $stats, array $recentQueue, ?array $currentTerm, array $legislativeOverview): void
     {
         require __DIR__ . '/../../../resources/views/admin/dashboard.php';
     }

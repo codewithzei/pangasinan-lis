@@ -11,6 +11,8 @@ $recentUsers = $recentUsers ?? [];
 $logOverview = $logOverview ?? [];
 $logTotals = $logTotals ?? ['system_logs' => 0, 'audit_logs' => 0];
 $recentActivity = $recentActivity ?? [];
+$currentTerm = $currentTerm ?? null;
+$termProgress = $termProgress ?? 0;
 
 ob_start();
 ?>
@@ -18,16 +20,31 @@ ob_start();
 <div class="space-y-6">
 
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10 max-w-3xl">
-                <p class="text-sm font-medium text-blue-100">MASTER CONTROL PANEL</p>
-                <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                    Hello, <?= htmlspecialchars($userName) ?>
-                </h1>
-                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
-                    Manage system users, monitor all legislative workflows, review audit trails, and control
-                    application configuration from the master console.
-                </p>
+        <div class="relative px-6 py-7 sm:px-8">
+            <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div class="flex items-start gap-4">
+                    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/5 text-blue-100">
+                        <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM19.4 15a1.7 1.7 0 00.34 1.88l.06.06-1.7 2.94-.08-.02a1.7 1.7 0 00-1.78.67l-.05.07h-3.4l-.05-.07a1.7 1.7 0 00-1.78-.67l-.08.02-1.7-2.94.06-.06A1.7 1.7 0 009.6 15l-.08-.04v-3.4l.08-.04a1.7 1.7 0 00-.34-1.88l-.06-.06 1.7-2.94.08.02a1.7 1.7 0 001.78-.67l.05-.07h3.4l.05.07a1.7 1.7 0 001.78.67l.08-.02 1.7 2.94-.06.06A1.7 1.7 0 0019.6 11l.08.04v3.4l-.28.56z"/>
+                        </svg>
+                    </div>
+                    <div class="max-w-3xl">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Master Control Panel</p>
+                        <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                            Welcome, <?= htmlspecialchars($userName) ?>
+                        </h1>
+                        <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
+                            Manage system access, monitor platform activity, review audit trails, and oversee legislative configuration.
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 border-t border-white/15 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                    <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-300 ring-4 ring-emerald-300/20"></span>
+                    <div>
+                        <p class="text-xs font-medium text-white">System overview</p>
+                        <p class="mt-0.5 text-xs text-blue-100/80"><?= htmlspecialchars(date('l, F j, Y')) ?></p>
+                    </div>
+                </div>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
             <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
@@ -37,7 +54,8 @@ ob_start();
     <section>
         <div class="mb-4 flex items-center justify-between">
             <div>
-                <h2 class="text-base font-semibold text-gray-900">System Overview</h2>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">At a glance</p>
+                <h2 class="mt-1 text-xl font-semibold text-gray-900">System Overview</h2>
                 <p class="text-xs text-gray-500">Platform-wide statistics and health indicators</p>
             </div>
         </div>
@@ -48,7 +66,7 @@ ob_start();
                 'blue'    => 'bg-blue-50 text-primary',
                 'indigo'  => 'bg-indigo-50 text-indigo-600',
                 'emerald' => 'bg-emerald-50 text-emerald-600',
-                'amber'   => 'bg-amber-50 text-amber-600',
+                'amber'   => 'bg-amber-50 text-amber-700',
                 'rose'    => 'bg-rose-50 text-rose-600',
                 'sky'     => 'bg-sky-50 text-sky-600',
                 'violet'  => 'bg-violet-50 text-violet-600',
@@ -64,7 +82,8 @@ ob_start();
             foreach ($stats as $stat):
                 $c = $colorMap[$stat['color']] ?? 'bg-gray-100 text-gray-600';
             ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+            <div class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 <?= $stat['color'] === 'blue' ? 'bg-primary' : ($stat['color'] === 'indigo' ? 'bg-indigo-500' : ($stat['color'] === 'emerald' ? 'bg-emerald-600' : ($stat['color'] === 'rose' ? 'bg-rose-500' : 'bg-sky-500'))) ?>"></span>
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-sm text-gray-500"><?= htmlspecialchars($stat['label']) ?></p>
@@ -86,10 +105,65 @@ ob_start();
         </div>
     </section>
 
+    <section aria-labelledby="master-current-term-title" class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div class="flex flex-col gap-5 p-5 sm:p-6 md:flex-row md:items-center md:justify-between">
+            <div class="flex items-start gap-4">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-primary">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">Legislative Management</p>
+                    <h2 id="master-current-term-title" class="mt-1 text-xl font-semibold text-gray-900">
+                        <?= $currentTerm ? htmlspecialchars($currentTerm['name']) : 'No active legislative term' ?>
+                    </h2>
+                    <?php if ($currentTerm): ?>
+                        <p class="mt-1 text-xs text-gray-500">
+                            <?= htmlspecialchars(date('F j, Y', strtotime($currentTerm['start_date']))) ?>
+                            <span class="px-1 text-gray-400">to</span>
+                            <?= htmlspecialchars(date('F j, Y', strtotime($currentTerm['end_date']))) ?>
+                        </p>
+                    <?php else: ?>
+                        <p class="mt-1 text-xs text-gray-500">Set an active term in Legislative Terms management.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php if ($currentTerm): ?>
+                <div class="grid grid-cols-2 gap-6 sm:min-w-64">
+                    <div>
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Session</p>
+                        <p class="mt-1 text-lg font-semibold text-gray-900"><?= number_format((int) $currentTerm['session_number']) ?></p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">SP Members</p>
+                        <p class="mt-1 text-lg font-semibold text-gray-900"><?= number_format((int) $currentTerm['member_count']) ?></p>
+                    </div>
+                </div>
+            <?php else: ?>
+                <a href="<?= BASE_URL ?>/master/legislative-terms" class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700">
+                    Manage Legislative Terms
+                </a>
+            <?php endif; ?>
+        </div>
+        <?php if ($currentTerm): ?>
+            <div class="border-t border-gray-100 px-5 py-4 sm:px-6">
+                <div class="mb-2 flex items-center justify-between text-[11px]">
+                    <span class="font-medium text-gray-600">Term timeline</span>
+                    <span class="font-semibold tabular-nums text-gray-900"><?= $termProgress ?>% elapsed</span>
+                </div>
+                <div class="h-2 overflow-hidden rounded-full bg-gray-100" role="progressbar" aria-label="Legislative term timeline" aria-valuenow="<?= $termProgress ?>" aria-valuemin="0" aria-valuemax="100">
+                    <div class="h-full rounded-full bg-primary transition-all" style="width: <?= $termProgress ?>%"></div>
+                </div>
+            </div>
+        <?php endif; ?>
+    </section>
+
     <section>
         <div class="mb-4 flex items-center justify-between">
             <div>
-                <h2 class="text-base font-semibold text-gray-900">Audit &amp; Monitoring</h2>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Platform health</p>
+                <h2 class="mt-1 text-xl font-semibold text-gray-900">Audit &amp; Monitoring</h2>
                 <p class="text-xs text-gray-500">
                     Total System Logs: <span class="font-semibold text-gray-700"><?= (int)$logTotals['system_logs'] ?></span> ·
                     Total Audit Logs: <span class="font-semibold text-gray-700"><?= (int)$logTotals['audit_logs'] ?></span>
@@ -122,7 +196,8 @@ ob_start();
                 if (str_contains($stat['label'], 'Errors') && (int)$stat['value'] > 0) $pulse = true;
                 if (str_contains($stat['label'], 'Lockouts') && (int)$stat['value'] > 0) $pulse = true;
             ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+            <div class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 <?= $stat['color'] === 'rose' ? 'bg-rose-500' : ($stat['color'] === 'amber' ? 'bg-amber-500' : ($stat['color'] === 'emerald' ? 'bg-emerald-600' : ($stat['color'] === 'violet' ? 'bg-violet-500' : 'bg-sky-500'))) ?>"></span>
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-sm text-gray-500"><?= htmlspecialchars($stat['label']) ?></p>
@@ -155,17 +230,18 @@ ob_start();
 
     <section class="grid grid-cols-1 gap-6 xl:grid-cols-3">
 
-        <div class="rounded-2xl border border-gray-200 bg-white xl:col-span-2">
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-2">
             <div class="flex items-center justify-between border-b border-gray-200 px-6 py-5">
                 <div>
-                    <h2 class="font-semibold text-gray-900">Users by Role</h2>
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Access overview</p>
+                    <h2 class="mt-1 font-semibold text-gray-900">Users by Role</h2>
                     <p class="mt-1 text-xs text-gray-500">Account distribution across access levels</p>
                 </div>
             </div>
             <div class="space-y-4 p-6">
                 <?php if (empty($roleBreakdown)): ?>
                     <div class="py-8 text-center">
-                        <p class="text-sm text-gray-500">Run the migration and seeders to populate role counts.</p>
+                        <p class="text-sm text-gray-500">No active user roles are available to display.</p>
                     </div>
                 <?php else: ?>
                     <?php foreach ($roleBreakdown as $row):
@@ -187,42 +263,63 @@ ob_start();
             </div>
         </div>
 
-        <div class="rounded-2xl border border-gray-200 bg-white">
+        <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-200 px-6 py-5">
-                <h2 class="font-semibold text-gray-900">Quick Actions</h2>
-                <p class="mt-1 text-xs text-gray-500">Common master admin tasks</p>
+                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Administration</p>
+                <h2 class="mt-1 font-semibold text-gray-900">Master Workbench</h2>
+                <p class="mt-1 text-xs text-gray-500">Manage access and legislative records</p>
             </div>
-            <div class="grid grid-cols-2 gap-3 p-6">
-                <a href="<?= BASE_URL ?>/users" class="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-center transition hover:border-primary hover:bg-blue-50 hover:text-primary">
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
-                    </svg>
-                    <span class="text-xs font-medium">Add User</span>
+            <div class="space-y-3 p-5">
+                <a href="<?= BASE_URL ?>/master/users" class="group flex items-start gap-3 rounded-xl border border-gray-200 p-3 transition hover:border-primary hover:bg-blue-50">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary transition group-hover:bg-white">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m16-13v6m3-3h-6M9 11a4 4 0 100-8 4 4 0 000 8z"/>
+                        </svg>
+                    </span>
+                    <span>
+                        <span class="block text-sm font-medium text-gray-800 group-hover:text-primary">User Accounts</span>
+                        <span class="mt-0.5 block text-xs text-gray-500">Create accounts and manage access</span>
+                    </span>
                 </a>
-                <a href="<?= BASE_URL ?>/data-management" class="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-center transition hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600">
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
-                    </svg>
-                    <span class="text-xs font-medium">Reference Data</span>
+                <a href="<?= BASE_URL ?>/master/legislative-terms" class="group flex items-start gap-3 rounded-xl border border-gray-200 p-3 transition hover:border-indigo-300 hover:bg-indigo-50">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition group-hover:bg-white">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </span>
+                    <span>
+                        <span class="block text-sm font-medium text-gray-800 group-hover:text-indigo-700">Legislative Terms</span>
+                        <span class="mt-0.5 block text-xs text-gray-500">Set terms, sessions, and SP members</span>
+                    </span>
                 </a>
-                <a href="<?= BASE_URL ?>/receiving/dashboard" class="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-center transition hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600">
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 4h16v16H4zM8 9h8M8 13h6"/>
-                    </svg>
-                    <span class="text-xs font-medium">Receiving Desk</span>
+                <a href="<?= BASE_URL ?>/master/committees" class="group flex items-start gap-3 rounded-xl border border-gray-200 p-3 transition hover:border-sky-300 hover:bg-sky-50">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-700 transition group-hover:bg-white">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 21h18M4 18h16M5 18V9l7-5 7 5v9M9 10v5m6-5v5M2 9h20"/>
+                        </svg>
+                    </span>
+                    <span>
+                        <span class="block text-sm font-medium text-gray-800 group-hover:text-sky-700">Committees</span>
+                        <span class="mt-0.5 block text-xs text-gray-500">Maintain legislative committees</span>
+                    </span>
                 </a>
-                <a href="<?= BASE_URL ?>/records" class="flex flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-center transition hover:border-amber-400 hover:bg-amber-50 hover:text-amber-600">
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                    <span class="text-xs font-medium">Records</span>
+                <a href="<?= BASE_URL ?>/master/documents" class="group flex items-start gap-3 rounded-xl border border-gray-200 p-3 transition hover:border-emerald-300 hover:bg-emerald-50">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 transition group-hover:bg-white">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm10-2v6h6M8 13h8m-8 4h8"/>
+                        </svg>
+                    </span>
+                    <span>
+                        <span class="block text-sm font-medium text-gray-800 group-hover:text-emerald-700">Document Registry</span>
+                        <span class="mt-0.5 block text-xs text-gray-500">Browse and manage legislative records</span>
+                    </span>
                 </a>
             </div>
         </div>
 
     </section>
 
-    <section class="rounded-2xl border border-gray-200 bg-white">
+    <section class="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div class="flex items-center justify-between border-b border-gray-200 px-6 py-5">
             <div>
                 <h2 class="font-semibold text-gray-900">Recent Audit Activity</h2>
@@ -288,13 +385,13 @@ ob_start();
         </div>
     </section>
 
-    <section class="rounded-2xl border border-gray-200 bg-white">
+    <section class="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div class="flex items-center justify-between border-b border-gray-200 px-6 py-5">
             <div>
                 <h2 class="font-semibold text-gray-900">Recently Created Accounts</h2>
                 <p class="mt-1 text-xs text-gray-500">Latest users registered on the platform</p>
             </div>
-            <a href="<?= BASE_URL ?>/users" class="text-xs font-medium text-primary hover:text-primary-dark">View all users</a>
+            <a href="<?= BASE_URL ?>/master/users" class="text-xs font-medium text-primary hover:text-primary-dark">View all users</a>
         </div>
         <div class="overflow-x-auto">
             <?php if (empty($recentUsers)): ?>

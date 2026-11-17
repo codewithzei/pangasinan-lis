@@ -107,8 +107,8 @@ return [
     ],
 
     'receiving/dashboard' => [
-        'view' => 'receiving/dashboard',
-        'title' => 'Receiving Dashboard',
+        'controller' => 'Receiving/ReceivingDashboardController',
+        'action' => 'index',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
@@ -120,14 +120,14 @@ return [
     ],
 
     'spsec/dashboard' => [
-        'view' => 'spsec/dashboard',
-        'title' => 'SP Secretary Dashboard',
+        'controller' => 'Spsec/SpsecDashboardController',
+        'action' => 'index',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
     'plenary/dashboard' => [
-        'view' => 'plenary/dashboard',
-        'title' => 'Plenary Dashboard',
+        'controller' => 'Plenary/PlenaryDashboardController',
+        'action' => 'index',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
