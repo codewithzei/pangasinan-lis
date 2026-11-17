@@ -2193,13 +2193,12 @@ class PlenaryReadingController
             $this->pdo->prepare("
                 UPDATE documents
                 SET current_status_id = ?,
-                    current_phase = ?,
-                    finalized_at = " . ($isDisapproved ? 'NOW()' : 'NULL') . ",
+                    current_phase = 'PLENARY',
+                    finalized_at = NULL,
                     updated_by = ?
                 WHERE id = ?
             ")->execute([
                 $targetStatusId,
-                $isDisapproved ? 'FINALIZED' : 'PLENARY',
                 $userId,
                 $documentId,
             ]);

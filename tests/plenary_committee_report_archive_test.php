@@ -15,6 +15,8 @@ $checks = [
         "'APPROVED', 'DISAPPROVED'",
         "'Awaiting Second Reading'",
         "'Plenary: Committee Report Adopted'",
+        "current_phase = 'PLENARY',",
+        'finalized_at = NULL,',
         '$decision === \'APPROVED\' && ($isCommDocument || $isCasesDocument)',
         'FROM plenary_comm_first_reading',
         'FROM plenary_cases_first_reading',
