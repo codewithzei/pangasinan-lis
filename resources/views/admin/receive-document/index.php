@@ -124,6 +124,7 @@ ob_start();
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <input type="hidden" name="document_type_id" id="resubmission_document_type_id" disabled>
                         <p class="mt-1 text-xs text-gray-500">Select the type of document</p>
                     </div>
                 </div>
@@ -770,6 +771,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const resubmissionSpinner = document.getElementById('resubmissionSpinner');
     const resubmissionPreview = document.getElementById('resubmissionPreview');
     const resubmissionNoResults = document.getElementById('resubmissionNoResults');
+    const resubmissionDocumentTypeInput = document.getElementById('resubmission_document_type_id');
     let resubmissionRequestId = 0;
     let resubmissionDebounce = null;
 
@@ -777,9 +779,16 @@ document.addEventListener('DOMContentLoaded', function () {
         return [3, 4, 5].includes(Number(routingSelect && routingSelect.value));
     }
 
+    function unlockResubmissionDocumentType() {
+        documentTypeSelect.disabled = false;
+        resubmissionDocumentTypeInput.value = '';
+        resubmissionDocumentTypeInput.disabled = true;
+    }
+
     function clearResubmissionSelection() {
         if (resubmissionId) resubmissionId.value = '';
         if (resubmissionSearch) resubmissionSearch.value = '';
+        unlockResubmissionDocumentType();
         if (resubmissionPreview) resubmissionPreview.classList.add('hidden');
         if (resubmissionDropdown) {
             resubmissionDropdown.classList.add('hidden');
@@ -791,6 +800,16 @@ document.addEventListener('DOMContentLoaded', function () {
     function selectResubmissionDocument(item) {
         resubmissionId.value = item.id;
         resubmissionSearch.value = item.tracking_number || '';
+        if (item.document_type_id) {
+            const documentTypeId = String(item.document_type_id);
+            if (documentTypeSelect.value !== documentTypeId) {
+                documentTypeSelect.value = documentTypeId;
+                documentTypeSelect.dispatchEvent(new Event('change'));
+            }
+            documentTypeSelect.disabled = true;
+            resubmissionDocumentTypeInput.value = documentTypeId;
+            resubmissionDocumentTypeInput.disabled = false;
+        }
         resubmissionDropdown.classList.add('hidden');
         resubmissionDropdown.innerHTML = '';
         document.getElementById('resubmissionPreviewTracking').textContent =
@@ -854,6 +873,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     resubmissionDropdown.appendChild(option);
                 });
+                if (documentId) {
+                    const selectedItem = documents.find(item => String(item.id) === String(documentId));
+                    if (selectedItem) selectResubmissionDocument(selectedItem);
+                }
                 resubmissionDropdown.classList.remove('hidden');
             })
             .catch(error => {
@@ -891,6 +914,7 @@ document.addEventListener('DOMContentLoaded', function () {
     resubmissionSearch.addEventListener('input', function () {
         const query = this.value.trim();
         resubmissionId.value = '';
+        unlockResubmissionDocumentType();
         resubmissionPreview.classList.add('hidden');
         clearTimeout(resubmissionDebounce);
         resubmissionDebounce = setTimeout(() => loadResubmissionReferences(query), 250);

@@ -1829,6 +1829,7 @@ class DocumentService
         $stmt = $this->pdo->prepare("
             SELECT
                 d.id,
+                d.document_type_id,
                 d.tracking_number,
                 d.subject_matter,
                 dt.name AS document_type_name,

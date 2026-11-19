@@ -185,10 +185,26 @@ $eligibleQuery = $eligibleQueryStart !== false && $eligibleQueryEnd !== false
     : '';
 verifyResubmissionCheck(
     str_contains($eligibleQuery, 'newer.referenced_document_id = d.id')
+        && str_contains($eligibleQuery, 'd.document_type_id')
         && !str_contains($eligibleQuery, 'original_document_id')
         && !str_contains($eligibleQuery, 'version_number'),
     'Resubmission references query must work with the original parent-link schema.'
 );
+
+$receivingForm = file_get_contents(__DIR__ . '/../resources/views/receiving/receive-document/index.php');
+$adminReceiveForm = file_get_contents(__DIR__ . '/../resources/views/admin/receive-document/index.php');
+foreach ([
+    'Receiving' => $receivingForm,
+    'Admin direct receive' => $adminReceiveForm,
+] as $formName => $formSource) {
+    verifyResubmissionCheck(
+        $formSource !== false
+            && str_contains($formSource, 'resubmission_document_type_id')
+            && str_contains($formSource, 'documentTypeSelect.disabled = true')
+            && str_contains($formSource, 'document_type_id'),
+        "{$formName} form does not lock the selected reference's document type."
+    );
+}
 
 $lineageMigration = file_get_contents(__DIR__ . '/../database/migrations/104_document_resubmission_lineage.php');
 verifyResubmissionCheck(

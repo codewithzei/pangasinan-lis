@@ -94,6 +94,7 @@ ob_start();
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <input type="hidden" name="document_type_id" id="resubmission_document_type_id" disabled>
                         <p class="mt-1 text-xs text-gray-500">Select the type of document</p>
                     </div>
                 </div>
@@ -532,8 +533,28 @@ document.addEventListener('DOMContentLoaded', function() {
     const resubmissionResults = document.getElementById('resubmissionResults');
     const resubmissionReferenceId = document.getElementById('resubmission_reference_id');
     const resubmissionNoResults = document.getElementById('resubmissionNoResults');
+    const resubmissionDocumentTypeInput = document.getElementById('resubmission_document_type_id');
     let resubmissionSearchTimer = null;
     let resubmissionRequestId = 0;
+    let resubmissionDocumentsById = {};
+
+    function syncResubmissionDocumentType(document) {
+        if (!document || !document.document_type_id) return;
+        const documentTypeId = String(document.document_type_id);
+        if (documentTypeSelect.value !== documentTypeId) {
+            documentTypeSelect.value = documentTypeId;
+            documentTypeSelect.dispatchEvent(new Event('change'));
+        }
+        documentTypeSelect.disabled = true;
+        resubmissionDocumentTypeInput.value = documentTypeId;
+        resubmissionDocumentTypeInput.disabled = false;
+    }
+
+    function unlockResubmissionDocumentType() {
+        documentTypeSelect.disabled = false;
+        resubmissionDocumentTypeInput.value = '';
+        resubmissionDocumentTypeInput.disabled = true;
+    }
 
     function loadResubmissionReferences(query, documentId) {
         const requestId = ++resubmissionRequestId;
@@ -555,6 +576,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!data.success) throw new Error(data.error || 'Failed to fetch resubmission references');
 
                 resubmissionResults.innerHTML = '';
+                resubmissionDocumentsById = {};
                 const documents = Array.isArray(data.documents) ? data.documents : [];
                 if (!documents.length) {
                     resubmissionResults.add(new Option('No eligible documents found', ''));
@@ -567,11 +589,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 documents.forEach(document => {
                     const proposedNumber = document.proposed_number ? ` | ${document.proposed_number}` : '';
                     const label = `${document.tracking_number}${proposedNumber} | ${document.status_name} | ${document.subject_matter}`;
-                    resubmissionResults.add(new Option(label, document.id));
+                    const option = new Option(label, document.id);
+                    option.dataset.documentTypeId = String(document.document_type_id);
+                    resubmissionResults.add(option);
+                    resubmissionDocumentsById[String(document.id)] = document;
                 });
                 if (documentId) {
                     resubmissionResults.value = String(documentId);
                     resubmissionReferenceId.value = String(documentId);
+                    syncResubmissionDocumentType(resubmissionDocumentsById[String(documentId)]);
                 }
             })
             .catch(error => {
@@ -593,6 +619,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             resubmissionRequestId++;
             resubmissionReferenceId.value = '';
+            unlockResubmissionDocumentType();
             resubmissionSearch.value = '';
             resubmissionResults.innerHTML = '';
             resubmissionResults.add(new Option('Search for a deferred, remanded, or withdrawn document', ''));
@@ -610,6 +637,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     resubmissionResults.addEventListener('change', function() {
         resubmissionReferenceId.value = this.value;
+        if (this.value) {
+            syncResubmissionDocumentType(resubmissionDocumentsById[this.value]);
+        } else {
+            unlockResubmissionDocumentType();
+        }
     });
 
     if (resubmissionToggle.checked) {
