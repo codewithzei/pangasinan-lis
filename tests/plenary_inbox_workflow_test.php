@@ -517,20 +517,34 @@ try {
         doSaveProcessing($pdo, $d5a['document_id'], $preDecisionStatuses['For Encoding'],
                          $uniqueNum, '', '', [], [], [], $userA);
 
-        // The controller's uniqueness check (simulated here directly)
+        // Use the same normalized, lineage-aware current read as the controller.
+        $lockName = 'pn:test:' . substr(hash('sha256', $uniqueNum), 0, 55);
+        $lockStmt = $pdo->prepare('SELECT GET_LOCK(?, 10)');
+        $lockStmt->execute([$lockName]);
+        $hasProposedNumberLock = (int) $lockStmt->fetchColumn() === 1;
+        check('5.1: Proposed number lock acquired before uniqueness check', $hasProposedNumberLock);
+
         $dupStmt = $pdo->prepare("
-            SELECT document_id FROM plenary_document_details
-            WHERE proposed_number = ? AND document_id != ?
+            SELECT document_id
+            FROM plenary_document_details
+            WHERE LOWER(TRIM(proposed_number)) = LOWER(TRIM(?))
+              AND document_id != ?
+              AND document_id NOT IN (?)
             LIMIT 1
+            FOR UPDATE
         ");
-        $dupStmt->execute([$uniqueNum, $d5b['document_id']]);
+        $dupStmt->execute([$uniqueNum, $d5b['document_id'], $d5b['document_id']]);
         $dupFound = $dupStmt->fetch();
         check('5.1: Duplicate proposed_number detected by uniqueness query', $dupFound !== false);
 
         // Same doc can update its own number
-        $dupStmt->execute([$uniqueNum, $d5a['document_id']]);
+        $dupStmt->execute([$uniqueNum, $d5a['document_id'], $d5a['document_id']]);
         $selfDup = $dupStmt->fetch();
         check('5.2: Updating own proposed_number does not trigger false duplicate', $selfDup === false);
+
+        $releaseLock = $pdo->prepare('SELECT RELEASE_LOCK(?)');
+        $releaseLock->execute([$lockName]);
+        check('5.3: Proposed number lock released', (int) $releaseLock->fetchColumn() === 1);
     } else {
         echo "  [SKIP] For Encoding status not seeded — skipping group 5." . PHP_EOL;
     }
@@ -734,6 +748,13 @@ try {
         str_contains($documentServiceSource, 'public function getSpMembers()')
             && str_contains($documentServiceSource, 'tl.sp_member_id = sm.sp_member_id')
             && str_contains($documentServiceSource, 'Select an active SP Member assigned to the active legislative term.'));
+
+    check('9.5: proposed number validation is serialized and compares normalized values',
+        str_contains($controllerSrc, 'SELECT GET_LOCK(?, 10)')
+            && str_contains($controllerSrc, 'SELECT RELEASE_LOCK(?)')
+            && str_contains($controllerSrc, 'LOWER(TRIM(proposed_number))')
+            && str_contains($controllerSrc, 'document_id NOT IN ({$lineagePlaceholders})')
+            && str_contains($controllerSrc, 'FOR UPDATE'));
 
 } finally {
     $pdo->rollBack(); // zero permanent DB changes

@@ -93,6 +93,7 @@ class PlenaryInboxController
 {
     protected PDO             $pdo;
     protected DocumentService $docService;
+    private ?string $proposedNumberLockName = null;
 
     /** Valid POST actions for process(). */
     private const VALID_ACTIONS = [
@@ -695,6 +696,7 @@ class PlenaryInboxController
                 }
 
                 $this->pdo->commit();
+                $this->releaseProposedNumberLock();
 
                 // Flush deferred file-upload audit logs now that the transaction
                 // has committed (never while a transaction is still open).
@@ -755,6 +757,7 @@ class PlenaryInboxController
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
                 }
+                $this->releaseProposedNumberLock();
                 $lastException = $e;
                 break; // RuntimeException = business rule violation; no retry
 
@@ -762,6 +765,7 @@ class PlenaryInboxController
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
                 }
+                $this->releaseProposedNumberLock();
                 $errorCode = (int) ($e->errorInfo[1] ?? 0);
                 if (in_array($errorCode, [1205, 1213], true) && $attempt < $maxRetries) {
                     usleep($retryDelay);
@@ -774,6 +778,7 @@ class PlenaryInboxController
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
                 }
+                $this->releaseProposedNumberLock();
                 $lastException = $e;
                 break;
             }
@@ -1082,13 +1087,23 @@ class PlenaryInboxController
         if (!$isCommunication && $proposedNumber !== '') {
             $lineageDocumentIds = $this->docService->getResubmissionLineageDocumentIds($documentId);
             $lineagePlaceholders = implode(',', array_fill(0, count($lineageDocumentIds), '?'));
+
+            $lockName = 'pn:' . substr(hash('sha256', mb_strtolower(trim($proposedNumber))), 0, 61);
+            $lockStmt = $this->pdo->prepare('SELECT GET_LOCK(?, 10)');
+            $lockStmt->execute([$lockName]);
+            if ((int) $lockStmt->fetchColumn() !== 1) {
+                throw new RuntimeException('Could not verify the proposed number. Please try again.');
+            }
+            $this->proposedNumberLockName = $lockName;
+
             $dupStmt = $this->pdo->prepare("
                 SELECT document_id
                 FROM plenary_document_details
-                WHERE proposed_number = ?
+                WHERE LOWER(TRIM(proposed_number)) = LOWER(TRIM(?))
                   AND document_id    != ?
                   AND document_id NOT IN ({$lineagePlaceholders})
                 LIMIT 1
+                FOR UPDATE
             ");
             $dupStmt->execute([$proposedNumber, $documentId, ...$lineageDocumentIds]);
             if ($dupStmt->fetch()) {
@@ -1112,6 +1127,7 @@ class PlenaryInboxController
         }
 
         if (!empty($errors)) {
+            $this->releaseProposedNumberLock();
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
@@ -2005,6 +2021,31 @@ class PlenaryInboxController
         $lower = strtolower(trim($documentTypeName));
         return str_contains($lower, 'administrative case')
             || str_contains($lower, 'complaint');
+    }
+
+    private function releaseProposedNumberLock(): void
+    {
+        if ($this->proposedNumberLockName === null) {
+            return;
+        }
+
+        $lockName = $this->proposedNumberLockName;
+        $this->proposedNumberLockName = null;
+
+        try {
+            $stmt = $this->pdo->prepare('SELECT RELEASE_LOCK(?)');
+            $stmt->execute([$lockName]);
+            if ((int) $stmt->fetchColumn() !== 1) {
+                system_log('WARNING', 'Failed to release Plenary proposed-number lock', [
+                    'lock_name' => $lockName,
+                ]);
+            }
+        } catch (Throwable $e) {
+            system_log('WARNING', 'Failed to release Plenary proposed-number lock', [
+                'lock_name' => $lockName,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
