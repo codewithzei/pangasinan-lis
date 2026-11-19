@@ -1080,33 +1080,17 @@ class PlenaryInboxController
 
         // Check uniqueness of proposed_number (exclude this document)
         if (!$isCommunication && $proposedNumber !== '') {
+            $lineageDocumentIds = $this->docService->getResubmissionLineageDocumentIds($documentId);
+            $lineagePlaceholders = implode(',', array_fill(0, count($lineageDocumentIds), '?'));
             $dupStmt = $this->pdo->prepare("
                 SELECT document_id
                 FROM plenary_document_details
                 WHERE proposed_number = ?
                   AND document_id    != ?
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM documents lineage_current
-                      LEFT JOIN document_resubmission_links current_link
-                          ON current_link.resubmitted_document_id = lineage_current.id
-                      WHERE lineage_current.id = ?
-                        AND (
-                            plenary_document_details.document_id =
-                                COALESCE(current_link.original_document_id, lineage_current.id)
-                            OR EXISTS (
-                                SELECT 1
-                                FROM document_resubmission_links lineage_member
-                                WHERE lineage_member.original_document_id =
-                                    COALESCE(current_link.original_document_id, lineage_current.id)
-                                  AND lineage_member.resubmitted_document_id =
-                                    plenary_document_details.document_id
-                            )
-                        )
-                  )
+                  AND document_id NOT IN ({$lineagePlaceholders})
                 LIMIT 1
             ");
-            $dupStmt->execute([$proposedNumber, $documentId, $documentId]);
+            $dupStmt->execute([$proposedNumber, $documentId, ...$lineageDocumentIds]);
             if ($dupStmt->fetch()) {
                 $errors[] = 'Proposed Number "' . htmlspecialchars($proposedNumber) . '" is already used by another document.';
             }

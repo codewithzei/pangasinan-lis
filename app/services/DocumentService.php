@@ -1972,40 +1972,14 @@ class DocumentService
         array $committeeIds,
         int $userId
     ): void {
-        $lineageStmt = $this->pdo->prepare("
-            SELECT COALESCE(current_link.original_document_id, current_document.id) AS original_document_id
-            FROM documents current_document
-            LEFT JOIN document_resubmission_links current_link
-                ON current_link.resubmitted_document_id = current_document.id
-            WHERE current_document.id = ?
-            LIMIT 1
-        ");
-        $lineageStmt->execute([$documentId]);
-        $originalDocumentId = (int) $lineageStmt->fetchColumn();
-        if ($originalDocumentId <= 0) {
+        $documentIds = $this->getResubmissionLineageDocumentIds($documentId);
+        if (empty($documentIds)) {
             throw new RuntimeException('Unable to resolve the document lineage for shared legislative data.');
         }
 
-        $lineageExists = $this->pdo->prepare("
-            SELECT 1
-            FROM document_resubmission_links
-            WHERE original_document_id = ?
-            LIMIT 1
-        ");
-        $lineageExists->execute([$originalDocumentId]);
-        if (!$lineageExists->fetchColumn()) {
+        if (count($documentIds) === 1) {
             return;
         }
-
-        $memberStmt = $this->pdo->prepare("
-            SELECT ?
-            UNION
-            SELECT resubmitted_document_id
-            FROM document_resubmission_links
-            WHERE original_document_id = ?
-        ");
-        $memberStmt->execute([$originalDocumentId, $originalDocumentId]);
-        $documentIds = array_map('intval', $memberStmt->fetchAll(PDO::FETCH_COLUMN));
 
         $updateDetails = $this->pdo->prepare("
             UPDATE plenary_document_details
@@ -2528,9 +2502,12 @@ class DocumentService
     }
 
     /**
-     * Retrieve the complete submission history for a document's lineage.
+     * Resolve all document IDs in the same resubmission chain using the
+     * original parent reference, which is present before lineage migrations.
+     *
+     * @return int[] Original submission first, followed by its resubmissions.
      */
-    public function getRelatedResubmissions(int $documentId): array
+    public function getResubmissionLineageDocumentIds(int $documentId): array
     {
         if ($documentId <= 0) {
             return [];
@@ -2556,6 +2533,44 @@ class DocumentService
             }
             $originalDocumentId = $parentId;
         }
+
+        $links = $this->pdo->query("
+            SELECT resubmitted_document_id, referenced_document_id
+            FROM document_resubmission_links
+            ORDER BY linked_at ASC, id ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        $childrenByParent = [];
+        foreach ($links as $link) {
+            $childrenByParent[(int) $link['referenced_document_id']][] =
+                (int) $link['resubmitted_document_id'];
+        }
+
+        $documentIds = [$originalDocumentId];
+        $seen = [$originalDocumentId => true];
+        for ($index = 0; $index < count($documentIds); $index++) {
+            $parentId = $documentIds[$index];
+            foreach ($childrenByParent[$parentId] ?? [] as $childId) {
+                if (isset($seen[$childId])) {
+                    throw new RuntimeException('A cycle or duplicate branch was found in document resubmission links.');
+                }
+                $seen[$childId] = true;
+                $documentIds[] = $childId;
+            }
+        }
+
+        return $documentIds;
+    }
+
+    /**
+     * Retrieve the complete submission history for a document's lineage.
+     */
+    public function getRelatedResubmissions(int $documentId): array
+    {
+        $lineageDocumentIds = $this->getResubmissionLineageDocumentIds($documentId);
+        if (count($lineageDocumentIds) <= 1) {
+            return [];
+        }
+        $originalDocumentId = $lineageDocumentIds[0];
 
         $lineageStmt = $this->pdo->prepare("
             SELECT
