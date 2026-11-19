@@ -1863,66 +1863,23 @@ class DocumentService
      */
     public function getResubmissionLineage(int $documentId): array
     {
-        $rootStmt = $this->pdo->prepare("
-            SELECT COALESCE(parent_link.original_document_id, d.id)
-            FROM documents d
-            LEFT JOIN document_resubmission_links parent_link
-                ON parent_link.resubmitted_document_id = d.id
-            WHERE d.id = ?
-            LIMIT 1
-        ");
-        $rootStmt->execute([$documentId]);
-        $originalDocumentId = (int) $rootStmt->fetchColumn();
-        if ($originalDocumentId <= 0) {
-            return [];
-        }
-
-        $stmt = $this->pdo->prepare("
-            SELECT
-                d.id AS document_id,
-                d.tracking_number,
-                d.subject_matter,
-                d.date_received,
-                d.current_phase,
-                d.document_type_id,
-                dt.name AS document_type_name,
-                ds.name AS status_name,
-                ds.badge_color AS status_badge_color,
-                COALESCE(member_link.version_number, 1) AS version_number,
-                member_link.referenced_document_id,
-                member_link.linked_at,
-                COALESCE(
-                    pdd.proposed_number,
-                    (
-                        SELECT shared_pdd.proposed_number
-                        FROM plenary_document_details shared_pdd
-                        LEFT JOIN document_resubmission_links shared_link
-                            ON shared_link.resubmitted_document_id = shared_pdd.document_id
-                        WHERE shared_pdd.document_id = ?
-                           OR shared_link.original_document_id = ?
-                        ORDER BY COALESCE(shared_link.version_number, 1) DESC
-                        LIMIT 1
-                    )
-                ) AS proposed_number,
-                (d.id = ?) AS is_current
-            FROM documents d
-            LEFT JOIN document_resubmission_links member_link
-                ON member_link.resubmitted_document_id = d.id
-            LEFT JOIN document_types dt ON dt.id = d.document_type_id
-            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
-            LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
-            WHERE d.id = ?
-               OR member_link.original_document_id = ?
-            ORDER BY COALESCE(member_link.version_number, 1) ASC, d.id ASC
-        ");
-        $stmt->execute([
-            $originalDocumentId,
-            $originalDocumentId,
-            $documentId,
-            $originalDocumentId,
-            $originalDocumentId,
-        ]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $history = $this->getRelatedResubmissions($documentId);
+        return array_map(static function (array $row) use ($documentId): array {
+            return [
+                'document_id' => (int) $row['resubmitted_document_id'],
+                'tracking_number' => $row['resubmitted_tracking_number'],
+                'subject_matter' => $row['resubmitted_subject_matter'],
+                'date_received' => $row['resubmitted_date_received'],
+                'document_type_name' => $row['resubmitted_document_type_name'],
+                'status_name' => $row['resubmitted_status'],
+                'status_badge_color' => $row['resubmitted_status_badge_color'],
+                'version_number' => $row['version_number'],
+                'referenced_document_id' => $row['referenced_document_id'],
+                'linked_at' => $row['linked_at'],
+                'proposed_number' => $row['resubmitted_proposed_number'],
+                'is_current' => (int) $row['resubmitted_document_id'] === $documentId,
+            ];
+        }, $history);
     }
 
     /**
@@ -1930,6 +1887,12 @@ class DocumentService
      */
     public function getSharedResubmissionLegislativeDetails(int $documentId): ?array
     {
+        $documentIds = array_reverse($this->getResubmissionLineageDocumentIds($documentId));
+        if (empty($documentIds)) {
+            return null;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($documentIds), '?'));
         $stmt = $this->pdo->prepare("
             SELECT
                 pdd.proposed_number,
@@ -1938,24 +1901,12 @@ class DocumentService
                 pdd.additional_details,
                 pdd.authors_all,
                 pdd.co_authors_all
-            FROM documents current_document
-            LEFT JOIN document_resubmission_links current_link
-                ON current_link.resubmitted_document_id = current_document.id
-            INNER JOIN plenary_document_details pdd
-                ON pdd.document_id = current_document.id
-                OR pdd.document_id IN (
-                    SELECT lineage_link.resubmitted_document_id
-                    FROM document_resubmission_links lineage_link
-                    WHERE lineage_link.original_document_id =
-                        COALESCE(current_link.original_document_id, current_document.id)
-                )
-            LEFT JOIN document_resubmission_links member_link
-                ON member_link.resubmitted_document_id = pdd.document_id
-            WHERE current_document.id = ?
-            ORDER BY COALESCE(member_link.version_number, 1) DESC
+            FROM plenary_document_details pdd
+            WHERE pdd.document_id IN ({$placeholders})
+            ORDER BY FIELD(pdd.document_id, " . implode(',', array_map('intval', $documentIds)) . ")
             LIMIT 1
         ");
-        $stmt->execute([$documentId]);
+        $stmt->execute($documentIds);
         $details = $stmt->fetch(PDO::FETCH_ASSOC);
         return $details ?: null;
     }

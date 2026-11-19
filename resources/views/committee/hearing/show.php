@@ -124,7 +124,10 @@ ob_start();
 
     <section class="space-y-4">
         <h2 class="text-lg font-semibold text-gray-900">Full Document Details</h2>
-        <?php require __DIR__ . '/document-show.php'; ?>
+        <?php
+        $backUrl = $detailBackUrl;
+        require __DIR__ . '/../referred/document-show.php';
+        ?>
     </section>
 
     <!-- Already recorded banner -->
