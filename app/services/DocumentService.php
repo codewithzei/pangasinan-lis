@@ -2506,7 +2506,7 @@ class DocumentService
                 ref.tracking_number AS ref_tracking_number,
                 ref.subject_matter  AS ref_subject_matter,
                 ref.date_received   AS ref_date_received,
-                COALESCE(refpdd.proposed_number, root_pdd.proposed_number) AS ref_proposed_number,
+                refpdd.proposed_number AS ref_proposed_number,
                 dt.name             AS ref_document_type_name,
                 dt.badge_color      AS ref_document_type_badge_color,
                 ds.name             AS ref_status,
@@ -2517,7 +2517,6 @@ class DocumentService
             LEFT JOIN document_types dt ON dt.id = ref.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = ref.current_status_id
             LEFT JOIN plenary_document_details refpdd ON refpdd.document_id = ref.id
-            LEFT JOIN plenary_document_details root_pdd ON root_pdd.document_id = drl.original_document_id
             LEFT JOIN routing_options ro ON ro.id = drl.routing_option_id
             WHERE drl.resubmitted_document_id = ?
             LIMIT 1
