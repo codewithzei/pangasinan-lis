@@ -1839,16 +1839,13 @@ class DocumentService
                                          AND dt.is_deleted = 0
             " . $this->resubmissionOutcomeJoinSql() . "
             LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
-            LEFT JOIN document_resubmission_links parent_link
-                ON parent_link.resubmitted_document_id = d.id
             WHERE outcome_status.name IN (?, ?, ?)
               AND outcome_status.is_active = 1
               AND outcome_status.is_deleted = 0
               AND NOT EXISTS (
                   SELECT 1
                   FROM document_resubmission_links newer
-                  WHERE newer.original_document_id = COALESCE(parent_link.original_document_id, d.id)
-                    AND newer.version_number > COALESCE(parent_link.version_number, 1)
+                  WHERE newer.referenced_document_id = d.id
               )
               " . (!empty($filters) ? 'AND ' . implode(' AND ', $filters) : '') . "
             ORDER BY d.tracking_number DESC
@@ -2179,22 +2176,17 @@ class DocumentService
                 d.subject_matter,
                 dt.name AS document_type_name,
                 outcome_status.name AS status_name,
-                pdd.proposed_number,
-                COALESCE(parent_link.original_document_id, d.id) AS original_document_id,
-                COALESCE(parent_link.version_number, 1) AS version_number
+                pdd.proposed_number
             FROM documents d
             INNER JOIN document_types dt ON dt.id = d.document_type_id
                                          AND dt.is_deleted = 0
             " . $this->resubmissionOutcomeJoinSql() . "
             LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
-            LEFT JOIN document_resubmission_links parent_link
-                ON parent_link.resubmitted_document_id = d.id
             WHERE d.id = ?
               AND NOT EXISTS (
                   SELECT 1
                   FROM document_resubmission_links newer
-                  WHERE newer.original_document_id = COALESCE(parent_link.original_document_id, d.id)
-                    AND newer.version_number > COALESCE(parent_link.version_number, 1)
+                  WHERE newer.referenced_document_id = d.id
               )
               AND outcome_status.name IN ('Remanded', 'Deferred', 'Withdrawn')
               AND outcome_status.is_active = 1
@@ -2203,6 +2195,11 @@ class DocumentService
         );
         $stmt->execute([$documentId]);
         $document = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($document) {
+            $lineageIds = $this->getResubmissionLineageDocumentIds($documentId);
+            $document['original_document_id'] = $lineageIds[0] ?? $documentId;
+            $document['version_number'] = count($lineageIds);
+        }
         return $document ?: null;
     }
 

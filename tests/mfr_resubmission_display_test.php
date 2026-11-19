@@ -178,6 +178,18 @@ verifyResubmissionCheck(
     'Document lineage and shared legislative data handling is missing.'
 );
 
+$eligibleQueryStart = strpos($documentService, 'public function getEligibleResubmissionDocuments');
+$eligibleQueryEnd = strpos($documentService, 'public function getResubmissionLineage', $eligibleQueryStart);
+$eligibleQuery = $eligibleQueryStart !== false && $eligibleQueryEnd !== false
+    ? substr($documentService, $eligibleQueryStart, $eligibleQueryEnd - $eligibleQueryStart)
+    : '';
+verifyResubmissionCheck(
+    str_contains($eligibleQuery, 'newer.referenced_document_id = d.id')
+        && !str_contains($eligibleQuery, 'original_document_id')
+        && !str_contains($eligibleQuery, 'version_number'),
+    'Resubmission references query must work with the original parent-link schema.'
+);
+
 $lineageMigration = file_get_contents(__DIR__ . '/../database/migrations/104_document_resubmission_lineage.php');
 verifyResubmissionCheck(
     $lineageMigration !== false
