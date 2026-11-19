@@ -110,6 +110,16 @@ class AdminReceiveDocumentController
         // Preserve form values for repopulation on error
         old_set($_POST);
 
+        $reference = null;
+        if ($data['is_resubmission'] && $data['resubmission_reference_id'] > 0) {
+            $reference = $this->docService->validateResubmissionReference(
+                $data['resubmission_reference_id']
+            );
+            if ($reference['valid']) {
+                $data['document_type_id'] = (int) $reference['document']['document_type_id'];
+            }
+        }
+
         // Validate fields (reuses the shared DocumentService rules)
         $errors = $this->docService->validateSubmission($data);
 
@@ -126,13 +136,8 @@ class AdminReceiveDocumentController
                 $errors[] = 'Resubmission is available only when routing to SP Secretary, Plenary, or Committee.';
             } elseif ($data['resubmission_reference_id'] <= 0) {
                 $errors[] = 'Select a previous document that needs resubmission.';
-            } else {
-                $reference = $this->docService->validateResubmissionReference(
-                    $data['resubmission_reference_id']
-                );
-                if (!$reference['valid']) {
-                    $errors[] = $reference['error'];
-                }
+            } elseif ($reference === null || !$reference['valid']) {
+                $errors[] = $reference['error'] ?? 'The selected resubmission reference is not eligible.';
             }
         } else {
             $data['resubmission_reference_id'] = 0;

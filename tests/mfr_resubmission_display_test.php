@@ -206,6 +206,26 @@ foreach ([
     );
 }
 
+foreach ([
+    'Receiving' => 'app/controllers/Receiving/RouteDocumentController.php',
+    'Admin direct receive' => 'app/controllers/Admin/AdminReceiveDocumentController.php',
+] as $controllerName => $controllerPath) {
+    $controller = file_get_contents(__DIR__ . '/../' . $controllerPath);
+    $referenceVariable = $controllerName === 'Receiving' ? '$referenceResult' : '$reference';
+    $referenceTypeAssignment = strpos(
+        $controller,
+        '$data[\'document_type_id\'] = (int) ' . $referenceVariable . '[\'document\'][\'document_type_id\']'
+    );
+    $submissionValidation = strpos($controller, 'validateSubmission($data)');
+    verifyResubmissionCheck(
+        $controller !== false
+            && $referenceTypeAssignment !== false
+            && $submissionValidation !== false
+            && $referenceTypeAssignment < $submissionValidation,
+        "{$controllerName} must use the selected reference's document type before validating submission."
+    );
+}
+
 $lineageMigration = file_get_contents(__DIR__ . '/../database/migrations/104_document_resubmission_lineage.php');
 verifyResubmissionCheck(
     $lineageMigration !== false

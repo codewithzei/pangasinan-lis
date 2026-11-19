@@ -117,16 +117,25 @@ class RouteDocumentController
         // ------------------------------------------------------------------
         old_set($_POST);
 
+        $referenceResult = null;
+        if ($data['is_resubmission'] && $data['resubmission_reference_id'] > 0) {
+            $referenceResult = $this->docService->validateResubmissionReference(
+                $data['resubmission_reference_id']
+            );
+            if ($referenceResult['valid']) {
+                $data['document_type_id'] = (int) $referenceResult['document']['document_type_id'];
+            }
+        }
+
         // ------------------------------------------------------------------
         // 3. Validate fields
         // ------------------------------------------------------------------
         $errors = $this->docService->validateSubmission($data);
         if ($data['is_resubmission']) {
-            $reference = $this->docService->validateResubmissionReference(
-                $data['resubmission_reference_id']
-            );
-            if (!$reference['valid']) {
-                $errors[] = $reference['error'];
+            if ($data['resubmission_reference_id'] <= 0) {
+                $errors[] = 'Select a previous document that needs resubmission.';
+            } elseif ($referenceResult === null || !$referenceResult['valid']) {
+                $errors[] = $referenceResult['error'] ?? 'The selected resubmission reference is not eligible.';
             }
         } else {
             $data['resubmission_reference_id'] = 0;

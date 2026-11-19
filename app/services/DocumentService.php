@@ -19,6 +19,7 @@ require_once __DIR__ . '/../config/database.php';
 class DocumentService
 {
     protected PDO $pdo;
+    private ?bool $hasPersistentResubmissionLineage = null;
 
     /**
      * @param PDO|null $pdo Connection owned by the caller. Pass it whenever the
@@ -2025,39 +2026,50 @@ class DocumentService
             throw new InvalidArgumentException('A resubmission must reference a different, existing document.');
         }
 
-        $parentLineage = $this->pdo->prepare("
-            SELECT original_document_id, version_number
-            FROM document_resubmission_links
-            WHERE resubmitted_document_id = ?
-            LIMIT 1
-        ");
-        $parentLineage->execute([$referencedDocumentId]);
-        $parent = $parentLineage->fetch(PDO::FETCH_ASSOC);
-        $originalDocumentId = $parent
-            ? (int) $parent['original_document_id']
-            : $referencedDocumentId;
-        $nextVersion = $this->pdo->prepare("
-            SELECT COALESCE(MAX(version_number), 1) + 1
-            FROM document_resubmission_links
-            WHERE original_document_id = ?
-        ");
-        $nextVersion->execute([$originalDocumentId]);
-        $versionNumber = (int) $nextVersion->fetchColumn();
+        if ($this->supportsPersistentResubmissionLineage()) {
+            $lineageDocumentIds = $this->getResubmissionLineageDocumentIds($referencedDocumentId);
+            $originalDocumentId = $lineageDocumentIds[0] ?? $referencedDocumentId;
+            $versionNumber = count($lineageDocumentIds) + 1;
+
+            $stmt = $this->pdo->prepare("
+                INSERT INTO document_resubmission_links
+                    (resubmitted_document_id, referenced_document_id, original_document_id,
+                     version_number, routing_option_id, linked_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $resubmittedDocumentId,
+                $referencedDocumentId,
+                $originalDocumentId,
+                $versionNumber,
+                $routingOptionId,
+                $userId,
+            ]);
+            return;
+        }
 
         $stmt = $this->pdo->prepare("
             INSERT INTO document_resubmission_links
-                (resubmitted_document_id, referenced_document_id, original_document_id,
-                 version_number, routing_option_id, linked_by)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (resubmitted_document_id, referenced_document_id, routing_option_id, linked_by)
+            VALUES (?, ?, ?, ?)
         ");
-        $stmt->execute([
-            $resubmittedDocumentId,
-            $referencedDocumentId,
-            $originalDocumentId,
-            $versionNumber,
-            $routingOptionId,
-            $userId,
-        ]);
+        $stmt->execute([$resubmittedDocumentId, $referencedDocumentId, $routingOptionId, $userId]);
+    }
+
+    private function supportsPersistentResubmissionLineage(): bool
+    {
+        if ($this->hasPersistentResubmissionLineage !== null) {
+            return $this->hasPersistentResubmissionLineage;
+        }
+
+        $columns = $this->pdo->query("
+            SHOW COLUMNS FROM document_resubmission_links
+        ")->fetchAll(PDO::FETCH_COLUMN);
+        $this->hasPersistentResubmissionLineage =
+            in_array('original_document_id', $columns, true)
+            && in_array('version_number', $columns, true);
+
+        return $this->hasPersistentResubmissionLineage;
     }
 
     /**
@@ -2069,6 +2081,8 @@ class DocumentService
         int $referencedDocumentId,
         int $userId
     ): void {
+        $lineageDocumentIds = $this->getResubmissionLineageDocumentIds($referencedDocumentId);
+        $originalDocumentId = $lineageDocumentIds[0] ?? $referencedDocumentId;
         $stmt = $this->pdo->prepare("
             SELECT
                 COALESCE(parent_pdd.proposed_number, root_pdd.proposed_number) AS proposed_number,
@@ -2079,15 +2093,13 @@ class DocumentService
                 COALESCE(parent_pdd.authors_all, root_pdd.authors_all, 0) AS authors_all,
                 COALESCE(parent_pdd.co_authors_all, root_pdd.co_authors_all, 0) AS co_authors_all
             FROM documents ref
-            LEFT JOIN document_resubmission_links parent_link
-                ON parent_link.resubmitted_document_id = ref.id
             LEFT JOIN plenary_document_details parent_pdd ON parent_pdd.document_id = ref.id
             LEFT JOIN plenary_document_details root_pdd
-                ON root_pdd.document_id = COALESCE(parent_link.original_document_id, ref.id)
+                ON root_pdd.document_id = ?
             WHERE ref.id = ?
             LIMIT 1
         ");
-        $stmt->execute([$referencedDocumentId]);
+        $stmt->execute([$originalDocumentId, $referencedDocumentId]);
         $details = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($details && $details['proposed_number'] !== null) {
