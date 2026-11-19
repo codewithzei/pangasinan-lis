@@ -2532,35 +2532,59 @@ class DocumentService
      */
     public function getRelatedResubmissions(int $documentId): array
     {
-        $rootStmt = $this->pdo->prepare("
-            SELECT COALESCE(parent_link.original_document_id, d.id)
-            FROM documents d
-            LEFT JOIN document_resubmission_links parent_link
-                ON parent_link.resubmitted_document_id = d.id
-            WHERE d.id = ?
-            LIMIT 1
-        ");
-        $rootStmt->execute([$documentId]);
-        $originalDocumentId = (int) $rootStmt->fetchColumn();
-        if ($originalDocumentId <= 0) {
+        if ($documentId <= 0) {
             return [];
         }
 
-        $hasLineage = $this->pdo->prepare("
-            SELECT 1
+        $parentStmt = $this->pdo->prepare("
+            SELECT referenced_document_id
             FROM document_resubmission_links
-            WHERE original_document_id = ?
+            WHERE resubmitted_document_id = ?
             LIMIT 1
         ");
-        $hasLineage->execute([$originalDocumentId]);
-        if (!$hasLineage->fetchColumn()) {
-            return [];
+        $originalDocumentId = $documentId;
+        $visited = [];
+        while (true) {
+            if (isset($visited[$originalDocumentId])) {
+                throw new RuntimeException('A cycle was found in document resubmission links.');
+            }
+            $visited[$originalDocumentId] = true;
+            $parentStmt->execute([$originalDocumentId]);
+            $parentId = (int) $parentStmt->fetchColumn();
+            if ($parentId <= 0) {
+                break;
+            }
+            $originalDocumentId = $parentId;
         }
 
-        $stmt = $this->pdo->prepare("
+        $lineageStmt = $this->pdo->prepare("
             SELECT
-                member_link.id AS link_id,
-                member_link.linked_at,
+                drl.id AS link_id,
+                drl.resubmitted_document_id,
+                drl.referenced_document_id,
+                drl.linked_at,
+                d.tracking_number AS resubmitted_tracking_number,
+                d.subject_matter AS resubmitted_subject_matter,
+                d.date_received AS resubmitted_date_received,
+                dt.name AS resubmitted_document_type_name,
+                ds.name AS resubmitted_status,
+                ds.badge_color AS resubmitted_status_badge_color,
+                pdd.proposed_number AS resubmitted_proposed_number
+            FROM document_resubmission_links drl
+            INNER JOIN documents d ON d.id = drl.resubmitted_document_id
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
+            ORDER BY drl.linked_at ASC, drl.id ASC
+        ");
+        $lineageStmt->execute();
+        $childrenByParent = [];
+        foreach ($lineageStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $childrenByParent[(int) $row['referenced_document_id']][] = $row;
+        }
+
+        $rootStmt = $this->pdo->prepare("
+            SELECT
                 d.id AS resubmitted_document_id,
                 d.tracking_number AS resubmitted_tracking_number,
                 d.subject_matter AS resubmitted_subject_matter,
@@ -2568,30 +2592,49 @@ class DocumentService
                 dt.name AS resubmitted_document_type_name,
                 ds.name AS resubmitted_status,
                 ds.badge_color AS resubmitted_status_badge_color,
-                COALESCE(
-                    member_pdd.proposed_number,
-                    root_pdd.proposed_number
-                ) AS resubmitted_proposed_number,
-                COALESCE(member_link.version_number, 1) AS version_number,
-                member_link.referenced_document_id,
-                (d.id = ?) AS is_current
+                pdd.proposed_number AS resubmitted_proposed_number
             FROM documents d
-            LEFT JOIN document_resubmission_links member_link
-                ON member_link.resubmitted_document_id = d.id
-            LEFT JOIN plenary_document_details member_pdd ON member_pdd.document_id = d.id
-            LEFT JOIN plenary_document_details root_pdd ON root_pdd.document_id = ?
             LEFT JOIN document_types dt ON dt.id = d.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
             WHERE d.id = ?
-               OR member_link.original_document_id = ?
-            ORDER BY COALESCE(member_link.version_number, 1) ASC, d.id ASC
+            LIMIT 1
         ");
-        $stmt->execute([
-            $documentId,
-            $originalDocumentId,
-            $originalDocumentId,
-            $originalDocumentId,
-        ]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rootStmt->execute([$originalDocumentId]);
+        $root = $rootStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$root || empty($childrenByParent[$originalDocumentId])) {
+            return [];
+        }
+
+        $history = [];
+        $pending = [$originalDocumentId];
+        $seenDocuments = [];
+        $nextVersion = 2;
+        while ($pending !== []) {
+            $parentId = array_shift($pending);
+            foreach ($childrenByParent[$parentId] ?? [] as $child) {
+                $childId = (int) $child['resubmitted_document_id'];
+                if (isset($seenDocuments[$childId])) {
+                    throw new RuntimeException('A cycle or duplicate branch was found in document resubmission links.');
+                }
+                $seenDocuments[$childId] = true;
+                $child['version_number'] = $nextVersion++;
+                $child['is_current'] = $childId === $documentId;
+                if (empty($child['resubmitted_proposed_number'])) {
+                    $child['resubmitted_proposed_number'] = $root['resubmitted_proposed_number'];
+                }
+                $history[] = $child;
+                $pending[] = $childId;
+            }
+        }
+
+        $root['link_id'] = null;
+        $root['linked_at'] = null;
+        $root['referenced_document_id'] = null;
+        $root['version_number'] = 1;
+        $root['is_current'] = $originalDocumentId === $documentId;
+        array_unshift($history, $root);
+
+        return $history;
     }
 }
