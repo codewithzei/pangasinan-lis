@@ -13,6 +13,36 @@ $caseRecord = $caseRecord ?? null;
 $caseActions = $caseActions ?? [];
 $caseActionAttachments = $caseActionAttachments ?? [];
 $secondReadingDetails = $secondReadingDetails ?? [];
+$routes = $routes ?? [];
+$checklistItems = $checklistItems ?? [];
+
+// Reuse the existing routed-document viewing layout for consistent details.
+$document['status'] = $document['document_status'] ?? $document['status'] ?? '—';
+$document['status_badge_color'] = $document['status_badge_color'] ?? '#6B7280';
+$document['document_type_badge_color'] = $document['document_type_badge_color'] ?? '#2563EB';
+$document['source_type'] = $document['source_type_name'] ?? $document['source_type'] ?? '—';
+$attachments = $documentAttachments;
+$pageSubtitle = $document['tracking_number'] ?? 'Document Details';
+$detailBackUrl = $backUrl ?? BASE_URL . '/plenary/referred-to-committee';
+$detailBackLabel = 'Back to Referred to Committee';
+$showMfrRelationship = false;
+
+$documentEvents = array_map(static function (array $entry): array {
+    return [
+        'event_type' => $entry['record_type'] === 'event'
+            ? ($entry['event_type'] ?? $entry['title'] ?? 'OTHER')
+            : ($entry['title'] ?? 'WORKFLOW_ACTION'),
+        'phase' => $entry['phase'] ?? null,
+        'created_at' => $entry['created_at'] ?? null,
+        'performed_by_name' => $entry['performed_by_name'] ?? null,
+        'from_status_name' => $entry['from_status'] ?? null,
+        'to_status_name' => $entry['to_status'] ?? null,
+        'remarks' => $entry['remarks'] ?? null,
+    ];
+}, $timeline);
+
+require __DIR__ . '/../../receiving/routed-documents/show.php';
+return;
 
 function rtcHistoryDate(?string $date, bool $withTime = true): string
 {
@@ -32,7 +62,7 @@ function rtcHistoryFileUrl(string $path): string
 ob_start();
 ?>
 <div class="detail-page space-y-6">
-    <a href="<?= BASE_URL ?>/plenary/referred-to-committee"
+    <a href="<?= htmlspecialchars($backUrl ?? BASE_URL . '/plenary/referred-to-committee', ENT_QUOTES, 'UTF-8') ?>"
        class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary">
         <span aria-hidden="true">←</span> Back to Referred to Committee
     </a>

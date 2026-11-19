@@ -11,6 +11,10 @@
 $document = $document ?? [];
 $cycle = $cycle ?? [];
 $progress = $progress ?? [];
+$plenaryDetails = $plenaryDetails ?? [];
+$plenaryAuthors = $plenaryAuthors ?? [];
+$plenaryFirstReading = $plenaryFirstReading ?? null;
+$documentAttachments = $documentAttachments ?? [];
 $offices = $progress['offices'] ?? [];
 $totalOffices = (int) ($progress['total'] ?? 0);
 $clearedOffices = (int) ($progress['cleared'] ?? 0);
@@ -45,73 +49,17 @@ ob_start();
         <span class="font-medium text-gray-700">Opinion Office Details</span>
     </nav>
 
-    <section class="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div class="min-w-0">
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Document</p>
-                <h2 class="mt-1 text-lg font-bold text-gray-900">
-                    <?= htmlspecialchars((string) ($document['tracking_number'] ?? '—')) ?>
-                </h2>
-                <p class="mt-1 max-w-3xl whitespace-pre-line text-sm text-gray-600">
-                    <?= htmlspecialchars((string) ($document['subject_matter'] ?? '—')) ?>
-                </p>
-            </div>
-            <div class="shrink-0 rounded-xl bg-emerald-50 px-4 py-3 text-center">
-                <p class="text-xl font-bold text-emerald-700"><?= $clearedOffices ?>/<?= $totalOffices ?></p>
-                <p class="text-xs font-medium text-emerald-700">Favorable offices</p>
-            </div>
-        </div>
+    <section class="space-y-4">
+        <h2 class="text-lg font-semibold text-gray-900">Full Document Details</h2>
+        <?php
+        $pageSubtitle = $document['tracking_number'] ?? 'Document Details';
+        $detailBackUrl = BASE_URL . '/committee/referred?tab=for_opinion';
+        $detailBackLabel = 'Back to For Opinion';
+        $showMfrRelationship = false;
+        $renderAsPartial = true;
+        require __DIR__ . '/document-show.php';
+        ?>
     </section>
-
-    <details class="group overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 sm:px-6
-                       [&::-webkit-details-marker]:hidden">
-            <div>
-                <h2 class="text-sm font-semibold text-gray-900">Document Details</h2>
-                <p class="mt-0.5 text-xs text-gray-500">View the document's receipt, source, and workflow information.</p>
-            </div>
-            <svg class="h-5 w-5 shrink-0 text-gray-400 transition-transform group-open:rotate-180"
-                 fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-            </svg>
-        </summary>
-        <div class="border-t border-gray-100 px-5 py-5 sm:px-6">
-            <?php
-            $documentDetails = [
-                'Tracking Number' => $document['tracking_number'] ?? null,
-                'Document Type' => $document['document_type_name'] ?? null,
-                'Current Status' => $document['status'] ?? null,
-                'Current Phase' => $document['current_phase'] ?? null,
-                'Date Received' => !empty($document['date_received'])
-                    ? date('F j, Y', strtotime((string) $document['date_received']))
-                    : null,
-                'Time Received' => !empty($document['time_received'])
-                    ? date('g:i A', strtotime((string) $document['time_received']))
-                    : null,
-                'Source' => $document['source_name'] ?? null,
-                'Source Contact' => $document['source_contact_number'] ?? null,
-                'Source Liaison' => $document['source_liaison_name'] ?? null,
-                'Source Address' => $document['source_address'] ?? null,
-                'Document Remarks' => $document['remarks'] ?? null,
-            ];
-            ?>
-            <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-                <?php foreach ($documentDetails as $detailLabel => $detailValue): ?>
-                    <?php if (trim((string) $detailValue) !== ''): ?>
-                        <div class="<?= in_array($detailLabel, ['Source Address', 'Document Remarks'], true) ? 'sm:col-span-2' : '' ?>">
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                <?= htmlspecialchars($detailLabel) ?>
-                            </dt>
-                            <dd class="mt-1 whitespace-pre-line break-words text-sm text-gray-800">
-                                <?= htmlspecialchars((string) $detailValue) ?>
-                            </dd>
-                        </div>
-                    <?php endif; ?>
-                <?php endforeach; ?>
-            </dl>
-        </div>
-    </details>
-
     <?php if ($offices === []): ?>
         <div class="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
             <p class="text-sm font-semibold text-gray-700">No opinion office records found</p>

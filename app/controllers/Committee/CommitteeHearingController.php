@@ -171,8 +171,14 @@ class CommitteeHearingController
                 ds.badge_color  AS status_badge_color,
                 st.name         AS source_type,
                 eo.name         AS external_office_name,
+                eo.abbreviation AS external_office_abbr,
                 h.name          AS hospital_name,
-                mu.name         AS municipality_name
+                mu.name         AS municipality_name,
+                mu.type         AS municipality_type,
+                cc.name         AS communication_category_name,
+                creator.username AS created_by_username,
+                updater.username AS updated_by_username,
+                owner.username AS current_owner_username
             FROM documents d
             LEFT JOIN document_types    dt ON dt.id = d.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
@@ -180,6 +186,10 @@ class CommitteeHearingController
             LEFT JOIN provincial_government_offices  eo ON eo.id = d.external_office_id
             LEFT JOIN hospitals          h ON  h.id = d.hospital_id
             LEFT JOIN municities        mu ON mu.id = d.municipality_id
+            LEFT JOIN communication_categories cc ON cc.id = d.communication_category_id
+            LEFT JOIN user_accounts creator ON creator.id = d.created_by
+            LEFT JOIN user_accounts updater ON updater.id = d.updated_by
+            LEFT JOIN user_accounts owner ON owner.id = d.current_owner_user_id
             WHERE d.id = ?
             LIMIT 1
         ");
@@ -244,12 +254,83 @@ class CommitteeHearingController
         $attStmt->execute([$documentId]);
         $attachments = $attStmt->fetchAll();
 
-        // Workflow events
+        $plenaryDetailsStmt = $this->pdo->prepare("
+            SELECT proposed_number, target_first_reading_date, session_type,
+                   additional_details, authors_all, co_authors_all
+            FROM plenary_document_details
+            WHERE document_id = ?
+            LIMIT 1
+        ");
+        $plenaryDetailsStmt->execute([$documentId]);
+        $plenaryDetails = $plenaryDetailsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $plenaryAuthorsStmt = $this->pdo->prepare("
+            SELECT da.author_role,
+                   CONCAT_WS(' ', NULLIF(sm.first_name, ''), NULLIF(sm.middle_name, ''),
+                                  NULLIF(sm.last_name, ''), NULLIF(sm.suffix, '')) AS full_name
+            FROM document_authors da
+            INNER JOIN sp_members sm ON sm.sp_member_id = da.sp_member_id
+            WHERE da.document_id = ?
+            ORDER BY da.author_role ASC, da.sort_order ASC, da.id ASC
+        ");
+        $plenaryAuthorsStmt->execute([$documentId]);
+        $plenaryAuthors = $plenaryAuthorsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $plenaryFirstReadingStmt = $this->pdo->prepare("
+            SELECT action AS decision, reading_date, remarks, performed_at, 'Legislative' AS reading_type
+            FROM plenary_readings
+            WHERE document_id = ? AND reading_number = 1
+            UNION ALL
+            SELECT decision, reading_date, remarks, performed_at, 'Communication' AS reading_type
+            FROM plenary_comm_first_reading
+            WHERE document_id = ?
+            UNION ALL
+            SELECT decision, reading_date, remarks, performed_at, 'Petitions / Cases' AS reading_type
+            FROM plenary_cases_first_reading
+            WHERE document_id = ?
+            ORDER BY reading_date DESC, performed_at DESC
+            LIMIT 1
+        ");
+        $plenaryFirstReadingStmt->execute([$documentId, $documentId, $documentId]);
+        $plenaryFirstReading = $plenaryFirstReadingStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        $routesStmt = $this->pdo->prepare("
+            SELECT dr.id, dr.from_phase, dr.to_phase, dr.remarks,
+                   dr.created_at AS routed_at,
+                   routed_by.username AS routed_by_username,
+                   routed_to_role.name AS routed_to_role_name,
+                   ro.name AS routing_option_name
+            FROM document_routes dr
+            LEFT JOIN user_accounts routed_by ON routed_by.id = dr.routed_by
+            LEFT JOIN roles routed_to_role ON routed_to_role.id = dr.routed_to_role_id
+            LEFT JOIN routing_options ro ON ro.id = dr.routing_option_id
+            WHERE dr.document_id = ?
+            ORDER BY dr.created_at ASC, dr.id ASC
+        ");
+        $routesStmt->execute([$documentId]);
+        $routes = $routesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $checklistStmt = $this->pdo->prepare("
+            SELECT dci.id, dci.is_completed, dci.completed_at,
+                   c.name AS checklist_name,
+                   c.description AS checklist_description,
+                   completed_by.username AS completed_by_username
+            FROM document_checklist_items dci
+            INNER JOIN checklists c ON c.id = dci.checklist_id
+            LEFT JOIN user_accounts completed_by ON completed_by.id = dci.completed_by
+            WHERE dci.document_id = ?
+            ORDER BY c.name ASC
+        ");
+        $checklistStmt->execute([$documentId]);
+        $checklistItems = $checklistStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Keep the hearing page's existing event fields and load the shared
+        // routed-document timeline separately for the full details partial.
         $evtStmt = $this->pdo->prepare("
             SELECT de.*, ua.username AS performed_by_username,
                    fs.name AS from_status_name, ts.name AS to_status_name
             FROM document_events de
-            LEFT JOIN user_accounts  ua ON ua.id = de.performed_by
+            LEFT JOIN user_accounts ua ON ua.id = de.performed_by
             LEFT JOIN document_statuses fs ON fs.id = de.from_status_id
             LEFT JOIN document_statuses ts ON ts.id = de.to_status_id
             WHERE de.document_id = ?
@@ -257,6 +338,7 @@ class CommitteeHearingController
         ");
         $evtStmt->execute([$documentId]);
         $events = $evtStmt->fetchAll();
+        $documentEvents = $this->docService->getDocumentEvents($documentId);
 
         // Existing hearing record (prevents re-submit if already recorded)
         $hearingStmt = $this->pdo->prepare("
@@ -281,6 +363,11 @@ class CommitteeHearingController
         }
 
         $pageTitle = 'Committee Hearing — ' . htmlspecialchars($document['tracking_number']);
+        $pageSubtitle = $document['tracking_number'];
+        $detailBackUrl = BASE_URL . '/committee/hearing?tab=scheduled';
+        $detailBackLabel = 'Back to Scheduled Hearings';
+        $showMfrRelationship = false;
+        $renderAsPartial = true;
         require __DIR__ . '/../../../resources/views/committee/hearing/show.php';
     }
 

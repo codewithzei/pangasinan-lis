@@ -9,6 +9,7 @@ declare(strict_types=1);
 $root = dirname(__DIR__);
 $controller = file_get_contents($root . '/app/controllers/Committee/CommitteeReportsController.php');
 $hearingController = file_get_contents($root . '/app/controllers/Committee/CommitteeHearingController.php');
+$hearingReportDetailView = file_get_contents($root . '/resources/views/committee/hearing/report-show.php');
 $hearingIndex = file_get_contents($root . '/resources/views/committee/hearing/index.php');
 $shareForm = file_get_contents($root . '/resources/views/committee/hearing/share-to-report.php');
 $detailView = file_get_contents($root . '/resources/views/committee/reports/show.php');
@@ -67,6 +68,14 @@ $checks = [
         && str_contains($detailView, '/committee/reports/document-show?id=')
         && str_contains($controller, 'WHERE committee_report_id = ? AND document_id = ?')
         && str_contains($documentDetailView, 'Document Information'),
+    'report document detail loads Plenary First Reading details and authors' => str_contains($controller, 'FROM plenary_document_details')
+        && str_contains($controller, 'FROM plenary_readings')
+        && str_contains($controller, 'FROM plenary_comm_first_reading')
+        && str_contains($controller, 'FROM plenary_cases_first_reading')
+        && str_contains($controller, 'FROM document_authors')
+        && str_contains($documentDetailView, 'Proposed Number'),
+    'hearing report documents link to the report-scoped full document view' => str_contains($hearingReportDetailView, '/committee/reports/document-show?id=')
+        && str_contains($hearingReportDetailView, 'Full Details'),
     'returned reports remain selectable as shared parents' => !str_contains($hearingController, 'WHERE cr.returned_to_plenary_at IS NULL'),
     'reports list no longer offers a report-wide return action' => !str_contains($listView, 'onclick="openReturnModal('),
     'hearing selection is available beyond the approved tab' => str_contains($hearingIndex, 'id="selectAllDocuments"')

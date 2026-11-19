@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../services/DocumentService.php';
 
 class PlenaryReportsController
 {
@@ -169,6 +170,178 @@ class PlenaryReportsController
 
         $pageTitle = 'Adopted Committee Report';
         require __DIR__ . '/../../../resources/views/plenary/reports/show.php';
+    }
+
+    public function documentShow(): void
+    {
+        $this->requirePlenaryAccess();
+
+        $reportId = (int) ($_GET['report_id'] ?? 0);
+        $documentId = (int) ($_GET['id'] ?? 0);
+        if ($reportId <= 0 || $documentId <= 0) {
+            flash_set('error', 'Invalid Committee Report document.');
+            redirect('plenary/reports');
+            return;
+        }
+
+        $membershipStmt = $this->pdo->prepare("
+            SELECT 1
+            FROM plenary_committee_report_adoptions
+            WHERE committee_report_id = ? AND document_id = ?
+            LIMIT 1
+        ");
+        $membershipStmt->execute([$reportId, $documentId]);
+        if (!$membershipStmt->fetchColumn()) {
+            flash_set('error', 'This document is not part of the selected adopted Committee Report.');
+            redirect('plenary/reports/show?id=' . $reportId);
+            return;
+        }
+
+        $documentStmt = $this->pdo->prepare("
+            SELECT d.*,
+                   dt.name AS document_type_name,
+                   dt.badge_color AS document_type_badge_color,
+                   ds.name AS status,
+                   ds.badge_color AS status_badge_color,
+                   st.name AS source_type,
+                   eo.name AS external_office_name,
+                   eo.abbreviation AS external_office_abbr,
+                   h.name AS hospital_name,
+                   m.name AS municipality_name,
+                   m.type AS municipality_type,
+                   cc.name AS communication_category_name,
+                   creator.username AS created_by_username,
+                   updater.username AS updated_by_username,
+                   owner.username AS current_owner_username
+            FROM documents d
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN source_types st ON st.id = d.source_type_id
+            LEFT JOIN provincial_government_offices eo ON eo.id = d.external_office_id
+            LEFT JOIN hospitals h ON h.id = d.hospital_id
+            LEFT JOIN municities m ON m.id = d.municipality_id
+            LEFT JOIN communication_categories cc ON cc.id = d.communication_category_id
+            LEFT JOIN user_accounts creator ON creator.id = d.created_by
+            LEFT JOIN user_accounts updater ON updater.id = d.updated_by
+            LEFT JOIN user_accounts owner ON owner.id = d.current_owner_user_id
+            WHERE d.id = ?
+            LIMIT 1
+        ");
+        $documentStmt->execute([$documentId]);
+        $document = $documentStmt->fetch();
+        if (!$document) {
+            flash_set('error', 'Document not found.');
+            redirect('plenary/reports/show?id=' . $reportId);
+            return;
+        }
+
+        $plenaryDetailsStmt = $this->pdo->prepare("
+            SELECT proposed_number, target_first_reading_date, session_type,
+                   additional_details, authors_all, co_authors_all
+            FROM plenary_document_details
+            WHERE document_id = ?
+            LIMIT 1
+        ");
+        $plenaryDetailsStmt->execute([$documentId]);
+        $plenaryDetails = $plenaryDetailsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $plenaryAuthorsStmt = $this->pdo->prepare("
+            SELECT da.author_role,
+                   CONCAT_WS(' ', NULLIF(sm.first_name, ''), NULLIF(sm.middle_name, ''),
+                                  NULLIF(sm.last_name, ''), NULLIF(sm.suffix, '')) AS full_name
+            FROM document_authors da
+            INNER JOIN sp_members sm ON sm.sp_member_id = da.sp_member_id
+            WHERE da.document_id = ?
+            ORDER BY da.author_role ASC, da.sort_order ASC, da.id ASC
+        ");
+        $plenaryAuthorsStmt->execute([$documentId]);
+        $plenaryAuthors = $plenaryAuthorsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $plenaryFirstReadingStmt = $this->pdo->prepare("
+            SELECT action AS decision, reading_date, remarks, performed_at, 'Legislative' AS reading_type
+            FROM plenary_readings
+            WHERE document_id = ? AND reading_number = 1
+            UNION ALL
+            SELECT decision, reading_date, remarks, performed_at, 'Communication' AS reading_type
+            FROM plenary_comm_first_reading
+            WHERE document_id = ?
+            UNION ALL
+            SELECT decision, reading_date, remarks, performed_at, 'Petitions / Cases' AS reading_type
+            FROM plenary_cases_first_reading
+            WHERE document_id = ?
+            ORDER BY reading_date DESC, performed_at DESC
+            LIMIT 1
+        ");
+        $plenaryFirstReadingStmt->execute([$documentId, $documentId, $documentId]);
+        $plenaryFirstReading = $plenaryFirstReadingStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        $attachmentStmt = $this->pdo->prepare("
+            SELECT attachment_rows.*
+            FROM (
+                SELECT da.id, da.file_name, da.stored_path, da.mime_type, da.file_size,
+                       da.phase, da.attachment_type, da.created_at,
+                       ua.username AS uploaded_by_username,
+                       NULL AS report_number
+                FROM document_attachments da
+                LEFT JOIN user_accounts ua ON ua.id = da.uploaded_by
+                WHERE da.document_id = ?
+
+                UNION ALL
+
+                SELECT cra.id, cra.file_name, cra.stored_path, cra.mime_type, cra.file_size,
+                       'COMMITTEE' AS phase, 'COMMITTEE_REPORT' AS attachment_type, cra.created_at,
+                       ua.username AS uploaded_by_username,
+                       cr.report_number
+                FROM committee_report_attachments cra
+                INNER JOIN committee_reports cr ON cr.id = cra.committee_report_id
+                LEFT JOIN user_accounts ua ON ua.id = cra.uploaded_by
+                WHERE cra.committee_report_id = ?
+            ) attachment_rows
+            ORDER BY attachment_rows.created_at ASC, attachment_rows.id ASC
+        ");
+        $attachmentStmt->execute([$documentId, $reportId]);
+        $attachments = $attachmentStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $routesStmt = $this->pdo->prepare("
+            SELECT dr.id, dr.from_phase, dr.to_phase, dr.remarks,
+                   dr.created_at AS routed_at,
+                   routed_by_user.username AS routed_by_username,
+                   routed_to_role.name AS routed_to_role_name,
+                   ro.name AS routing_option_name
+            FROM document_routes dr
+            LEFT JOIN user_accounts routed_by_user ON dr.routed_by = routed_by_user.id
+            LEFT JOIN roles routed_to_role ON dr.routed_to_role_id = routed_to_role.id
+            LEFT JOIN routing_options ro ON dr.routing_option_id = ro.id
+            WHERE dr.document_id = ?
+            ORDER BY dr.created_at ASC, dr.id ASC
+        ");
+        $routesStmt->execute([$documentId]);
+        $routes = $routesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $checklistStmt = $this->pdo->prepare("
+            SELECT dci.id, dci.is_completed, dci.completed_at,
+                   c.name AS checklist_name,
+                   c.description AS checklist_description,
+                   completed_by_user.username AS completed_by_username
+            FROM document_checklist_items dci
+            INNER JOIN checklists c ON dci.checklist_id = c.id
+            LEFT JOIN user_accounts completed_by_user ON dci.completed_by = completed_by_user.id
+            WHERE dci.document_id = ?
+            ORDER BY c.name ASC
+        ");
+        $checklistStmt->execute([$documentId]);
+        $checklistItems = $checklistStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
+        $mfrLink = null;
+        $relatedMotions = [];
+        $showMfrRelationship = false;
+        $detailBackUrl = BASE_URL . '/plenary/reports/show?id=' . $reportId;
+        $detailBackLabel = 'Back to Plenary Report';
+        $pageTitle = 'Document Details';
+        $pageSubtitle = $document['tracking_number'];
+
+        require __DIR__ . '/../../../resources/views/receiving/routed-documents/show.php';
     }
 
     private function buildSearchClause(string $search): array

@@ -184,6 +184,13 @@ class PlenaryInboxController
             SELECT 1 FROM plenary_readings pr WHERE pr.document_id = da.document_id
         )
         AND d.current_phase = 'PLENARY'
+        AND d.finalized_at IS NULL
+        AND d.current_status_id NOT IN (
+            SELECT id FROM document_statuses
+            WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
+              AND is_active = 1
+              AND is_deleted = 0
+        )
     ";
 
     // =========================================================================
@@ -231,6 +238,14 @@ class PlenaryInboxController
             $where[] = 'da.completed_at IS NULL';
             $where[] = '(da.assigned_to_user_id IS NULL OR da.assigned_to_user_id = ?)';
             $where[] = 'da.accepted_by IS NULL';
+            $where[] = "d.current_phase = 'PLENARY'";
+            $where[] = 'd.finalized_at IS NULL';
+            $where[] = "d.current_status_id NOT IN (
+                SELECT id FROM document_statuses
+                WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
+                  AND is_active = 1
+                  AND is_deleted = 0
+            )";
             $params[] = $userId;
         } elseif ($isOutcomeView) {
             // Outcome tabs list the documents this user accepted whose current
@@ -241,6 +256,8 @@ class PlenaryInboxController
             $where[] = '(da.accepted_by = ? OR da.assigned_to_user_id = ?)';
             $params[] = $userId;
             $params[] = $userId;
+            $where[] = "d.current_phase = 'PLENARY'";
+            $where[] = 'd.finalized_at IS NULL';
             $where[]  = 'pdd.status_id = (
                 SELECT id FROM document_statuses
                 WHERE name = ? AND is_active = 1 AND is_deleted = 0
@@ -1628,13 +1645,22 @@ class PlenaryInboxController
     {
         $pendingRow = $this->pdo->prepare("
             SELECT COUNT(*) AS cnt
-            FROM document_assignments
-            WHERE assigned_to_role_id = ?
-              AND phase               = 'PLENARY'
-              AND decision            = 'PENDING'
-              AND completed_at        IS NULL
-              AND accepted_by         IS NULL
-              AND (assigned_to_user_id IS NULL OR assigned_to_user_id = ?)
+            FROM document_assignments da
+            INNER JOIN documents d ON d.id = da.document_id
+            WHERE da.assigned_to_role_id = ?
+              AND da.phase               = 'PLENARY'
+              AND da.decision            = 'PENDING'
+              AND da.completed_at        IS NULL
+              AND da.accepted_by         IS NULL
+              AND (da.assigned_to_user_id IS NULL OR da.assigned_to_user_id = ?)
+              AND d.current_phase = 'PLENARY'
+              AND d.finalized_at IS NULL
+              AND d.current_status_id NOT IN (
+                    SELECT id FROM document_statuses
+                    WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
+                      AND is_active = 1
+                      AND is_deleted = 0
+              )
         ");
         $pendingRow->execute([$plenaryRoleId, $userId]);
 
@@ -1669,6 +1695,8 @@ class PlenaryInboxController
               AND da.decision            = 'ACCEPTED'
               AND da.completed_at        IS NULL
               AND (da.accepted_by = ? OR da.assigned_to_user_id = ?)
+              AND d.current_phase = 'PLENARY'
+              AND d.finalized_at IS NULL
               AND pds.name      = ?
               AND pds.is_active = 1
               AND pds.is_deleted = 0

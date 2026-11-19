@@ -328,6 +328,137 @@ class CommitteeReferredController
         require __DIR__ . '/../../../resources/views/committee/referred/index.php';
     }
 
+    /**
+     * Read-only full document view from the Referred Documents workflow.
+     */
+    public function documentShow(): void
+    {
+        if (auth_id() === null) {
+            flash_set('error', 'You must be logged in.');
+            redirect('login');
+        }
+
+        $documentId = (int) ($_GET['id'] ?? 0);
+        if ($documentId <= 0) {
+            flash_set('error', 'Invalid document ID.');
+            redirect('committee/referred');
+        }
+
+        $returnParams = [];
+        $tab = trim((string) ($_GET['tab'] ?? 'referred'));
+        if (in_array($tab, ['referred', 'for_opinion', 'ready_for_agenda', 'withdrawn'], true)) {
+            $returnParams['tab'] = $tab;
+        }
+        $search = trim((string) ($_GET['search'] ?? ''));
+        if ($search !== '') {
+            $returnParams['search'] = $search;
+        }
+        $documentTypeId = (int) ($_GET['doc_type'] ?? 0);
+        if ($documentTypeId > 0) {
+            $returnParams['doc_type'] = $documentTypeId;
+        }
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        if ($page > 1) {
+            $returnParams['page'] = $page;
+        }
+        $backUrl = BASE_URL . '/committee/referred'
+            . ($returnParams !== [] ? '?' . http_build_query($returnParams) : '');
+
+        $documentStmt = $this->pdo->prepare("
+            SELECT d.*,
+                   dt.name AS document_type_name,
+                   dt.badge_color AS document_type_badge_color,
+                   ds.name AS status,
+                   ds.badge_color AS status_badge_color,
+                   st.name AS source_type,
+                   eo.name AS external_office_name,
+                   eo.abbreviation AS external_office_abbr,
+                   h.name AS hospital_name,
+                   m.name AS municipality_name,
+                   m.type AS municipality_type,
+                   cc.name AS communication_category_name,
+                   creator.username AS created_by_username,
+                   updater.username AS updated_by_username,
+                   owner.username AS current_owner_username
+            FROM documents d
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN source_types st ON st.id = d.source_type_id
+            LEFT JOIN provincial_government_offices eo ON eo.id = d.external_office_id
+            LEFT JOIN hospitals h ON h.id = d.hospital_id
+            LEFT JOIN municities m ON m.id = d.municipality_id
+            LEFT JOIN communication_categories cc ON cc.id = d.communication_category_id
+            LEFT JOIN user_accounts creator ON creator.id = d.created_by
+            LEFT JOIN user_accounts updater ON updater.id = d.updated_by
+            LEFT JOIN user_accounts owner ON owner.id = d.current_owner_user_id
+            WHERE d.id = ?
+              AND EXISTS (
+                  SELECT 1 FROM committee_cycles cycle
+                  WHERE cycle.document_id = d.id AND cycle.completed_at IS NOT NULL
+              )
+              AND EXISTS (
+                  SELECT 1 FROM document_events referred_event
+                  WHERE referred_event.document_id = d.id
+                    AND referred_event.event_type = 'COMMITTEE_ENDORSED_REFERRED'
+              )
+            LIMIT 1
+        ");
+        $documentStmt->execute([$documentId]);
+        $document = $documentStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$document) {
+            flash_set('error', 'Referred document not found.');
+            redirect('committee/referred');
+        }
+
+        $attachmentsStmt = $this->pdo->prepare("
+            SELECT da.*, ua.username AS uploaded_by_username
+            FROM document_attachments da
+            LEFT JOIN user_accounts ua ON ua.id = da.uploaded_by
+            WHERE da.document_id = ?
+            ORDER BY da.created_at ASC, da.id ASC
+        ");
+        $attachmentsStmt->execute([$documentId]);
+        $attachments = $attachmentsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $routesStmt = $this->pdo->prepare("
+            SELECT dr.id, dr.from_phase, dr.to_phase, dr.remarks,
+                   dr.created_at AS routed_at,
+                   routed_by.username AS routed_by_username,
+                   routed_to_role.name AS routed_to_role_name,
+                   ro.name AS routing_option_name
+            FROM document_routes dr
+            LEFT JOIN user_accounts routed_by ON routed_by.id = dr.routed_by
+            LEFT JOIN roles routed_to_role ON routed_to_role.id = dr.routed_to_role_id
+            LEFT JOIN routing_options ro ON ro.id = dr.routing_option_id
+            WHERE dr.document_id = ?
+            ORDER BY dr.created_at ASC, dr.id ASC
+        ");
+        $routesStmt->execute([$documentId]);
+        $routes = $routesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $checklistStmt = $this->pdo->prepare("
+            SELECT dci.id, dci.is_completed, dci.completed_at,
+                   c.name AS checklist_name,
+                   c.description AS checklist_description,
+                   completed_by.username AS completed_by_username
+            FROM document_checklist_items dci
+            INNER JOIN checklists c ON c.id = dci.checklist_id
+            LEFT JOIN user_accounts completed_by ON completed_by.id = dci.completed_by
+            WHERE dci.document_id = ?
+            ORDER BY c.name ASC
+        ");
+        $checklistStmt->execute([$documentId]);
+        $checklistItems = $checklistStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $documentEvents = $this->docService->getDocumentEvents($documentId);
+        $pageTitle = 'Referred Document — ' . $document['tracking_number'];
+        $pageSubtitle = $document['tracking_number'];
+        $detailBackUrl = $backUrl;
+        $detailBackLabel = 'Back to Referred Documents';
+        $showMfrRelationship = false;
+        require __DIR__ . '/../../../resources/views/committee/referred/document-show.php';
+    }
+
     // =========================================================================
     // 2. Endorse — show form
     // =========================================================================
@@ -630,6 +761,122 @@ class CommitteeReferredController
         }
 
         [$document, $cycle] = $this->requireReferredDocument($documentId);
+        $documentDetailsStmt = $this->pdo->prepare("
+            SELECT d.*,
+                   dt.name AS document_type_name,
+                   dt.badge_color AS document_type_badge_color,
+                   ds.name AS status,
+                   ds.badge_color AS status_badge_color,
+                   st.name AS source_type,
+                   eo.name AS external_office_name,
+                   eo.abbreviation AS external_office_abbr,
+                   h.name AS hospital_name,
+                   m.name AS municipality_name,
+                   m.type AS municipality_type,
+                   cc.name AS communication_category_name,
+                   creator.username AS created_by_username,
+                   updater.username AS updated_by_username,
+                   owner.username AS current_owner_username
+            FROM documents d
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN source_types st ON st.id = d.source_type_id
+            LEFT JOIN provincial_government_offices eo ON eo.id = d.external_office_id
+            LEFT JOIN hospitals h ON h.id = d.hospital_id
+            LEFT JOIN municities m ON m.id = d.municipality_id
+            LEFT JOIN communication_categories cc ON cc.id = d.communication_category_id
+            LEFT JOIN user_accounts creator ON creator.id = d.created_by
+            LEFT JOIN user_accounts updater ON updater.id = d.updated_by
+            LEFT JOIN user_accounts owner ON owner.id = d.current_owner_user_id
+            WHERE d.id = ?
+            LIMIT 1
+        ");
+        $documentDetailsStmt->execute([$documentId]);
+        $document = array_merge($document, $documentDetailsStmt->fetch(PDO::FETCH_ASSOC) ?: []);
+
+        $plenaryDetailsStmt = $this->pdo->prepare("
+            SELECT proposed_number, target_first_reading_date, session_type,
+                   additional_details, authors_all, co_authors_all
+            FROM plenary_document_details
+            WHERE document_id = ?
+            LIMIT 1
+        ");
+        $plenaryDetailsStmt->execute([$documentId]);
+        $plenaryDetails = $plenaryDetailsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $plenaryAuthorsStmt = $this->pdo->prepare("
+            SELECT da.author_role,
+                   CONCAT_WS(' ', NULLIF(sm.first_name, ''), NULLIF(sm.middle_name, ''),
+                                  NULLIF(sm.last_name, ''), NULLIF(sm.suffix, '')) AS full_name
+            FROM document_authors da
+            INNER JOIN sp_members sm ON sm.sp_member_id = da.sp_member_id
+            WHERE da.document_id = ?
+            ORDER BY da.author_role ASC, da.sort_order ASC, da.id ASC
+        ");
+        $plenaryAuthorsStmt->execute([$documentId]);
+        $plenaryAuthors = $plenaryAuthorsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $plenaryFirstReadingStmt = $this->pdo->prepare("
+            SELECT action AS decision, reading_date, remarks, performed_at, 'Legislative' AS reading_type
+            FROM plenary_readings
+            WHERE document_id = ? AND reading_number = 1
+            UNION ALL
+            SELECT decision, reading_date, remarks, performed_at, 'Communication' AS reading_type
+            FROM plenary_comm_first_reading
+            WHERE document_id = ?
+            UNION ALL
+            SELECT decision, reading_date, remarks, performed_at, 'Petitions / Cases' AS reading_type
+            FROM plenary_cases_first_reading
+            WHERE document_id = ?
+            ORDER BY reading_date DESC, performed_at DESC
+            LIMIT 1
+        ");
+        $plenaryFirstReadingStmt->execute([$documentId, $documentId, $documentId]);
+        $plenaryFirstReading = $plenaryFirstReadingStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        $documentAttachmentsStmt = $this->pdo->prepare("
+            SELECT id, file_name, stored_path, mime_type, file_size,
+                   phase, attachment_type, created_at
+            FROM document_attachments
+            WHERE document_id = ?
+              AND COALESCE(attachment_type, '') NOT IN ('OPINION_FILE', 'COMPLIANCE_FILE')
+            ORDER BY created_at ASC, id ASC
+        ");
+        $documentAttachmentsStmt->execute([$documentId]);
+        $documentAttachments = $documentAttachmentsStmt->fetchAll(PDO::FETCH_ASSOC);
+        $attachments = $documentAttachments;
+
+        $routesStmt = $this->pdo->prepare("
+            SELECT dr.id, dr.from_phase, dr.to_phase, dr.remarks,
+                   dr.created_at AS routed_at,
+                   routed_by.username AS routed_by_username,
+                   routed_to_role.name AS routed_to_role_name,
+                   ro.name AS routing_option_name
+            FROM document_routes dr
+            LEFT JOIN user_accounts routed_by ON routed_by.id = dr.routed_by
+            LEFT JOIN roles routed_to_role ON routed_to_role.id = dr.routed_to_role_id
+            LEFT JOIN routing_options ro ON ro.id = dr.routing_option_id
+            WHERE dr.document_id = ?
+            ORDER BY dr.created_at ASC, dr.id ASC
+        ");
+        $routesStmt->execute([$documentId]);
+        $routes = $routesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $checklistStmt = $this->pdo->prepare("
+            SELECT dci.id, dci.is_completed, dci.completed_at,
+                   c.name AS checklist_name,
+                   c.description AS checklist_description,
+                   completed_by.username AS completed_by_username
+            FROM document_checklist_items dci
+            INNER JOIN checklists c ON c.id = dci.checklist_id
+            LEFT JOIN user_accounts completed_by ON completed_by.id = dci.completed_by
+            WHERE dci.document_id = ?
+            ORDER BY c.name ASC
+        ");
+        $checklistStmt->execute([$documentId]);
+        $checklistItems = $checklistStmt->fetchAll(PDO::FETCH_ASSOC);
+        $documentEvents = $this->docService->getDocumentEvents($documentId);
+
         $endorsements = $this->latestCycleEndorsementsWithOffice((int) $cycle['id']);
         $endorsements = $this->loadOpinionIssueFiles($endorsements, $documentId);
         $progress = $this->summarizeOpinionProgress($endorsements);
@@ -642,6 +889,11 @@ class CommitteeReferredController
         $progress['cleared'] = !empty($progress['offices'][$officeId]['cleared']) ? 1 : 0;
 
         $pageTitle = 'Opinion Office Details';
+        $pageSubtitle = $document['tracking_number'] ?? 'Document Details';
+        $detailBackUrl = BASE_URL . '/committee/referred?tab=for_opinion';
+        $detailBackLabel = 'Back to For Opinion';
+        $showMfrRelationship = false;
+        $renderAsPartial = true;
         require __DIR__ . '/../../../resources/views/committee/referred/opinion-details.php';
     }
 

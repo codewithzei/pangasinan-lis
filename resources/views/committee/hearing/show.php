@@ -122,6 +122,11 @@ ob_start();
         <span class="font-medium text-gray-700">Record Outcome</span>
     </nav>
 
+    <section class="space-y-4">
+        <h2 class="text-lg font-semibold text-gray-900">Full Document Details</h2>
+        <?php require __DIR__ . '/document-show.php'; ?>
+    </section>
+
     <!-- Already recorded banner -->
     <?php if ($alreadyDone): ?>
         <?php $cfg = $outcomeConfig[$existingHearing['outcome']] ?? null; ?>
@@ -165,32 +170,8 @@ ob_start();
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
 
-        <!-- Left column: document + agenda summary -->
+        <!-- Left column: hearing agenda -->
         <div class="xl:col-span-1 space-y-4">
-
-            <!-- Document card -->
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-400">Document</h2>
-                <p class="font-mono font-bold text-blue-700 text-sm">
-                    <?= htmlspecialchars($document['tracking_number'] ?? '—') ?>
-                </p>
-                <?php if (!empty($document['document_type_name'])): ?>
-                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
-                          style="background-color:<?= htmlspecialchars($document['document_type_badge_color'] ?? '#6B7280') ?>">
-                        <?= htmlspecialchars($document['document_type_name']) ?>
-                    </span>
-                <?php endif; ?>
-                <p class="text-sm text-gray-700 line-clamp-4">
-                    <?= htmlspecialchars($document['subject_matter'] ?? '—') ?>
-                </p>
-                <div class="flex items-center gap-2 pt-1">
-                    <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5
-                                 text-xs font-semibold text-amber-700">
-                        <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                        <?= htmlspecialchars($document['status'] ?? 'On Going') ?>
-                    </span>
-                </div>
-            </div>
 
             <!-- Agenda card -->
             <div class="rounded-2xl border border-blue-100 bg-blue-50 p-5 space-y-3">
@@ -254,31 +235,6 @@ ob_start();
                 <?php endif; ?>
             </div>
 
-            <!-- Attachments -->
-            <?php if (!empty($attachments)): ?>
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                    <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                        Attachments (<?= count($attachments) ?>)
-                    </h2>
-                    <ul class="space-y-2">
-                        <?php foreach ($attachments as $att): ?>
-                            <li class="flex items-center justify-between gap-2">
-                                <div class="min-w-0">
-                                    <p class="truncate text-xs font-medium text-gray-700">
-                                        <?= htmlspecialchars($att['file_name']) ?>
-                                    </p>
-                                    <p class="text-xs text-gray-400">
-                                        <?= number_format((int)($att['file_size'] ?? 0) / 1024, 1) ?> KB
-                                    </p>
-                                </div>
-                                <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars($att['stored_path']) ?>"
-                                   target="_blank" rel="noopener"
-                                   class="shrink-0 text-xs text-blue-600 hover:underline">View</a>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            <?php endif; ?>
         </div>
 
         <!-- Right column: outcome form OR already-done state -->

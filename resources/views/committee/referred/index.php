@@ -52,6 +52,19 @@ function referredQueryWith(array $overrides): string
     return http_build_query($merged);
 }
 
+function referredDocumentViewUrl(int $documentId): string
+{
+    $params = [
+        'id' => $documentId,
+        'tab' => $_GET['tab'] ?? 'referred',
+        'search' => $_GET['search'] ?? '',
+        'doc_type' => $_GET['doc_type'] ?? '',
+        'page' => $_GET['page'] ?? 1,
+    ];
+    $params = array_filter($params, fn($value) => $value !== '' && $value !== null && $value !== 0 && $value !== '0');
+    return BASE_URL . '/committee/referred/show?' . http_build_query($params);
+}
+
 $tabs = [
     'referred'         => ['label' => 'Referred',          'badge' => $referredCount],
     'for_opinion'      => ['label' => 'For Opinion',        'badge' => $forOpinionCount],
@@ -215,7 +228,7 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                 <!-- Tracking # + cycle -->
                                 <td class="px-6 py-4">
                                     <div class="font-medium text-gray-900">
-                                        <a href="<?= BASE_URL ?>/committee/inbox/show?id=<?= (int) $doc['document_id'] ?>"
+                                        <a href="<?= htmlspecialchars(referredDocumentViewUrl((int) $doc['document_id']), ENT_QUOTES, 'UTF-8') ?>"
                                            class="text-primary hover:underline">
                                             <?= htmlspecialchars($doc['tracking_number']) ?>
                                         </a>
@@ -308,24 +321,38 @@ $hasFilter = $search !== '' || $filterDocType > 0;
 
                                 <!-- Action -->
                                 <td class="px-6 py-4 text-right">
-                                    <a href="<?= BASE_URL ?>/committee/referred/endorse?id=<?= (int) $doc['document_id'] ?>"
-                                       class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200
-                                              bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700
-                                              hover:bg-indigo-100 transition">
-                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                  d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806
-                                                     3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806
-                                                     3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946
-                                                     3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946
-                                                     3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806
-                                                     3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806
-                                                     3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946
-                                                     3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946
-                                                     3.42 3.42 0 013.138-3.138z"/>
-                                        </svg>
-                                        Endorse
-                                    </a>
+                                    <div class="flex flex-wrap justify-end gap-2">
+                                        <a href="<?= htmlspecialchars(referredDocumentViewUrl((int) $doc['document_id']), ENT_QUOTES, 'UTF-8') ?>"
+                                           class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200
+                                                  bg-white px-3 py-1.5 text-xs font-semibold text-gray-700
+                                                  hover:bg-gray-50 transition">
+                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.065 7-9.542 7s-8.268-2.943-9.542-7z"/>
+                                            </svg>
+                                            View Details
+                                        </a>
+                                        <a href="<?= BASE_URL ?>/committee/referred/endorse?id=<?= (int) $doc['document_id'] ?>"
+                                           class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200
+                                                  bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700
+                                                  hover:bg-indigo-100 transition">
+                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806
+                                                         3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806
+                                                         3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946
+                                                         3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946
+                                                         3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806
+                                                         3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806
+                                                         3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946
+                                                         3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946
+                                                         3.42 3.42 0 013.138-3.138z"/>
+                                            </svg>
+                                            Endorse
+                                        </a>
+                                    </div>
                                 </td>
 
                             </tr>
@@ -446,7 +473,7 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                 <!-- Tracking # + cycle -->
                                 <td class="px-6 py-4">
                                     <div class="font-medium text-gray-900">
-                                        <a href="<?= BASE_URL ?>/committee/inbox/show?id=<?= (int) $doc['document_id'] ?>"
+                                        <a href="<?= htmlspecialchars(referredDocumentViewUrl((int) $doc['document_id']), ENT_QUOTES, 'UTF-8') ?>"
                                            class="text-primary hover:underline">
                                             <?= htmlspecialchars($doc['tracking_number']) ?>
                                         </a>
@@ -735,7 +762,7 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                 <!-- Tracking # + cycle -->
                                 <td class="px-6 py-4">
                                     <div class="font-medium text-gray-900">
-                                        <a href="<?= BASE_URL ?>/committee/inbox/show?id=<?= (int) $doc['document_id'] ?>"
+                                        <a href="<?= htmlspecialchars(referredDocumentViewUrl((int) $doc['document_id']), ENT_QUOTES, 'UTF-8') ?>"
                                            class="text-primary hover:underline">
                                             <?= htmlspecialchars($doc['tracking_number']) ?>
                                         </a>
@@ -937,7 +964,7 @@ $hasFilter = $search !== '' || $filterDocType > 0;
                                 <!-- Tracking # + cycle -->
                                 <td class="px-6 py-4">
                                     <div class="font-medium text-gray-900">
-                                        <a href="<?= BASE_URL ?>/committee/inbox/show?id=<?= (int) $doc['document_id'] ?>"
+                                        <a href="<?= htmlspecialchars(referredDocumentViewUrl((int) $doc['document_id']), ENT_QUOTES, 'UTF-8') ?>"
                                            class="text-gray-600 hover:text-primary hover:underline">
                                             <?= htmlspecialchars($doc['tracking_number']) ?>
                                         </a>

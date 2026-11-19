@@ -1819,6 +1819,8 @@ try {
     $indexView   = (string) file_get_contents($root . '/resources/views/committee/referred/index.php');
     $opinionView = (string) file_get_contents($root . '/resources/views/committee/referred/opinion.php');
     $opinionDetailsView = (string) file_get_contents($root . '/resources/views/committee/referred/opinion-details.php');
+    $referredDocumentView = (string) file_get_contents($root . '/resources/views/committee/referred/document-show.php');
+    $routedDocumentView = (string) file_get_contents($root . '/resources/views/receiving/routed-documents/show.php');
     $attachmentPreviewScript = (string) file_get_contents($root . '/public/assets/js/document-attachment-preview.js');
     $endorseView = (string) file_get_contents($root . '/resources/views/committee/referred/endorse.php');
     $referredController = (string) file_get_contents($root . '/app/controllers/Committee/CommitteeReferredController.php');
@@ -1860,13 +1862,17 @@ try {
             && strpos($opinionDetailsView, 'endorsement_remarks') !== false
     );
     assert_test(
-        'UI: document metadata is available in a collapsed, expandable details panel',
-        strpos($opinionDetailsView, '<details class="group') !== false
-            && strpos($opinionDetailsView, 'Document Details') !== false
-            && strpos($opinionDetailsView, 'Date Received') !== false
-            && strpos($opinionDetailsView, 'Source Address') !== false
-            && strpos($opinionDetailsView, 'Document Remarks') !== false
-            && strpos($opinionDetailsView, '$document[\'current_phase\']') !== false
+        'UI: Opinion Office Details embeds the full shared document view with Plenary details and attachments',
+        strpos($opinionDetailsView, 'require __DIR__ . \'/document-show.php\'') !== false
+            && strpos($opinionDetailsView, '$renderAsPartial = true') !== false
+            && strpos($referredDocumentView, 'receiving/routed-documents/show.php') !== false
+            && strpos($routedDocumentView, 'Date & Time Received') !== false
+            && strpos($routedDocumentView, 'Source Information') !== false
+            && strpos($routedDocumentView, 'Proposed Number') !== false
+            && strpos($routedDocumentView, 'Attachments') !== false
+            && strpos($routedDocumentView, 'Routing History') !== false
+            && strpos($routedDocumentView, 'Checklist') !== false
+            && strpos($routedDocumentView, 'Metadata') !== false
     );
     assert_test(
         'UI: office issue details are filtered to the selected office',

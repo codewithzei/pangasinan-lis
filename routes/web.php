@@ -1425,6 +1425,13 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'committee/referred/show' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeReferredController',
+        'action'     => 'documentShow',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // Endorse a referred document to opinion offices (GET = form, POST = process)
     'committee/referred/endorse' => [
         [
@@ -2070,6 +2077,13 @@ return [
         'method'     => 'GET',
         'controller' => 'Plenary/PlenaryReportsController',
         'action'     => 'show',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/reports/document-show' => [
+        'method'     => 'GET',
+        'controller' => 'Plenary/PlenaryReportsController',
+        'action'     => 'documentShow',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 

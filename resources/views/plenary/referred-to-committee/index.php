@@ -70,6 +70,17 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search, int $documen
     }
     return BASE_URL . '/plenary/referred-to-committee?' . http_build_query($params);
 }
+
+function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $search, int $documentTypeId): string {
+    $params = ['id' => $documentId, 'tab' => $tab, 'page' => $pageNum];
+    if ($search !== '') {
+        $params['search'] = $search;
+    }
+    if ($documentTypeId > 0) {
+        $params['doc_type'] = $documentTypeId;
+    }
+    return BASE_URL . '/plenary/referred-to-committee/show?' . http_build_query($params);
+}
 ?>
 
 <div class="space-y-6">
@@ -186,14 +197,14 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search, int $documen
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full min-w-[900px] table-fixed text-left text-sm">
+            <table class="w-full min-w-[1050px] table-fixed text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="w-[18%] px-5 py-3 font-medium">Tracking Number</th>
-                        <th class="w-[38%] px-5 py-3 font-medium">Subject Matter</th>
+                        <th class="w-[16%] px-5 py-3 font-medium">Tracking Number</th>
+                        <th class="w-[34%] px-5 py-3 font-medium">Subject Matter</th>
                         <th class="w-[20%] px-5 py-3 font-medium">Committee(s)</th>
                         <th class="w-[12%] px-5 py-3 font-medium">Hearing Status</th>
-                        <th class="w-[12%] px-5 py-3 font-medium text-right">Action</th>
+                        <th class="w-[18%] px-5 py-3 font-medium text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -233,16 +244,20 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search, int $documen
                                     'TERMINATED' => '#DC2626',
                                 ];
                                 $committeeOutcomeColor = $committeeOutcomeColors[$committeeOutcome] ?? '#6B7280';
+                                $detailUrl = rtcBuildDetailUrl((int) $row['document_id'], $tab, $page, $search, $documentTypeId);
                             ?>
                             <tr class="hover:bg-gray-50/50 transition">
                                 <td class="px-6 py-4">
-                                    <div class="font-medium text-gray-900"><?= htmlspecialchars($row['tracking_number']) ?></div>
+                                    <a href="<?= htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') ?>" class="font-medium text-gray-900 hover:text-primary hover:underline"><?= htmlspecialchars($row['tracking_number']) ?></a>
                                     <div class="text-xs text-gray-500">
                                         <?php if (!empty($row['proposed_number'])): ?>
                                             <?= htmlspecialchars($row['proposed_number']) ?> ·
                                         <?php endif; ?>
                                         <?= htmlspecialchars(date('M j, Y', strtotime($row['date_received']))) ?>
                                     </div>
+                                    <?php if (!empty($row['accepted_by_username'])): ?>
+                                        <div class="mt-1 text-xs text-gray-400">Accepted by <?= htmlspecialchars($row['accepted_by_username']) ?></div>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="max-w-2xl">
@@ -255,14 +270,20 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search, int $documen
                                         <?php endif; ?>
                                     </div>
                                 </td>
+                                <?php
+                                    $committeeNames = array_values(array_filter(array_map('trim', explode(',', (string) ($row['committee_names'] ?? '')))));
+                                    $committeeCount = count($committeeNames);
+                                ?>
                                 <td class="px-6 py-4">
-                                    <?php if (!empty($row['committee_names'])): ?>
-                                        <div class="font-medium text-gray-800"><?= htmlspecialchars($row['committee_names']) ?></div>
+                                    <?php if ($committeeCount > 0): ?>
+                                        <div class="font-medium text-gray-800" title="<?= htmlspecialchars(implode(', ', $committeeNames), ENT_QUOTES, 'UTF-8') ?>">
+                                            <?= htmlspecialchars($committeeNames[0]) ?>
+                                            <?php if ($committeeCount > 1): ?>
+                                                <span class="ml-1 text-xs font-medium text-gray-500">+<?= $committeeCount - 1 ?> others</span>
+                                            <?php endif; ?>
+                                        </div>
                                     <?php else: ?>
                                         <span class="text-xs italic text-gray-400">—</span>
-                                    <?php endif; ?>
-                                    <?php if (!empty($row['accepted_by_username'])): ?>
-                                        <div class="text-xs text-gray-400">Accepted by <?= htmlspecialchars($row['accepted_by_username']) ?></div>
                                     <?php endif; ?>
                                 </td>
                                 <td class="px-6 py-4">
@@ -272,7 +293,7 @@ function rtcBuildPageUrl(string $tab, int $pageNum, string $search, int $documen
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <a href="<?= BASE_URL ?>/plenary/referred-to-committee/show?id=<?= (int) $row['document_id'] ?>"
+                                    <a href="<?= htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') ?>"
                                        class="mb-2 ml-auto flex w-fit items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
                                        aria-label="View legislative history for <?= htmlspecialchars($row['tracking_number'], ENT_QUOTES, 'UTF-8') ?>">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

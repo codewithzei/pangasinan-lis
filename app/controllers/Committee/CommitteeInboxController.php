@@ -510,6 +510,47 @@ class CommitteeInboxController
         $committeeAssignStmt->execute([$documentId]);
         $committeeAssignments = $committeeAssignStmt->fetchAll();
 
+        // Plenary processing details and First Reading referral record.
+        $plenaryDetailsStmt = $this->pdo->prepare("
+            SELECT proposed_number, target_first_reading_date, session_type,
+                   additional_details, authors_all, co_authors_all
+            FROM plenary_document_details
+            WHERE document_id = ?
+            LIMIT 1
+        ");
+        $plenaryDetailsStmt->execute([$documentId]);
+        $plenaryDetails = $plenaryDetailsStmt->fetch() ?: [];
+
+        $plenaryAuthorsStmt = $this->pdo->prepare("
+            SELECT da.author_role,
+                   CONCAT_WS(' ', NULLIF(sm.first_name, ''), NULLIF(sm.middle_name, ''),
+                                  NULLIF(sm.last_name, ''), NULLIF(sm.suffix, '')) AS full_name
+            FROM document_authors da
+            INNER JOIN sp_members sm ON sm.sp_member_id = da.sp_member_id
+            WHERE da.document_id = ?
+            ORDER BY da.author_role ASC, da.sort_order ASC, da.id ASC
+        ");
+        $plenaryAuthorsStmt->execute([$documentId]);
+        $plenaryAuthors = $plenaryAuthorsStmt->fetchAll();
+
+        $plenaryFirstReadingStmt = $this->pdo->prepare("
+            SELECT action AS decision, reading_date, remarks, performed_at, 'Legislative' AS reading_type
+            FROM plenary_readings
+            WHERE document_id = ? AND reading_number = 1
+            UNION ALL
+            SELECT decision, reading_date, remarks, performed_at, 'Communication' AS reading_type
+            FROM plenary_comm_first_reading
+            WHERE document_id = ?
+            UNION ALL
+            SELECT decision, reading_date, remarks, performed_at, 'Petitions / Cases' AS reading_type
+            FROM plenary_cases_first_reading
+            WHERE document_id = ?
+            ORDER BY reading_date DESC, performed_at DESC
+            LIMIT 1
+        ");
+        $plenaryFirstReadingStmt->execute([$documentId, $documentId, $documentId]);
+        $plenaryFirstReading = $plenaryFirstReadingStmt->fetch() ?: null;
+
         // Attachments
         $attStmt = $this->pdo->prepare("
             SELECT da.*, ua.username AS uploaded_by_username

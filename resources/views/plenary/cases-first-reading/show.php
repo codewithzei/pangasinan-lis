@@ -22,6 +22,7 @@ $events         = $events         ?? [];
 $errors         = $errors         ?? [];
 $old            = $old            ?? [];
 $canAct         = $canAct         ?? false;
+$documentAttachments = $documentAttachments ?? [];
 
 $documentId     = (int) ($document['id']               ?? 0);
 $trackingNumber = $document['tracking_number']          ?? '';
@@ -80,6 +81,14 @@ ob_start();
                     <p class="text-xs text-gray-400">Subject Matter</p>
                     <p class="text-sm text-gray-800 leading-5"><?= htmlspecialchars($subjectMatter) ?></p>
                 </div>
+                <div>
+                    <p class="text-xs text-gray-400">Date Received</p>
+                    <p class="text-sm text-gray-800"><?= !empty($document['date_received']) ? htmlspecialchars(date('F j, Y', strtotime($document['date_received']))) : '—' ?></p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400">Time Received</p>
+                    <p class="text-sm text-gray-800"><?= !empty($document['time_received']) ? htmlspecialchars(date('g:i A', strtotime($document['time_received']))) : '—' ?></p>
+                </div>
                 <?php if (!empty($document['document_type_name'])): ?>
                 <div>
                     <p class="text-xs text-gray-400">Document Type</p>
@@ -88,6 +97,16 @@ ob_start();
                                  color:<?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
                         <?= htmlspecialchars($document['document_type_name']) ?>
                     </span>
+                </div>
+                <?php endif; ?>
+                <div>
+                    <p class="text-xs text-gray-400">Source Type</p>
+                    <p class="text-sm text-gray-800"><?= htmlspecialchars($document['source_type_name'] ?: '—') ?></p>
+                </div>
+                <?php if (!empty($document['source_name'])): ?>
+                <div>
+                    <p class="text-xs text-gray-400">Source / Originating Office</p>
+                    <p class="text-sm text-gray-800 whitespace-pre-wrap"><?= htmlspecialchars($document['source_name']) ?></p>
                 </div>
                 <?php endif; ?>
                 <?php if (!empty($targetDate)): ?>
@@ -111,6 +130,44 @@ ob_start();
                     <p class="text-xs text-gray-400">Source</p>
                     <p class="text-sm text-gray-800"><?= htmlspecialchars($document['source_name']) ?></p>
                 </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Uploaded documents -->
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Attachments</h2>
+                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"><?= count($documentAttachments) ?></span>
+                </div>
+                <?php if ($documentAttachments === []): ?>
+                    <p class="text-sm text-gray-500">No uploaded documents.</p>
+                <?php else: ?>
+                    <ul class="divide-y divide-gray-100">
+                        <?php foreach ($documentAttachments as $attachment): ?>
+                            <li class="py-3 first:pt-0 last:pb-0">
+                                <p class="break-all text-sm font-medium text-gray-800"><?= htmlspecialchars($attachment['file_name']) ?></p>
+                                <?php if (!empty($attachment['file_size'])): ?>
+                                    <p class="mt-1 text-xs text-gray-500"><?= number_format((int) $attachment['file_size'] / 1024, 1) ?> KB</p>
+                                <?php endif; ?>
+                                <?php if (!empty($attachment['stored_path'])):
+                                    $attachmentUrl = BASE_URL . '/public/' . ltrim($attachment['stored_path'], '/');
+                                    $attachmentName = (string) ($attachment['file_name'] ?? 'Attachment');
+                                ?>
+                                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                                        <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           target="_blank"
+                                           data-attachment-preview
+                                           data-preview-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           data-preview-name="<?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?>"
+                                           data-download-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           class="inline-flex rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition">Preview</a>
+                                        <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" download
+                                           class="inline-flex rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition">Download</a>
+                                    </div>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
                 <?php endif; ?>
             </div>
 

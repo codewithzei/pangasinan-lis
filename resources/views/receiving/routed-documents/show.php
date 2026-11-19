@@ -10,6 +10,7 @@ $pageSubtitle = $pageSubtitle ?? '';
 $detailBackUrl = $detailBackUrl ?? BASE_URL . '/receiving/routed-documents';
 $detailBackLabel = $detailBackLabel ?? 'Back to Routed Documents';
 $showMfrRelationship = $showMfrRelationship ?? true;
+$renderAsPartial = $renderAsPartial ?? false;
 
 // Helper function to format phase names
 function formatPhaseName(string $phase): string
@@ -42,6 +43,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
 <div class="detail-page space-y-6">
 
+    <?php if (!$renderAsPartial): ?>
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10">
@@ -65,6 +67,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
             <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
     </section>
+    <?php endif; ?>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         
@@ -127,6 +130,69 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                     <?php endif; ?>
                 </div>
             </section>
+
+            <?php if (!empty($plenaryDetails) || !empty($plenaryAuthors) || !empty($plenaryFirstReading)): ?>
+                <section class="rounded-2xl border border-violet-100 bg-white p-6">
+                    <h2 class="text-lg font-semibold text-gray-900">Plenary First Reading Details</h2>
+                    <p class="mt-1 text-sm text-gray-500">Information recorded in Plenary before Committee referral.</p>
+                    <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <?php foreach ([
+                            'Proposed Number' => $plenaryDetails['proposed_number'] ?? null,
+                            'Target First Reading Date' => !empty($plenaryDetails['target_first_reading_date'])
+                                ? date('F j, Y', strtotime((string) $plenaryDetails['target_first_reading_date']))
+                                : null,
+                            'Session Type' => !empty($plenaryDetails['session_type'])
+                                ? ucwords(strtolower(str_replace('_', ' ', (string) $plenaryDetails['session_type'])))
+                                : null,
+                        ] as $label => $value): ?>
+                            <div>
+                                <dt class="text-xs font-medium uppercase tracking-wide text-gray-500"><?= htmlspecialchars($label) ?></dt>
+                                <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars((string) ($value ?: '—')) ?></dd>
+                            </div>
+                        <?php endforeach; ?>
+                        <?php foreach (['AUTHOR' => 'Author(s)', 'CO_AUTHOR' => 'Co-Author(s)'] as $role => $label): ?>
+                            <?php
+                            $authorNames = array_values(array_filter(array_map(
+                                static fn(array $author): string => trim((string) ($author['full_name'] ?? '')),
+                                array_filter($plenaryAuthors ?? [], static fn(array $author): bool => ($author['author_role'] ?? '') === $role)
+                            )));
+                            $allAuthors = $role === 'AUTHOR'
+                                ? !empty($plenaryDetails['authors_all'])
+                                : !empty($plenaryDetails['co_authors_all']);
+                            ?>
+                            <div>
+                                <dt class="text-xs font-medium uppercase tracking-wide text-gray-500"><?= $label ?></dt>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    <?= $allAuthors ? 'ALL' : htmlspecialchars($authorNames !== [] ? implode(', ', $authorNames) : '—') ?>
+                                </dd>
+                            </div>
+                        <?php endforeach; ?>
+                        <?php if (!empty($plenaryDetails['additional_details'])): ?>
+                            <div class="sm:col-span-2">
+                                <dt class="text-xs font-medium uppercase tracking-wide text-gray-500">Additional Plenary Details</dt>
+                                <dd class="mt-1 whitespace-pre-wrap text-sm text-gray-900"><?= htmlspecialchars((string) $plenaryDetails['additional_details']) ?></dd>
+                            </div>
+                        <?php endif; ?>
+                        <?php if (!empty($plenaryFirstReading)): ?>
+                            <?php foreach ([
+                                'First Reading Type' => $plenaryFirstReading['reading_type'] ?? null,
+                                'First Reading Date' => !empty($plenaryFirstReading['reading_date'])
+                                    ? date('F j, Y', strtotime((string) $plenaryFirstReading['reading_date']))
+                                    : null,
+                                'Plenary Decision' => $plenaryFirstReading['decision'] ?? null,
+                                'First Reading Remarks' => $plenaryFirstReading['remarks'] ?? null,
+                            ] as $label => $value): ?>
+                                <?php if (!empty($value)): ?>
+                                    <div class="<?= $label === 'First Reading Remarks' ? 'sm:col-span-2' : '' ?>">
+                                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-500"><?= htmlspecialchars($label) ?></dt>
+                                        <dd class="mt-1 whitespace-pre-wrap text-sm text-gray-900"><?= htmlspecialchars((string) $value) ?></dd>
+                                    </div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </dl>
+                </section>
+            <?php endif; ?>
 
             <!-- Source Information -->
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
@@ -210,7 +276,12 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                     </div>
                 <?php else: ?>
                     <div class="mt-4 space-y-2">
-                        <?php foreach ($attachments as $attachment): ?>
+                        <?php foreach ($attachments as $attachment):
+                            $attachmentName = (string) ($attachment['file_name'] ?? 'Attachment');
+                            $attachmentUrl = BASE_URL . '/public/' . (
+                                preg_replace('#^(?:public/)+#i', '', ltrim((string) ($attachment['stored_path'] ?? ''), '/\\')) ?? ''
+                            );
+                        ?>
                             <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
                                 <div class="flex items-center gap-3 min-w-0 flex-1">
                                     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-primary">
@@ -219,23 +290,33 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                                         </svg>
                                     </div>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars($attachment['file_name']) ?></p>
+                                        <p class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars($attachmentName) ?></p>
                                         <p class="text-xs text-gray-500">
-                                            <?= formatFileSize($attachment['file_size']) ?> • 
-                                            <?= htmlspecialchars(formatPhaseName($attachment['phase'])) ?> • 
+                                            <?= formatFileSize($attachment['file_size']) ?> •
+                                            <?= htmlspecialchars(formatPhaseName($attachment['phase'])) ?>
+                                            <?php if (!empty($attachment['attachment_type'])): ?>
+                                                • <?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $attachment['attachment_type'])))) ?>
+                                            <?php endif; ?>
+                                            •
                                             <?= htmlspecialchars(date('M j, Y', strtotime($attachment['created_at']))) ?>
                                         </p>
                                     </div>
                                 </div>
-                                <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars(
-                                    preg_replace('#^(?:public/)+#i', '', ltrim((string) $attachment['stored_path'], '/\\')) ?? '',
-                                    ENT_QUOTES,
-                                    'UTF-8'
-                                ) ?>"
-                                   target="_blank"
-                                   class="ml-3 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition">
-                                    Download
-                                </a>
+                                <div class="ml-3 flex shrink-0 items-center gap-2">
+                                    <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                       data-attachment-preview
+                                       data-preview-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                       data-preview-name="<?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?>"
+                                       data-download-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                       class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition">
+                                        Preview
+                                    </a>
+                                    <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                       download
+                                       class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition">
+                                        Download
+                                    </a>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -375,7 +456,11 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                     <div>
                         <p class="text-xs font-medium text-gray-500">Last Updated</p>
                         <p class="mt-1 text-xs text-gray-900">
-                            <?= htmlspecialchars(date('F j, Y g:i A', strtotime($document['updated_at']))) ?>
+                            <?php if (!empty($document['updated_at'])): ?>
+                                <?= htmlspecialchars(date('F j, Y g:i A', strtotime($document['updated_at']))) ?>
+                            <?php else: ?>
+                                —
+                            <?php endif; ?>
                             <?php if (!empty($document['updated_by_username'])): ?>
                                 <br>by <?= htmlspecialchars($document['updated_by_username']) ?>
                             <?php endif; ?>
@@ -407,12 +492,6 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                     </div>
                     <?php endif; ?>
 
-                    <div>
-                        <p class="text-xs font-medium text-gray-500">Public Access</p>
-                        <p class="mt-1 text-xs text-gray-900">
-                            <?= $document['is_public'] ? 'Yes' : 'No' ?>
-                        </p>
-                    </div>
                 </div>
             </section>
 
@@ -432,5 +511,9 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
 <?php
 $content = ob_get_clean();
-require __DIR__ . '/../../layouts/app.php';
+if ($renderAsPartial) {
+    echo $content;
+} else {
+    require __DIR__ . '/../../layouts/app.php';
+}
 ?>

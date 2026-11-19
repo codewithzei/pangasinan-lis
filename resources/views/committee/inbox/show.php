@@ -26,9 +26,13 @@ $attachments          = $attachments          ?? [];
 $routes               = $routes               ?? [];
 $events               = $events               ?? [];
 $revisions            = $revisions            ?? [];
+$plenaryDetails       = $plenaryDetails       ?? [];
+$plenaryAuthors       = $plenaryAuthors       ?? [];
+$plenaryFirstReading  = $plenaryFirstReading  ?? null;
 
 $documentId     = (int) ($document['id'] ?? 0);
 $trackingNumber = $document['tracking_number'] ?? '';
+$committeeShowBackUrl = BASE_URL . '/committee/inbox';
 
 // ── Assignment state (controller-computed; re-guarded here as a safety net) ──
 $assignmentDecision = $activeAssignment !== false
@@ -117,7 +121,7 @@ ob_start();
 
     <!-- Back + Page header --------------------------------------------------->
     <div class="flex items-center gap-4">
-        <a href="<?= BASE_URL ?>/committee/inbox"
+        <a href="<?= htmlspecialchars($committeeShowBackUrl, ENT_QUOTES, 'UTF-8') ?>"
            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200
                   bg-white text-gray-500 hover:bg-gray-50 transition">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -199,6 +203,98 @@ ob_start();
                     <?php endif; ?>
                 </dl>
             </div>
+
+            <!-- Plenary First Reading details ------------------------------>
+            <?php if ($plenaryDetails !== [] || $plenaryAuthors !== [] || $plenaryFirstReading !== null): ?>
+                <section class="rounded-2xl border border-violet-100 bg-white p-6">
+                    <div class="mb-4 flex items-center gap-3">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-base font-semibold text-gray-900">Plenary First Reading Details</h2>
+                            <p class="text-xs text-gray-500">Plenary information recorded before referral to Committee</p>
+                        </div>
+                    </div>
+
+                    <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Proposed Number</dt>
+                            <dd class="mt-1 text-sm text-gray-800"><?= htmlspecialchars($plenaryDetails['proposed_number'] ?? '—') ?></dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Target First Reading Date</dt>
+                            <dd class="mt-1 text-sm text-gray-800">
+                                <?= !empty($plenaryDetails['target_first_reading_date'])
+                                    ? htmlspecialchars(date('F j, Y', strtotime($plenaryDetails['target_first_reading_date'])))
+                                    : '—' ?>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Session Type</dt>
+                            <dd class="mt-1 text-sm text-gray-800">
+                                <?= !empty($plenaryDetails['session_type'])
+                                    ? htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $plenaryDetails['session_type']))))
+                                    : '—' ?>
+                            </dd>
+                        </div>
+
+                        <?php foreach (['AUTHOR' => 'Author(s)', 'CO_AUTHOR' => 'Co-Author(s)'] as $role => $label): ?>
+                            <div class="sm:col-span-2">
+                                <dt class="text-xs font-medium uppercase tracking-wide text-gray-400"><?= $label ?></dt>
+                                <dd class="mt-1 text-sm text-gray-800">
+                                    <?php
+                                    $names = array_values(array_filter(array_map(
+                                        static fn(array $author): string => trim((string) ($author['full_name'] ?? '')),
+                                        array_filter($plenaryAuthors, static fn(array $author): bool => ($author['author_role'] ?? '') === $role)
+                                    )));
+                                    $allSelected = $role === 'AUTHOR'
+                                        ? !empty($plenaryDetails['authors_all'])
+                                        : !empty($plenaryDetails['co_authors_all']);
+                                    ?>
+                                    <?= $allSelected ? 'ALL' : htmlspecialchars($names !== [] ? implode(', ', $names) : '—') ?>
+                                </dd>
+                            </div>
+                        <?php endforeach; ?>
+
+                        <?php if (!empty($plenaryDetails['additional_details'])): ?>
+                            <div class="sm:col-span-2">
+                                <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Additional Plenary Details</dt>
+                                <dd class="mt-1 whitespace-pre-wrap text-sm text-gray-800"><?= escape_trimmed_text($plenaryDetails['additional_details']) ?></dd>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ($plenaryFirstReading !== null): ?>
+                            <div>
+                                <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">First Reading Type</dt>
+                                <dd class="mt-1 text-sm text-gray-800"><?= htmlspecialchars($plenaryFirstReading['reading_type']) ?></dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">First Reading Date</dt>
+                                <dd class="mt-1 text-sm text-gray-800">
+                                    <?= !empty($plenaryFirstReading['reading_date'])
+                                        ? htmlspecialchars(date('F j, Y', strtotime($plenaryFirstReading['reading_date'])))
+                                        : '—' ?>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Plenary Decision</dt>
+                                <dd class="mt-1 text-sm font-medium text-gray-800">
+                                    <?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $plenaryFirstReading['decision'] ?? '')))) ?>
+                                </dd>
+                            </div>
+                            <?php if (!empty($plenaryFirstReading['remarks'])): ?>
+                                <div class="sm:col-span-2">
+                                    <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">First Reading Remarks</dt>
+                                    <dd class="mt-1 whitespace-pre-wrap text-sm text-gray-800"><?= escape_trimmed_text($plenaryFirstReading['remarks']) ?></dd>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </dl>
+                </section>
+            <?php endif; ?>
 
             <!-- Committee assignments (named committees) ---------------------->
             <?php if (!empty($committeeAssignments)): ?>

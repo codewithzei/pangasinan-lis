@@ -165,6 +165,7 @@ class PlenaryReadingController
         $committees      = $this->fetchCommittees($documentId);
         $events          = $this->fetchEvents($documentId);
         $existingReading = $this->fetchReading($documentId, 1);
+        $documentAttachments = $this->fetchDocumentAttachments($documentId);
 
         // Ownership: must be ACCEPTED by this user
         $canAct = $this->isOwnedByUser($documentId, $userId);
@@ -294,18 +295,49 @@ class PlenaryReadingController
             redirect('plenary/referred-to-committee');
         }
 
+        $returnParams = [];
+        $returnTab = trim((string) ($_GET['tab'] ?? ''));
+        if (in_array($returnTab, ['in_committee', 'returned'], true)) {
+            $returnParams['tab'] = $returnTab;
+        }
+        $returnSearch = trim((string) ($_GET['search'] ?? ''));
+        if ($returnSearch !== '') {
+            $returnParams['search'] = $returnSearch;
+        }
+        $returnDocumentType = (int) ($_GET['doc_type'] ?? 0);
+        if ($returnDocumentType > 0) {
+            $returnParams['doc_type'] = $returnDocumentType;
+        }
+        $returnPage = max(1, (int) ($_GET['page'] ?? 1));
+        if ($returnPage > 1) {
+            $returnParams['page'] = $returnPage;
+        }
+        $backUrl = BASE_URL . '/plenary/referred-to-committee'
+            . ($returnParams !== [] ? '?' . http_build_query($returnParams) : '');
+
         $documentStmt = $this->pdo->prepare("
             SELECT d.id AS document_id, d.tracking_number, d.subject_matter,
                    d.date_received, d.time_received, d.current_phase, d.created_at,
+                   d.updated_at, d.is_public, d.finalized_at, d.filed_at,
                    d.source_name, d.source_contact_number, d.source_address,
                    d.source_liaison_name, st.name AS source_type_name,
-                   dt.name AS document_type_name,
-                   ds.name AS document_status,
-                   pdd.proposed_number, pdd.target_first_reading_date, pdd.session_type
+                   dt.name AS document_type_name, dt.badge_color AS document_type_badge_color,
+                   ds.name AS document_status, ds.badge_color AS status_badge_color,
+                   pdd.proposed_number, pdd.target_first_reading_date, pdd.session_type,
+                   eo.name AS external_office_name, eo.abbreviation AS external_office_abbr,
+                   h.name AS hospital_name, m.name AS municipality_name, m.type AS municipality_type,
+                   creator.username AS created_by_username, updater.username AS updated_by_username,
+                   owner.username AS current_owner_username
             FROM documents d
             LEFT JOIN document_types dt ON dt.id = d.document_type_id
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             LEFT JOIN source_types st ON st.id = d.source_type_id
+            LEFT JOIN provincial_government_offices eo ON eo.id = d.external_office_id
+            LEFT JOIN hospitals h ON h.id = d.hospital_id
+            LEFT JOIN municities m ON m.id = d.municipality_id
+            LEFT JOIN user_accounts creator ON creator.id = d.created_by
+            LEFT JOIN user_accounts updater ON updater.id = d.updated_by
+            LEFT JOIN user_accounts owner ON owner.id = d.current_owner_user_id
             LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
             WHERE d.id = ?
               AND (
@@ -686,6 +718,37 @@ class PlenaryReadingController
         ");
         $secondReadingDetailsStmt->execute([$documentId]);
         $secondReadingDetails = $secondReadingDetailsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $routes = [];
+        $routesStmt = $this->pdo->prepare("
+            SELECT dr.id, dr.from_phase, dr.to_phase, dr.remarks,
+                   dr.created_at AS routed_at,
+                   rb.username AS routed_by_username,
+                   rr.name AS routed_to_role_name,
+                   ro.name AS routing_option_name
+            FROM document_routes dr
+            LEFT JOIN user_accounts rb ON rb.id = dr.routed_by
+            LEFT JOIN roles rr ON rr.id = dr.routed_to_role_id
+            LEFT JOIN routing_options ro ON ro.id = dr.routing_option_id
+            WHERE dr.document_id = ?
+            ORDER BY dr.created_at ASC, dr.id ASC
+        ");
+        $routesStmt->execute([$documentId]);
+        $routes = $routesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $checklistItems = [];
+        $checklistStmt = $this->pdo->prepare("
+            SELECT dci.id, dci.is_completed, dci.completed_at,
+                   c.name AS checklist_name, c.description AS checklist_description,
+                   cu.username AS completed_by_username
+            FROM document_checklist_items dci
+            INNER JOIN checklists c ON c.id = dci.checklist_id
+            LEFT JOIN user_accounts cu ON cu.id = dci.completed_by
+            WHERE dci.document_id = ?
+            ORDER BY c.name ASC
+        ");
+        $checklistStmt->execute([$documentId]);
+        $checklistItems = $checklistStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $attachmentStmt = $this->pdo->prepare("
             SELECT cr.id AS report_id, cra.file_name, cra.stored_path, cra.mime_type,
@@ -2307,10 +2370,12 @@ class PlenaryReadingController
                    ds.name        AS status_name,
                    ds.badge_color AS status_badge_color,
                    dt.name        AS document_type_name,
-                   dt.badge_color AS document_type_badge_color
+                   dt.badge_color AS document_type_badge_color,
+                   st.name        AS source_type_name
             FROM documents d
             LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
             LEFT JOIN document_types    dt ON dt.id = d.document_type_id
+            LEFT JOIN source_types      st ON st.id = d.source_type_id
             WHERE d.id = ?
             LIMIT 1
         ");
@@ -2357,6 +2422,19 @@ class PlenaryReadingController
                 'You do not have ownership of this document. Only the Plenary user who accepted it may perform this action.'
             );
         }
+    }
+
+    private function fetchDocumentAttachments(int $documentId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT id, file_name, stored_path, mime_type, file_size,
+                   phase, attachment_type, created_at
+            FROM document_attachments
+            WHERE document_id = ?
+            ORDER BY created_at ASC, id ASC
+        ");
+        $stmt->execute([$documentId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     private function fetchPlenaryDetails(int $documentId): ?array
@@ -2968,6 +3046,7 @@ class PlenaryReadingController
         $docCommittees  = $this->fetchDocumentCommittees($documentId);
         $categories     = $this->fetchCommunicationCategories();
         $events         = $this->fetchEvents($documentId);
+        $documentAttachments = $this->fetchDocumentAttachments($documentId);
 
         $existingReading = $this->fetchCommFirstReading($documentId);
 
@@ -4311,6 +4390,7 @@ class PlenaryReadingController
         $committees      = $this->fetchCommittees($documentId);
         $docCommittees   = $this->fetchDocumentCommittees($documentId);
         $events          = $this->fetchEvents($documentId);
+        $documentAttachments = $this->fetchDocumentAttachments($documentId);
         $existingReading = $this->fetchCasesFirstReading($documentId);
 
         $canAct = $this->isOwnedByUser($documentId, $userId);
