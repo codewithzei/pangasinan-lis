@@ -268,6 +268,9 @@ function formatDestination(array $doc): string
                                     <div class="text-sm font-medium text-gray-900 line-clamp-2">
                                         <?= htmlspecialchars($doc['subject_matter']) ?>
                                     </div>
+                                    <?php if (!empty($doc['is_resubmission'])): ?>
+                                        <span class="mt-1 inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Resubmission</span>
+                                    <?php endif; ?>
                                 </td>
 
                                 <!-- Document type -->

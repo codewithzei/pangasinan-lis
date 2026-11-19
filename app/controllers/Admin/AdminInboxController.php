@@ -469,6 +469,8 @@ class AdminInboxController
         } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
             $relatedMotions = $docService->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
 
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
         require __DIR__ . '/../../../resources/views/admin/inbox/show.php';

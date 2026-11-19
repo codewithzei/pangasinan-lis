@@ -357,6 +357,8 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+
 <?php
 $content = ob_get_clean();
 require __DIR__ . '/../../layouts/app.php';

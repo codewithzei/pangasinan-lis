@@ -191,6 +191,8 @@ class PlenaryPetitionsController
         } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
             $relatedMotions = $docService->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
 
         require __DIR__ . '/../../../resources/views/plenary/petitions/show.php';
     }

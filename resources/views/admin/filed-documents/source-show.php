@@ -80,6 +80,8 @@ function _ss_typeLabel(string $type): string
                         <div class="flex items-center gap-2">
                             <p class="text-sm font-medium text-blue-100">FINALIZED — AWAITING FILING</p>
                         </div>
+
+                        <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
                         <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                             <?= htmlspecialchars($pageSubtitle) ?>
                         </h1>

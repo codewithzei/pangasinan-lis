@@ -402,6 +402,11 @@ class DocumentService
                         'The selected resubmission reference is no longer eligible. Please select another document.'
                     );
                 }
+                if ((int) $resubmissionReference['document_type_id'] !== (int) $data['document_type_id']) {
+                    throw new RuntimeException(
+                        'A resubmission must use the same document type as the latest submission in its lineage.'
+                    );
+                }
             }
 
             // 1. Tracking number (row-locked for safety)
@@ -656,6 +661,11 @@ class DocumentService
                         $userId,
                     ]);
                 }
+                $this->copySharedResubmissionLegislativeDetails(
+                    $documentId,
+                    (int) $resubmissionReference['id'],
+                    $userId
+                );
             }
 
             // 8. Determine if a non-Noted forward routing option was selected.
@@ -789,6 +799,8 @@ class DocumentService
                     json_encode(
                         array_merge($baseMetadata, [
                             'referenced_document_id' => (int) $resubmissionReference['id'],
+                            'original_document_id' => (int) $resubmissionReference['original_document_id'],
+                            'version_number' => (int) $resubmissionReference['version_number'] + 1,
                             'routing_option_id' => $routingOptionId > 0 ? $routingOptionId : null,
                             'adopted_proposed_number' => $routingOptionId === 5
                                 ? ($resubmissionReference['proposed_number'] ?: null)
@@ -1827,15 +1839,226 @@ class DocumentService
                                          AND dt.is_deleted = 0
             " . $this->resubmissionOutcomeJoinSql() . "
             LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
+            LEFT JOIN document_resubmission_links parent_link
+                ON parent_link.resubmitted_document_id = d.id
             WHERE outcome_status.name IN (?, ?, ?)
               AND outcome_status.is_active = 1
               AND outcome_status.is_deleted = 0
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM document_resubmission_links newer
+                  WHERE newer.original_document_id = COALESCE(parent_link.original_document_id, d.id)
+                    AND newer.version_number > COALESCE(parent_link.version_number, 1)
+              )
               " . (!empty($filters) ? 'AND ' . implode(' AND ', $filters) : '') . "
             ORDER BY d.tracking_number DESC
             LIMIT 50
         ");
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Return the complete ordered lineage, including its original submission.
+     */
+    public function getResubmissionLineage(int $documentId): array
+    {
+        $rootStmt = $this->pdo->prepare("
+            SELECT COALESCE(parent_link.original_document_id, d.id)
+            FROM documents d
+            LEFT JOIN document_resubmission_links parent_link
+                ON parent_link.resubmitted_document_id = d.id
+            WHERE d.id = ?
+            LIMIT 1
+        ");
+        $rootStmt->execute([$documentId]);
+        $originalDocumentId = (int) $rootStmt->fetchColumn();
+        if ($originalDocumentId <= 0) {
+            return [];
+        }
+
+        $stmt = $this->pdo->prepare("
+            SELECT
+                d.id AS document_id,
+                d.tracking_number,
+                d.subject_matter,
+                d.date_received,
+                d.current_phase,
+                d.document_type_id,
+                dt.name AS document_type_name,
+                ds.name AS status_name,
+                ds.badge_color AS status_badge_color,
+                COALESCE(member_link.version_number, 1) AS version_number,
+                member_link.referenced_document_id,
+                member_link.linked_at,
+                COALESCE(
+                    pdd.proposed_number,
+                    (
+                        SELECT shared_pdd.proposed_number
+                        FROM plenary_document_details shared_pdd
+                        LEFT JOIN document_resubmission_links shared_link
+                            ON shared_link.resubmitted_document_id = shared_pdd.document_id
+                        WHERE shared_pdd.document_id = ?
+                           OR shared_link.original_document_id = ?
+                        ORDER BY COALESCE(shared_link.version_number, 1) DESC
+                        LIMIT 1
+                    )
+                ) AS proposed_number,
+                (d.id = ?) AS is_current
+            FROM documents d
+            LEFT JOIN document_resubmission_links member_link
+                ON member_link.resubmitted_document_id = d.id
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
+            WHERE d.id = ?
+               OR member_link.original_document_id = ?
+            ORDER BY COALESCE(member_link.version_number, 1) ASC, d.id ASC
+        ");
+        $stmt->execute([
+            $originalDocumentId,
+            $originalDocumentId,
+            $documentId,
+            $originalDocumentId,
+            $originalDocumentId,
+        ]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Return the latest shared legislative fields recorded for a lineage.
+     */
+    public function getSharedResubmissionLegislativeDetails(int $documentId): ?array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT
+                pdd.proposed_number,
+                pdd.target_first_reading_date,
+                pdd.session_type,
+                pdd.additional_details,
+                pdd.authors_all,
+                pdd.co_authors_all
+            FROM documents current_document
+            LEFT JOIN document_resubmission_links current_link
+                ON current_link.resubmitted_document_id = current_document.id
+            INNER JOIN plenary_document_details pdd
+                ON pdd.document_id = current_document.id
+                OR pdd.document_id IN (
+                    SELECT lineage_link.resubmitted_document_id
+                    FROM document_resubmission_links lineage_link
+                    WHERE lineage_link.original_document_id =
+                        COALESCE(current_link.original_document_id, current_document.id)
+                )
+            LEFT JOIN document_resubmission_links member_link
+                ON member_link.resubmitted_document_id = pdd.document_id
+            WHERE current_document.id = ?
+            ORDER BY COALESCE(member_link.version_number, 1) DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$documentId]);
+        $details = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $details ?: null;
+    }
+
+    /**
+     * Synchronize shared Plenary fields and assignments across a lineage.
+     * Submission-specific status, remarks, attachments, and routes are untouched.
+     */
+    public function synchronizeResubmissionLegislativeDetails(
+        int $documentId,
+        array $details,
+        array $authorIds,
+        array $coAuthorIds,
+        array $committeeIds,
+        int $userId
+    ): void {
+        $lineageStmt = $this->pdo->prepare("
+            SELECT COALESCE(current_link.original_document_id, current_document.id) AS original_document_id
+            FROM documents current_document
+            LEFT JOIN document_resubmission_links current_link
+                ON current_link.resubmitted_document_id = current_document.id
+            WHERE current_document.id = ?
+            LIMIT 1
+        ");
+        $lineageStmt->execute([$documentId]);
+        $originalDocumentId = (int) $lineageStmt->fetchColumn();
+        if ($originalDocumentId <= 0) {
+            throw new RuntimeException('Unable to resolve the document lineage for shared legislative data.');
+        }
+
+        $lineageExists = $this->pdo->prepare("
+            SELECT 1
+            FROM document_resubmission_links
+            WHERE original_document_id = ?
+            LIMIT 1
+        ");
+        $lineageExists->execute([$originalDocumentId]);
+        if (!$lineageExists->fetchColumn()) {
+            return;
+        }
+
+        $memberStmt = $this->pdo->prepare("
+            SELECT ?
+            UNION
+            SELECT resubmitted_document_id
+            FROM document_resubmission_links
+            WHERE original_document_id = ?
+        ");
+        $memberStmt->execute([$originalDocumentId, $originalDocumentId]);
+        $documentIds = array_map('intval', $memberStmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $updateDetails = $this->pdo->prepare("
+            UPDATE plenary_document_details
+            SET proposed_number = ?,
+                target_first_reading_date = ?,
+                session_type = ?,
+                additional_details = ?,
+                authors_all = ?,
+                co_authors_all = ?,
+                updated_by = ?
+            WHERE document_id = ?
+        ");
+        foreach ($documentIds as $lineageDocumentId) {
+            $updateDetails->execute([
+                $details['proposed_number'] ?: null,
+                $details['target_first_reading_date'] ?: null,
+                $details['session_type'] ?: null,
+                $details['additional_details'] ?: null,
+                (int) ($details['authors_all'] ?? 0),
+                (int) ($details['co_authors_all'] ?? 0),
+                $userId,
+                $lineageDocumentId,
+            ]);
+
+            if ($lineageDocumentId !== $documentId) {
+                $this->pdo->prepare("DELETE FROM document_authors WHERE document_id = ?")
+                    ->execute([$lineageDocumentId]);
+                $this->pdo->prepare("DELETE FROM document_committees WHERE document_id = ?")
+                    ->execute([$lineageDocumentId]);
+            }
+
+            $insertAuthor = $this->pdo->prepare("
+                INSERT IGNORE INTO document_authors
+                    (document_id, sp_member_id, author_role, sort_order)
+                SELECT ?, sp_member_id, author_role, sort_order
+                FROM document_authors
+                WHERE document_id = ?
+                ORDER BY author_role, sort_order
+            ");
+            if ($lineageDocumentId !== $documentId) {
+                $insertAuthor->execute([$lineageDocumentId, $documentId]);
+            }
+
+            $insertCommittee = $this->pdo->prepare("
+                INSERT IGNORE INTO document_committees (document_id, committee_id, assigned_by)
+                SELECT ?, committee_id, assigned_by
+                FROM document_committees
+                WHERE document_id = ?
+            ");
+            if ($lineageDocumentId !== $documentId) {
+                $insertCommittee->execute([$lineageDocumentId, $documentId]);
+            }
+        }
     }
 
     /**
@@ -1874,17 +2097,144 @@ class DocumentService
         ?int $routingOptionId,
         int $userId
     ): void {
+        if ($resubmittedDocumentId <= 0 || $referencedDocumentId <= 0
+            || $resubmittedDocumentId === $referencedDocumentId) {
+            throw new InvalidArgumentException('A resubmission must reference a different, existing document.');
+        }
+
+        $parentLineage = $this->pdo->prepare("
+            SELECT original_document_id, version_number
+            FROM document_resubmission_links
+            WHERE resubmitted_document_id = ?
+            LIMIT 1
+        ");
+        $parentLineage->execute([$referencedDocumentId]);
+        $parent = $parentLineage->fetch(PDO::FETCH_ASSOC);
+        $originalDocumentId = $parent
+            ? (int) $parent['original_document_id']
+            : $referencedDocumentId;
+        $nextVersion = $this->pdo->prepare("
+            SELECT COALESCE(MAX(version_number), 1) + 1
+            FROM document_resubmission_links
+            WHERE original_document_id = ?
+        ");
+        $nextVersion->execute([$originalDocumentId]);
+        $versionNumber = (int) $nextVersion->fetchColumn();
+
         $stmt = $this->pdo->prepare("
             INSERT INTO document_resubmission_links
-                (resubmitted_document_id, referenced_document_id, routing_option_id, linked_by)
-            VALUES (?, ?, ?, ?)
+                (resubmitted_document_id, referenced_document_id, original_document_id,
+                 version_number, routing_option_id, linked_by)
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $resubmittedDocumentId,
             $referencedDocumentId,
+            $originalDocumentId,
+            $versionNumber,
             $routingOptionId,
             $userId,
         ]);
+    }
+
+    /**
+     * Copy shared legislative fields without changing the prior submission's
+     * workflow status, remarks, attachments, or route history.
+     */
+    private function copySharedResubmissionLegislativeDetails(
+        int $newDocumentId,
+        int $referencedDocumentId,
+        int $userId
+    ): void {
+        $stmt = $this->pdo->prepare("
+            SELECT
+                COALESCE(parent_pdd.proposed_number, root_pdd.proposed_number) AS proposed_number,
+                COALESCE(parent_pdd.target_first_reading_date, root_pdd.target_first_reading_date)
+                    AS target_first_reading_date,
+                COALESCE(parent_pdd.session_type, root_pdd.session_type) AS session_type,
+                COALESCE(parent_pdd.additional_details, root_pdd.additional_details) AS additional_details,
+                COALESCE(parent_pdd.authors_all, root_pdd.authors_all, 0) AS authors_all,
+                COALESCE(parent_pdd.co_authors_all, root_pdd.co_authors_all, 0) AS co_authors_all
+            FROM documents ref
+            LEFT JOIN document_resubmission_links parent_link
+                ON parent_link.resubmitted_document_id = ref.id
+            LEFT JOIN plenary_document_details parent_pdd ON parent_pdd.document_id = ref.id
+            LEFT JOIN plenary_document_details root_pdd
+                ON root_pdd.document_id = COALESCE(parent_link.original_document_id, ref.id)
+            WHERE ref.id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$referencedDocumentId]);
+        $details = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($details && $details['proposed_number'] !== null) {
+            $this->pdo->prepare("
+                UPDATE plenary_document_details
+                SET proposed_number = ?
+                WHERE document_id = ?
+            ")->execute([$details['proposed_number'], $newDocumentId]);
+        }
+
+        if ($details) {
+            $this->pdo->prepare("
+                UPDATE plenary_document_details
+                SET target_first_reading_date = ?,
+                    session_type = ?,
+                    additional_details = ?,
+                    authors_all = ?,
+                    co_authors_all = ?,
+                    updated_by = ?
+                WHERE document_id = ?
+            ")->execute([
+                $details['target_first_reading_date'],
+                $details['session_type'],
+                $details['additional_details'],
+                $details['authors_all'],
+                $details['co_authors_all'],
+                $userId,
+                $newDocumentId,
+            ]);
+        }
+
+        $copyAuthors = $this->pdo->prepare("
+            INSERT IGNORE INTO document_authors
+                (document_id, sp_member_id, author_role, sort_order)
+            SELECT ?, sp_member_id, author_role, sort_order
+            FROM document_authors
+            WHERE document_id = ?
+            ORDER BY author_role, sort_order
+        ");
+        $copyAuthors->execute([$newDocumentId, $referencedDocumentId]);
+
+        $copyCommittees = $this->pdo->prepare("
+            INSERT IGNORE INTO document_committees (document_id, committee_id, assigned_by)
+            SELECT ?, committee_id, assigned_by
+            FROM document_committees
+            WHERE document_id = ?
+        ");
+        $copyCommittees->execute([$newDocumentId, $referencedDocumentId]);
+    }
+
+    /**
+     * Inherit shared legislative data once a Plenary details row is created.
+     */
+    public function inheritResubmissionLegislativeDetails(int $documentId, int $userId): void
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT referenced_document_id
+            FROM document_resubmission_links
+            WHERE resubmitted_document_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$documentId]);
+        $referencedDocumentId = (int) $stmt->fetchColumn();
+        if ($referencedDocumentId > 0) {
+            $this->copySharedResubmissionLegislativeDetails(
+                $documentId,
+                $referencedDocumentId,
+                $userId
+            );
+        }
     }
 
     /**
@@ -1899,17 +2249,28 @@ class DocumentService
         $stmt = $this->pdo->prepare("
             SELECT
                 d.id,
+                d.document_type_id,
                 d.tracking_number,
                 d.subject_matter,
                 dt.name AS document_type_name,
                 outcome_status.name AS status_name,
-                pdd.proposed_number
+                pdd.proposed_number,
+                COALESCE(parent_link.original_document_id, d.id) AS original_document_id,
+                COALESCE(parent_link.version_number, 1) AS version_number
             FROM documents d
             INNER JOIN document_types dt ON dt.id = d.document_type_id
                                          AND dt.is_deleted = 0
             " . $this->resubmissionOutcomeJoinSql() . "
             LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
+            LEFT JOIN document_resubmission_links parent_link
+                ON parent_link.resubmitted_document_id = d.id
             WHERE d.id = ?
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM document_resubmission_links newer
+                  WHERE newer.original_document_id = COALESCE(parent_link.original_document_id, d.id)
+                    AND newer.version_number > COALESCE(parent_link.version_number, 1)
+              )
               AND outcome_status.name IN ('Remanded', 'Deferred', 'Withdrawn')
               AND outcome_status.is_active = 1
               AND outcome_status.is_deleted = 0
@@ -2130,6 +2491,108 @@ class DocumentService
             ORDER BY mrl.linked_at DESC, mrl.id DESC
         ");
         $stmt->execute([$referencedDocumentId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Retrieve the prior document linked to a resubmitted document.
+     */
+    public function getResubmissionReference(int $resubmittedDocumentId): ?array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT
+                drl.*,
+                ref.id              AS ref_id,
+                ref.tracking_number AS ref_tracking_number,
+                ref.subject_matter  AS ref_subject_matter,
+                ref.date_received   AS ref_date_received,
+                COALESCE(refpdd.proposed_number, root_pdd.proposed_number) AS ref_proposed_number,
+                dt.name             AS ref_document_type_name,
+                dt.badge_color      AS ref_document_type_badge_color,
+                ds.name             AS ref_status,
+                ds.badge_color      AS ref_status_badge_color,
+                ro.name             AS routing_option_name
+            FROM document_resubmission_links drl
+            INNER JOIN documents ref ON ref.id = drl.referenced_document_id
+            LEFT JOIN document_types dt ON dt.id = ref.document_type_id
+            LEFT JOIN document_statuses ds ON ds.id = ref.current_status_id
+            LEFT JOIN plenary_document_details refpdd ON refpdd.document_id = ref.id
+            LEFT JOIN plenary_document_details root_pdd ON root_pdd.document_id = drl.original_document_id
+            LEFT JOIN routing_options ro ON ro.id = drl.routing_option_id
+            WHERE drl.resubmitted_document_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$resubmittedDocumentId]);
+        $reference = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $reference ?: null;
+    }
+
+    /**
+     * Retrieve the complete submission history for a document's lineage.
+     */
+    public function getRelatedResubmissions(int $documentId): array
+    {
+        $rootStmt = $this->pdo->prepare("
+            SELECT COALESCE(parent_link.original_document_id, d.id)
+            FROM documents d
+            LEFT JOIN document_resubmission_links parent_link
+                ON parent_link.resubmitted_document_id = d.id
+            WHERE d.id = ?
+            LIMIT 1
+        ");
+        $rootStmt->execute([$documentId]);
+        $originalDocumentId = (int) $rootStmt->fetchColumn();
+        if ($originalDocumentId <= 0) {
+            return [];
+        }
+
+        $hasLineage = $this->pdo->prepare("
+            SELECT 1
+            FROM document_resubmission_links
+            WHERE original_document_id = ?
+            LIMIT 1
+        ");
+        $hasLineage->execute([$originalDocumentId]);
+        if (!$hasLineage->fetchColumn()) {
+            return [];
+        }
+
+        $stmt = $this->pdo->prepare("
+            SELECT
+                member_link.id AS link_id,
+                member_link.linked_at,
+                d.id AS resubmitted_document_id,
+                d.tracking_number AS resubmitted_tracking_number,
+                d.subject_matter AS resubmitted_subject_matter,
+                d.date_received AS resubmitted_date_received,
+                dt.name AS resubmitted_document_type_name,
+                ds.name AS resubmitted_status,
+                ds.badge_color AS resubmitted_status_badge_color,
+                COALESCE(
+                    member_pdd.proposed_number,
+                    root_pdd.proposed_number
+                ) AS resubmitted_proposed_number,
+                COALESCE(member_link.version_number, 1) AS version_number,
+                member_link.referenced_document_id,
+                (d.id = ?) AS is_current
+            FROM documents d
+            LEFT JOIN document_resubmission_links member_link
+                ON member_link.resubmitted_document_id = d.id
+            LEFT JOIN plenary_document_details member_pdd ON member_pdd.document_id = d.id
+            LEFT JOIN plenary_document_details root_pdd ON root_pdd.document_id = ?
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            WHERE d.id = ?
+               OR member_link.original_document_id = ?
+            ORDER BY COALESCE(member_link.version_number, 1) ASC, d.id ASC
+        ");
+        $stmt->execute([
+            $documentId,
+            $originalDocumentId,
+            $originalDocumentId,
+            $originalDocumentId,
+        ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }

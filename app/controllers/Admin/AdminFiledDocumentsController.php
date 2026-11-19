@@ -463,6 +463,11 @@ class AdminFiledDocumentsController
         $allAttachmentsStmt->execute([$documentId]);
         $allAttachments = $allAttachmentsStmt->fetchAll();
 
+        $docService = new DocumentService($this->pdo);
+        $resubmissionReference = $docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'admin/routed';
+
         $pageTitle    = 'Finalized Document Details';
         $pageSubtitle = $document['tracking_number'];
 
@@ -722,7 +727,11 @@ class AdminFiledDocumentsController
         $allAttachmentsStmt->execute([$documentId]);
         $allAttachments = $allAttachmentsStmt->fetchAll();
 
-        $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
+        $docService = new DocumentService($this->pdo);
+        $documentEvents = $docService->getDocumentEvents($documentId);
+        $resubmissionReference = $docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'admin/routed';
 
         $pageTitle    = 'Filed Document Details';
         $pageSubtitle = $document['tracking_number'];

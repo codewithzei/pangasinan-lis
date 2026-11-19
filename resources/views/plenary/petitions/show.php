@@ -169,6 +169,7 @@ ob_start();
 // MFR relationship links — Petitions show related MFRs filed against this Case
 $mfrDetailRoute = 'plenary/petitions';
 require __DIR__ . '/../../partials/mfr-relationship.php';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
 ?>
 
 <?php

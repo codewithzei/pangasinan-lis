@@ -672,6 +672,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 // MFR relationship links (Referenced Original Case / Related Motions)
 $mfrDetailRoute = 'spsec/inbox';
 require __DIR__ . '/../../partials/mfr-relationship.php';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
 ?>
 
 <?php

@@ -1106,6 +1106,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // MFR relationship links (Referenced Original Case / Related Motions)
 $mfrDetailRoute = 'spsec/inbox';
 require __DIR__ . '/../../partials/mfr-relationship.php';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
 ?>
 
 <?php

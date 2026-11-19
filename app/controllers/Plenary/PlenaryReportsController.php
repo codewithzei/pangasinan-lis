@@ -332,7 +332,11 @@ class PlenaryReportsController
         $checklistStmt->execute([$documentId]);
         $checklistItems = $checklistStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
+        $docService = new DocumentService($this->pdo);
+        $documentEvents = $docService->getDocumentEvents($documentId);
+        $resubmissionReference = $docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'plenary/inbox';
         $mfrLink = null;
         $relatedMotions = [];
         $showMfrRelationship = false;

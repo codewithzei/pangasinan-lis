@@ -393,6 +393,7 @@ ob_start();
 // MFR relationship links — Cases First Reading shows related MFRs filed against this Case
 $mfrDetailRoute = 'plenary/cases-first-reading';
 require __DIR__ . '/../../partials/mfr-relationship.php';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
 ?>
 
 <?php

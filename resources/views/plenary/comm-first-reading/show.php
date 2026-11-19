@@ -718,6 +718,7 @@ ob_start();
 // MFR relationship links — Comm First Reading shows the original case link when this is an MFR
 $mfrDetailRoute = 'plenary/comm-first-reading';
 require __DIR__ . '/../../partials/mfr-relationship.php';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
 ?>
 
 <?php

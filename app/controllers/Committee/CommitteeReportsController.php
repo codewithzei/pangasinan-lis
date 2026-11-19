@@ -556,6 +556,9 @@ class CommitteeReportsController
         $checklistItems = $checklistStmt->fetchAll();
 
         $documentEvents = $this->docService->getDocumentEvents($documentId);
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'committee/inbox';
         $mfrLink = null;
         $relatedMotions = [];
         $showMfrRelationship = false;

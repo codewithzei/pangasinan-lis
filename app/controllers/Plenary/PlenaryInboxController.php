@@ -504,6 +504,8 @@ class PlenaryInboxController
         } elseif ($this->isCasesType($documentTypeName)) {
             $relatedMotions = $docServiceMfr->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $docServiceMfr->getResubmissionReference($documentId);
+        $relatedResubmissions = $docServiceMfr->getRelatedResubmissions($documentId);
 
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
 
@@ -927,6 +929,8 @@ class PlenaryInboxController
             VALUES (?, ?, ?, ?, ?)
         ")->execute([$documentId, $statusId, $remarks ?: null, $userId, $userId]);
 
+        $this->docService->inheritResubmissionLegislativeDetails($documentId, $userId);
+
         // Synchronize shared document status with Plenary pre-decision status
         // This ensures other divisions and users see the current status
         $this->pdo->prepare("
@@ -1083,16 +1087,26 @@ class PlenaryInboxController
                   AND document_id    != ?
                   AND NOT EXISTS (
                       SELECT 1
-                      FROM document_resubmission_links drl
-                      INNER JOIN plenary_document_details refpdd
-                          ON refpdd.document_id = drl.referenced_document_id
-                      WHERE drl.resubmitted_document_id = ?
-                        AND refpdd.document_id = plenary_document_details.document_id
-                        AND refpdd.proposed_number = ?
+                      FROM documents lineage_current
+                      LEFT JOIN document_resubmission_links current_link
+                          ON current_link.resubmitted_document_id = lineage_current.id
+                      WHERE lineage_current.id = ?
+                        AND (
+                            plenary_document_details.document_id =
+                                COALESCE(current_link.original_document_id, lineage_current.id)
+                            OR EXISTS (
+                                SELECT 1
+                                FROM document_resubmission_links lineage_member
+                                WHERE lineage_member.original_document_id =
+                                    COALESCE(current_link.original_document_id, lineage_current.id)
+                                  AND lineage_member.resubmitted_document_id =
+                                    plenary_document_details.document_id
+                            )
+                        )
                   )
                 LIMIT 1
             ");
-            $dupStmt->execute([$proposedNumber, $documentId, $documentId, $proposedNumber]);
+            $dupStmt->execute([$proposedNumber, $documentId, $documentId]);
             if ($dupStmt->fetch()) {
                 $errors[] = 'Proposed Number "' . htmlspecialchars($proposedNumber) . '" is already used by another document.';
             }
@@ -1315,6 +1329,22 @@ class PlenaryInboxController
                     $insertCmt->execute([$documentId, $cid, $userId]);
                 }
             }
+
+            $this->docService->synchronizeResubmissionLegislativeDetails(
+                $documentId,
+                [
+                    'proposed_number' => $proposedNumber,
+                    'target_first_reading_date' => $targetDate,
+                    'session_type' => $sessionType,
+                    'additional_details' => $additionalDetails,
+                    'authors_all' => $authorsAll,
+                    'co_authors_all' => $coAuthorsAll,
+                ],
+                $authorIds,
+                $coAuthorIds,
+                $committeeIds,
+                $userId
+            );
         }
 
         // ── 7. Insert document event ───────────────────────────────────────

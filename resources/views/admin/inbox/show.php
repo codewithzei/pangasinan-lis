@@ -189,7 +189,10 @@ ob_start();
                         <p class="text-sm font-semibold text-indigo-900">Resubmission needed</p>
                         <p class="mt-1 text-sm text-indigo-800">
                             Linked to
-                            <span class="font-semibold"><?= htmlspecialchars($resubmissionReference['tracking_number']) ?></span>
+                            <a href="<?= BASE_URL ?>/admin/inbox/show?id=<?= (int) $resubmissionReference['id'] ?>"
+                               class="font-semibold text-primary hover:underline">
+                                <?= htmlspecialchars($resubmissionReference['tracking_number']) ?>
+                            </a>
                             <?php if (!empty($resubmissionReference['proposed_number'])): ?>
                                 (<?= htmlspecialchars($resubmissionReference['proposed_number']) ?>)
                             <?php endif; ?>
@@ -876,6 +879,7 @@ ob_start();
 // MFR relationship links (Referenced Original Case / Related Motions)
 $mfrDetailRoute = 'admin/inbox';
 require __DIR__ . '/../../partials/mfr-relationship.php';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
 ?>
 
 </div><!-- /space-y-6 -->

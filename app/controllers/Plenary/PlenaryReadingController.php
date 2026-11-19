@@ -179,6 +179,9 @@ class PlenaryReadingController
 
         $pageTitle = 'First Reading — ' . htmlspecialchars($document['tracking_number']);
         $old     = old_get();
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'plenary/inbox';
         require __DIR__ . '/../../../resources/views/plenary/first-reading/show.php';
     }
 
@@ -762,6 +765,9 @@ class PlenaryReadingController
         $attachmentStmt->execute([$documentId]);
         $reportAttachments = $attachmentStmt->fetchAll(PDO::FETCH_ASSOC);
 
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'plenary/inbox';
         $pageTitle = 'Legislative Document History — ' . $document['tracking_number'];
         require __DIR__ . '/../../../resources/views/plenary/referred-to-committee/show.php';
     }
@@ -1169,6 +1175,9 @@ class PlenaryReadingController
 
         $pageTitle = 'Second Reading — ' . htmlspecialchars($document['tracking_number']);
         $old     = old_get();
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'plenary/inbox';
         require __DIR__ . '/../../../resources/views/plenary/second-reading/show.php';
     }
 
@@ -1791,6 +1800,8 @@ class PlenaryReadingController
         } elseif ($this->isCasesTypeName($statusListTypeName)) {
             $relatedMotions = $this->docService->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
 
         require __DIR__ . '/../../../resources/views/plenary/status-list/show.php';
     }
@@ -3069,6 +3080,8 @@ class PlenaryReadingController
         } elseif ($this->isCasesTypeName($typeName)) {
             $relatedMotions = $this->docService->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
 
         $pageTitle = 'Communication First Reading — ' . htmlspecialchars($document['tracking_number']);
         $old     = old_get();
@@ -4413,6 +4426,8 @@ class PlenaryReadingController
         } elseif ($this->isCasesTypeName($typeName)) {
             $relatedMotions = $this->docService->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
 
         $pageTitle = 'Petitions First Reading — ' . htmlspecialchars($document['tracking_number']);
         $old     = old_get();

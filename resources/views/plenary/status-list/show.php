@@ -1095,6 +1095,7 @@ ob_start();
 // MFR relationship links — Finalized Document detail (status-list)
 $mfrDetailRoute = 'plenary/status-list';
 require __DIR__ . '/../../partials/mfr-relationship.php';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
 ?>
 
 <?php

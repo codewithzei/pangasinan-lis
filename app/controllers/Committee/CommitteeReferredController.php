@@ -451,6 +451,9 @@ class CommitteeReferredController
         $checklistItems = $checklistStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $documentEvents = $this->docService->getDocumentEvents($documentId);
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'committee/inbox';
         $pageTitle = 'Referred Document — ' . $document['tracking_number'];
         $pageSubtitle = $document['tracking_number'];
         $detailBackUrl = $backUrl;

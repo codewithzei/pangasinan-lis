@@ -159,6 +159,8 @@ ob_start();
     </div>
 </div>
 
+<?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+
 <?php
 $content = ob_get_clean();
 require __DIR__ . '/../../layouts/app.php';

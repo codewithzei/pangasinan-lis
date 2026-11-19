@@ -744,6 +744,8 @@ class CommitteeInboxController
         } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
             $relatedMotions = $this->docService->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
 
         $pageTitle = 'Document Details — ' . htmlspecialchars($document['tracking_number']);
         require __DIR__ . '/../../../resources/views/committee/inbox/show.php';

@@ -154,7 +154,10 @@ class SpsecCommFirstReadingController
 
         $inboxItem    = $this->fetchInboxItem($documentId);
         $firstReading = $this->fetchFirstReading($documentId);
-        $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
+        $documentEvents = $this->docService->getDocumentEvents($documentId);
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'spsec/inbox';
 
         // Dropdown data
         $categories = $this->pdo->query("

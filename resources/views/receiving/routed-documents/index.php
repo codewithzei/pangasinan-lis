@@ -199,6 +199,9 @@ function formatPhaseName(string $phase): string
                                                          color: <?= htmlspecialchars($doc['document_type_badge_color'] ?? '#2563EB') ?>;">
                                                 <?= htmlspecialchars($doc['document_type_name']) ?>
                                             </span>
+                                            <?php if (!empty($doc['is_resubmission'])): ?>
+                                                <span class="ml-1 inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Resubmission</span>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </td>

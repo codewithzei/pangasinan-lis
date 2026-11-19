@@ -118,6 +118,11 @@ class AdminRoutedDocumentController
         $sql = "
             SELECT
                 d.id,
+                EXISTS (
+                    SELECT 1
+                    FROM document_resubmission_links drl
+                    WHERE drl.resubmitted_document_id = d.id
+                ) AS is_resubmission,
                 d.tracking_number,
                 d.subject_matter,
                 dt.name              AS document_type_name,
@@ -382,6 +387,8 @@ class AdminRoutedDocumentController
         } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
             $relatedMotions = $docService->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
 
         require __DIR__ . '/../../../resources/views/admin/routed/show.php';
     }

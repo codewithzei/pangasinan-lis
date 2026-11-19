@@ -490,6 +490,8 @@ class ReceivingInboxController
         } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
             $relatedMotions = $this->docService->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
 
         $pageTitle = $isAccepted ? 'Edit Returned Document' : 'View Returned Document';
         require __DIR__ . '/../../../resources/views/receiving/inbox/show.php';

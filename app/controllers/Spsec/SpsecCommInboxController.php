@@ -197,7 +197,10 @@ class SpsecCommInboxController
 
         // Route history (for context)
         $routes = $this->fetchRoutes($documentId);
-        $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
+        $documentEvents = $this->docService->getDocumentEvents($documentId);
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'spsec/inbox';
 
         $pageTitle = 'Communication — ' . htmlspecialchars($document['tracking_number'] ?? '');
         $success   = flash_get('success');

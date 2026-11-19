@@ -69,6 +69,8 @@ function _typeLabel(string $type): string
                             <?= htmlspecialchars($pageSubtitle) ?>
                         </h1>
                     </div>
+
+                    <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
                 </div>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>

@@ -668,6 +668,8 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
 </div>
 
+<?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+
 <?php
 $content = ob_get_clean();
 require __DIR__ . '/../../layouts/app.php';

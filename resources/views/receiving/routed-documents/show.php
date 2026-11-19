@@ -510,6 +510,11 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 <?php endif; ?>
 
 <?php
+$mfrDetailRoute = 'receiving/routed-documents';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+?>
+
+<?php
 $content = ob_get_clean();
 if ($renderAsPartial) {
     echo $content;

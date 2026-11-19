@@ -96,6 +96,11 @@ class SpsecRoutedDocumentController
         $sql = "
             SELECT
                 d.id,
+                EXISTS (
+                    SELECT 1
+                    FROM document_resubmission_links drl
+                    WHERE drl.resubmitted_document_id = d.id
+                ) AS is_resubmission,
                 d.tracking_number,
                 d.subject_matter,
                 d.document_type_id,
@@ -329,6 +334,8 @@ class SpsecRoutedDocumentController
         } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
             $relatedMotions = $docService->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
 
         require __DIR__ . '/../../../resources/views/spsec/routed/show.php';
     }

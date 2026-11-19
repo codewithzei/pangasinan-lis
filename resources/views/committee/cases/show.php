@@ -1439,6 +1439,7 @@ openActionModal();
 // MFR relationship links — Cases show related MFRs; use committee/inbox for document detail links
 $mfrDetailRoute = 'committee/inbox';
 require __DIR__ . '/../../partials/mfr-relationship.php';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
 ?>
 
 <?php

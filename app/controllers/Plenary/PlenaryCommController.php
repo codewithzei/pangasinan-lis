@@ -200,7 +200,11 @@ class PlenaryCommController
         $routeStmt->execute([$documentId]);
         $routes = $routeStmt->fetchAll();
 
-        $documentEvents = (new DocumentService($this->pdo))->getDocumentEvents($documentId);
+        $docService = new DocumentService($this->pdo);
+        $documentEvents = $docService->getDocumentEvents($documentId);
+        $resubmissionReference = $docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'plenary/inbox';
 
         $pageTitle = 'Communication — ' . htmlspecialchars($document['tracking_number'] ?? '');
         require __DIR__ . '/../../../resources/views/plenary/communications/show.php';

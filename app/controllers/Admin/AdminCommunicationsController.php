@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../services/DocumentService.php';
 
 /**
  * AdminCommunicationsController
@@ -354,6 +355,10 @@ class AdminCommunicationsController
         $eventStmt->execute([$documentId]);
         $events = $eventStmt->fetchAll();
 
+        $docService = new DocumentService($this->pdo);
+        $resubmissionReference = $docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'admin/inbox';
         $pageTitle    = 'Communication Details — ' . htmlspecialchars($document['tracking_number']);
         $pageSubtitle = 'Noted communication document details and history';
 

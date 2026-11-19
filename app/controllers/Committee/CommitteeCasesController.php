@@ -740,6 +740,8 @@ class CommitteeCasesController
         } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
             $relatedMotions = $this->docService->getRelatedMotions((int) $case['document_id']);
         }
+        $resubmissionReference = $this->docService->getResubmissionReference((int) $case['document_id']);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions((int) $case['document_id']);
 
         $errors  = flash_peek('errors', []);
         $old     = old_get();

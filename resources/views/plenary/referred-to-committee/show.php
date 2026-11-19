@@ -390,6 +390,9 @@ ob_start();
         <?php endif; ?>
     </section>
 </div>
+
+<?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+
 <?php
 $content = ob_get_clean();
 $pageModals = '';

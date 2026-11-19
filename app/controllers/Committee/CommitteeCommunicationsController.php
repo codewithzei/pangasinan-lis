@@ -516,6 +516,8 @@ class CommitteeCommunicationsController
         } elseif (in_array($docTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
             $relatedMotions = $this->docService->getRelatedMotions($documentId);
         }
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
 
         $pageTitle = 'Communication — ' . htmlspecialchars($comm['tracking_number'] ?? '');
         require __DIR__ . '/../../../resources/views/committee/communications/show.php';

@@ -339,6 +339,9 @@ class CommitteeHearingController
         $evtStmt->execute([$documentId]);
         $events = $evtStmt->fetchAll();
         $documentEvents = $this->docService->getDocumentEvents($documentId);
+        $resubmissionReference = $this->docService->getResubmissionReference($documentId);
+        $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'committee/inbox';
 
         // Existing hearing record (prevents re-submit if already recorded)
         $hearingStmt = $this->pdo->prepare("
