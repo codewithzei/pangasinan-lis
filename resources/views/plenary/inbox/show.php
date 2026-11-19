@@ -640,7 +640,7 @@ ob_start();
                             <strong class="text-amber-600">Note:</strong>
                             No standard numbering format has been configured for this system yet.
                             Please enter the proposed number in whatever format your office uses.
-                            Must be unique across separate legislative documents. Resubmissions in the same document chain retain the shared number.
+                            Duplicate numbers are allowed only for documents in the same resubmission chain.
                         </p>
                     </div>
 

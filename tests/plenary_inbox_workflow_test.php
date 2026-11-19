@@ -8,7 +8,7 @@
  *   3. Document-type numbering exceptions (Communication, Administrative Case, Complaint)
  *   4. Multi-author and multi-committee persistence and replacement
  *   5. Ownership checks (only the accepting user can write)
- *   6. Duplicate/concurrent proposed_number uniqueness
+ *   6. Duplicate proposed_number values are allowed
  *   7. Pre-decision status validation (only the six allowed names)
  *   8. Pre-decision remarks persistence
  *   9. Session type ENUM validation
@@ -27,6 +27,8 @@
 declare(strict_types=1);
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
+require_once __DIR__ . '/../app/services/DocumentService.php';
+
 $dsn = 'mysql:host=127.0.0.1;port=3306;dbname=pangasinan_lis;charset=utf8mb4';
 try {
     $pdo = new PDO($dsn, 'root', '', [
@@ -497,54 +499,75 @@ try {
     }
 
     // ==========================================================================
-    // TEST GROUP 5: Duplicate proposed_number uniqueness
+    // TEST GROUP 5: Duplicate proposed_number values are allowed only in one lineage
     // ==========================================================================
-    echo PHP_EOL . "Group 5: Proposed number uniqueness" . PHP_EOL;
+    echo PHP_EOL . "Group 5: Proposed number uniqueness follows resubmission lineage" . PHP_EOL;
 
     if (isset($preDecisionStatuses['For Encoding'])) {
         $d5a = createPlenaryDoc($pdo, $genericDocTypeId, $sourceTypeId, $docStatusId,
                                  $plenaryRoleId, $userA, $genericDocTypeName);
         $d5b = createPlenaryDoc($pdo, $genericDocTypeId, $sourceTypeId, $docStatusId,
                                  $plenaryRoleId, $userA, $genericDocTypeName);
+        $d5c = createPlenaryDoc($pdo, $genericDocTypeId, $sourceTypeId, $docStatusId,
+                                 $plenaryRoleId, $userA, $genericDocTypeName);
         doAccept($pdo, $d5a['document_id'], $d5a['assignment_id'], $userA, $plenaryRoleId, $docStatusId);
         doAccept($pdo, $d5b['document_id'], $d5b['assignment_id'], $userA, $plenaryRoleId, $docStatusId);
         doPreDecision($pdo, $d5a['document_id'], $preDecisionStatuses['For Encoding'], '', $userA);
         doPreDecision($pdo, $d5b['document_id'], $preDecisionStatuses['For Encoding'], '', $userA);
 
-        $uniqueNum = 'PLT-UNIQ-' . uniqid();
+        $sharedNum = 'PLT-DUP-' . uniqid();
 
-        // Save first document with unique number
+        // Model a resubmission link from d5b back to d5a.
+        $linkColumns = $pdo->query("
+            SHOW COLUMNS FROM document_resubmission_links
+        ")->fetchAll(PDO::FETCH_COLUMN);
+        if (in_array('original_document_id', $linkColumns, true)
+            && in_array('version_number', $linkColumns, true)) {
+            $pdo->prepare("
+                INSERT INTO document_resubmission_links
+                    (resubmitted_document_id, referenced_document_id,
+                     original_document_id, version_number)
+                VALUES (?, ?, ?, 2)
+            ")->execute([$d5b['document_id'], $d5a['document_id'], $d5a['document_id']]);
+        } else {
+            $pdo->prepare("
+                INSERT INTO document_resubmission_links
+                    (resubmitted_document_id, referenced_document_id)
+                VALUES (?, ?)
+            ")->execute([$d5b['document_id'], $d5a['document_id']]);
+        }
+
+        // Save the shared number on both linked documents.
         doSaveProcessing($pdo, $d5a['document_id'], $preDecisionStatuses['For Encoding'],
-                         $uniqueNum, '', '', [], [], [], $userA);
+                         $sharedNum, '', '', [], [], [], $userA);
+        doSaveProcessing($pdo, $d5b['document_id'], $preDecisionStatuses['For Encoding'],
+                         $sharedNum, '', '', [], [], [], $userA);
 
-        // Use the same normalized, lineage-aware current read as the controller.
-        $lockName = 'pn:test:' . substr(hash('sha256', $uniqueNum), 0, 55);
-        $lockStmt = $pdo->prepare('SELECT GET_LOCK(?, 10)');
-        $lockStmt->execute([$lockName]);
-        $hasProposedNumberLock = (int) $lockStmt->fetchColumn() === 1;
-        check('5.1: Proposed number lock acquired before uniqueness check', $hasProposedNumberLock);
+        $docService = new DocumentService($pdo);
+        $findUnrelatedDuplicate = static function (int $documentId) use ($pdo, $docService, $sharedNum): bool {
+            $lineageIds = $docService->getResubmissionLineageDocumentIds($documentId);
+            $placeholders = implode(',', array_fill(0, count($lineageIds), '?'));
+            $stmt = $pdo->prepare("
+                SELECT document_id
+                FROM plenary_document_details
+                WHERE LOWER(TRIM(proposed_number)) = LOWER(TRIM(?))
+                  AND document_id NOT IN ({$placeholders})
+                LIMIT 1
+            ");
+            $stmt->execute([$sharedNum, ...$lineageIds]);
+            return $stmt->fetch() !== false;
+        };
+        check('5.1: Same proposed number is allowed within the linked resubmission chain',
+            !$findUnrelatedDuplicate($d5b['document_id']));
+        check('5.2: Same proposed number is rejected for an unrelated document',
+            $findUnrelatedDuplicate($d5c['document_id']));
 
-        $dupStmt = $pdo->prepare("
-            SELECT document_id
-            FROM plenary_document_details
-            WHERE LOWER(TRIM(proposed_number)) = LOWER(TRIM(?))
-              AND document_id != ?
-              AND document_id NOT IN (?)
-            LIMIT 1
-            FOR UPDATE
-        ");
-        $dupStmt->execute([$uniqueNum, $d5b['document_id'], $d5b['document_id']]);
-        $dupFound = $dupStmt->fetch();
-        check('5.1: Duplicate proposed_number detected by uniqueness query', $dupFound !== false);
-
-        // Same doc can update its own number
-        $dupStmt->execute([$uniqueNum, $d5a['document_id'], $d5a['document_id']]);
-        $selfDup = $dupStmt->fetch();
-        check('5.2: Updating own proposed_number does not trigger false duplicate', $selfDup === false);
-
-        $releaseLock = $pdo->prepare('SELECT RELEASE_LOCK(?)');
-        $releaseLock->execute([$lockName]);
-        check('5.3: Proposed number lock released', (int) $releaseLock->fetchColumn() === 1);
+        $controllerSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Plenary/PlenaryInboxController.php');
+        check('5.3: Plenary duplicate check excludes only documents in the resubmission lineage',
+            str_contains($controllerSrc, 'getResubmissionLineageDocumentIds($documentId)')
+                && str_contains($controllerSrc, 'document_id NOT IN ({$lineagePlaceholders})')
+                && str_contains($controllerSrc, 'GET_LOCK')
+                && str_contains($controllerSrc, 'already used by an unrelated document'));
     } else {
         echo "  [SKIP] For Encoding status not seeded — skipping group 5." . PHP_EOL;
     }
@@ -749,12 +772,39 @@ try {
             && str_contains($documentServiceSource, 'tl.sp_member_id = sm.sp_member_id')
             && str_contains($documentServiceSource, 'Select an active SP Member assigned to the active legislative term.'));
 
-    check('9.5: proposed number validation is serialized and compares normalized values',
-        str_contains($controllerSrc, 'SELECT GET_LOCK(?, 10)')
-            && str_contains($controllerSrc, 'SELECT RELEASE_LOCK(?)')
-            && str_contains($controllerSrc, 'LOWER(TRIM(proposed_number))')
-            && str_contains($controllerSrc, 'document_id NOT IN ({$lineagePlaceholders})')
-            && str_contains($controllerSrc, 'FOR UPDATE'));
+    check('9.5: proposed number validation uses resubmission lineage',
+        str_contains($controllerSrc, 'getResubmissionLineageDocumentIds($documentId)')
+            && str_contains($controllerSrc, 'LOWER(TRIM(proposed_number))'));
+    $numberLockStart = strpos($controllerSrc, '$this->acquireProcessingLocks(');
+    $transactionStart = strpos($controllerSrc, '$this->pdo->beginTransaction()');
+    $duplicateQueryStart = strpos($controllerSrc, '$duplicateStmt = $this->pdo->prepare("');
+    $duplicateQueryEnd = $duplicateQueryStart !== false
+        ? strpos($controllerSrc, '$duplicateStmt->execute(', $duplicateQueryStart)
+        : false;
+    $duplicateQuery = $duplicateQueryStart !== false && $duplicateQueryEnd !== false
+        ? substr($controllerSrc, $duplicateQueryStart, $duplicateQueryEnd - $duplicateQueryStart)
+        : '';
+    check('9.6: proposed-number and lineage locks are acquired before starting the transaction',
+        $numberLockStart !== false
+            && $transactionStart !== false
+            && $numberLockStart < $transactionStart
+            && str_contains($controllerSrc, "'pl:' . \$lineageRootId")
+            && str_contains($controllerSrc, 'sort($lockNames, SORT_STRING)'));
+    $pdoCatch = strpos($controllerSrc, '} catch (PDOException $e)');
+    $runtimeCatch = strpos($controllerSrc, '} catch (RuntimeException $e)');
+    check('9.7: transient PDO lock errors reach the retry handler before RuntimeException',
+        $pdoCatch !== false
+            && $runtimeCatch !== false
+            && $pdoCatch < $runtimeCatch
+            && str_contains($controllerSrc, 'in_array($errorCode, [1205, 1213], true)'));
+    check('9.8: Plenary processing bounds InnoDB lock waits',
+        str_contains($controllerSrc, "SET SESSION innodb_lock_wait_timeout = 10"));
+    check('9.9: proposed-number duplicate lookup does not lock scanned rows',
+        $duplicateQuery !== ''
+            && str_contains($duplicateQuery, 'LOWER(TRIM(proposed_number))')
+            && !str_contains($duplicateQuery, 'FOR UPDATE'));
+    check('9.10: Plenary DocumentService shares the controller transaction connection',
+        str_contains($controllerSrc, '$this->docService = new DocumentService($this->pdo);'));
 
 } finally {
     $pdo->rollBack(); // zero permanent DB changes

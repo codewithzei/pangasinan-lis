@@ -717,8 +717,7 @@ ob_start();
                                 </div>
                             </div>
 
-                            <!-- ── Mark as Noted (Communication only) ───── -->
-                            <?php if ($isCommunication): ?>
+                            <!-- ── Mark as Noted (available for every document type) ───── -->
                             <div class="mb-2" id="noted">
                                 <button type="button" data-action="noted"
                                         class="action-btn w-full inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition">
@@ -727,7 +726,8 @@ ob_start();
                                     </svg>
                                     Mark as Noted
                                 </button>
-                                <!-- Communication category selector (hidden until Noted selected) -->
+                                <!-- Communication category is required only for Communication documents -->
+                                <?php if ($isCommunication): ?>
                                 <div id="categorySelectWrap" class="mt-2 hidden">
                                     <label for="communication_category_id" class="block text-xs font-semibold text-gray-600 mb-1">
                                         Communication Category <span class="text-red-500">*</span>
@@ -743,8 +743,8 @@ ob_start();
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
+                                <?php endif; ?>
                             </div>
-                            <?php endif; ?>
 
                             <!-- ── Return to Admin ───────────────────────── -->
                             <div class="mt-3 pt-3 border-t border-gray-100">
@@ -915,7 +915,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const actionLabels = {
         'route_plenary':   'Route this document to Plenary?',
         'route_committee': 'Route this document to the selected Committee?',
-        'noted':           'Mark this Communication document as Noted with the selected category?',
+        'noted':           'Mark this document as Noted?',
         'return_to_admin': 'Return this document to Admin? A return reason is required.',
     };
 

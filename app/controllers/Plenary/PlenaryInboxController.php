@@ -93,7 +93,8 @@ class PlenaryInboxController
 {
     protected PDO             $pdo;
     protected DocumentService $docService;
-    private ?string $proposedNumberLockName = null;
+    /** @var string[] */
+    private array $processingLockNames = [];
 
     /** Valid POST actions for process(). */
     private const VALID_ACTIONS = [
@@ -202,7 +203,7 @@ class PlenaryInboxController
     {
         $database         = new Database();
         $this->pdo        = $database->connect();
-        $this->docService = new DocumentService();
+        $this->docService = new DocumentService($this->pdo);
     }
 
     // =========================================================================
@@ -599,13 +600,27 @@ class PlenaryInboxController
 
         $plenaryRoleId = $this->requirePlenaryRoleId();
 
-        // Retry loop for transient DB lock errors
+        // Keep shared resubmission writes serialized and retry transient row locks.
         $maxRetries    = 3;
-        $retryDelay    = 100000; // 100 ms
+        $retryDelay    = 100000; // 100 ms base backoff
         $lastException = null;
+        if (in_array($action, ['pre_decision', 'save_processing'], true)) {
+            $this->pdo->exec('SET SESSION innodb_lock_wait_timeout = 10');
+        }
 
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             try {
+                if (in_array($action, ['pre_decision', 'save_processing'], true)) {
+                    $lineageDocumentIds = $this->docService->getResubmissionLineageDocumentIds($documentId);
+                    $proposedNumber = $action === 'save_processing'
+                        ? trim($_POST['proposed_number'] ?? '')
+                        : '';
+                    $this->acquireProcessingLocks(
+                        $proposedNumber,
+                        $lineageDocumentIds[0] ?? $documentId
+                    );
+                }
+
                 $this->pdo->beginTransaction();
 
                 // Resolve assignment
@@ -753,14 +768,6 @@ class PlenaryInboxController
                     redirect('plenary/inbox/show?id=' . $documentId);
                 }
 
-            } catch (RuntimeException $e) {
-                if ($this->pdo->inTransaction()) {
-                    $this->pdo->rollBack();
-                }
-                $this->releaseProposedNumberLock();
-                $lastException = $e;
-                break; // RuntimeException = business rule violation; no retry
-
             } catch (PDOException $e) {
                 if ($this->pdo->inTransaction()) {
                     $this->pdo->rollBack();
@@ -768,11 +775,19 @@ class PlenaryInboxController
                 $this->releaseProposedNumberLock();
                 $errorCode = (int) ($e->errorInfo[1] ?? 0);
                 if (in_array($errorCode, [1205, 1213], true) && $attempt < $maxRetries) {
-                    usleep($retryDelay);
+                    usleep($retryDelay * $attempt);
                     continue; // retry on deadlock / lock timeout
                 }
                 $lastException = $e;
                 break;
+
+            } catch (RuntimeException $e) {
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
+                $this->releaseProposedNumberLock();
+                $lastException = $e;
+                break; // RuntimeException = business rule violation; no retry
 
             } catch (Throwable $e) {
                 if ($this->pdo->inTransaction()) {
@@ -1083,34 +1098,6 @@ class PlenaryInboxController
             $errors[] = 'Proposed Number must not exceed 50 characters.';
         }
 
-        // Check uniqueness of proposed_number (exclude this document)
-        if (!$isCommunication && $proposedNumber !== '') {
-            $lineageDocumentIds = $this->docService->getResubmissionLineageDocumentIds($documentId);
-            $lineagePlaceholders = implode(',', array_fill(0, count($lineageDocumentIds), '?'));
-
-            $lockName = 'pn:' . substr(hash('sha256', mb_strtolower(trim($proposedNumber))), 0, 61);
-            $lockStmt = $this->pdo->prepare('SELECT GET_LOCK(?, 10)');
-            $lockStmt->execute([$lockName]);
-            if ((int) $lockStmt->fetchColumn() !== 1) {
-                throw new RuntimeException('Could not verify the proposed number. Please try again.');
-            }
-            $this->proposedNumberLockName = $lockName;
-
-            $dupStmt = $this->pdo->prepare("
-                SELECT document_id
-                FROM plenary_document_details
-                WHERE LOWER(TRIM(proposed_number)) = LOWER(TRIM(?))
-                  AND document_id    != ?
-                  AND document_id NOT IN ({$lineagePlaceholders})
-                LIMIT 1
-                FOR UPDATE
-            ");
-            $dupStmt->execute([$proposedNumber, $documentId, ...$lineageDocumentIds]);
-            if ($dupStmt->fetch()) {
-                $errors[] = 'Proposed Number "' . htmlspecialchars($proposedNumber) . '" is already used by another document.';
-            }
-        }
-
         if ($targetDate !== '') {
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $targetDate) || !checkdate(
                 (int) substr($targetDate, 5, 2),
@@ -1127,7 +1114,6 @@ class PlenaryInboxController
         }
 
         if (!empty($errors)) {
-            $this->releaseProposedNumberLock();
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
@@ -1230,6 +1216,32 @@ class PlenaryInboxController
                     old_set($_POST);
                     redirect('plenary/inbox/show?id=' . $documentId);
                 }
+            }
+        }
+
+        if (!$isCommunication && $proposedNumber !== '') {
+            $lineageDocumentIds = $this->docService->getResubmissionLineageDocumentIds($documentId);
+            $lineagePlaceholders = implode(',', array_fill(0, count($lineageDocumentIds), '?'));
+
+            $duplicateStmt = $this->pdo->prepare("
+                SELECT document_id
+                FROM plenary_document_details
+                WHERE LOWER(TRIM(proposed_number)) = LOWER(TRIM(?))
+                  AND document_id NOT IN ({$lineagePlaceholders})
+                LIMIT 1
+            ");
+            $duplicateStmt->execute([$proposedNumber, ...$lineageDocumentIds]);
+            if ($duplicateStmt->fetch()) {
+                $this->releaseProposedNumberLock();
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
+                flash_set(
+                    'errors',
+                    ['Proposed Number "' . htmlspecialchars($proposedNumber) . '" is already used by an unrelated document.']
+                );
+                old_set($_POST);
+                redirect('plenary/inbox/show?id=' . $documentId);
             }
         }
 
@@ -2023,28 +2035,48 @@ class PlenaryInboxController
             || str_contains($lower, 'complaint');
     }
 
+    private function acquireProcessingLocks(string $proposedNumber, int $lineageRootId): void
+    {
+        $lockNames = ['pl:' . $lineageRootId];
+        if ($proposedNumber !== '') {
+            $lockNames[] = 'pn:' . substr(hash('sha256', mb_strtolower(trim($proposedNumber))), 0, 61);
+        }
+        sort($lockNames, SORT_STRING);
+
+        foreach ($lockNames as $lockName) {
+            $stmt = $this->pdo->prepare('SELECT GET_LOCK(?, 10)');
+            $stmt->execute([$lockName]);
+            if ((int) $stmt->fetchColumn() !== 1) {
+                $this->releaseProposedNumberLock();
+                throw new RuntimeException('This proposed number or document lineage is being processed. Please try again.');
+            }
+            $this->processingLockNames[] = $lockName;
+        }
+    }
+
     private function releaseProposedNumberLock(): void
     {
-        if ($this->proposedNumberLockName === null) {
+        if ($this->processingLockNames === []) {
             return;
         }
 
-        $lockName = $this->proposedNumberLockName;
-        $this->proposedNumberLockName = null;
-
-        try {
-            $stmt = $this->pdo->prepare('SELECT RELEASE_LOCK(?)');
-            $stmt->execute([$lockName]);
-            if ((int) $stmt->fetchColumn() !== 1) {
+        $lockNames = $this->processingLockNames;
+        $this->processingLockNames = [];
+        foreach (array_reverse($lockNames) as $lockName) {
+            try {
+                $stmt = $this->pdo->prepare('SELECT RELEASE_LOCK(?)');
+                $stmt->execute([$lockName]);
+                if ((int) $stmt->fetchColumn() !== 1) {
+                    system_log('WARNING', 'Failed to release Plenary processing lock', [
+                        'lock_name' => $lockName,
+                    ]);
+                }
+            } catch (Throwable $e) {
                 system_log('WARNING', 'Failed to release Plenary proposed-number lock', [
                     'lock_name' => $lockName,
+                    'error' => $e->getMessage(),
                 ]);
             }
-        } catch (Throwable $e) {
-            system_log('WARNING', 'Failed to release Plenary proposed-number lock', [
-                'lock_name' => $lockName,
-                'error' => $e->getMessage(),
-            ]);
         }
     }
 

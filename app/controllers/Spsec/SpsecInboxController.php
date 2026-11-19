@@ -1469,7 +1469,7 @@ class SpsecInboxController
     /** Check whether the document_type_name string indicates Communication. */
     private function isCommunicationDocument(string $documentTypeName): bool
     {
-        return strcasecmp(trim($documentTypeName), 'Communication') === 0;
+        return stripos(trim($documentTypeName), 'communication') !== false;
     }
 
     /** Require and return the SP Secretary role ID; redirect if not found. */
