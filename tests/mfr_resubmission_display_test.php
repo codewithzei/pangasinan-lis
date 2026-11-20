@@ -204,6 +204,16 @@ verifyResubmissionCheck(
 
 $receivingForm = file_get_contents(__DIR__ . '/../resources/views/receiving/receive-document/index.php');
 $adminReceiveForm = file_get_contents(__DIR__ . '/../resources/views/admin/receive-document/index.php');
+verifyResubmissionCheck(
+    $receivingForm !== false
+        && str_contains($receivingForm, 'id="resubmissionResults"')
+        && str_contains($receivingForm, 'role="listbox"')
+        && str_contains($receivingForm, "setAttribute('role', 'option')")
+        && str_contains($receivingForm, 'resubmissionPreviewTracking')
+        && str_contains($receivingForm, 'resubmissionSearch.addEventListener(\'focus\'')
+        && !str_contains($receivingForm, '<select id="resubmissionResults"'),
+    'Receiving resubmission references must use the searchable preview list.'
+);
 foreach ([
     'Receiving' => $receivingForm,
     'Admin direct receive' => $adminReceiveForm,

@@ -7,6 +7,9 @@ $tabLabels = [
     'cases'                 => 'Cases',
     'others'                => 'Others',
 ];
+if (!empty($includeCommunications)) {
+    $tabLabels['communications'] = 'Communications';
+}
 ?>
 
 <div class="space-y-6">
@@ -18,7 +21,9 @@ $tabLabels = [
             </h1>
             <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
                 <?= htmlspecialchars($pageSubtitle) ?>
-                Communications are kept in the separate Communications section.
+                <?php if (empty($includeCommunications)): ?>
+                    Communications are kept in the separate Communications section.
+                <?php endif; ?>
             </p>
             <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
         </div>

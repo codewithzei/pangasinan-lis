@@ -547,6 +547,8 @@ try {
     $spsecViewSrc  = (string) file_get_contents(__DIR__ . '/../resources/views/spsec/inbox/show.php');
     $notedCtrlSrc  = (string) file_get_contents(__DIR__ . '/../app/controllers/Admin/AdminNotedDocumentsController.php');
     $spsecNotedCtrlSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Spsec/SpsecNotedDocumentsController.php');
+    $committeeNotedCtrlSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Committee/CommitteeNotedDocumentsController.php');
+    $committeeInboxCtrlSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Committee/CommitteeInboxController.php');
     $notedViewSrc  = (string) file_get_contents(__DIR__ . '/../resources/views/admin/noted-documents/index.php');
     $webRoutesSrc  = (string) file_get_contents(__DIR__ . '/../routes/web.php');
     $sidebarSrc    = (string) file_get_contents(__DIR__ . '/../resources/views/layouts/sidebar.php');
@@ -646,6 +648,18 @@ try {
     check('5.25: Shared Noted Documents view uses role-specific list and copy URLs',
         str_contains($notedViewSrc, '$notedBaseUrl')
             && str_contains($notedViewSrc, '$documentViewUrl'));
+    check('5.26: Committee Noted action completes its assignment and records a phase-specific route',
+        str_contains($committeeInboxCtrlSrc, "SET decision     = 'NOTED'")
+            && str_contains($committeeInboxCtrlSrc, "VALUES (?, 'COMMITTEE', 'COMMITTEE', ?, ?, ?, ?)")
+            && str_contains($committeeInboxCtrlSrc, "'DOCUMENT_NOTED', 'COMMITTEE'"));
+    check('5.27: Committee Noted Documents page is routed and available in the Committee sidebar',
+        str_contains($webRoutesSrc, "'committee/noted-documents'")
+            && str_contains($sidebarSrc, 'BASE_URL ?>/committee/noted-documents'));
+    check('5.28: Committee Noted Documents page includes communications and filters to Committee notes',
+        str_contains($committeeNotedCtrlSrc, "'communications'        => 'Communications'")
+            && str_contains($committeeNotedCtrlSrc, "dr.from_phase = 'COMMITTEE'")
+            && str_contains($committeeNotedCtrlSrc, "dr.to_phase = 'COMMITTEE'")
+            && str_contains($committeeNotedCtrlSrc, "ro.name = 'Noted'"));
 
 } finally {
     if ($pdo->inTransaction()) {

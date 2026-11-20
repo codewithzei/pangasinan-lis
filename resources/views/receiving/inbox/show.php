@@ -61,8 +61,8 @@ function normalizeTimeForInput(?string $time): string {
 
     <!-- Page Header -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10">
+        <div class="relative flex flex-col gap-5 px-4 py-6 sm:px-8 sm:py-8 md:flex-row md:items-start md:justify-between">
+            <div class="relative z-10 min-w-0">
                 <p class="text-sm font-medium text-blue-100">RECEIVING / INBOX / <?= $isAccepted ? 'EDIT DOCUMENT' : 'VIEW RETURNED DOCUMENT' ?></p>
                 <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                     <?= $isAccepted ? 'Edit Returned Document' : 'Returned Document' ?>
@@ -73,6 +73,13 @@ function normalizeTimeForInput(?string $time): string {
                         : 'Review the return reason and accept this document to begin corrections.' ?>
                 </p>
             </div>
+            <a href="<?= BASE_URL ?>/receiving/inbox<?= $isAccepted ? '?view=accepted' : '' ?>"
+               class="relative z-10 inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/70 md:mt-1 md:w-auto">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                Back to Inbox
+            </a>
             <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
             <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
@@ -108,22 +115,48 @@ function normalizeTimeForInput(?string $time): string {
         </div>
     <?php endif; ?>
 
-    <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+    <!-- Accept action -->
+    <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+        <div class="flex items-start gap-4">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+                <svg class="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-sm font-semibold text-amber-900">Acceptance Required</h3>
+                <p class="mt-1 text-sm text-amber-800">
+                    Review the return reason above, then accept this document to unlock editing and re-routing.
+                    Once accepted, you can correct the details and route it back to Admin.
+                </p>
+                <!-- Hidden form — submitted by the modal OK button -->
+                <form id="acceptDocumentForm" method="POST" action="<?= BASE_URL ?>/receiving/inbox/accept">
+                    <input type="hidden" name="document_id"   value="<?= (int) ($document['id'] ?? 0) ?>">
+                    <input type="hidden" name="assignment_id" value="<?= (int) ($assignment['id'] ?? 0) ?>">
+                </form>
+                <div class="mt-4">
+                    <button type="button" id="acceptTriggerBtn"
+                            class="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400 transition">
+                        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Accept Document
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- Document Info Card -->
     <section class="rounded-2xl border border-gray-200 bg-white p-6">
-        <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+        <div class="border-b border-gray-100 pb-4">
             <div>
                 <h2 class="text-lg font-semibold text-gray-900">Document Information</h2>
                 <p class="mt-1 text-sm text-gray-500">
                     Tracking Number:
-                    <span class="font-medium text-primary"><?= htmlspecialchars($document['tracking_number'] ?? '—') ?></span>
+                    <span class="break-words font-medium text-primary"><?= htmlspecialchars($document['tracking_number'] ?? '—') ?></span>
                 </p>
             </div>
-            <a href="<?= BASE_URL ?>/receiving/inbox<?= $isAccepted ? '?view=accepted' : '' ?>"
-               class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-                ← Back to Inbox
-            </a>
         </div>
 
         <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -253,45 +286,7 @@ function normalizeTimeForInput(?string $time): string {
     </section>
     <?php endif; ?>
 
-    <!-- Accept action -->
-    <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
-        <div class="flex items-start gap-4">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100">
-                <svg class="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-            </div>
-            <div class="flex-1">
-                <h3 class="text-sm font-semibold text-amber-900">Acceptance Required</h3>
-                <p class="mt-1 text-sm text-amber-800">
-                    Review the return reason above, then accept this document to unlock editing and re-routing.
-                    Once accepted, you can correct the details and route it back to Admin.
-                </p>
-                <!-- Hidden form — submitted by the modal OK button -->
-                <form id="acceptDocumentForm" method="POST" action="<?= BASE_URL ?>/receiving/inbox/accept">
-                    <input type="hidden" name="document_id"   value="<?= (int) ($document['id'] ?? 0) ?>">
-                    <input type="hidden" name="assignment_id" value="<?= (int) ($assignment['id'] ?? 0) ?>">
-                </form>
-                <div class="mt-4">
-                    <button type="button" id="acceptTriggerBtn"
-                            class="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400 transition">
-                        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Accept Document
-                    </button>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Back link -->
-    <div class="flex justify-start">
-        <a href="<?= BASE_URL ?>/receiving/inbox"
-           class="inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition">
-            ← Back to Inbox
-        </a>
-    </div>
+    <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
 
     <!-- Accept confirmation modal -->
     <div id="acceptConfirmModal"
@@ -776,6 +771,8 @@ function normalizeTimeForInput(?string $time): string {
         <?php endif; ?>
     </section>
 
+    <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+
     <!-- =====================================================================
          Remarks / Notes + Submit — fields belong to editDocumentForm via the
          form="editDocumentForm" attribute. No nesting, no duplicate form tags.
@@ -795,14 +792,14 @@ function normalizeTimeForInput(?string $time): string {
         </section>
 
         <!-- Submit -->
-        <section class="flex items-center justify-end gap-3">
+        <section class="flex flex-col-reverse items-stretch justify-end gap-3 sm:flex-row sm:items-center">
             <a href="<?= BASE_URL ?>/receiving/inbox"
-               class="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition">
+               class="inline-flex w-full items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition sm:w-auto">
                 Cancel
             </a>
             <!-- Triggers the process confirmation modal; actual submit happens on Confirm -->
             <button type="button" id="submitTriggerBtn"
-                    class="inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition">
+                    class="inline-flex w-full items-center justify-center rounded-xl px-6 py-3 text-sm font-medium text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition sm:w-auto">
                 <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>

@@ -209,14 +209,22 @@ ob_start();
                     <label for="resubmissionSearch" class="block text-sm font-medium text-gray-700">
                         Previous document <span class="text-red-500">*</span>
                     </label>
-                    <input type="text" id="resubmissionSearch" autocomplete="off"
-                           placeholder="Search by tracking number, proposed number, document type, or title"
-                           class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
-                    <select id="resubmissionResults" size="5"
-                            class="mt-2 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                            aria-label="Select previous document">
-                        <option value="">Search for a deferred, remanded, or withdrawn document</option>
-                    </select>
+                    <div class="relative mt-1">
+                        <input type="text" id="resubmissionSearch" autocomplete="off"
+                               placeholder="Search by tracking number, proposed number, document type, or title"
+                               class="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-20 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                               aria-label="Search previous document" aria-autocomplete="list"
+                               aria-controls="resubmissionResults">
+                        <span id="resubmissionLoading" class="absolute right-3 top-2.5 hidden text-xs text-indigo-600">Loading…</span>
+                        <ul id="resubmissionResults"
+                            class="absolute left-0 top-full z-20 hidden max-h-72 w-full overflow-auto rounded-xl border border-indigo-200 bg-white text-sm shadow-lg"
+                            role="listbox"></ul>
+                    </div>
+                    <div id="resubmissionPreview" class="mt-3 hidden rounded-lg border border-indigo-200 bg-white p-3 text-sm">
+                        <p id="resubmissionPreviewTracking" class="font-semibold text-gray-800"></p>
+                        <p id="resubmissionPreviewSubject" class="mt-1 text-gray-600"></p>
+                        <p id="resubmissionPreviewMeta" class="mt-1 text-xs text-indigo-700"></p>
+                    </div>
                     <p id="resubmissionNoResults" class="mt-2 hidden text-sm text-red-700" role="status"></p>
                 </div>
             </section>
@@ -531,12 +539,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const resubmissionWrapper = document.getElementById('resubmissionReferenceWrapper');
     const resubmissionSearch = document.getElementById('resubmissionSearch');
     const resubmissionResults = document.getElementById('resubmissionResults');
+    const resubmissionLoading = document.getElementById('resubmissionLoading');
+    const resubmissionPreview = document.getElementById('resubmissionPreview');
     const resubmissionReferenceId = document.getElementById('resubmission_reference_id');
     const resubmissionNoResults = document.getElementById('resubmissionNoResults');
     const resubmissionDocumentTypeInput = document.getElementById('resubmission_document_type_id');
     let resubmissionSearchTimer = null;
     let resubmissionRequestId = 0;
-    let resubmissionDocumentsById = {};
 
     function syncResubmissionDocumentType(document) {
         if (!document || !document.document_type_id) return;
@@ -556,6 +565,22 @@ document.addEventListener('DOMContentLoaded', function() {
         resubmissionDocumentTypeInput.disabled = true;
     }
 
+    function selectResubmissionDocument(item) {
+        resubmissionReferenceId.value = String(item.id);
+        resubmissionSearch.value = item.tracking_number || '';
+        syncResubmissionDocumentType(item);
+        resubmissionResults.classList.add('hidden');
+        document.getElementById('resubmissionPreviewTracking').textContent =
+            (item.tracking_number || '') + ' — ' + (item.status_name || '');
+        document.getElementById('resubmissionPreviewSubject').textContent =
+            item.subject_matter || '';
+        document.getElementById('resubmissionPreviewMeta').textContent =
+            (item.document_type_name || '') +
+            (item.proposed_number ? ' · Proposed Number: ' + item.proposed_number : '');
+        resubmissionPreview.classList.remove('hidden');
+        resubmissionNoResults.classList.add('hidden');
+    }
+
     function loadResubmissionReferences(query, documentId) {
         const requestId = ++resubmissionRequestId;
         const params = new URLSearchParams();
@@ -566,6 +591,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         resubmissionNoResults.classList.add('hidden');
+        resubmissionLoading.classList.remove('hidden');
+        resubmissionResults.classList.add('hidden');
+        resubmissionResults.innerHTML = '';
         fetch(window.__resubmissionSearchUrl + '?' + params.toString())
             .then(response => {
                 if (!response.ok) throw new Error('Failed to fetch resubmission references');
@@ -573,35 +601,52 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(data => {
                 if (requestId !== resubmissionRequestId || !resubmissionToggle.checked) return;
+                resubmissionLoading.classList.add('hidden');
                 if (!data.success) throw new Error(data.error || 'Failed to fetch resubmission references');
 
-                resubmissionResults.innerHTML = '';
-                resubmissionDocumentsById = {};
                 const documents = Array.isArray(data.documents) ? data.documents : [];
                 if (!documents.length) {
-                    resubmissionResults.add(new Option('No eligible documents found', ''));
-                    resubmissionNoResults.textContent = 'No deferred, remanded, or withdrawn documents match your search.';
+                    resubmissionNoResults.textContent = documentId
+                        ? 'The previously selected document is no longer eligible. Please choose another.'
+                        : 'No deferred, remanded, or withdrawn documents match your search.';
                     resubmissionNoResults.classList.remove('hidden');
                     return;
                 }
 
-                resubmissionResults.add(new Option('-- Select a previous document --', ''));
-                documents.forEach(document => {
-                    const proposedNumber = document.proposed_number ? ` | ${document.proposed_number}` : '';
-                    const label = `${document.tracking_number}${proposedNumber} | ${document.status_name} | ${document.subject_matter}`;
-                    const option = new Option(label, document.id);
-                    option.dataset.documentTypeId = String(document.document_type_id);
-                    resubmissionResults.add(option);
-                    resubmissionDocumentsById[String(document.id)] = document;
+                documents.forEach(item => {
+                    const option = document.createElement('button');
+                    option.type = 'button';
+                    option.setAttribute('role', 'option');
+                    option.setAttribute('aria-selected', 'false');
+                    option.className = 'block w-full cursor-pointer border-b border-gray-100 px-4 py-3 text-left last:border-0 hover:bg-indigo-50';
+                    const title = document.createElement('p');
+                    title.className = 'font-semibold text-gray-800';
+                    title.textContent = (item.tracking_number || '') + ' · ' + (item.status_name || '');
+                    const subject = document.createElement('p');
+                    subject.className = 'mt-0.5 truncate text-xs text-gray-600';
+                    subject.textContent = item.subject_matter || '';
+                    const details = document.createElement('p');
+                    details.className = 'mt-0.5 text-xs text-indigo-700';
+                    details.textContent = (item.document_type_name || '') +
+                        (item.proposed_number ? ' · Proposed Number: ' + item.proposed_number : '');
+                    option.append(title, subject, details);
+                    option.addEventListener('click', () => {
+                        selectResubmissionDocument(item);
+                    });
+                    resubmissionResults.appendChild(option);
                 });
                 if (documentId) {
-                    resubmissionResults.value = String(documentId);
-                    resubmissionReferenceId.value = String(documentId);
-                    syncResubmissionDocumentType(resubmissionDocumentsById[String(documentId)]);
+                    const selectedDocument = documents.find(item => String(item.id) === String(documentId));
+                    if (selectedDocument) {
+                        selectResubmissionDocument(selectedDocument);
+                        return;
+                    }
                 }
+                resubmissionResults.classList.remove('hidden');
             })
             .catch(error => {
                 if (requestId !== resubmissionRequestId || !resubmissionToggle.checked) return;
+                resubmissionLoading.classList.add('hidden');
                 resubmissionNoResults.textContent = 'Unable to load previous documents. Please try again.';
                 resubmissionNoResults.classList.remove('hidden');
                 console.error(error);
@@ -622,26 +667,34 @@ document.addEventListener('DOMContentLoaded', function() {
             unlockResubmissionDocumentType();
             resubmissionSearch.value = '';
             resubmissionResults.innerHTML = '';
-            resubmissionResults.add(new Option('Search for a deferred, remanded, or withdrawn document', ''));
+            resubmissionResults.classList.add('hidden');
+            resubmissionPreview.classList.add('hidden');
+            resubmissionLoading.classList.add('hidden');
             resubmissionNoResults.classList.add('hidden');
+        }
+    });
+
+    resubmissionSearch.addEventListener('focus', function() {
+        if (!resubmissionReferenceId.value) {
+            loadResubmissionReferences(this.value.trim(), '');
         }
     });
 
     resubmissionSearch.addEventListener('input', function() {
         resubmissionReferenceId.value = '';
+        unlockResubmissionDocumentType();
+        resubmissionPreview.classList.add('hidden');
         clearTimeout(resubmissionSearchTimer);
         resubmissionSearchTimer = setTimeout(() => {
             loadResubmissionReferences(this.value.trim(), '');
         }, 250);
     });
 
-    resubmissionResults.addEventListener('change', function() {
-        resubmissionReferenceId.value = this.value;
-        if (this.value) {
-            syncResubmissionDocumentType(resubmissionDocumentsById[this.value]);
-        } else {
-            unlockResubmissionDocumentType();
-        }
+    resubmissionSearch.addEventListener('blur', function() {
+        window.setTimeout(() => {
+            resubmissionResults.classList.add('hidden');
+            resubmissionResults.innerHTML = '';
+        }, 200);
     });
 
     if (resubmissionToggle.checked) {

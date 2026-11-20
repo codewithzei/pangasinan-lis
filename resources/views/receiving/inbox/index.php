@@ -62,82 +62,116 @@ $viewTitles = [
 ];
 $pageTitle = $viewTitles[$currentView]['title'] ?? 'Receiving Inbox';
 $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
+$documentTypeId = $documentTypeId ?? 0;
+$documentTypes = $documentTypes ?? [];
+$filterQuery = ['view' => $currentView];
+if ($search !== '') {
+    $filterQuery['search'] = $search;
+}
+if ($documentTypeId > 0) {
+    $filterQuery['document_type_id'] = $documentTypeId;
+}
+$returnedQuery = $filterQuery;
+$returnedQuery['view'] = 'returned';
+$acceptedQuery = $filterQuery;
+$acceptedQuery['view'] = 'accepted';
 ?>
 
 <div class="space-y-6">
 
     <!-- Page header ---------------------------------------------------------->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10 max-w-3xl">
-                <p class="text-sm font-medium text-blue-100">RECEIVING / INBOX</p>
-                <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl"><?= htmlspecialchars($pageTitle) ?></h1>
-                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
-                    <?= htmlspecialchars($pageSubtitle) ?>
-                </p>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex flex-col gap-6 px-6 py-7 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
+            <div class="flex items-start gap-4">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/5 text-blue-100">
+                    <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 19.5A2.5 2.5 0 016.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2zM8 7h8m-8 4h8"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Receiving Section · Inbox</p>
+                    <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl"><?= htmlspecialchars($pageTitle) ?></h1>
+                    <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
+                        <?= htmlspecialchars($pageSubtitle) ?>
+                    </p>
+                </div>
             </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
+            <div class="flex items-center gap-3 border-t border-white/15 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                <span class="flex h-2.5 w-2.5 rounded-full <?= $currentView === 'returned' ? 'bg-rose-300 ring-4 ring-rose-300/20' : 'bg-emerald-300 ring-4 ring-emerald-300/20' ?>"></span>
+                <div>
+                    <p class="text-xs font-medium text-white"><?= $currentView === 'returned' ? 'Correction queue' : 'Processed queue' ?></p>
+                    <p class="mt-0.5 text-xs text-blue-100/80"><?= htmlspecialchars(date('l, F j, Y')) ?></p>
+                </div>
+            </div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <!-- Statistics Cards ----------------------------------------------------->
     <section>
+        <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">At a glance</p>
+                <h2 class="mt-1 text-xl font-semibold text-gray-900">Inbox activity</h2>
+            </div>
+            <p class="text-xs text-gray-500">Returned items and corrected submissions</p>
+        </div>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-rose-500"></span>
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-sm text-gray-500">Returned by Admin</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($returnedCount) ?></p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($returnedCount) ?></p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                         </svg>
                     </div>
                 </div>
-                <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-red-50 px-2 py-1 font-medium text-red-600">Needs correction</span>
-                </div>
-            </div>
+                <p class="mt-3 text-[11px] text-gray-400">Shared queue requiring correction</p>
+            </article>
 
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-emerald-500"></span>
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-sm text-gray-500">Corrected & Re-routed</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($acceptedCount) ?></p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($acceptedCount) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     </div>
                 </div>
-                <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-600">Processed</span>
-                </div>
-            </div>
+                <p class="mt-3 text-[11px] text-gray-400">Corrected and sent back to Admin</p>
+            </article>
         </div>
     </section>
 
     <!-- Navigation Tabs ------------------------------------------------------>
     <section>
         <div class="border-b border-gray-200">
-            <nav class="-mb-px flex gap-6">
-                <a href="<?= BASE_URL ?>/receiving/inbox?view=returned<?= $search ? '&search=' . urlencode($search) : '' ?>"
-                   class="<?= $currentView === 'returned' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?> whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
+            <nav class="-mb-px flex gap-6 overflow-x-auto" aria-label="Inbox views">
+                <a href="<?= BASE_URL ?>/receiving/inbox?<?= htmlspecialchars(http_build_query($returnedQuery), ENT_QUOTES, 'UTF-8') ?>"
+                   <?= $currentView === 'returned' ? 'aria-current="page"' : '' ?>
+                   class="<?= $currentView === 'returned' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?> inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
                     Returned
                     <?php if ($returnedCount > 0): ?>
-                        <span class="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">
+                        <span class="inline-flex min-w-6 items-center justify-center rounded-full <?= $currentView === 'returned' ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-600' ?> px-2 py-0.5 text-xs font-semibold">
                             <?= $returnedCount ?>
                         </span>
                     <?php endif; ?>
                 </a>
-                <a href="<?= BASE_URL ?>/receiving/inbox?view=accepted<?= $search ? '&search=' . urlencode($search) : '' ?>"
-                   class="<?= $currentView === 'accepted' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?> whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
+                <a href="<?= BASE_URL ?>/receiving/inbox?<?= htmlspecialchars(http_build_query($acceptedQuery), ENT_QUOTES, 'UTF-8') ?>"
+                   <?= $currentView === 'accepted' ? 'aria-current="page"' : '' ?>
+                   class="<?= $currentView === 'accepted' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?> inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
                     Accepted
                     <?php if ($acceptedCount > 0): ?>
-                        <span class="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                        <span class="inline-flex min-w-6 items-center justify-center rounded-full <?= $currentView === 'accepted' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600' ?> px-2 py-0.5 text-xs font-semibold">
                             <?= $acceptedCount ?>
                         </span>
                     <?php endif; ?>
@@ -147,7 +181,7 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
     </section>
 
     <!-- Document List Section ----------------------------------------------->
-    <section class="rounded-2xl border border-gray-200 bg-white">
+    <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <h2 class="font-semibold text-gray-900">Documents List</h2>
@@ -155,21 +189,30 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                     <?= $total ?> record<?= $total !== 1 ? 's' : '' ?> found
                 </p>
             </div>
-            <form method="GET" action="<?= BASE_URL ?>/receiving/inbox" class="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <form method="GET" action="<?= BASE_URL ?>/receiving/inbox" class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <input type="hidden" name="view" value="<?= htmlspecialchars($currentView) ?>">
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search tracking # or subject..."
+                    <input type="search" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search tracking # or subject..."
                         class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:w-64">
                 </div>
-                <button type="submit" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                <select name="document_type_id" aria-label="Filter by document type"
+                    class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-52">
+                    <option value="">All document types</option>
+                    <?php foreach ($documentTypes as $documentType): ?>
+                        <option value="<?= (int) $documentType['id'] ?>" <?= (int) $documentTypeId === (int) $documentType['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($documentType['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="submit" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 transition">
                     Filter
                 </button>
-                <?php if ($search !== ''): ?>
+                <?php if ($search !== '' || $documentTypeId > 0): ?>
                     <a href="<?= BASE_URL ?>/receiving/inbox?view=<?= htmlspecialchars($currentView) ?>"
-                       class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition text-center">
+                       class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 transition text-center">
                         Clear
                     </a>
                 <?php endif; ?>
@@ -178,22 +221,22 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
 
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
-                <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+                <thead class="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500">
                     <tr>
-                        <th class="px-6 py-3 font-medium">Tracking Number</th>
-                        <th class="px-6 py-3 font-medium">Subject Matter</th>
-                        <th class="px-6 py-3 font-medium">Document Type</th>
-                        <th class="px-6 py-3 font-medium">Current Status</th>
-                        <th class="px-6 py-3 font-medium">Current Phase</th>
+                        <th class="whitespace-nowrap px-6 py-3 font-semibold">Tracking Number</th>
+                        <th class="px-6 py-3 font-semibold">Subject Matter</th>
+                        <th class="whitespace-nowrap px-6 py-3 font-semibold">Document Type</th>
+                        <th class="whitespace-nowrap px-6 py-3 font-semibold">Current Status</th>
+                        <th class="whitespace-nowrap px-6 py-3 font-semibold">Current Phase</th>
                         <?php if ($currentView === 'returned'): ?>
-                            <th class="px-6 py-3 font-medium">Date Returned</th>
-                            <th class="px-6 py-3 font-medium">Returned By</th>
-                            <th class="px-6 py-3 font-medium">Return Reason</th>
+                            <th class="whitespace-nowrap px-6 py-3 font-semibold">Returned At</th>
+                            <th class="whitespace-nowrap px-6 py-3 font-semibold">Returned By</th>
+                            <th class="px-6 py-3 font-semibold">Return Reason</th>
                         <?php else: ?>
-                            <th class="px-6 py-3 font-medium">Date Accepted</th>
-                            <th class="px-6 py-3 font-medium">Accepted By</th>
+                            <th class="whitespace-nowrap px-6 py-3 font-semibold">Date Accepted</th>
+                            <th class="whitespace-nowrap px-6 py-3 font-semibold">Accepted By</th>
                         <?php endif; ?>
-                        <th class="px-6 py-3 font-medium text-right">Action</th>
+                        <th class="whitespace-nowrap px-6 py-3 text-right font-semibold">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -215,16 +258,16 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                         </tr>
                     <?php else: ?>
                         <?php foreach ($assignments as $assignment): ?>
-                            <tr class="hover:bg-gray-50 transition">
+                            <tr class="transition hover:bg-blue-50/40">
                                 <td class="px-6 py-4">
                                     <a href="<?= BASE_URL ?>/receiving/inbox/show?id=<?= $assignment['document_id'] ?>" 
-                                       class="font-medium text-primary hover:underline">
+                                       class="font-semibold text-primary hover:underline">
                                         <?= htmlspecialchars($assignment['tracking_number']) ?>
                                     </a>
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="max-w-md">
-                                        <p class="line-clamp-2 text-gray-900">
+                                        <p class="line-clamp-2 font-medium text-gray-900">
                                             <?= htmlspecialchars($assignment['subject_matter']) ?>
                                         </p>
                                     </div>
@@ -284,12 +327,20 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                     <div class="flex items-center justify-end gap-2">
                                         <?php if ($currentView === 'returned'): ?>
                                             <a href="<?= BASE_URL ?>/receiving/inbox/show?id=<?= $assignment['document_id'] ?>"
-                                               class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition">
+                                               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:bg-blue-50 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 transition">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                </svg>
                                                 View
                                             </a>
                                         <?php else: ?>
                                             <a href="<?= BASE_URL ?>/receiving/inbox/show?id=<?= $assignment['document_id'] ?>"
-                                               class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition">
+                                               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-primary hover:bg-blue-50 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 transition">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 4.487l1.651 1.651a1.875 1.875 0 010 2.652l-9.193 9.193a4.5 4.5 0 01-1.897 1.13l-3.07.878.878-3.07a4.5 4.5 0 011.13-1.897l9.193-9.193a1.875 1.875 0 012.652 0z"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.5 6.5l3 3"/>
+                                                </svg>
                                                 Edit
                                             </a>
                                         <?php endif; ?>
@@ -313,6 +364,7 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                 <?php
                 $query = ['view' => $currentView];
                 if ($search !== '') $query['search'] = $search;
+                if ($documentTypeId > 0) $query['document_type_id'] = $documentTypeId;
                 $queryString = !empty($query) ? '&' . http_build_query($query) : '';
                 ?>
                 <?php if ($page > 1): ?>

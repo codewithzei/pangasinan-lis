@@ -69,9 +69,9 @@ function check(string $label, bool $condition): void
  */
 function action_allowed(string $action, string $documentTypeName): bool
 {
-    $communicationAllowed = ['accept', 'proceed_to_communications', 'return_to_origin'];
+    $communicationAllowed = ['accept', 'noted', 'proceed_to_communications', 'return_to_origin'];
     $communicationOnly    = ['proceed_to_communications', 'return_to_origin'];
-    $casesAllowed         = ['accept', 'return_to_admin'];
+    $casesAllowed         = ['accept', 'noted', 'return_to_admin'];
     $casesTypes           = ['Administrative Cases', 'Complaint'];
     $isCommunication      = $documentTypeName === 'Communication';
     $isCasesType          = in_array($documentTypeName, $casesTypes, true);
@@ -684,12 +684,17 @@ $communicationsIndexSrc = (string) file_get_contents(__DIR__ . '/../resources/vi
 $communicationsShowSrc = (string) file_get_contents(__DIR__ . '/../resources/views/committee/communications/show.php');
 
 check('controller accepts the two new action keys', str_contains($controllerSrc, "'proceed_to_communications'")
-    && str_contains($controllerSrc, "'return_to_origin'"));
+    && str_contains($controllerSrc, "'return_to_origin'")
+    && str_contains($controllerSrc, "'noted'"));
 check('controller defines COMMUNICATION_ALLOWED_ACTIONS', str_contains($controllerSrc, 'COMMUNICATION_ALLOWED_ACTIONS'));
 check('controller dispatches proceed_to_communications', str_contains($controllerSrc, "case 'proceed_to_communications':"));
 check('controller dispatches return_to_origin', str_contains($controllerSrc, "case 'return_to_origin':"));
 check('controller rejects other actions on Communication docs',
-    str_contains($controllerSrc, 'Communication documents can only proceed to the Communications workflow or be returned.'));
+    str_contains($controllerSrc, 'Communication documents can only proceed to Communications, be returned, or be marked as Noted.'));
+check('Committee Noted action is dispatched and listed after processing',
+    str_contains($controllerSrc, "case 'noted':")
+    && str_contains($controllerSrc, "redirect('committee/noted-documents')")
+    && str_contains($viewSrc, 'data-action="noted"'));
 check('controller rejects Communication-only actions on other types',
     str_contains($controllerSrc, 'This action is only available for Communication documents.'));
 check('controller resolves the origin from routing history', str_contains($controllerSrc, 'private function resolveOrigin'));

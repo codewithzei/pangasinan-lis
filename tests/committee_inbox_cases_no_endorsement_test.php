@@ -106,12 +106,12 @@ function check(string $label, bool $condition): void
  */
 function action_allowed(string $action, string $documentTypeName): bool
 {
-    $validActions         = ['accept', 'return_to_admin', 'endorse',
+    $validActions         = ['accept', 'noted', 'return_to_admin', 'endorse',
                              'proceed_to_communications', 'proceed_to_cases',
                              'return_to_origin'];
-    $communicationAllowed = ['accept', 'proceed_to_communications', 'return_to_origin'];
+    $communicationAllowed = ['accept', 'noted', 'proceed_to_communications', 'return_to_origin'];
     $communicationOnly    = ['proceed_to_communications', 'return_to_origin'];
-    $casesAllowed         = ['accept', 'return_to_admin', 'proceed_to_cases'];
+    $casesAllowed         = ['accept', 'noted', 'return_to_admin', 'proceed_to_cases'];
     $casesOnly            = ['proceed_to_cases'];
     $casesTypes           = ['Administrative Cases', 'Complaint'];
 
@@ -170,6 +170,7 @@ $matrix = [
     // [type, action, expected_allowed]
     // --- Communication type ---
     ['Communication', 'accept',                    true],
+    ['Communication', 'noted',                     true],
     ['Communication', 'proceed_to_communications', true],
     ['Communication', 'return_to_origin',          true],
     ['Communication', 'endorse',                   false],   // ← blocked
@@ -177,6 +178,7 @@ $matrix = [
 
     // --- Administrative Cases ---
     ['Administrative Cases', 'accept',                    true],
+    ['Administrative Cases', 'noted',                     true],
     ['Administrative Cases', 'return_to_admin',           true],
     ['Administrative Cases', 'proceed_to_cases',          true],   // ← Cases hand-off
     ['Administrative Cases', 'endorse',                   false],  // ← BLOCKED (this is the fix)
@@ -185,6 +187,7 @@ $matrix = [
 
     // --- Complaint ---
     ['Complaint', 'accept',                    true],
+    ['Complaint', 'noted',                     true],
     ['Complaint', 'return_to_admin',           true],
     ['Complaint', 'proceed_to_cases',          true],   // ← Cases hand-off
     ['Complaint', 'endorse',                   false],   // ← BLOCKED (this is the fix)
@@ -193,6 +196,7 @@ $matrix = [
 
     // --- Other type (ordinance, resolution, etc.) ---
     ['Provincial Resolution', 'accept',                    true],
+    ['Provincial Resolution', 'noted',                     true],
     ['Provincial Resolution', 'endorse',                   true],  // ← still allowed
     ['Provincial Resolution', 'return_to_admin',           true],
     ['Provincial Resolution', 'proceed_to_cases',          false], // ← cases-only

@@ -1393,6 +1393,13 @@ return [
     // Committee Inbox Routes
     // -------------------------------------------------------------------------
 
+    'committee/noted-documents' => [
+        'method'     => 'GET',
+        'controller' => 'Committee/CommitteeNotedDocumentsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'committee/inbox' => [
         'method'     => 'GET',
         'controller' => 'Committee/CommitteeInboxController',

@@ -44,6 +44,17 @@ class ReceivingInboxController
 
         // Filters
         $search = trim($_GET['search'] ?? '');
+        $documentTypeId = isset($_GET['document_type_id'])
+            && is_scalar($_GET['document_type_id'])
+            && ctype_digit((string) $_GET['document_type_id'])
+            ? (int) $_GET['document_type_id']
+            : 0;
+        $documentTypes = $this->pdo->query("
+            SELECT id, name
+            FROM document_types
+            WHERE is_active = 1 AND is_deleted = 0
+            ORDER BY sort_order ASC, name ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
 
         // Pagination
         $page    = max(1, (int) ($_GET['page'] ?? 1));
@@ -90,6 +101,11 @@ class ReceivingInboxController
             $params[] = "%{$search}%";
         }
 
+        if ($documentTypeId > 0) {
+            $where[]  = 'd.document_type_id = ?';
+            $params[] = $documentTypeId;
+        }
+
         $whereClause = implode(' AND ', $where);
 
         // Count total records
@@ -128,7 +144,7 @@ class ReceivingInboxController
                     da_admin.decline_reason,
                     da_admin.declined_at,
                     ua_declined.username AS declined_by_username,
-                    CONCAT(ui_declined.first_name, ' ', ui_declined.last_name) AS declined_by_name
+                    NULLIF(TRIM(CONCAT_WS(' ', ui_declined.first_name, ui_declined.last_name)), '') AS declined_by_name
                 FROM document_assignments da
                 INNER JOIN documents         d  ON da.document_id      = d.id
                 LEFT  JOIN document_statuses ds ON d.current_status_id = ds.id
@@ -149,7 +165,7 @@ class ReceivingInboxController
                     ) da_max ON da_latest.document_id = da_max.document_id AND da_latest.id = da_max.max_id
                 ) latest_decline ON latest_decline.document_id = da.document_id
                 LEFT  JOIN document_assignments da_admin ON da_admin.id = latest_decline.latest_id
-                LEFT  JOIN user_accounts ua_declined ON da_admin.assigned_by = ua_declined.id
+                LEFT  JOIN user_accounts ua_declined ON da_admin.accepted_by = ua_declined.id
                 LEFT  JOIN user_info ui_declined ON ua_declined.id = ui_declined.user_account_id
                 WHERE {$whereClause}
                 ORDER BY da.received_at DESC, d.date_received DESC, d.id DESC
@@ -407,9 +423,9 @@ class ReceivingInboxController
                 da.declined_at,
                 da.remarks,
                 ua.username AS declined_by_username,
-                CONCAT(ui.first_name, ' ', ui.last_name) AS declined_by_name
+                NULLIF(TRIM(CONCAT_WS(' ', ui.first_name, ui.last_name)), '') AS declined_by_name
             FROM document_assignments da
-            LEFT JOIN user_accounts ua ON da.assigned_by = ua.id
+            LEFT JOIN user_accounts ua ON da.accepted_by = ua.id
             LEFT JOIN user_info ui ON ua.id = ui.user_account_id
             WHERE da.document_id = ?
               AND da.phase = 'ADMIN'

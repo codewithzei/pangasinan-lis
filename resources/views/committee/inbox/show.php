@@ -1028,6 +1028,26 @@ ob_start();
                                 </button>
                             <?php endif; ?>
 
+                            <div class="relative my-2">
+                                <div class="absolute inset-0 flex items-center">
+                                    <div class="w-full border-t border-gray-100"></div>
+                                </div>
+                                <div class="relative flex justify-center">
+                                    <span class="bg-white px-2 text-xs text-gray-400">or</span>
+                                </div>
+                            </div>
+
+                            <button type="button" data-action="noted"
+                                    class="action-btn w-full inline-flex items-center justify-center gap-2
+                                           rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5
+                                           text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M5 13l4 4L19 7"/>
+                                </svg>
+                                Mark as Noted
+                            </button>
+
                             </div><!-- /action buttons -->
                         </form>
 
@@ -1271,6 +1291,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!processForm) return;
 
     const actionLabels = {
+        'noted': 'Mark this document as Noted? It will move to Committee Noted Documents.',
         'return_to_admin': 'Return this document to Admin? A reason is required.',
         'endorse': 'Proceed to Endorsement? This will mark the document as Referred. Remarks are required and this action cannot be undone.',
         'proceed_to_communications': 'Proceed to Communications? This will open the Communications workflow for this document and remove it from your Committee Inbox.',

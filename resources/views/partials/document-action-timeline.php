@@ -18,7 +18,7 @@ $documentEventPhaseLabel = static fn(?string $phase): string => match ($phase) {
         <p class="text-sm italic text-gray-400">No action history recorded.</p>
     <?php else: ?>
         <ol class="relative ml-3 space-y-5 border-l border-gray-200">
-            <?php foreach ($documentEvents as $event): ?>
+            <?php foreach (array_reverse($documentEvents) as $event): ?>
                 <?php
                 $eventType = (string) ($event['event_type'] ?? 'OTHER');
                 $eventLabel = ucwords(strtolower(str_replace('_', ' ', $eventType)));

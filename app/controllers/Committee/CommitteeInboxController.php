@@ -7,8 +7,7 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  * CommitteeInboxController
  *
  * Handles the Committee inbox: listing pending assignments, viewing document
- * detail, processing actions (Accept / Return to Admin), and uploading
- * additional attachments.
+ * detail, processing actions, and uploading additional attachments.
  *
  * OWNERSHIP MODEL (mirrors SpsecInboxController, migration 050):
  *   - A new document assignment arrives as PENDING with accepted_by = NULL
@@ -42,6 +41,7 @@ class CommitteeInboxController
     /** Valid actions the POST handler will accept. */
     private const VALID_ACTIONS = [
         'accept',
+        'noted',
         'return_to_admin',
         'endorse',
         'proceed_to_communications',
@@ -66,7 +66,7 @@ class CommitteeInboxController
     /**
      * Document type names that route through the Cases sub-workflow.
      * These types may never be endorsed (Proceed to Endorsement is hidden and
-     * server-blocked for them).
+     * server-blocked for them); they can still be marked as Noted.
      */
     private const CASES_TYPES = ['Administrative Cases', 'Complaint'];
 
@@ -83,6 +83,7 @@ class CommitteeInboxController
      */
     private const COMMUNICATION_ALLOWED_ACTIONS = [
         'accept',
+        'noted',
         'proceed_to_communications',
         'return_to_origin',
     ];
@@ -93,11 +94,12 @@ class CommitteeInboxController
      * types are never endorsable.
      *
      * 'proceed_to_cases' dockets the document and hands it to the Committee
-     * Cases workflow; the remaining case details (nature of case, respondents,
-     * complainant) are entered from the Committee Cases page itself.
+     * Cases workflow; 'noted' is a terminal outcome. The remaining case details
+     * (nature of case, respondents, complainant) are entered from Committee Cases.
      */
     private const CASES_ALLOWED_ACTIONS = [
         'accept',
+        'noted',
         'return_to_admin',
         'proceed_to_cases',
     ];
@@ -797,7 +799,7 @@ class CommitteeInboxController
         if ($isCommunication && !in_array($action, self::COMMUNICATION_ALLOWED_ACTIONS, true)) {
             flash_set(
                 'error',
-                'Communication documents can only proceed to the Communications workflow or be returned.'
+                'Communication documents can only proceed to Communications, be returned, or be marked as Noted.'
             );
             redirect('committee/inbox/show?id=' . $documentId);
         }
@@ -896,6 +898,10 @@ class CommitteeInboxController
                         $this->doAccept($documentId, $assignmentId, $userId, $committeeRoleId, $currentStatusId, $remarks);
                         break;
 
+                    case 'noted':
+                        $this->doNoted($documentId, $assignmentId, $committeeRoleId, $userId, $currentStatusId, $remarks);
+                        break;
+
                     case 'return_to_admin':
                         $notificationData = $this->doReturnToAdmin($documentId, $assignmentId, $assignment, $document, $userId, $currentStatusId, $remarks);
                         break;
@@ -937,6 +943,16 @@ class CommitteeInboxController
                         'accepted_by_username' => $acceptingUsername,
                         'accepted_at'          => date('Y-m-d H:i:s'),
                     ], "Committee accepted document ID {$documentId} (user: {$acceptingUsername})");
+
+                } elseif ($action === 'noted') {
+                    audit_log('UPDATE', 'Document', (string) $documentId, null, [
+                        'action'        => 'committee_noted',
+                        'assignment_id' => $assignmentId,
+                        'document_id'   => $documentId,
+                        'noted_by'      => $userId,
+                        'noted_at'      => date('Y-m-d H:i:s'),
+                        'remarks'       => $remarks,
+                    ], "Committee marked document ID {$documentId} as Noted");
 
                 } elseif ($notificationData !== null && isset($notificationData['auditData'])) {
                     audit_log(
@@ -1056,6 +1072,9 @@ class CommitteeInboxController
                 if ($action === 'proceed_to_cases' && !empty($caseData['caseId'])) {
                     flash_set('success', 'Document moved to Committee Cases. Please enter the docket number and case details to continue.');
                     redirect('committee/cases/show?id=' . (int) $caseData['caseId']);
+                }
+                if ($action === 'noted') {
+                    redirect('committee/noted-documents');
                 }
                 redirect('committee/inbox');
 
@@ -1299,6 +1318,105 @@ class CommitteeInboxController
                 'accepted_by_username' => $username,
                 'ip_address'           => client_ip(),
                 'user_agent'           => client_user_agent(),
+            ]),
+        ]);
+    }
+
+    /**
+     * Mark an accepted Committee assignment as Noted and keep it in the
+     * Committee's Noted Documents list.
+     */
+    private function doNoted(
+        int    $documentId,
+        int    $assignmentId,
+        int    $committeeRoleId,
+        int    $userId,
+        int    $currentStatusId,
+        string $remarks
+    ): void {
+        $statusStmt = $this->pdo->query(
+            "SELECT id FROM document_statuses
+             WHERE name = 'Noted' AND is_active = 1 AND is_deleted = 0
+             LIMIT 1"
+        );
+        $notedStatusId = $statusStmt->fetchColumn();
+        if ($notedStatusId === false) {
+            throw new RuntimeException('The Noted document status is unavailable. Please contact the system administrator.');
+        }
+        $notedStatusId = (int) $notedStatusId;
+
+        $routeStmt = $this->pdo->query(
+            "SELECT id FROM routing_options
+             WHERE name = 'Noted' AND is_active = 1 AND is_deleted = 0
+             LIMIT 1"
+        );
+        $notedRouteId = $routeStmt->fetchColumn();
+        if ($notedRouteId === false) {
+            throw new RuntimeException('The Noted routing option is unavailable. Please contact the system administrator.');
+        }
+
+        $assignmentStmt = $this->pdo->prepare("
+            UPDATE document_assignments
+            SET decision     = 'NOTED',
+                completed_at = NOW(),
+                remarks      = ?
+            WHERE id                  = ?
+              AND assigned_to_role_id = ?
+              AND phase               = 'COMMITTEE'
+              AND decision            = 'ACCEPTED'
+              AND completed_at        IS NULL
+              AND (accepted_by = ? OR assigned_to_user_id = ?)
+        ");
+        $assignmentStmt->execute([
+            $remarks !== '' ? $remarks : null,
+            $assignmentId,
+            $committeeRoleId,
+            $userId,
+            $userId,
+        ]);
+        if ($assignmentStmt->rowCount() === 0) {
+            throw new RuntimeException(
+                'This assignment has already been processed or you no longer own it. Please refresh the page.'
+            );
+        }
+
+        $this->pdo->prepare("
+            UPDATE documents
+            SET current_phase         = 'COMMITTEE',
+                current_status_id     = ?,
+                current_owner_user_id = NULL,
+                updated_by            = ?
+            WHERE id = ?
+        ")->execute([$notedStatusId, $userId, $documentId]);
+
+        $note = $remarks !== '' ? $remarks : 'Document marked as Noted by Committee.';
+        $this->pdo->prepare("
+            INSERT INTO document_routes (
+                document_id, from_phase, to_phase, routing_option_id,
+                routed_by, routed_to_role_id, remarks
+            ) VALUES (?, 'COMMITTEE', 'COMMITTEE', ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            (int) $notedRouteId,
+            $userId,
+            $committeeRoleId,
+            $note,
+        ]);
+
+        $this->pdo->prepare("
+            INSERT INTO document_events (
+                document_id, event_type, phase, performed_by,
+                from_status_id, to_status_id, remarks, metadata
+            ) VALUES (?, 'DOCUMENT_NOTED', 'COMMITTEE', ?, ?, ?, ?, ?)
+        ")->execute([
+            $documentId,
+            $userId,
+            $currentStatusId,
+            $notedStatusId,
+            $note,
+            json_encode([
+                'assignment_id' => $assignmentId,
+                'ip_address'    => client_ip(),
             ]),
         ]);
     }
@@ -2332,6 +2450,7 @@ class CommitteeInboxController
     {
         return match ($action) {
             'accept'                    => 'Accepted',
+            'noted'                     => 'Marked as Noted',
             'return_to_admin'           => 'Returned to Admin',
             'endorse'                   => 'Proceeded to Endorsement (Referred)',
             'proceed_to_communications' => 'Proceeded to Communications',
