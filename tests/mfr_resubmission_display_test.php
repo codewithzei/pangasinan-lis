@@ -120,6 +120,17 @@ foreach ($detailViews as $viewPath) {
     );
 }
 
+$adminInboxView = file_get_contents(__DIR__ . '/../resources/views/admin/inbox/show.php');
+verifyResubmissionCheck(
+    $adminInboxView !== false
+        && str_contains($adminInboxView, "['ref_tracking_number']")
+        && str_contains($adminInboxView, "['ref_proposed_number']")
+        && str_contains($adminInboxView, "['ref_status']")
+        && str_contains($adminInboxView, "['ref_subject_matter']")
+        && !str_contains($adminInboxView, "\$resubmissionReference['tracking_number']"),
+    'Admin inbox resubmission details do not match the DocumentService reference fields.'
+);
+
 $detailControllers = [
     'app/controllers/Admin/AdminCommunicationsController.php',
     'app/controllers/Admin/AdminFiledDocumentsController.php',

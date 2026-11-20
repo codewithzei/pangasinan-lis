@@ -1382,6 +1382,13 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'spsec/noted-documents' => [
+        'method'     => 'GET',
+        'controller' => 'Spsec/SpsecNotedDocumentsController',
+        'action'     => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     // -------------------------------------------------------------------------
     // Committee Inbox Routes
     // -------------------------------------------------------------------------

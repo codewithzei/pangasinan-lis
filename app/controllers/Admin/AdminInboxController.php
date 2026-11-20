@@ -273,23 +273,6 @@ class AdminInboxController
             redirect('admin/inbox');
         }
 
-        $resubmissionStmt = $this->pdo->prepare("
-            SELECT
-                ref.id,
-                ref.tracking_number,
-                ref.subject_matter,
-                refpdd.proposed_number,
-                refStatus.name AS status_name
-            FROM document_resubmission_links drl
-            INNER JOIN documents ref ON ref.id = drl.referenced_document_id
-            LEFT JOIN plenary_document_details refpdd ON refpdd.document_id = ref.id
-            LEFT JOIN document_statuses refStatus ON refStatus.id = ref.current_status_id
-            WHERE drl.resubmitted_document_id = ?
-            LIMIT 1
-        ");
-        $resubmissionStmt->execute([$documentId]);
-        $resubmissionReference = $resubmissionStmt->fetch() ?: null;
-
         // ── Find the current Admin assignment for this document ───────────────
         // We need to look for PENDING assignments visible to this user OR
         // ACCEPTED assignments owned by this user.

@@ -189,16 +189,16 @@ ob_start();
                         <p class="text-sm font-semibold text-indigo-900">Resubmission needed</p>
                         <p class="mt-1 text-sm text-indigo-800">
                             Linked to
-                            <a href="<?= BASE_URL ?>/admin/inbox/show?id=<?= (int) $resubmissionReference['id'] ?>"
+                            <a href="<?= BASE_URL ?>/admin/inbox/show?id=<?= (int) ($resubmissionReference['ref_id'] ?? 0) ?>"
                                class="font-semibold text-primary hover:underline">
-                                <?= htmlspecialchars($resubmissionReference['tracking_number']) ?>
+                                <?= htmlspecialchars($resubmissionReference['ref_tracking_number'] ?? '—') ?>
                             </a>
-                            <?php if (!empty($resubmissionReference['proposed_number'])): ?>
-                                (<?= htmlspecialchars($resubmissionReference['proposed_number']) ?>)
+                            <?php if (!empty($resubmissionReference['ref_proposed_number'])): ?>
+                                (<?= htmlspecialchars($resubmissionReference['ref_proposed_number']) ?>)
                             <?php endif; ?>
-                            — <?= htmlspecialchars($resubmissionReference['status_name'] ?? 'Prior document') ?>.
+                            — <?= htmlspecialchars($resubmissionReference['ref_status'] ?? 'Prior document') ?>.
                         </p>
-                        <p class="mt-1 text-xs text-indigo-700"><?= escape_trimmed_text($resubmissionReference['subject_matter'] ?? '') ?></p>
+                        <p class="mt-1 text-xs text-indigo-700"><?= escape_trimmed_text($resubmissionReference['ref_subject_matter'] ?? '') ?></p>
                         <p class="mt-2 text-xs font-medium text-indigo-700">Choose the destination when routing this document.</p>
                     </div>
                 <?php endif; ?>

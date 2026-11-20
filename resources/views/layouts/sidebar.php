@@ -261,6 +261,13 @@ if ($userRoleId !== null) {
                     </svg>
                     Communications
                 </a>
+                <a href="<?= BASE_URL ?>/spsec/noted-documents" class="<?= $navBase ?> <?= isActiveNav('spsec/noted-documents', $currentRoute) ?>">
+                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5h6m-6 4h6m-6 4h6m-6 4h4"/>
+                    </svg>
+                    Noted Documents
+                </a>
             </nav>
         </div>
         <?php endif; ?>

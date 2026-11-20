@@ -546,6 +546,7 @@ try {
     $adminViewSrc  = (string) file_get_contents(__DIR__ . '/../resources/views/admin/inbox/show.php');
     $spsecViewSrc  = (string) file_get_contents(__DIR__ . '/../resources/views/spsec/inbox/show.php');
     $notedCtrlSrc  = (string) file_get_contents(__DIR__ . '/../app/controllers/Admin/AdminNotedDocumentsController.php');
+    $spsecNotedCtrlSrc = (string) file_get_contents(__DIR__ . '/../app/controllers/Spsec/SpsecNotedDocumentsController.php');
     $notedViewSrc  = (string) file_get_contents(__DIR__ . '/../resources/views/admin/noted-documents/index.php');
     $webRoutesSrc  = (string) file_get_contents(__DIR__ . '/../routes/web.php');
     $sidebarSrc    = (string) file_get_contents(__DIR__ . '/../resources/views/layouts/sidebar.php');
@@ -635,6 +636,16 @@ try {
     check('5.20: Admin routes are closed to the SP Secretary role', !in_array('SP Secretary', $roleGate('admin/inbox/process'), true));
     check('5.21: SPSEC routes allow the SP Secretary role', in_array('SP Secretary', $roleGate('spsec/inbox/process'), true));
     check('5.22: SPSEC routes are closed to the Admin role', !in_array('Admin', $roleGate('spsec/inbox/process'), true));
+    check('5.23: SP Secretary Noted Documents page is routed and available in the sidebar',
+        str_contains($webRoutesSrc, "'spsec/noted-documents'")
+            && str_contains($sidebarSrc, 'BASE_URL ?>/spsec/noted-documents'));
+    check('5.24: SP Secretary Noted Documents page includes only documents noted in its phase',
+        str_contains($spsecNotedCtrlSrc, "dr.from_phase = 'SP_SECRETARY'")
+            && str_contains($spsecNotedCtrlSrc, "dr.to_phase = 'SP_SECRETARY'")
+            && str_contains($spsecNotedCtrlSrc, "ro.name = 'Noted'"));
+    check('5.25: Shared Noted Documents view uses role-specific list and copy URLs',
+        str_contains($notedViewSrc, '$notedBaseUrl')
+            && str_contains($notedViewSrc, '$documentViewUrl'));
 
 } finally {
     if ($pdo->inTransaction()) {

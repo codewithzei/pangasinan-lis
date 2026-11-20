@@ -160,6 +160,8 @@ class AdminNotedDocumentsController
         $totalNoted = array_sum($tabCounts);
         $pageTitle = 'Noted Documents';
         $pageSubtitle = 'Copies of documents marked as Noted by Admin, organized by document type.';
+        $notedBaseUrl = BASE_URL . '/admin/noted-documents';
+        $documentViewUrl = BASE_URL . '/admin/inbox/show?id=';
 
         ob_start();
         require __DIR__ . '/../../../resources/views/admin/noted-documents/index.php';

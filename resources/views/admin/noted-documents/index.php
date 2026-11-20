@@ -39,7 +39,7 @@ $tabLabels = [
     <div class="border-b border-gray-200">
         <nav class="-mb-px flex gap-1 overflow-x-auto" aria-label="Noted document types">
             <?php foreach ($tabLabels as $tabKey => $label): ?>
-                <a href="<?= BASE_URL ?>/admin/noted-documents?<?= http_build_query(['tab' => $tabKey]) ?>"
+                <a href="<?= htmlspecialchars($notedBaseUrl) ?>?<?= http_build_query(['tab' => $tabKey]) ?>"
                    class="inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition
                        focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
                        <?= $tab === $tabKey
@@ -64,7 +64,7 @@ $tabLabels = [
                     <?= number_format($totalRows) ?> record<?= $totalRows !== 1 ? 's' : '' ?> found
                 </p>
             </div>
-            <form method="GET" action="<?= BASE_URL ?>/admin/noted-documents"
+            <form method="GET" action="<?= htmlspecialchars($notedBaseUrl) ?>"
                   class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
                 <input type="search" name="search" value="<?= htmlspecialchars($search) ?>"
@@ -85,7 +85,7 @@ $tabLabels = [
                     Filter
                 </button>
                 <?php if ($search !== '' || $filterStatus !== ''): ?>
-                    <a href="<?= BASE_URL ?>/admin/noted-documents?tab=<?= urlencode($tab) ?>"
+                    <a href="<?= htmlspecialchars($notedBaseUrl) ?>?tab=<?= urlencode($tab) ?>"
                        class="rounded-xl border border-gray-200 px-4 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-50">
                         Clear
                     </a>
@@ -147,7 +147,7 @@ $tabLabels = [
                                     </span>
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-4 text-right">
-                                    <a href="<?= BASE_URL ?>/admin/inbox/show?id=<?= (int) $doc['id'] ?>"
+                                    <a href="<?= htmlspecialchars($documentViewUrl) ?><?= (int) $doc['id'] ?>"
                                        class="inline-flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-blue-50">
                                         View Copy
                                     </a>
