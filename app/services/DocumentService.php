@@ -2416,6 +2416,9 @@ class DocumentService
                 dt.badge_color      AS mfr_document_type_badge_color,
                 ds.name             AS mfr_status,
                 ds.badge_color      AS mfr_status_badge_color,
+                mrl.outcome         AS mfr_outcome,
+                mrl.outcome_remarks AS mfr_outcome_remarks,
+                mrl.outcome_at      AS mfr_outcome_at,
                 lb.username         AS linked_by_username
             FROM motion_reconsideration_links mrl
             INNER JOIN documents        d    ON d.id   = mrl.mfr_document_id

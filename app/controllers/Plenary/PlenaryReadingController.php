@@ -984,6 +984,7 @@ class PlenaryReadingController
             $typeName = strtolower(trim($row['document_type_name'] ?? ''));
             $row['is_comm']   = strpos($typeName, 'communication') !== false
                              || strpos($typeName, 'motion for reconsideration') !== false;
+            $row['is_mfr']    = strpos($typeName, 'motion for reconsideration') !== false;
             $row['is_cases']  = $this->isCasesTypeName($typeName);
 
             // Check if this comm was referred via plenary_comm_first_reading
@@ -3570,6 +3571,9 @@ class PlenaryReadingController
             $this->requireOwnedByUser($documentId, $userId);
             $document = $this->requireDocument($documentId);
 
+            $typeName = strtolower(trim((string) ($document['document_type_name'] ?? $document['type_name'] ?? '')));
+            $isMfr = strpos($typeName, 'motion for reconsideration') !== false;
+
             // Must be a Communication
             if (!$this->isCommDocument($document)) {
                 throw new RuntimeException('This action is only available for Communication documents.');
@@ -3653,6 +3657,27 @@ class PlenaryReadingController
                 WHERE document_id = ?
             ")->execute([$finalizedStatusId, $userId, $documentId]);
 
+            if ($isMfr) {
+                $mfrStatus = strtoupper(trim($_POST['mfr_status'] ?? ''));
+                if (!in_array($mfrStatus, ['GRANTED', 'DENIED'], true)) {
+                    throw new RuntimeException('Select Granted or Denied as the Motion for Reconsideration status.');
+                }
+                $mfrUpdate = $this->pdo->prepare("
+                    UPDATE motion_reconsideration_links
+                    SET outcome = ?, outcome_remarks = ?, outcome_at = NOW(), outcome_by = ?, updated_at = NOW()
+                    WHERE mfr_document_id = ?
+                ");
+                $mfrUpdate->execute([
+                    $mfrStatus,
+                    $remarks !== '' ? $remarks : null,
+                    $userId,
+                    $documentId,
+                ]);
+                if ($mfrUpdate->rowCount() < 1) {
+                    throw new RuntimeException('This Motion for Reconsideration could not be linked to an outcome.');
+                }
+            }
+
             // Persist resolution files
             if (!empty($stagedResFiles)) {
                 $this->insertCommResolutionFiles($stagedResFiles, $documentId, null, $adoptionId, $userId);
@@ -3668,6 +3693,7 @@ class PlenaryReadingController
                 'adoption_id'       => $adoptionId,
                 'committee_report_id' => $committeeReportId,
                 'file_count'        => count($stagedResFiles),
+                'mfr_status'        => isset($isMfr) && $isMfr ? strtoupper(trim($_POST['mfr_status'] ?? '')) : null,
             ]);
 
             $this->insertEvent(

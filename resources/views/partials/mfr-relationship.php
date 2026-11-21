@@ -66,6 +66,33 @@ if (empty($mfrLink) && empty($relatedMotions)) {
         This Motion for Reconsideration challenges the following finalized case.
     </p>
 
+    <?php if (!empty($mfrLink['outcome']) && $mfrLink['outcome'] !== 'PENDING'): ?>
+    <?php
+        $mfrGranted = $mfrLink['outcome'] === 'GRANTED';
+        $mfrOutcomeClass = $mfrGranted
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+            : 'border-red-200 bg-red-50 text-red-900';
+    ?>
+    <div class="mt-4 rounded-2xl border <?= $mfrOutcomeClass ?> p-4">
+        <div class="flex items-start gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full <?= $mfrGranted ? 'bg-emerald-600' : 'bg-red-600' ?> text-white">
+                <?php if ($mfrGranted): ?>
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <?php else: ?>
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <?php endif; ?>
+            </span>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide opacity-75">Plenary Outcome</p>
+                <p class="mt-0.5 text-lg font-bold"><?= htmlspecialchars($mfrLink['outcome']) ?></p>
+                <?php if (!empty($mfrLink['outcome_remarks'])): ?>
+                <p class="mt-1 text-sm opacity-90"><?= htmlspecialchars($mfrLink['outcome_remarks']) ?></p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
 
         <div>
@@ -187,12 +214,21 @@ if (empty($mfrLink) && empty($relatedMotions)) {
                     </p>
                     <?php endif; ?>
                 </div>
-                <?php if (!empty($motion['mfr_status_badge_color'])): ?>
-                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                      style="background-color:<?= htmlspecialchars($motion['mfr_status_badge_color']) ?>;color:white;">
-                    <?= htmlspecialchars($motion['mfr_status'] ?? '') ?>
-                </span>
-                <?php endif; ?>
+                <div class="flex flex-wrap justify-end gap-2">
+                    <?php if (!empty($motion['mfr_status_badge_color'])): ?>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                          style="background-color:<?= htmlspecialchars($motion['mfr_status_badge_color']) ?>;color:white;">
+                        <?= htmlspecialchars($motion['mfr_status'] ?? '') ?>
+                    </span>
+                    <?php endif; ?>
+                    <?php if (!empty($motion['mfr_outcome']) && $motion['mfr_outcome'] !== 'PENDING'): ?>
+                    <?php $outcomeColor = $motion['mfr_outcome'] === 'GRANTED' ? '#059669' : '#DC2626'; ?>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
+                          style="background-color:<?= $outcomeColor ?>;">
+                        <?= htmlspecialchars($motion['mfr_outcome']) ?>
+                    </span>
+                    <?php endif; ?>
+                </div>
             </div>
 
             <div class="mt-2 flex flex-wrap gap-4 text-xs text-gray-500">

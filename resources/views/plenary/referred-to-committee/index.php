@@ -318,7 +318,7 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                         <?php elseif ($hearingApproved && !empty($row['is_plenary_comm_referred'])): ?>
                                             <!-- Communication returned from Committee: Adopt Committee Report -->
                                             <button type="button"
-                                                    onclick="openAdoptModal(<?= (int) $row['document_id'] ?>, <?= htmlspecialchars(json_encode((string) $row['tracking_number'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"
+                                                    onclick="openAdoptModal(<?= (int) $row['document_id'] ?>, <?= htmlspecialchars(json_encode((string) $row['tracking_number'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= !empty($row['is_mfr']) ? 'true' : 'false' ?>)"
                                                     class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -452,7 +452,7 @@ ob_start();
 
     <!-- Panel -->
     <div id="adopt-comm-panel"
-         class="relative z-10 w-full max-w-lg mx-4 bg-white rounded-2xl shadow-2xl border border-gray-100
+         class="relative z-10 w-full max-w-lg mx-4 max-h-[92vh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-gray-100
                 transform scale-95 opacity-0 transition-all duration-200">
 
         <!-- Header -->
@@ -479,6 +479,45 @@ ob_start();
                 <span id="adopt-tracking-number" class="font-semibold text-gray-900"></span>
             </p>
             <p class="text-xs text-gray-500">The returned Committee Report copy will also be available on Plenary Reports.</p>
+
+            <fieldset id="adopt-mfr-status-field" class="hidden rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+                <legend class="px-2 text-sm font-bold text-amber-900">
+                    Motion for Reconsideration Decision <span class="text-red-500" aria-hidden="true">*</span>
+                </legend>
+                <p class="mb-3 text-xs text-amber-700">Choose how Plenary will dispose of this Motion for Reconsideration.</p>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label data-mfr-card="GRANTED"
+                           class="cursor-pointer rounded-xl border-2 border-gray-200 bg-white p-4 transition hover:border-emerald-300 hover:bg-emerald-50/40">
+                        <span class="flex items-center gap-3">
+                            <input type="radio" name="mfr_status" value="GRANTED" class="sr-only" onchange="updateMfrStatusCards(this)">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </span>
+                            <span>
+                                <span class="block text-sm font-bold text-gray-900">Granted</span>
+                                <span class="mt-0.5 block text-xs text-gray-500">Approve the reconsideration</span>
+                            </span>
+                        </span>
+                    </label>
+                    <label data-mfr-card="DENIED"
+                           class="cursor-pointer rounded-xl border-2 border-gray-200 bg-white p-4 transition hover:border-red-300 hover:bg-red-50/40">
+                        <span class="flex items-center gap-3">
+                            <input type="radio" name="mfr_status" value="DENIED" class="sr-only" onchange="updateMfrStatusCards(this)">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </span>
+                            <span>
+                                <span class="block text-sm font-bold text-gray-900">Denied</span>
+                                <span class="mt-0.5 block text-xs text-gray-500">Reject the reconsideration</span>
+                            </span>
+                        </span>
+                    </label>
+                </div>
+            </fieldset>
 
             <fieldset>
                 <legend class="block text-sm font-medium text-gray-700 mb-2">
@@ -612,7 +651,7 @@ ob_start();
                                text-gray-700 hover:bg-gray-50 transition">
                     Cancel
                 </button>
-                <button type="submit"
+                <button type="submit" id="adopt-submit-btn"
                         class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm
                                font-semibold text-white hover:bg-emerald-700 transition
                                focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
@@ -620,7 +659,7 @@ ob_start();
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    Finalize Communication
+                    <span id="adopt-submit-label">Finalize Communication</span>
                 </button>
             </div>
         </form>
@@ -640,8 +679,43 @@ ob_start();
     var panel    = document.getElementById('adopt-comm-panel');
     var adoptOpen = false;
 
-    window.openAdoptModal = function (documentId, trackingNumber, subjectMatter) {
+    window.updateMfrStatusCards = function (radio) {
+        document.querySelectorAll('[data-mfr-card]').forEach(function (card) {
+            card.classList.remove('border-emerald-500', 'border-red-500', 'bg-emerald-50', 'bg-red-50', 'ring-2', 'ring-emerald-200', 'ring-red-200');
+            card.classList.add('border-gray-200', 'bg-white');
+        });
+        var card = radio.closest('[data-mfr-card]');
+        if (!card) return;
+        card.classList.remove('border-gray-200', 'bg-white');
+        if (radio.value === 'GRANTED') {
+            card.classList.add('border-emerald-500', 'bg-emerald-50', 'ring-2', 'ring-emerald-200');
+        } else {
+            card.classList.add('border-red-500', 'bg-red-50', 'ring-2', 'ring-red-200');
+        }
+    };
+
+    window.openAdoptModal = function (documentId, trackingNumber, subjectMatter, isMfr) {
         if (!modal || adoptOpen) return;
+
+        var mfrField = document.getElementById('adopt-mfr-status-field');
+        if (mfrField) {
+            mfrField.classList.toggle('hidden', !isMfr);
+            mfrField.querySelectorAll('input[name="mfr_status"]').forEach(function (input) {
+                input.required = !!isMfr;
+                input.checked = false;
+            });
+            document.querySelectorAll('[data-mfr-card]').forEach(function (card) {
+                card.classList.remove('border-emerald-500', 'border-red-500', 'bg-emerald-50', 'bg-red-50', 'ring-2', 'ring-emerald-200', 'ring-red-200');
+                card.classList.add('border-gray-200', 'bg-white');
+            });
+        }
+
+        document.getElementById('adopt-modal-title').textContent = isMfr
+            ? 'Adopt Motion for Reconsideration'
+            : 'Adopted Committee Report';
+        document.getElementById('adopt-submit-label').textContent = isMfr
+            ? 'Finalize Motion for Reconsideration'
+            : 'Finalize Communication';
 
         document.getElementById('adopt-document-id').value           = documentId;
         document.getElementById('adopt-tracking-number').textContent = trackingNumber;
