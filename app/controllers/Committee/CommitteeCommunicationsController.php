@@ -34,22 +34,17 @@ require_once __DIR__ . '/../../services/DocumentService.php';
  * ─────────────────────────────────────────────────────────────────────────────
  *  Documents with document_types.name = 'Communication' or
  *  'Motion for Reconsideration' are eligible for this workflow.
- *  Motion for Reconsideration follows the same workflow as Communication while
- *  retaining its mandatory link to a finalized Complaint / Administrative Cases
- *  document (motion_reconsideration_links table).
+ *  Motion for Reconsideration skips agenda scheduling and hearings and proceeds
+ *  directly to the Committee Report while retaining its mandatory case link.
  *
  * WORKFLOW STEPS
  * ─────────────────────────────────────────────────────────────────────────────
  *  1. Create communication record   → status: "Communication In Progress"
- *  2. Schedule agenda               → reuses agendas / agenda_committees /
- *                                     agenda_chairpersons tables
- *                                     status: "On Going"
- *  3. Record hearing outcome        → reuses committee_hearings table
- *                                     status: "Hearing Completed" (if APPROVED)
- *  4. Create committee report       → managed from Committee Hearings
- *                                     using the shared report workflow
+ *  2. Schedule agenda (Communication only)
+ *  3. Record hearing outcome (Communication only)
+ *  4. Create committee report       → directly for Motion for Reconsideration;
+ *                                     from Committee Hearings for Communication
  *  5. Return to Plenary             → handled by CommitteeReportsController
- *                                     (same as all other report types)
  *
  * DUPLICATE PREVENTION
  * ─────────────────────────────────────────────────────────────────────────────
@@ -232,7 +227,9 @@ class CommitteeCommunicationsController
         if ($this->commExistsForDocument($documentId)) {
             $existing = $this->getCommByDocumentId($documentId);
             flash_set('error', 'A Communication record already exists for this document.');
-            redirect('committee/communications/show?id=' . (int) $existing['id']);
+            redirect($this->isMotionForReconsideration($document)
+                ? 'committee/hearing?tab=approved'
+                : 'committee/communications/show?id=' . (int) $existing['id']);
         }
 
         $old     = old_get();
@@ -301,9 +298,13 @@ class CommitteeCommunicationsController
             redirect('committee/communications/create?document_id=' . $documentId);
         }
 
+        $isMotionForReconsideration = $this->isMotionForReconsideration($document);
+
         // ── Resolve required status ───────────────────────────────────────────
         try {
-            $inProgressStatus = $this->requireDocumentStatus('Communication In Progress');
+            $targetStatus = $this->requireDocumentStatus(
+                $isMotionForReconsideration ? 'Hearing Completed' : 'Communication In Progress'
+            );
         } catch (RuntimeException $e) {
             flash_set('error', $e->getMessage());
             redirect('committee/communications/create?document_id=' . $documentId);
@@ -334,10 +335,10 @@ class CommitteeCommunicationsController
             ]);
             $commId = (int) $this->pdo->lastInsertId();
 
-            // 2. Update document status → "Communication In Progress".
+            // 2. Update document status for the appropriate workflow.
             $this->pdo->prepare(
                 "UPDATE documents SET current_status_id = ?, updated_by = ? WHERE id = ?"
-            )->execute([$inProgressStatus['id'], $userId, $documentId]);
+            )->execute([$targetStatus['id'], $userId, $documentId]);
 
             // 3. Workflow event.
             $currentStatusId = (int) ($document['current_status_id'] ?? 0);
@@ -350,7 +351,7 @@ class CommitteeCommunicationsController
                 $documentId,
                 $userId,
                 $currentStatusId ?: null,
-                $inProgressStatus['id'],
+                $targetStatus['id'],
                 "Communication record opened: {$subject}",
                 json_encode([
                     'comm_id'     => $commId,
@@ -361,6 +362,43 @@ class CommitteeCommunicationsController
                 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ]);
 
+            if ($isMotionForReconsideration) {
+                $this->pdo->prepare("
+                    INSERT INTO committee_hearings
+                        (document_id, agenda_id, outcome, remarks, performed_by, performed_at, created_at)
+                    VALUES (?, NULL, 'APPROVED', ?, ?, NOW(), NOW())
+                ")->execute([
+                    $documentId,
+                    'Automatically approved for Motion for Reconsideration; no agenda or hearing required.',
+                    $userId,
+                ]);
+                $hearingId = (int) $this->pdo->lastInsertId();
+                $this->pdo->prepare(
+                    "UPDATE committee_communications SET hearing_id = ?, updated_at = NOW() WHERE id = ?"
+                )->execute([$hearingId, $commId]);
+
+                $this->pdo->prepare("
+                    INSERT INTO document_events (
+                        document_id, event_type, phase, performed_by,
+                        from_status_id, to_status_id, remarks, metadata
+                    ) VALUES (?, 'HEARING_COMPLETED', 'COMMITTEE', ?, ?, ?, ?, ?)
+                ")->execute([
+                    $documentId,
+                    $userId,
+                    $currentStatusId ?: null,
+                    $targetStatus['id'],
+                    'Motion for Reconsideration automatically approved; no agenda or hearing required.',
+                    json_encode([
+                        'hearing_id'            => $hearingId,
+                        'outcome'               => 'APPROVED',
+                        'auto_approved'         => true,
+                        'reason'                => 'MOTION_FOR_RECONSIDERATION',
+                        'performed_by'          => $userId,
+                        'ip_address'            => client_ip(),
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ]);
+            }
+
             $this->pdo->commit();
 
         } catch (PDOException $e) {
@@ -370,7 +408,9 @@ class CommitteeCommunicationsController
                 // Duplicate document_id — race condition.
                 $existing = $this->getCommByDocumentId($documentId);
                 flash_set('error', 'A Communication record was just created by a concurrent request.');
-                redirect('committee/communications/show?id=' . (int) ($existing['id'] ?? 0));
+                redirect($isMotionForReconsideration
+                    ? 'committee/hearing?tab=approved'
+                    : 'committee/communications/show?id=' . (int) ($existing['id'] ?? 0));
             }
             system_log('ERROR', 'CommitteeCommunicationsController::store PDO exception', [
                 'document_id' => $documentId,
@@ -406,6 +446,14 @@ class CommitteeCommunicationsController
         ], "Communication record #{$commId} created for document ID {$documentId} (user: {$username})");
 
         old_clear();
+        if ($isMotionForReconsideration) {
+            flash_set(
+                'success',
+                'Motion for Reconsideration approved. You can now share it to a Committee Report from Approved Hearings.'
+            );
+            redirect('committee/hearing?tab=approved');
+        }
+
         flash_set('success', 'Communication record created. You may now schedule it for a hearing agenda.');
         redirect('committee/communications/show?id=' . $commId);
     }
@@ -543,6 +591,7 @@ class CommitteeCommunicationsController
             redirect('committee/inbox');
         }
         $this->requireCommOwnership($comm, $userId);
+        $this->rejectMfrAgendaHearing($comm, $commId);
 
         // Guard: agenda already scheduled
         if (!empty($comm['agenda_id'])) {
@@ -600,6 +649,7 @@ class CommitteeCommunicationsController
             redirect('committee/inbox');
         }
         $this->requireCommOwnership($comm, $userId);
+        $this->rejectMfrAgendaHearing($comm, $commId);
 
         // Guard: already scheduled
         if (!empty($comm['agenda_id'])) {
@@ -901,6 +951,7 @@ class CommitteeCommunicationsController
             redirect('committee/inbox');
         }
         $this->requireCommOwnership($comm, $userId);
+        $this->rejectMfrAgendaHearing($comm, $commId);
 
         // Must have an agenda scheduled first
         if (empty($comm['agenda_id'])) {
@@ -952,6 +1003,7 @@ class CommitteeCommunicationsController
             redirect('committee/inbox');
         }
         $this->requireCommOwnership($comm, $userId);
+        $this->rejectMfrAgendaHearing($comm, $commId);
 
         if (empty($comm['agenda_id'])) {
             flash_set('error', 'No agenda scheduled for this communication.');
@@ -1118,22 +1170,28 @@ class CommitteeCommunicationsController
             redirect('committee/inbox');
         }
         $this->requireCommOwnership($comm, $userId);
+        $this->rejectMfrAgendaHearing($comm, $commId);
 
-        if (empty($comm['hearing_id'])) {
+        $isMotionForReconsideration = $this->isMotionForReconsideration($comm);
+
+        if (!$isMotionForReconsideration && empty($comm['hearing_id'])) {
             flash_set('error', 'A hearing must be recorded before creating a Committee Report.');
             redirect('committee/communications/show?id=' . $commId);
         }
 
-        // Load hearing — must be APPROVED
-        $hearingStmt = $this->pdo->prepare(
-            "SELECT * FROM committee_hearings WHERE id = ? LIMIT 1"
-        );
-        $hearingStmt->execute([(int) $comm['hearing_id']]);
-        $hearing = $hearingStmt->fetch();
+        $hearing = [];
+        if (!$isMotionForReconsideration) {
+            // Regular Communications require an approved hearing first.
+            $hearingStmt = $this->pdo->prepare(
+                "SELECT * FROM committee_hearings WHERE id = ? LIMIT 1"
+            );
+            $hearingStmt->execute([(int) $comm['hearing_id']]);
+            $hearing = $hearingStmt->fetch() ?: [];
 
-        if (!$hearing || $hearing['outcome'] !== 'APPROVED') {
-            flash_set('error', 'Only Approved hearings can produce a Committee Report.');
-            redirect('committee/communications/show?id=' . $commId);
+            if (($hearing['outcome'] ?? null) !== 'APPROVED') {
+                flash_set('error', 'Only Approved hearings can produce a Committee Report.');
+                redirect('committee/communications/show?id=' . $commId);
+            }
         }
 
         // Guard: report already created
@@ -1144,25 +1202,42 @@ class CommitteeCommunicationsController
 
         $documentId = (int) $comm['document_id'];
 
-        // Include committees already on the agenda even if they are no longer active.
-        $agendaCommitteeStmt = $this->pdo->prepare("
-            SELECT c.id, c.name
-            FROM committees c
-            WHERE (c.is_active = 1 AND c.is_deleted = 0)
-               OR EXISTS (
-                    SELECT 1 FROM agenda_committees ac
-                    WHERE ac.agenda_id = ? AND ac.committee_id = c.id
-               )
-            ORDER BY c.name ASC
-        ");
-        $agendaCommitteeStmt->execute([(int) $comm['agenda_id']]);
+        if ($isMotionForReconsideration) {
+            // MFR reports use committees assigned to the document, not an agenda.
+            $agendaCommitteeStmt = $this->pdo->prepare("
+                SELECT c.id, c.name
+                FROM committees c
+                WHERE (c.is_active = 1 AND c.is_deleted = 0)
+                   OR EXISTS (
+                        SELECT 1 FROM document_committees dc
+                        WHERE dc.document_id = ? AND dc.committee_id = c.id
+                   )
+                ORDER BY c.name ASC
+            ");
+            $agendaCommitteeStmt->execute([$documentId]);
+        } else {
+            // Include committees already on the agenda even if they are no longer active.
+            $agendaCommitteeStmt = $this->pdo->prepare("
+                SELECT c.id, c.name
+                FROM committees c
+                WHERE (c.is_active = 1 AND c.is_deleted = 0)
+                   OR EXISTS (
+                        SELECT 1 FROM agenda_committees ac
+                        WHERE ac.agenda_id = ? AND ac.committee_id = c.id
+                   )
+                ORDER BY c.name ASC
+            ");
+            $agendaCommitteeStmt->execute([(int) $comm['agenda_id']]);
+        }
         $agendaCommittees = $agendaCommitteeStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // IDs of committees already on this agenda (used for default pre-selection).
-        $acStmt = $this->pdo->prepare(
-            "SELECT committee_id FROM agenda_committees WHERE agenda_id = ?"
-        );
-        $acStmt->execute([(int) $comm['agenda_id']]);
+        // Pre-select the committees already assigned to the document or agenda.
+        $acStmt = $isMotionForReconsideration
+            ? $this->pdo->prepare("SELECT committee_id FROM document_committees WHERE document_id = ?")
+            : $this->pdo->prepare("SELECT committee_id FROM agenda_committees WHERE agenda_id = ?");
+        $acStmt->execute([
+            $isMotionForReconsideration ? $documentId : (int) $comm['agenda_id']
+        ]);
         $agendaCommitteeIds = array_column($acStmt->fetchAll(PDO::FETCH_ASSOC), 'committee_id');
 
         $old     = old_get();
@@ -1201,8 +1276,11 @@ class CommitteeCommunicationsController
             redirect('committee/inbox');
         }
         $this->requireCommOwnership($comm, $userId);
+        $this->rejectMfrAgendaHearing($comm, $commId);
 
-        if (empty($comm['hearing_id'])) {
+        $isMotionForReconsideration = $this->isMotionForReconsideration($comm);
+
+        if (!$isMotionForReconsideration && empty($comm['hearing_id'])) {
             flash_set('error', 'No hearing record found for this communication.');
             redirect('committee/communications/show?id=' . $commId);
         }
@@ -1213,19 +1291,21 @@ class CommitteeCommunicationsController
         }
 
         $documentId = (int) $comm['document_id'];
-        $hearingId  = (int) $comm['hearing_id'];
-        $agendaId   = (int) $comm['agenda_id'];
+        $hearingId  = $isMotionForReconsideration ? null : (int) $comm['hearing_id'];
+        $agendaId   = $isMotionForReconsideration ? null : (int) $comm['agenda_id'];
 
-        // Verify hearing is APPROVED
-        $hearingStmt = $this->pdo->prepare(
-            "SELECT outcome FROM committee_hearings WHERE id = ? AND document_id = ? LIMIT 1"
-        );
-        $hearingStmt->execute([$hearingId, $documentId]);
-        $hearingRow = $hearingStmt->fetch();
+        if (!$isMotionForReconsideration) {
+            // Verify that the Communication hearing is still APPROVED.
+            $hearingStmt = $this->pdo->prepare(
+                "SELECT outcome FROM committee_hearings WHERE id = ? AND document_id = ? LIMIT 1"
+            );
+            $hearingStmt->execute([$hearingId, $documentId]);
+            $hearingRow = $hearingStmt->fetch();
 
-        if (!$hearingRow || $hearingRow['outcome'] !== 'APPROVED') {
-            flash_set('error', 'Only Approved hearings can produce a Committee Report.');
-            redirect('committee/communications/show?id=' . $commId);
+            if (!$hearingRow || $hearingRow['outcome'] !== 'APPROVED') {
+                flash_set('error', 'Only Approved hearings can produce a Committee Report.');
+                redirect('committee/communications/show?id=' . $commId);
+            }
         }
 
         // ── Collect inputs ────────────────────────────────────────────────────
@@ -1285,19 +1365,27 @@ class CommitteeCommunicationsController
 
         // ── Validate committee IDs ────────────────────────────────────────────
         $cPh  = implode(',', array_fill(0, count($committeeIds), '?'));
+        $committeeMembershipCheck = $isMotionForReconsideration
+            ? "EXISTS (
+                    SELECT 1 FROM document_committees dc
+                    WHERE dc.document_id = ?
+                      AND dc.committee_id = c.id
+               )"
+            : "EXISTS (
+                    SELECT 1 FROM agenda_committees ac
+                    WHERE ac.agenda_id = ?
+                      AND ac.committee_id = c.id
+               )";
+        $committeeSourceId = $isMotionForReconsideration ? $documentId : $agendaId;
         $cChk = $this->pdo->prepare(
             "SELECT c.id FROM committees c
              WHERE c.id IN ({$cPh})
                AND (
                     (c.is_active = 1 AND c.is_deleted = 0)
-                    OR EXISTS (
-                        SELECT 1 FROM agenda_committees ac
-                        WHERE ac.agenda_id = ?
-                          AND ac.committee_id = c.id
-                    )
+                    OR {$committeeMembershipCheck}
                )"
         );
-        $cChk->execute([...$committeeIds, $agendaId]);
+        $cChk->execute([...$committeeIds, $committeeSourceId]);
         $validCIds = array_column($cChk->fetchAll(PDO::FETCH_ASSOC), 'id');
 
         if (count($validCIds) !== count($committeeIds)) {
@@ -1319,8 +1407,10 @@ class CommitteeCommunicationsController
 
         // ── Status ────────────────────────────────────────────────────────────
         try {
-            $reportStatus         = $this->requireDocumentStatus('Committee Report Created');
-            $hearingCompletedStat = $this->requireDocumentStatus('Hearing Completed');
+            $reportStatus = $this->requireDocumentStatus('Committee Report Created');
+            $sourceStatusId = $isMotionForReconsideration
+                ? ((int) ($comm['current_status_id'] ?? 0) ?: null)
+                : (int) $this->requireDocumentStatus('Hearing Completed')['id'];
         } catch (RuntimeException $e) {
             flash_set('error', $e->getMessage());
             redirect('committee/communications/report?id=' . $commId);
@@ -1398,7 +1488,7 @@ class CommitteeCommunicationsController
             ")->execute([
                 $documentId,
                 $userId,
-                $hearingCompletedStat['id'],
+                $sourceStatusId,
                 $reportStatus['id'],
                 "Committee Report #{$reportNumber} created (Communication workflow).",
                 json_encode([
@@ -1566,6 +1656,22 @@ class CommitteeCommunicationsController
         if ((int) ($comm['assigned_by'] ?? 0) !== $userId) {
             flash_set('error', 'You do not have ownership of this Communication record.');
             redirect('committee/inbox');
+        }
+    }
+
+    private function isMotionForReconsideration(array $document): bool
+    {
+        return ($document['document_type_name'] ?? null) === DocumentService::mfrTypeName();
+    }
+
+    private function rejectMfrAgendaHearing(array $comm, int $commId): void
+    {
+        if ($this->isMotionForReconsideration($comm)) {
+            flash_set(
+                'error',
+                'Motion for Reconsideration is automatically approved and must be shared to a Committee Report from Approved Hearings.'
+            );
+            redirect('committee/hearing?tab=approved');
         }
     }
 

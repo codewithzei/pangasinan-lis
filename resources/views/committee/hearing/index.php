@@ -104,7 +104,7 @@ ob_start();
                     Committee Hearings
                 </h1>
                 <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
-                    Manage scheduled hearings and finalized outcomes entered from Cases.
+                    Manage scheduled hearings, approved outcomes, and finalized cases.
                 </p>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full bg-white/10"></div>
@@ -344,6 +344,7 @@ ob_start();
                             $isScheduled    = ($outcomeLabel === null);
                             $isApproved     = ($outcomeLabel === 'APPROVED');
                             $isReset        = ($outcomeLabel === 'RESET');
+                            $isMfr          = ($doc['document_type_name'] ?? '') === 'Motion for Reconsideration';
                             $isCaseOutcome  = !empty($doc['is_case_outcome']);
                             $isCaseOwner    = $isCaseOutcome
                                 && (int) ($doc['case_owner_id'] ?? 0) === (int) ($userId ?? 0);
@@ -563,6 +564,19 @@ ob_start();
                                             </a>
 
                                         <?php elseif ($isApproved && empty($doc['report_id'])): ?>
+                                            <?php if ($isMfr): ?>
+                                                <a href="<?= BASE_URL ?>/committee/hearing/share-to-report?<?= http_build_query(['document_ids' => [(int) $doc['document_id']]]) ?>"
+                                                   class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200
+                                                          bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100
+                                                          focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                                                   title="Share to Committee Report"
+                                                   aria-label="Share to Committee Report">
+                                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                              d="M12 4v16m8-8H4"/>
+                                                    </svg>
+                                                </a>
+                                            <?php else: ?>
                                             <a href="<?= BASE_URL ?>/committee/hearing/show?id=<?= (int) $doc['document_id'] ?>"
                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200
                                                       bg-white text-gray-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600
@@ -589,8 +603,10 @@ ob_start();
                                                     </svg>
                                                 </a>
                                             <?php endif; ?>
+                                            <?php endif; ?>
 
                                         <?php elseif ($isApproved && !empty($doc['report_id'])): ?>
+                                            <?php if (!$isMfr): ?>
                                             <a href="<?= BASE_URL ?>/committee/hearing/show?id=<?= (int) $doc['document_id'] ?>"
                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200
                                                       bg-white text-gray-500 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600
@@ -604,6 +620,7 @@ ob_start();
                                                           d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                                 </svg>
                                             </a>
+                                            <?php endif; ?>
                                             <a href="<?= BASE_URL ?>/committee/hearing/report/show?id=<?= (int) $doc['report_id'] ?>"
                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200
                                                       bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100

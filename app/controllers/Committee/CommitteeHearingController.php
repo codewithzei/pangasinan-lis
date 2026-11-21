@@ -6,8 +6,7 @@ require_once __DIR__ . '/../../services/DocumentService.php';
 /**
  * CommitteeHearingController
  *
- * Manages the Committee Hearing workflow — the step that follows a successfully
- * scheduled Agenda.
+ * Manages scheduled committee hearings and approved agenda-free MFR records.
  *
  * ROUTE MAP
  * ─────────────────────────────────────────────────────────────────────────────
@@ -1110,6 +1109,26 @@ class CommitteeHearingController
                 SELECT cc.document_id
                 FROM committee_cases cc
                 WHERE cc.final_outcome IS NOT NULL
+
+                UNION
+
+                SELECT d.id
+                FROM documents d
+                INNER JOIN document_types dt ON dt.id = d.document_type_id
+                INNER JOIN committee_hearings ch
+                    ON ch.document_id = d.id
+                   AND ch.id = (
+                       SELECT MAX(ch2.id)
+                       FROM committee_hearings ch2
+                       WHERE ch2.document_id = d.id
+                   )
+                   AND ch.agenda_id IS NULL
+                   AND ch.outcome = 'APPROVED'
+                WHERE dt.name = 'Motion for Reconsideration'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM committee_cases cc
+                      WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+                  )
             ) hearing_documents
         ");
         $all = (int) $allStmt->fetchColumn();
@@ -1127,7 +1146,9 @@ class CommitteeHearingController
 
         // Outcome counts represent the latest scheduled agenda, not old cycles.
         $appStmt = $this->countLatestAgendaOutcome('APPROVED');
-        $approved = (int) $appStmt->fetchColumn() + $this->countFinalCaseDocuments('APPROVED');
+        $approved = (int) $appStmt->fetchColumn()
+            + $this->countFinalCaseDocuments('APPROVED')
+            + $this->countAutoApprovedMfrDocuments();
 
         // "deferred" = outcome DEFERRED
         $defStmt = $this->countLatestAgendaOutcome('DEFERRED');
@@ -1159,6 +1180,26 @@ class CommitteeHearingController
               {$outcomeFilter}
         ");
         $stmt->execute($outcome === null ? [] : [$outcome]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    private function countAutoApprovedMfrDocuments(): int
+    {
+        $stmt = $this->pdo->query("
+            SELECT COUNT(DISTINCT d.id)
+            FROM documents d
+            INNER JOIN document_types dt ON dt.id = d.document_type_id
+            INNER JOIN committee_hearings ch
+                ON ch.document_id = d.id
+               AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
+               AND ch.agenda_id IS NULL
+               AND ch.outcome = 'APPROVED'
+            WHERE dt.name = 'Motion for Reconsideration'
+              AND NOT EXISTS (
+                  SELECT 1 FROM committee_cases cc
+                  WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+              )
+        ");
         return (int) $stmt->fetchColumn();
     }
 
@@ -1236,8 +1277,8 @@ class CommitteeHearingController
     }
 
     /**
-     * "All" tab: agenda hearings plus finalized case outcomes. A finalized
-     * Cases record takes precedence when a document also has an agenda.
+     * "All" tab: agenda hearings, auto-approved MFRs, and finalized case outcomes.
+     * A finalized Cases record takes precedence when a document also has an agenda.
      */
     private function queryAllTab(
         string $searchWhere, array $searchParams, int $perPage, int $offset
@@ -1263,9 +1304,30 @@ class CommitteeHearingController
                 WHERE cc.final_outcome IS NOT NULL
                   {$searchWhere}
                 GROUP BY d.id
+
+                UNION
+
+                SELECT d.id
+                FROM documents d
+                INNER JOIN document_types dt ON dt.id = d.document_type_id
+                INNER JOIN committee_hearings ch
+                    ON ch.document_id = d.id
+                   AND ch.id = (
+                       SELECT MAX(ch2.id)
+                       FROM committee_hearings ch2
+                       WHERE ch2.document_id = d.id
+                   )
+                   AND ch.agenda_id IS NULL
+                   AND ch.outcome = 'APPROVED'
+                WHERE dt.name = 'Motion for Reconsideration'
+                  {$searchWhere}
+                  AND NOT EXISTS (
+                      SELECT 1 FROM committee_cases cc
+                      WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+                  )
             ) hearing_documents
         ");
-        $countStmt->execute([...$searchParams, ...$searchParams]);
+        $countStmt->execute([...$searchParams, ...$searchParams, ...$searchParams]);
         $total = (int) $countStmt->fetchColumn();
 
         $listStmt = $this->pdo->prepare("
@@ -1313,6 +1375,16 @@ class CommitteeHearingController
                       SELECT 1 FROM committee_cases cc
                       WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
                   )
+                  AND NOT (
+                      dt.name = 'Motion for Reconsideration'
+                      AND EXISTS (
+                          SELECT 1
+                          FROM committee_hearings auto_approved
+                          WHERE auto_approved.document_id = d.id
+                            AND auto_approved.agenda_id IS NULL
+                            AND auto_approved.outcome = 'APPROVED'
+                      )
+                  )
                   {$searchWhere}
                 GROUP BY
                     d.id, d.tracking_number, d.subject_matter,
@@ -1357,11 +1429,80 @@ class CommitteeHearingController
                 LEFT JOIN committee_reports cr ON cr.id = crd.committee_report_id
                 WHERE cc.final_outcome IS NOT NULL
                   {$searchWhere}
+
+                UNION ALL
+
+                SELECT
+                    d.id                            AS document_id,
+                    d.tracking_number,
+                    d.subject_matter,
+                    dt.name                         AS document_type_name,
+                    dt.badge_color                  AS document_type_badge_color,
+                    ds.name                         AS status,
+                    ds.badge_color                  AS status_badge_color,
+                    NULL                            AS agenda_id,
+                    NULL                            AS agenda_date,
+                    NULL                            AS agenda_time,
+                    NULL                            AS venue,
+                    GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ')
+                                                    AS committee_names,
+                    ch.id                           AS hearing_id,
+                    ch.outcome                      AS hearing_outcome,
+                    ch.performed_at                 AS outcome_date,
+                    ua_ch.username                  AS outcome_by,
+                    cr.id                           AS report_id,
+                    cr.report_number,
+                    cr.report_type,
+                    NULL                            AS case_id,
+                    NULL                            AS case_owner_id,
+                    0                               AS is_case_outcome
+                FROM documents d
+                INNER JOIN document_types dt ON dt.id = d.document_type_id
+                INNER JOIN committee_hearings ch
+                    ON ch.document_id = d.id
+                   AND ch.id = (
+                       SELECT MAX(ch2.id)
+                       FROM committee_hearings ch2
+                       WHERE ch2.document_id = d.id
+                   )
+                   AND ch.agenda_id IS NULL
+                   AND ch.outcome = 'APPROVED'
+                LEFT JOIN document_committees dc ON dc.document_id = d.id
+                LEFT JOIN committees c ON c.id = dc.committee_id
+                LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+                LEFT JOIN user_accounts ua_ch ON ua_ch.id = ch.performed_by
+                LEFT JOIN committee_report_documents crd ON crd.document_id = d.id
+                LEFT JOIN committee_reports cr ON cr.id = crd.committee_report_id
+                WHERE dt.name = 'Motion for Reconsideration'
+                  {$searchWhere}
+                  AND NOT EXISTS (
+                      SELECT 1 FROM committee_cases cc
+                      WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+                  )
+                GROUP BY
+                    d.id, d.tracking_number, d.subject_matter,
+                    dt.name, dt.badge_color, ds.name, ds.badge_color,
+                    ch.id, ch.outcome, ch.performed_at, ua_ch.username,
+                    cr.id, cr.report_number, cr.report_type
             ) hearing_rows
             ORDER BY COALESCE(outcome_date, agenda_date) DESC, document_id DESC
             LIMIT ? OFFSET ?
         ");
-        $listStmt->execute([...$searchParams, ...$searchParams, $perPage, $offset]);
+        $listParams = [
+            ...$searchParams,
+            ...$searchParams,
+            ...$searchParams,
+            $perPage,
+            $offset,
+        ];
+        foreach ($listParams as $index => $param) {
+            $listStmt->bindValue(
+                $index + 1,
+                $param,
+                is_int($param) ? PDO::PARAM_INT : PDO::PARAM_STR
+            );
+        }
+        $listStmt->execute();
         return [$listStmt->fetchAll(), $total];
     }
 
@@ -1465,6 +1606,27 @@ class CommitteeHearingController
         $countStmt->execute([$outcome, ...$searchParams]);
         $total = (int) $countStmt->fetchColumn();
 
+        if ($outcome === 'APPROVED') {
+            $mfrCountStmt = $this->pdo->prepare("
+                SELECT COUNT(DISTINCT d.id)
+                FROM documents d
+                INNER JOIN document_types dt ON dt.id = d.document_type_id
+                INNER JOIN committee_hearings ch
+                    ON ch.document_id = d.id
+                   AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
+                   AND ch.agenda_id IS NULL
+                   AND ch.outcome = 'APPROVED'
+                WHERE dt.name = 'Motion for Reconsideration'
+                  {$searchWhere}
+                  AND NOT EXISTS (
+                      SELECT 1 FROM committee_cases cc
+                      WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+                  )
+            ");
+            $mfrCountStmt->execute($searchParams);
+            $total += (int) $mfrCountStmt->fetchColumn();
+        }
+
         if (!$requireReadyStatus) {
             $caseCountStmt = $this->pdo->prepare("
                 SELECT COUNT(DISTINCT cc.document_id)
@@ -1515,6 +1677,59 @@ class CommitteeHearingController
             WHERE cc.final_outcome = ?
               {$searchWhere}
         ";
+
+        $mfrOutcomeQuery = $outcome === 'APPROVED' ? "
+            UNION ALL
+
+            SELECT
+                d.id                            AS document_id,
+                d.tracking_number,
+                d.subject_matter,
+                dt.name                         AS document_type_name,
+                dt.badge_color                  AS document_type_badge_color,
+                ds.name                         AS status,
+                ds.badge_color                  AS status_badge_color,
+                NULL                            AS agenda_id,
+                NULL                            AS agenda_date,
+                NULL                            AS agenda_time,
+                NULL                            AS venue,
+                GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ')
+                                                AS committee_names,
+                ch.id                           AS hearing_id,
+                ch.outcome                      AS hearing_outcome,
+                ch.performed_at                 AS outcome_date,
+                ua_ch.username                  AS outcome_by,
+                cr.id                           AS report_id,
+                cr.report_number,
+                cr.report_type,
+                NULL                            AS case_id,
+                NULL                            AS case_owner_id,
+                0                               AS is_case_outcome
+            FROM documents d
+            INNER JOIN document_types dt ON dt.id = d.document_type_id
+            INNER JOIN committee_hearings ch
+                ON ch.document_id = d.id
+               AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
+               AND ch.agenda_id IS NULL
+               AND ch.outcome = 'APPROVED'
+            LEFT JOIN document_committees dc ON dc.document_id = d.id
+            LEFT JOIN committees c ON c.id = dc.committee_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            LEFT JOIN user_accounts ua_ch ON ua_ch.id = ch.performed_by
+            LEFT JOIN committee_report_documents crd ON crd.document_id = d.id
+            LEFT JOIN committee_reports cr ON cr.id = crd.committee_report_id
+            WHERE dt.name = 'Motion for Reconsideration'
+              {$searchWhere}
+              AND NOT EXISTS (
+                  SELECT 1 FROM committee_cases cc
+                  WHERE cc.document_id = d.id AND cc.final_outcome IS NOT NULL
+              )
+            GROUP BY
+                d.id, d.tracking_number, d.subject_matter,
+                dt.name, dt.badge_color, ds.name, ds.badge_color,
+                ch.id, ch.outcome, ch.performed_at, ua_ch.username,
+                cr.id, cr.report_number, cr.report_type
+        " : '';
 
         $listStmt = $this->pdo->prepare("
             SELECT
@@ -1569,11 +1784,26 @@ class CommitteeHearingController
                 ch.id, ch.outcome, ch.performed_at, ua_ch.username,
                 cr.id, cr.report_number, cr.report_type
             {$caseOutcomeQuery}
+            {$mfrOutcomeQuery}
             ORDER BY outcome_date DESC, document_id DESC
             LIMIT ? OFFSET ?
         ");
         $caseOutcomeParams = $requireReadyStatus ? [] : [$outcome, ...$searchParams];
-        $listStmt->execute([$outcome, ...$searchParams, ...$caseOutcomeParams, $perPage, $offset]);
+        $mfrOutcomeParams = $outcome === 'APPROVED' ? $searchParams : [];
+        $listParams = [
+            $outcome, ...$searchParams,
+            ...$caseOutcomeParams,
+            ...$mfrOutcomeParams,
+            $perPage, $offset,
+        ];
+        foreach ($listParams as $index => $param) {
+            $listStmt->bindValue(
+                $index + 1,
+                $param,
+                is_int($param) ? PDO::PARAM_INT : PDO::PARAM_STR
+            );
+        }
+        $listStmt->execute();
         return [$listStmt->fetchAll(), $total];
     }
 
@@ -1708,9 +1938,18 @@ class CommitteeHearingController
                     (cc.final_outcome IS NOT NULL AND cc.assigned_by = ?)
                     OR (
                         cc.final_outcome IS NULL
-                        AND ag.id IS NOT NULL
-                        AND ch.outcome IS NOT NULL
-                        AND ch.outcome <> 'RESET'
+                        AND (
+                            (
+                                ag.id IS NOT NULL
+                                AND ch.outcome IS NOT NULL
+                                AND ch.outcome <> 'RESET'
+                            )
+                            OR (
+                                dt.name = 'Motion for Reconsideration'
+                                AND ch.agenda_id IS NULL
+                                AND ch.outcome = 'APPROVED'
+                            )
+                        )
                     )
               )
             ORDER BY d.tracking_number ASC
@@ -1729,8 +1968,8 @@ class CommitteeHearingController
         $validatedIds = array_column($selectedDocuments, 'document_id');
 
         // ── Build per-document committee mapping ──────────────────────────────
-        // Hearing documents use agenda_committees; case outcomes use the
-        // document_committees assigned to the case's document.
+        // Hearing documents use agenda_committees; cases and agenda-free MFR
+        // auto-approvals use document_committees.
         //
         // We do a single query for all validated document IDs to avoid N+1 queries.
         // The result is keyed by document_id so the view can warn when a document
@@ -1755,12 +1994,20 @@ class CommitteeHearingController
                 LEFT JOIN committee_cases cc
                     ON cc.document_id = d.id
                    AND cc.id = (SELECT MAX(cc2.id) FROM committee_cases cc2 WHERE cc2.document_id = d.id)
+                LEFT JOIN document_types dt ON dt.id = d.document_type_id
+                LEFT JOIN committee_hearings ch
+                    ON ch.document_id = d.id
+                   AND ch.id = (SELECT MAX(ch2.id) FROM committee_hearings ch2 WHERE ch2.document_id = d.id)
                 LEFT JOIN agenda_committees ac
                     ON ac.agenda_id = ag.id
                    AND cc.final_outcome IS NULL
+                   AND (ch.id IS NULL OR ch.agenda_id IS NOT NULL)
                 LEFT JOIN document_committees dc
                     ON dc.document_id = d.id
-                   AND cc.final_outcome IS NOT NULL
+                   AND (
+                       cc.final_outcome IS NOT NULL
+                       OR (dt.name = 'Motion for Reconsideration' AND ch.agenda_id IS NULL)
+                   )
                 INNER JOIN committees c
                     ON c.id = COALESCE(ac.committee_id, dc.committee_id)
                    AND c.is_active = 1
@@ -2022,14 +2269,24 @@ class CommitteeHearingController
             LEFT JOIN committee_cases cc
                 ON cc.document_id = d.id
                AND cc.id = (SELECT MAX(cc2.id) FROM committee_cases cc2 WHERE cc2.document_id = d.id)
+            LEFT JOIN document_types dt ON dt.id = d.document_type_id
             WHERE d.id IN ({$ph})
               AND (
                     (cc.final_outcome IS NOT NULL AND cc.assigned_by = ?)
                     OR (
                         cc.final_outcome IS NULL
-                        AND ag.id IS NOT NULL
-                        AND ch.outcome IS NOT NULL
-                        AND ch.outcome <> 'RESET'
+                        AND (
+                            (
+                                ag.id IS NOT NULL
+                                AND ch.outcome IS NOT NULL
+                                AND ch.outcome <> 'RESET'
+                            )
+                            OR (
+                                dt.name = 'Motion for Reconsideration'
+                                AND ch.agenda_id IS NULL
+                                AND ch.outcome = 'APPROVED'
+                            )
+                        )
                     )
               )
         ");

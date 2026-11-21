@@ -363,6 +363,49 @@ try {
     ok('4f: in_array check accepts Motion for Reconsideration against ELIGIBLE_TYPES',
         in_array('Motion for Reconsideration', $eligibleTypes ?? [], true));
 
+    $communicationsController = (new ReflectionClass(CommitteeCommunicationsController::class))
+        ->newInstanceWithoutConstructor();
+    $isMfr = new ReflectionMethod(CommitteeCommunicationsController::class, 'isMotionForReconsideration');
+    $isMfr->setAccessible(true);
+    ok('4g: Motion for Reconsideration uses the automatic-approval workflow',
+        $isMfr->invoke($communicationsController, ['document_type_name' => 'Motion for Reconsideration']));
+    ok('4h: regular Communication does not use the automatic-approval workflow',
+        !$isMfr->invoke($communicationsController, ['document_type_name' => 'Communication']));
+
+    $communicationsControllerSrc = (string) file_get_contents(
+        __DIR__ . '/../app/controllers/Committee/CommitteeCommunicationsController.php'
+    );
+    $communicationsShowSrc = (string) file_get_contents(
+        __DIR__ . '/../resources/views/committee/communications/show.php'
+    );
+    $hearingControllerSrc = (string) file_get_contents(
+        __DIR__ . '/../app/controllers/Committee/CommitteeHearingController.php'
+    );
+    $mfrMigrationSrc = (string) file_get_contents(
+        __DIR__ . '/../database/migrations/106_auto_approve_mfr_hearings.php'
+    );
+    ok('4i: MFR communication creation records an approved hearing without an agenda',
+        str_contains($communicationsControllerSrc, "VALUES (?, NULL, 'APPROVED', ?, ?, NOW(), NOW())")
+        && str_contains($communicationsControllerSrc, "'Hearing Completed'")
+        && str_contains($communicationsControllerSrc, 'redirect(\'committee/hearing?tab=approved\')'));
+    ok('4j: MFR appears in Approved Hearings and uses document committees',
+        str_contains($hearingControllerSrc, 'countAutoApprovedMfrDocuments')
+        && str_contains($hearingControllerSrc, 'dt.name = \'Motion for Reconsideration\'')
+        && str_contains($hearingControllerSrc, 'LEFT JOIN document_committees dc ON dc.document_id = d.id'));
+    ok('4n: MFR auto-approvals are included in All Hearings and its count',
+        str_contains($hearingControllerSrc, 'auto-approved MFRs')
+        && str_contains($hearingControllerSrc, 'UNION ALL')
+        && str_contains($hearingControllerSrc, 'ch.agenda_id IS NULL'));
+    ok('4k: MFR approved-hearing migration allows null agendas and backfills existing records',
+        str_contains($mfrMigrationSrc, 'MODIFY COLUMN agenda_id BIGINT UNSIGNED NULL')
+        && str_contains($mfrMigrationSrc, "SELECT d.id, NULL, 'APPROVED'")
+        && str_contains($mfrMigrationSrc, 'SET comm.hearing_id = ch.id'));
+    ok('4l: MFR detail page directs users to Approved Hearings',
+        str_contains($communicationsShowSrc, 'committee/hearing?tab=approved')
+        && str_contains($communicationsShowSrc, 'Share it to a Committee Report from Approved Hearings'));
+    ok('4m: MFR cannot access agenda, hearing, or direct-report routes',
+        substr_count($communicationsControllerSrc, '$this->rejectMfrAgendaHearing($comm, $commId);') >= 6);
+
 } catch (Throwable $e) {
     fail('Group 4 exception', $e->getMessage());
 }

@@ -24,6 +24,7 @@ $linkedReport  = $linkedReport  ?? null;
 $commId     = (int)    ($comm['id']          ?? 0);
 $documentId = (int)    ($comm['document_id'] ?? 0);
 $subject    = (string) ($comm['subject']     ?? '');
+$isMotionForReconsideration = ($comm['document_type_name'] ?? null) === 'Motion for Reconsideration';
 
 // Workflow step helper — which step are we currently on?
 $hasAgenda  = !empty($comm['agenda_id']);
@@ -375,13 +376,20 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                     </p>
                     <ol class="space-y-3">
                         <?php
-                        $steps = [
-                            ['label' => 'Communication Logged',  'done' => true],
-                            ['label' => 'Agenda Scheduled',      'done' => $hasAgenda],
-                            ['label' => 'Hearing Outcome',       'done' => $hasHearing],
-                            ['label' => 'Committee Report',      'done' => $hasReport],
-                            ['label' => 'Returned to Plenary',   'done' => !empty($linkedReport['returned_to_plenary_at'])],
-                        ];
+                        $steps = $isMotionForReconsideration
+                            ? [
+                                ['label' => 'Motion for Reconsideration Logged', 'done' => true],
+                                ['label' => 'Automatically Approved',           'done' => $hearingApproved],
+                                ['label' => 'Committee Report',                  'done' => $hasReport],
+                                ['label' => 'Returned to Plenary',               'done' => !empty($linkedReport['returned_to_plenary_at'])],
+                            ]
+                            : [
+                                ['label' => 'Communication Logged', 'done' => true],
+                                ['label' => 'Agenda Scheduled',      'done' => $hasAgenda],
+                                ['label' => 'Hearing Outcome',       'done' => $hasHearing],
+                                ['label' => 'Committee Report',      'done' => $hasReport],
+                                ['label' => 'Returned to Plenary',   'done' => !empty($linkedReport['returned_to_plenary_at'])],
+                            ];
                         foreach ($steps as $i => $step):
                             $isDone = $step['done'];
                         ?>
@@ -410,7 +418,22 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                 </div>
 
                 <!-- Next-step action card ------------------------------------->
-                <?php if (!$hasAgenda): ?>
+                <?php if ($isMotionForReconsideration && !$hasReport): ?>
+                    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-600">
+                            Automatically Approved
+                        </p>
+                        <p class="mb-4 text-sm text-emerald-800">
+                            This Motion for Reconsideration skips agenda scheduling and the hearing. Share it to a Committee Report from Approved Hearings.
+                        </p>
+                        <a href="<?= BASE_URL ?>/committee/hearing?tab=approved"
+                           class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600
+                                  px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition">
+                            Go to Approved Hearings
+                        </a>
+                    </div>
+
+                <?php elseif (!$isMotionForReconsideration && !$hasAgenda): ?>
                     <!-- Step 2: Schedule Agenda -->
                     <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
                         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-600">
