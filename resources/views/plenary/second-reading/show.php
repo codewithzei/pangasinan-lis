@@ -53,6 +53,8 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <div class="flex items-center gap-4">
         <a href="<?= BASE_URL ?>/plenary/second-reading"
            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition">
@@ -103,6 +105,8 @@ ob_start();
 
         <!-- Left column: Info panels -->
         <div class="lg:col-span-1 space-y-4">
+            <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
                 <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Document Details</h2>
                 <div><p class="text-xs text-gray-400">Tracking Number</p><p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($trackingNumber) ?></p></div>
@@ -483,7 +487,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-<?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
 
 <?php
 $content = ob_get_clean();

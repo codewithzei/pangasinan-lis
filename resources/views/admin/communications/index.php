@@ -6,10 +6,8 @@ $pageSubtitle            = $pageSubtitle            ?? '';
 $totalNoted              = $totalNoted              ?? 0;
 $totalRows               = $totalRows               ?? 0;
 $search                  = $search                  ?? '';
-$filterStatus            = $filterStatus            ?? '';
 $filterCat               = $filterCat               ?? '';
 $documents               = $documents               ?? [];
-$documentStatuses        = $documentStatuses        ?? [];
 $communicationCategories = $communicationCategories ?? [];
 $totalPages              = $totalPages              ?? 1;
 $page                    = $page                    ?? 1;
@@ -154,20 +152,6 @@ $page                    = $page                    ?? 1;
                                   focus:outline-none focus:ring-2 focus:ring-primary/20 lg:w-56">
                 </div>
 
-                <!-- Status filter -->
-                <select name="status"
-                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
-                               text-gray-800 focus:border-primary focus:outline-none
-                               focus:ring-2 focus:ring-primary/20">
-                    <option value="">All Statuses</option>
-                    <?php foreach ($documentStatuses as $st): ?>
-                        <option value="<?= (int) $st['id'] ?>"
-                            <?= ($filterStatus == $st['id']) ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($st['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-
                 <!-- Category filter -->
                 <select name="category"
                         class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
@@ -188,7 +172,7 @@ $page                    = $page                    ?? 1;
                     Filter
                 </button>
 
-                <?php if ($search !== '' || $filterStatus !== '' || $filterCat !== ''): ?>
+                <?php if ($search !== '' || $filterCat !== ''): ?>
                     <a href="<?= BASE_URL ?>/admin/communications"
                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
                               font-medium text-gray-700 hover:bg-gray-50 transition text-center">
@@ -228,7 +212,7 @@ $page                    = $page                    ?? 1;
                                 </div>
                                 <p class="mt-4 text-sm font-medium text-gray-700">No communications found.</p>
                                 <p class="mt-1 text-xs text-gray-500">
-                                    <?= ($search !== '' || $filterStatus !== '' || $filterCat !== '')
+                                    <?= ($search !== '' || $filterCat !== '')
                                         ? 'Try adjusting your search criteria or clearing filters.'
                                         : 'Communication documents marked as Noted will appear here.' ?>
                                 </p>
@@ -357,7 +341,6 @@ $page                    = $page                    ?? 1;
                 <?php
                 $qArgs = [];
                 if ($search !== '')       $qArgs['search']   = $search;
-                if ($filterStatus !== '') $qArgs['status']   = $filterStatus;
                 if ($filterCat !== '')    $qArgs['category'] = $filterCat;
                 $qs = !empty($qArgs) ? '&' . http_build_query($qArgs) : '';
                 ?>

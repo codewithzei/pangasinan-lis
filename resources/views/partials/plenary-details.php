@@ -58,6 +58,18 @@ $sessionTypeLabels = [
                 </dd>
             </div>
 
+            <!-- Legislative Term -->
+            <div>
+                <dt class="text-xs font-semibold uppercase tracking-wide text-indigo-400">
+                    Legislative Term
+                </dt>
+                <dd class="mt-1 text-sm text-indigo-900">
+                    <?= !empty($plenaryDetails['legislative_term_name'])
+                        ? htmlspecialchars($plenaryDetails['legislative_term_name'])
+                        : '<span class="italic text-indigo-400">—</span>' ?>
+                </dd>
+            </div>
+
             <!-- Target First Reading Date -->
             <div>
                 <dt class="text-xs font-semibold uppercase tracking-wide text-indigo-400">

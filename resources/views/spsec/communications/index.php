@@ -132,21 +132,8 @@ $page                    = $page                    ?? 1;
                            placeholder="Search tracking # or subject…"
                            class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm
                                   text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
-                                  focus:ring-2 focus:ring-primary/20 lg:w-56">
+                                  focus:ring-2 focus:ring-primary/20 lg:w-[360px]">
                 </div>
-
-                <!-- Status Filter -->
-                <select name="status"
-                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800
-                               focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <option value="">All Statuses</option>
-                    <?php foreach ($documentStatuses as $st): ?>
-                        <option value="<?= (int) $st['id'] ?>"
-                            <?= ($filterStatus == $st['id']) ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($st['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
 
                 <!-- Category Filter -->
                 <select name="category"

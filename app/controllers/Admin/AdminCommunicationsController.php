@@ -344,18 +344,9 @@ class AdminCommunicationsController
         $attStmt->execute([$documentId]);
         $attachments = $attStmt->fetchAll();
 
-        // Workflow events
-        $eventStmt = $this->pdo->prepare("
-            SELECT de.*, ua.username AS performed_by_username
-            FROM document_events de
-            LEFT JOIN user_accounts ua ON de.performed_by = ua.id
-            WHERE de.document_id = ?
-            ORDER BY de.created_at ASC
-        ");
-        $eventStmt->execute([$documentId]);
-        $events = $eventStmt->fetchAll();
-
         $docService = new DocumentService($this->pdo);
+        $events = $docService->getDocumentEvents($documentId);
+        $documentEvents = $events;
         $resubmissionReference = $docService->getResubmissionReference($documentId);
         $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
         $resubmissionDetailRoute = 'admin/inbox';

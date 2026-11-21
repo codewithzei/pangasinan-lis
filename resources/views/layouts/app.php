@@ -101,7 +101,7 @@ $pageTitle = $pageTitle ?? APP_SHORT_NAME;
 
     <?php require __DIR__ . '/attachment-preview-modal.php'; ?>
 
-    <script src="<?= BASE_URL ?>/public/assets/js/app.js"></script>
+    <script src="<?= BASE_URL ?>/public/assets/js/app.js?v=<?= filemtime(__DIR__ . '/../../../public/assets/js/app.js') ?>"></script>
     <script src="<?= BASE_URL ?>/public/assets/js/approval-file-upload.js"></script>
     <script src="<?= BASE_URL ?>/public/assets/js/document-attachment-preview.js"
             data-base-url="<?= htmlspecialchars(BASE_URL) ?>"></script>

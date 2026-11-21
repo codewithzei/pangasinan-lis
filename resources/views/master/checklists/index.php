@@ -607,13 +607,13 @@ async function toggleStatus(id, name) {
                 });
                 const result = await response.json();
                 if (result.success) {
-                    showToast(result.message || 'Status updated successfully.', 'success');
+                    showStatusToast(result.message || 'Status updated successfully.', 'success');
                     setTimeout(() => location.reload(), 800);
                 } else {
-                    showToast(result.message || 'Failed to update status.', 'error');
+                    showStatusToast(result.message || 'Failed to update status.', 'error');
                 }
             } catch (error) {
-                showToast('An error occurred while updating status.', 'error');
+                showStatusToast('An error occurred while updating status.', 'error');
             }
         }
     });

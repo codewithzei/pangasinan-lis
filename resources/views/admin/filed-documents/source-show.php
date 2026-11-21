@@ -63,6 +63,8 @@ function _ss_typeLabel(string $type): string
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- ── Page header ──────────────────────────────────────────────────── -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
@@ -81,7 +83,6 @@ function _ss_typeLabel(string $type): string
                             <p class="text-sm font-medium text-blue-100">FINALIZED — AWAITING FILING</p>
                         </div>
 
-                        <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
                         <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                             <?= htmlspecialchars($pageSubtitle) ?>
                         </h1>
@@ -118,6 +119,8 @@ function _ss_typeLabel(string $type): string
         <div class="lg:col-span-2 space-y-6">
 
             <!-- Document Information -->
+            <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="text-base font-semibold text-gray-900">Document Information</h2>
                 <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">

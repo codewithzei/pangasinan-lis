@@ -9,6 +9,12 @@ $dashboardRoute = dashboard_route_for_role($userRole);
 $isMaster = is_role('Super Admin');
 
 $currentRoute = $GLOBALS['route'] ?? '';
+if ($currentRoute === 'admin/inbox/show' && ($_GET['from'] ?? '') === 'noted') {
+    $currentRoute = 'admin/noted-documents';
+} elseif ($currentRoute === 'spsec/inbox/show' && ($_GET['from'] ?? '') === 'noted') {
+    $currentRoute = 'spsec/noted-documents';
+}
+
 function isActiveNav(string $prefix, string $current): string
 {
     return str_starts_with($current, $prefix)

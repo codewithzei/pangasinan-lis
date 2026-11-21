@@ -144,10 +144,10 @@ $old = old_get();
 ob_start();
 ?>
 
-<div class="detail-page space-y-6">
+<div class="detail-page flex min-w-0 flex-col space-y-5 sm:space-y-6">
 
     <!-- Back + Page header --------------------------------------------------->
-    <div class="flex items-center gap-4">
+    <div class="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
         <a href="<?= BASE_URL ?>/plenary/inbox"
            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200
                   bg-white text-gray-500 hover:bg-gray-50 transition">
@@ -155,9 +155,9 @@ ob_start();
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
             </svg>
         </a>
-        <div>
+        <div class="min-w-0">
             <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Plenary Inbox</p>
-            <h1 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($trackingNumber) ?></h1>
+            <h1 class="break-words text-xl font-bold text-gray-900"><?= htmlspecialchars($trackingNumber) ?></h1>
         </div>
     </div>
 
@@ -186,7 +186,14 @@ ob_start();
     <!-- ─────────────────────────────────────────────────────────────────────── -->
     <!-- Section 1: Document Information                                        -->
     <!-- ─────────────────────────────────────────────────────────────────────── -->
-    <section class="rounded-2xl border border-gray-200 bg-white p-6">
+    <?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'plenary/inbox';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
         <h2 class="mb-4 text-base font-semibold text-gray-900">Document Information</h2>
         <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
@@ -261,11 +268,81 @@ ob_start();
         </dl>
     </section>
 
+    <!-- Attachments --------------------------------------------------------->
+    <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+        <h2 class="mb-4 text-base font-semibold text-gray-900">
+            Attachments
+            <span class="ml-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                <?= count($attachments) ?>
+            </span>
+        </h2>
+        <?php if (empty($attachments)): ?>
+            <p class="text-sm text-gray-400">No attachments.</p>
+        <?php else: ?>
+            <div class="space-y-2">
+                <?php foreach ($attachments as $att): ?>
+                    <?php
+                    $attachmentPath = ltrim((string) ($att['stored_path'] ?? ''), '/');
+                    $attachmentUrl = BASE_URL . '/public/' . $attachmentPath;
+                    $attachmentName = (string) ($att['file_name'] ?? 'Attachment');
+                    ?>
+                    <div class="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex min-w-0 items-start gap-3 sm:items-center">
+                            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="break-words text-sm font-medium text-gray-800 sm:truncate">
+                                    <?= htmlspecialchars($attachmentName) ?>
+                                </p>
+                                <p class="mt-0.5 break-words text-xs leading-relaxed text-gray-500">
+                                    <?= htmlspecialchars(number_format(((int) ($att['file_size'] ?? 0)) / 1024, 1)) ?> KB
+                                    <?php if (!empty($att['phase'])): ?>
+                                        &middot; <?= htmlspecialchars(plenaryShowPhase($att['phase'])) ?>
+                                    <?php endif; ?>
+                                    <?php if (!empty($att['uploaded_by_username'])): ?>
+                                        &middot; by <?= htmlspecialchars($att['uploaded_by_username']) ?>
+                                    <?php endif; ?>
+                                    <?php if (!empty($att['created_at'])): ?>
+                                        &middot; <?= htmlspecialchars(date('M j, Y g:i A', strtotime($att['created_at']))) ?>
+                                    <?php endif; ?>
+                                    <?php if (!empty($att['attachment_type'])): ?>
+                                        &middot; <?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $att['attachment_type'])))) ?>
+                                    <?php endif; ?>
+                                    <?php if (!empty($att['report_number'])): ?>
+                                        &middot; Committee Report #<?= htmlspecialchars($att['report_number']) ?>
+                                    <?php endif; ?>
+                                </p>
+                            </div>
+                        </div>
+                        <?php if ($attachmentPath !== ''): ?>
+                            <div class="grid grid-cols-2 gap-2 sm:ml-4 sm:flex sm:shrink-0 sm:items-center">
+                                <a href="<?= htmlspecialchars($attachmentUrl) ?>"
+                                   target="_blank" rel="noopener"
+                                   class="inline-flex justify-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary-hover transition sm:py-1.5">
+                                    Preview
+                                </a>
+                                <a href="<?= htmlspecialchars($attachmentUrl) ?>"
+                                   download
+                                   class="inline-flex justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition sm:py-1.5">
+                                    Download
+                                </a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </section>
+
     <!-- ─────────────────────────────────────────────────────────────────────── -->
     <!-- Terminal outcome notice (Noted / Remanded / Withdrawn)                 -->
     <!-- ─────────────────────────────────────────────────────────────────────── -->
     <?php if ($isTerminalOutcome): ?>
-        <section class="rounded-2xl border border-gray-300 bg-gray-100 p-6">
+        <section class="rounded-2xl border border-gray-300 bg-gray-100 p-4 sm:p-6">
             <div class="flex items-start gap-3">
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-200">
                     <svg class="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,7 +367,7 @@ ob_start();
     <!-- Section 2: Accept Button (shown only when document is claimable)       -->
     <!-- ─────────────────────────────────────────────────────────────────────── -->
     <?php if ($canAccept): ?>
-        <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+        <section class="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-6">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="text-base font-semibold text-amber-900">Accept This Document</h2>
@@ -299,12 +376,12 @@ ob_start();
                         will no longer see it in their inbox.
                     </p>
                 </div>
-                <form method="POST" action="<?= BASE_URL ?>/plenary/inbox/accept" class="shrink-0">
+                <form id="acceptForm" method="POST" action="<?= BASE_URL ?>/plenary/inbox/accept" class="w-full sm:w-auto">
                     <input type="hidden" name="document_id" value="<?= $documentId ?>">
-                    <button type="submit"
-                            class="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5
+                    <button type="submit" id="acceptBtn"
+                            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5
                                    text-sm font-semibold text-white hover:bg-amber-700 transition
-                                   focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
+                                   focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 sm:w-auto">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -320,7 +397,7 @@ ob_start();
     <!-- Section 3: Pre-Decision Form (only for the owning user after accept)   -->
     <!-- ─────────────────────────────────────────────────────────────────────── -->
     <?php if ($canEditPreDecision): ?>
-        <section class="rounded-2xl border border-indigo-200 bg-white p-6">
+        <section class="rounded-2xl border border-indigo-200 bg-white p-4 sm:p-6">
             <div class="mb-4 flex items-center gap-2">
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100">
                     <svg class="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -404,11 +481,11 @@ ob_start();
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3">
+                <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                     <button type="submit"
-                            class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5
+                            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5
                                    text-sm font-semibold text-white hover:bg-indigo-700 transition
-                                   focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                   focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:w-auto">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M5 13l4 4L19 7"/>
@@ -424,7 +501,7 @@ ob_start();
         <!-- Section 3b: Compliance Submission (Deferred → resume processing)   -->
         <!-- ─────────────────────────────────────────────────────────────────── -->
         <?php if ($canSubmitCompliance): ?>
-            <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+            <section class="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-6">
                 <div class="mb-4 flex items-start gap-2">
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100">
                         <svg class="h-4 w-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -476,11 +553,11 @@ ob_start();
                         </p>
                     </div>
 
-                    <div class="flex items-center gap-3">
+                    <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                         <button type="submit"
-                                class="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5
+                                class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5
                                        text-sm font-semibold text-white hover:bg-amber-700 transition
-                                       focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
+                                       focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 sm:w-auto">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M5 13l4 4L19 7"/>
@@ -498,7 +575,7 @@ ob_start();
         <?php if ($canSaveProcessing): ?>
             <?php if ($isCases): ?>
             <!-- ── Cases fast-path: no details needed, just advance to FR ── -->
-            <section class="rounded-2xl border border-indigo-200 bg-indigo-50 p-6" aria-label="Send to First Reading">
+            <section class="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 sm:p-6" aria-label="Send to First Reading">
                 <div class="mb-4 flex items-start gap-2">
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-100">
                         <svg class="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -519,11 +596,11 @@ ob_start();
                 <form method="POST" action="<?= BASE_URL ?>/plenary/inbox/process" class="space-y-4">
                     <input type="hidden" name="document_id" value="<?= $documentId ?>">
                     <input type="hidden" name="action"      value="save_processing">
-                    <div class="flex items-center gap-3 pt-1">
+                    <div class="flex flex-col items-stretch gap-3 pt-1 sm:flex-row sm:items-center">
                         <button type="submit"
-                                class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5
+                                class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5
                                        text-sm font-semibold text-white hover:bg-indigo-700 transition
-                                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                       focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:w-auto">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M13 7l5 5m0 0l-5 5m5-5H6"/>
@@ -534,7 +611,7 @@ ob_start();
                 </form>
             </section>
             <?php else: ?>
-            <section class="rounded-2xl border border-violet-200 bg-white p-6">
+            <section class="rounded-2xl border border-violet-200 bg-white p-4 sm:p-6">
                 <div class="mb-4 flex items-center gap-2">
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100">
                         <svg class="h-4 w-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -551,6 +628,8 @@ ob_start();
                 <?php
                 // Current proposed number, dates, etc. for pre-population
                 $currentProposedNum  = $old['proposed_number']          ?? ($plenaryDetails['proposed_number']          ?? '');
+                $currentSequenceNum  = $old['proposed_number_sequence'] ?? ($currentProposedSequence ?? '');
+                $currentProposedYear = (int) ($currentProposedYear ?? date('Y'));
                 $currentSubject      = $old['subject_matter']            ?? $document['subject_matter'];
                 $currentTargetDate   = $old['target_first_reading_date'] ?? ($plenaryDetails['target_first_reading_date'] ?? '');
                 $currentSessionType  = $old['session_type']              ?? ($plenaryDetails['session_type']             ?? '');
@@ -628,19 +707,37 @@ ob_start();
                                 </span>
                             <?php endif; ?>
                         </label>
-                        <input type="text" id="proposed_number" name="proposed_number"
-                               value="<?= htmlspecialchars($currentProposedNum) ?>"
-                               maxlength="50"
-                               <?= !$proposedNumberExempt ? 'required' : '' ?>
-                               placeholder="e.g. SB-2026-001"
-                               class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
-                                      text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
-                                      focus:ring-2 focus:ring-primary/20">
+                        <?php if (!empty($standardPrefix)): ?>
+                            <div class="mt-1 flex items-center gap-2 font-mono text-sm">
+                                <span class="shrink-0 text-gray-600"><?= htmlspecialchars($standardPrefix) ?> -</span>
+                                <input type="text" id="proposed_number_sequence" name="proposed_number_sequence"
+                                       required maxlength="10" inputmode="numeric" pattern="[0-9]{1,10}"
+                                       value="<?= htmlspecialchars($currentSequenceNum) ?>"
+                                       placeholder="e.g. 123"
+                                       autocomplete="off"
+                                       class="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 font-sans text-sm
+                                              text-gray-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                                <span class="shrink-0 text-gray-600">- <?= htmlspecialchars((string) $currentProposedYear) ?></span>
+                            </div>
+                            <input type="hidden" name="proposed_number" value="<?= htmlspecialchars($currentProposedNum) ?>">
+                        <?php else: ?>
+                            <input type="text" id="proposed_number" name="proposed_number"
+                                   value="<?= htmlspecialchars($currentProposedNum) ?>"
+                                   maxlength="50"
+                                   <?= !$proposedNumberExempt ? 'required' : '' ?>
+                                   placeholder="e.g. SB-2026-001"
+                                   class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
+                                          text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
+                                          focus:ring-2 focus:ring-primary/20">
+                        <?php endif; ?>
                         <p class="mt-1 text-xs text-gray-400">
-                            <strong class="text-amber-600">Note:</strong>
-                            No standard numbering format has been configured for this system yet.
-                            Please enter the proposed number in whatever format your office uses.
-                            Duplicate numbers are allowed only for documents in the same resubmission chain.
+                            <?php if (!empty($standardPrefix)): ?>
+                                Legislative Term: <strong><?= htmlspecialchars($legislativeTerm['name'] ?? 'No active term') ?></strong>
+                                <br>Enter the sequence only. The sequence resets to 1 in each legislative term.
+                            <?php else: ?>
+                                Enter the proposed number in the format used by your office.
+                            <?php endif; ?>
+                            <br>Duplicate numbers are allowed only for documents in the same resubmission chain.
                         </p>
                     </div>
 
@@ -781,11 +878,11 @@ ob_start();
                     </div>
                     <?php endif; ?>
 
-                    <div class="flex items-center gap-3 border-t border-gray-100 pt-4">
+                    <div class="flex flex-col items-stretch gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center">
                         <button type="submit"
-                                class="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5
+                                class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5
                                        text-sm font-semibold text-white hover:bg-violet-700 transition
-                                       focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2">
+                                       focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 sm:w-auto">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
@@ -1098,7 +1195,7 @@ ob_start();
         <?php else: ?>
             <!-- Processing form is locked — show current data read-only -->
             <?php if ($plenaryDetails): ?>
-                <section class="rounded-2xl border border-gray-200 bg-gray-50 p-6">
+                <section class="rounded-2xl border border-gray-200 bg-gray-50 p-4 sm:p-6">
                     <div class="mb-3 flex items-center gap-2">
                         <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1117,7 +1214,7 @@ ob_start();
         <!-- ─────────────────────────────────────────────────────────────────── -->
         <!-- Section 5: Return to Admin                                         -->
         <!-- ─────────────────────────────────────────────────────────────────── -->
-        <section class="rounded-2xl border border-red-100 bg-red-50 p-6">
+        <section class="rounded-2xl border border-red-100 bg-red-50 p-4 sm:p-6">
             <h2 class="mb-3 text-base font-semibold text-red-900">Return to Admin</h2>
             <p class="mb-4 text-sm text-red-700">
                 This will return the document to the Admin inbox. A reason is required.
@@ -1138,9 +1235,9 @@ ob_start();
                 </div>
                 <button type="submit"
                         onclick="return confirm('Return this document to Admin? This action cannot be undone.')"
-                        class="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white
+                        class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-300 bg-white
                                px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 transition
-                               focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                               focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 sm:w-auto">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
@@ -1156,7 +1253,7 @@ ob_start();
     <!-- Section 6: Saved Plenary Details (read-only, shown to all owners)  -->
     <!-- ─────────────────────────────────────────────────────────────────── -->
     <?php if ((!$canProcess || $isTerminalOutcome) && $plenaryDetails): ?>
-        <section class="rounded-2xl border border-indigo-100 bg-indigo-50 p-6">
+        <section class="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 sm:p-6">
             <h2 class="mb-4 text-base font-semibold text-indigo-900">Plenary Details (Saved)</h2>
             <?php require __DIR__ . '/../../partials/plenary-details.php'; ?>
 
@@ -1216,114 +1313,147 @@ ob_start();
     <?php endif; ?>
 
     <!-- ─────────────────────────────────────────────────────────────────── -->
-    <!-- Section 7: Attachments                                             -->
+    <!-- Action History                                                      -->
     <!-- ─────────────────────────────────────────────────────────────────── -->
-    <?php if (!empty($attachments)): ?>
-        <section class="rounded-2xl border border-gray-200 bg-white p-6">
-            <h2 class="mb-4 text-base font-semibold text-gray-900">
-                Attachments
-                <span class="ml-1 text-xs font-normal text-gray-400">(<?= count($attachments) ?>)</span>
-            </h2>
-            <ul class="divide-y divide-gray-100">
-                <?php foreach ($attachments as $att): ?>
-                    <li class="flex items-center gap-3 py-3">
-                        <svg class="h-5 w-5 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
-                        </svg>
-                        <div class="flex-1 min-w-0">
-                            <div class="text-sm font-medium text-gray-800 truncate">
-                                <?= htmlspecialchars($att['file_name'] ?? '') ?>
-                            </div>
-                            <div class="text-xs text-gray-400">
-                                <?= htmlspecialchars($att['uploaded_by_username'] ?? '') ?>
-                                — <?= htmlspecialchars(date('M j, Y g:i A', strtotime($att['created_at']))) ?>
-                                <?php if (!empty($att['attachment_type'])): ?>
-                                    — <span class="font-medium"><?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $att['attachment_type'])))) ?></span>
-                                <?php endif; ?>
-                                <?php if (!empty($att['report_number'])): ?>
-                                    — Committee Report #<?= htmlspecialchars($att['report_number']) ?>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <?php if (!empty($att['stored_path'])): ?>
-                            <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars(ltrim($att['stored_path'], '/')) ?>"
-                               target="_blank" rel="noopener"
-                               class="shrink-0 rounded-lg border border-gray-200 px-2.5 py-1 text-xs
-                                      font-medium text-gray-600 hover:bg-gray-50 transition">
-                                Download
-                            </a>
+    <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+        <h2 class="mb-4 text-base font-semibold text-gray-900">Action History</h2>
+        <?php if (empty($events)): ?>
+            <p class="text-sm text-gray-400">No action history recorded.</p>
+        <?php else: ?>
+            <ol class="relative ml-3 space-y-5 border-l border-gray-200">
+                <?php foreach ($events as $ev): ?>
+                    <li class="ml-6">
+                        <span class="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white ring-4 ring-white">
+                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </span>
+                        <p class="break-words text-sm font-semibold text-gray-800">
+                            <?= htmlspecialchars(plenaryShowEvent($ev['event_type'] ?? '')) ?>
+                            <?php if (!empty($ev['to_status_name'])): ?>
+                                <span class="text-xs font-normal text-gray-500">
+                                    → <?= htmlspecialchars($ev['to_status_name']) ?>
+                                </span>
+                            <?php endif; ?>
+                        </p>
+                        <p class="break-words text-xs text-gray-400">
+                            <?= htmlspecialchars(plenaryShowPhase($ev['phase'] ?? '')) ?>
+                            <?php if (!empty($ev['performed_by_username'])): ?>
+                                &middot; by <?= htmlspecialchars($ev['performed_by_username']) ?>
+                            <?php endif; ?>
+                            <?php if (!empty($ev['created_at'])): ?>
+                                &middot; <?= htmlspecialchars(date('M j, Y g:i A', strtotime($ev['created_at']))) ?>
+                            <?php endif; ?>
+                        </p>
+                        <?php if (!empty($ev['remarks'])): ?>
+                            <p class="mt-1 break-words text-xs text-gray-500 italic">
+                                <?= htmlspecialchars($ev['remarks']) ?>
+                            </p>
                         <?php endif; ?>
                     </li>
                 <?php endforeach; ?>
-            </ul>
-        </section>
-    <?php endif; ?>
-
-    <!-- ─────────────────────────────────────────────────────────────────── -->
-    <!-- Section 8: History (Events / Routes / Assignments)                 -->
-    <!-- ─────────────────────────────────────────────────────────────────── -->
-    <?php if (!empty($events) || !empty($routes)): ?>
-        <section class="rounded-2xl border border-gray-200 bg-white p-6">
-            <h2 class="mb-4 text-base font-semibold text-gray-900">Activity History</h2>
-            <ol class="space-y-3">
-                <?php foreach ($events as $ev): ?>
-                    <li class="flex gap-3">
-                        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full
-                                    bg-indigo-100 text-indigo-600 text-xs font-bold">
-                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
-                        <div>
-                            <p class="text-sm font-medium text-gray-800">
-                                <?= htmlspecialchars(plenaryShowEvent($ev['event_type'] ?? '')) ?>
-                                <?php if (!empty($ev['to_status_name'])): ?>
-                                    <span class="text-xs font-normal text-gray-500">
-                                        → <?= htmlspecialchars($ev['to_status_name']) ?>
-                                    </span>
-                                <?php endif; ?>
-                            </p>
-                            <p class="text-xs text-gray-400">
-                                <?= htmlspecialchars($ev['performed_by_username'] ?? '') ?>
-                                — <?= htmlspecialchars(date('M j, Y g:i A', strtotime($ev['created_at']))) ?>
-                            </p>
-                            <?php if (!empty($ev['remarks'])): ?>
-                                <p class="mt-0.5 text-xs text-gray-500 italic">
-                                    "<?= htmlspecialchars(mb_strimwidth($ev['remarks'], 0, 120, '…')) ?>"
-                                </p>
-                            <?php endif; ?>
-                        </div>
-                    </li>
-                <?php endforeach; ?>
             </ol>
-        </section>
-    <?php endif; ?>
+        <?php endif; ?>
+    </section>
 
-    <!-- Assignment History -->
-    <?php if (!empty($allAssignments)): ?>
-        <section class="rounded-2xl border border-gray-200 bg-white p-6">
-            <h2 class="mb-4 text-base font-semibold text-gray-900">Assignment History</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-gray-50 text-gray-500 uppercase">
-                        <tr>
-                            <th class="px-4 py-2 font-medium">Phase</th>
-                            <th class="px-4 py-2 font-medium">Role</th>
-                            <th class="px-4 py-2 font-medium">Decision</th>
-                            <th class="px-4 py-2 font-medium">Accepted By</th>
-                            <th class="px-4 py-2 font-medium">Accepted At</th>
+    <!-- Assignment History --------------------------------------------------->
+    <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+        <h2 class="mb-4 text-base font-semibold text-gray-900">Assignment History</h2>
+        <?php if (empty($allAssignments)): ?>
+            <p class="text-sm text-gray-400">No assignments yet.</p>
+        <?php else: ?>
+            <div class="space-y-3 sm:hidden">
+                <?php foreach ($allAssignments as $asgn): ?>
+                    <?php
+                    $decision = $asgn['decision'] ?? '';
+                    $decisionClass = match ($decision) {
+                        'COMPLETED', 'NOTED' => 'bg-green-50 text-green-700',
+                        'ACCEPTED' => 'bg-blue-50 text-blue-700',
+                        'DECLINED', 'REJECTED' => 'bg-red-50 text-red-700',
+                        default => 'bg-amber-50 text-amber-700',
+                    };
+                    ?>
+                    <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                    <?= htmlspecialchars(plenaryShowPhase($asgn['phase'] ?? '')) ?>
+                                </p>
+                                <p class="mt-1 break-words text-sm font-semibold text-gray-800">
+                                    <?= htmlspecialchars($asgn['role_name'] ?? $asgn['assigned_to_username'] ?? '—') ?>
+                                </p>
+                            </div>
+                            <span class="shrink-0 rounded-full px-2 py-1 text-xs font-semibold <?= $decisionClass ?>">
+                                <?= htmlspecialchars(plenaryShowDecision($decision)) ?>
+                            </span>
+                        </div>
+                        <dl class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                                <dt class="text-gray-400">Accepted By</dt>
+                                <dd class="mt-0.5 break-words font-medium text-blue-700">
+                                    <?= htmlspecialchars($asgn['accepted_by_username'] ?? '—') ?>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-gray-400">Date</dt>
+                                <dd class="mt-0.5 break-words text-gray-600">
+                                    <?= !empty($asgn['created_at'])
+                                        ? htmlspecialchars(date('M j, Y', strtotime($asgn['created_at'])))
+                                        : '—' ?>
+                                </dd>
+                            </div>
+                            <?php if (!empty($asgn['accepted_at'])): ?>
+                                <div class="col-span-2">
+                                    <dt class="text-gray-400">Accepted At</dt>
+                                    <dd class="mt-0.5 break-words text-gray-600">
+                                        <?= htmlspecialchars(date('M j, Y g:i A', strtotime($asgn['accepted_at']))) ?>
+                                    </dd>
+                                </div>
+                            <?php endif; ?>
+                        </dl>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="hidden overflow-x-auto sm:block">
+                <table class="w-full divide-y divide-gray-100 text-left text-sm">
+                    <thead>
+                        <tr class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                            <th class="pb-2 pr-3">Phase</th>
+                            <th class="pb-2 pr-3">Role</th>
+                            <th class="pb-2 pr-3">Decision</th>
+                            <th class="pb-2 pr-3">Accepted By</th>
+                            <th class="pb-2">Accepted At</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody class="divide-y divide-gray-50">
                         <?php foreach ($allAssignments as $asgn): ?>
-                            <tr>
-                                <td class="px-4 py-2"><?= htmlspecialchars(plenaryShowPhase($asgn['phase'] ?? '')) ?></td>
-                                <td class="px-4 py-2"><?= htmlspecialchars($asgn['role_name'] ?? '—') ?></td>
-                                <td class="px-4 py-2"><?= htmlspecialchars(plenaryShowDecision($asgn['decision'] ?? '')) ?></td>
-                                <td class="px-4 py-2"><?= htmlspecialchars($asgn['accepted_by_username'] ?? '—') ?></td>
-                                <td class="px-4 py-2">
+                            <?php
+                            $decision = $asgn['decision'] ?? '';
+                            $decisionClass = match ($decision) {
+                                'COMPLETED', 'NOTED' => 'bg-green-50 text-green-700',
+                                'ACCEPTED' => 'bg-blue-50 text-blue-700',
+                                'DECLINED', 'REJECTED' => 'bg-red-50 text-red-700',
+                                default => 'bg-amber-50 text-amber-700',
+                            };
+                            ?>
+                            <tr class="text-gray-700">
+                                <td class="py-2 pr-3"><?= htmlspecialchars(plenaryShowPhase($asgn['phase'] ?? '')) ?></td>
+                                <td class="py-2 pr-3"><?= htmlspecialchars($asgn['role_name'] ?? $asgn['assigned_to_username'] ?? '—') ?></td>
+                                <td class="py-2 pr-3">
+                                    <span class="rounded-full px-2 py-1 text-xs font-semibold <?= $decisionClass ?>">
+                                        <?= htmlspecialchars(plenaryShowDecision($decision)) ?>
+                                    </span>
+                                </td>
+                                <td class="py-2 pr-3">
+                                    <?php if (!empty($asgn['accepted_by_username'])): ?>
+                                        <span class="font-medium text-blue-700"><?= htmlspecialchars($asgn['accepted_by_username']) ?></span>
+                                    <?php else: ?>
+                                        <span class="text-xs text-gray-400">—</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="py-2">
                                     <?= !empty($asgn['accepted_at'])
                                         ? htmlspecialchars(date('M j, Y g:i A', strtotime($asgn['accepted_at'])))
                                         : '—' ?>
@@ -1333,17 +1463,31 @@ ob_start();
                     </tbody>
                 </table>
             </div>
-        </section>
-    <?php endif; ?>
+        <?php endif; ?>
+    </section>
 
 </div>
 
-<?php
-// MFR relationship links (Referenced Original Case / Related Motions)
-$mfrDetailRoute = 'plenary/inbox';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+<?php require __DIR__ . '/../../partials/accept-document-modal.php'; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const acceptForm = document.getElementById('acceptForm');
+    const acceptBtn  = document.getElementById('acceptBtn');
+
+    if (acceptForm && acceptBtn) {
+        acceptForm.addEventListener('submit', function (event) {
+            if (acceptForm.dataset.confirmed !== 'true') {
+                event.preventDefault();
+                return;
+            }
+
+            acceptBtn.disabled = true;
+            acceptBtn.innerHTML = 'Accepting…';
+        });
+    }
+});
+</script>
 
 <?php
 $content = ob_get_clean();

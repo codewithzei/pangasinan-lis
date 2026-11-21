@@ -8,8 +8,8 @@
  *   $totalPages         int
  *   $total              int
  *   $search             string
- *   $tab                string  ('all' | 'ordinance' | 'resolution' | 'communication')
- *   $tabCounts          array   ['all', 'ordinance', 'resolution', 'communication']
+ *   $tab                string  active document-type tab ('petitions' is a legacy URL alias for 'cases')
+ *   $tabCounts          array   totals for each document-type tab
  *   $referredCommCount  int
  *   $success            string|null
  *   $error              string|null
@@ -22,7 +22,16 @@ $totalPages        = $totalPages        ?? 1;
 $total             = $total             ?? 0;
 $search            = $search            ?? '';
 $tab               = $tab               ?? 'all';
-$tabCounts         = $tabCounts         ?? ['all' => 0, 'ordinance' => 0, 'resolution' => 0, 'communication' => 0];
+$tabCounts         = $tabCounts         ?? [
+    'all' => 0,
+    'ordinance' => 0,
+    'resolution' => 0,
+    'municipal_ordinances' => 0,
+    'municipal_resolutions' => 0,
+    'cases' => 0,
+    'others' => 0,
+    'communication' => 0,
+];
 $referredCommCount = $referredCommCount ?? 0;
 $errors            = $errors            ?? [];
 
@@ -135,21 +144,24 @@ function frSessionLabel(string $type): string {
     <!-- Tabs -->
     <section>
         <div class="border-b border-gray-200">
-            <nav class="-mb-px flex flex-wrap gap-6" aria-label="First reading tabs">
+            <nav class="-mb-px flex flex-nowrap gap-6 overflow-x-auto overscroll-x-contain" aria-label="First reading tabs">
                 <?php
                 $tabs = [
-                    'all'           => ['label' => 'All', 'count' => $tabCounts['all']],
-                    'ordinance'     => ['label' => 'Provincial Ordinance', 'count' => $tabCounts['ordinance']],
-                    'resolution'    => ['label' => 'Provincial Resolution', 'count' => $tabCounts['resolution']],
-                    'communication' => ['label' => 'Communications', 'count' => $tabCounts['communication']],
-                    'petitions'     => ['label' => 'Petitions', 'count' => $tabCounts['petitions'] ?? 0],
+                    'all'                   => ['label' => 'All', 'count' => $tabCounts['all']],
+                    'ordinance'             => ['label' => 'Provincial Ordinances', 'count' => $tabCounts['ordinance']],
+                    'resolution'            => ['label' => 'Provincial Resolutions', 'count' => $tabCounts['resolution']],
+                    'municipal_ordinances'  => ['label' => 'Municipal/City Ordinances', 'count' => $tabCounts['municipal_ordinances']],
+                    'municipal_resolutions' => ['label' => 'Municipal/City Resolutions', 'count' => $tabCounts['municipal_resolutions']],
+                    'cases'                 => ['label' => 'Cases', 'count' => $tabCounts['cases']],
+                    'communication'         => ['label' => 'Communications', 'count' => $tabCounts['communication']],
+                    'others'                => ['label' => 'Others', 'count' => $tabCounts['others']],
                 ];
                 foreach ($tabs as $tabKey => $tabInfo):
                     $isActive = ($tab === $tabKey);
                 ?>
                 <a href="<?= frTabUrl($tabKey, $search) ?>"
                    class="<?= $isActive ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>
-                          whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
+                          shrink-0 whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
                     <?= htmlspecialchars($tabInfo['label']) ?>
                     <span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold
                                  <?= $isActive ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700' ?>">
@@ -198,14 +210,13 @@ function frSessionLabel(string $type): string {
                         <th class="px-6 py-3 font-medium">Session Type</th>
                         <?php endif; ?>
                         <th class="px-6 py-3 font-medium">Target Date</th>
-                        <th class="px-6 py-3 font-medium">Accepted By</th>
                         <th class="px-6 py-3 font-medium text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php if (empty($documents)): ?>
                         <tr>
-                            <td colspan="<?= ($tab !== 'communication') ? 7 : 5 ?>"
+                            <td colspan="<?= ($tab !== 'communication') ? 6 : 4 ?>"
                                 class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,16 +276,6 @@ function frSessionLabel(string $type): string {
                                     <?= !empty($row['target_first_reading_date'])
                                         ? htmlspecialchars(date('M j, Y', strtotime($row['target_first_reading_date'])))
                                         : '<span class="text-xs italic text-gray-400">Not set</span>' ?>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-gray-700">
-                                    <?php if (!empty($row['accepted_by_username'])): ?>
-                                        <div><?= htmlspecialchars($row['accepted_by_username']) ?></div>
-                                        <?php if (!empty(trim($row['accepted_by_name']))): ?>
-                                            <div class="text-xs text-gray-400"><?= htmlspecialchars(trim($row['accepted_by_name'])) ?></div>
-                                        <?php endif; ?>
-                                    <?php else: ?>
-                                        <span class="text-xs italic text-gray-400">—</span>
-                                    <?php endif; ?>
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <a href="<?= BASE_URL ?>/<?= $processRoute ?>"

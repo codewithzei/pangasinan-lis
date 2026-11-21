@@ -340,18 +340,8 @@ class SpsecCommunicationsController
         $attStmt->execute([$documentId]);
         $attachments = $attStmt->fetchAll();
 
-        // Events
-        $eventStmt = $this->pdo->prepare("
-            SELECT de.*, ua.username AS performed_by_username
-            FROM document_events de
-            LEFT JOIN user_accounts ua ON de.performed_by = ua.id
-            WHERE de.document_id = ?
-            ORDER BY de.created_at ASC
-        ");
-        $eventStmt->execute([$documentId]);
-        $events = $eventStmt->fetchAll();
-
         $docService = new DocumentService($this->pdo);
+        $documentEvents = $docService->getDocumentEvents($documentId);
         $resubmissionReference = $docService->getResubmissionReference($documentId);
         $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
         $resubmissionDetailRoute = 'spsec/inbox';

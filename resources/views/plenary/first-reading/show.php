@@ -45,6 +45,8 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- Back + title -->
     <div class="flex items-center gap-4">
         <a href="<?= BASE_URL ?>/plenary/first-reading"
@@ -75,6 +77,8 @@ ob_start();
 
         <!-- Left: Document info -->
         <div class="lg:col-span-1 space-y-4">
+            <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
                 <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Document Details</h2>
                 <div>
@@ -205,19 +209,40 @@ ob_start();
             </div>
             <?php endif; ?>
 
-            <!-- Current committees -->
-            <?php if (!empty($docCommittees)): ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Committee Referral</h2>
-                <ul class="space-y-1">
-                    <?php foreach ($docCommittees as $dc): ?>
-                        <li class="text-sm text-gray-800">
-                            <span class="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"><?= htmlspecialchars($dc['committee_name']) ?></span>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
-            <?php endif; ?>
+            <!-- Committee referral -->
+            <section class="rounded-2xl border border-gray-200 bg-white p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-base font-semibold text-gray-900">Committee Referral</h2>
+                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                        <?= count($docCommittees) ?>
+                    </span>
+                </div>
+                <?php if (!empty($docCommittees)): ?>
+                    <div class="mt-4 space-y-2">
+                        <?php foreach ($docCommittees as $dc): ?>
+                            <div class="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                    </svg>
+                                </div>
+                                <p class="min-w-0 flex-1 break-words text-sm font-semibold text-gray-900">
+                                    <?= htmlspecialchars($dc['committee_name'] ?? 'Committee') ?>
+                                </p>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 p-4">
+                        <svg class="h-5 w-5 shrink-0 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        </svg>
+                        <p class="text-sm italic text-gray-400">No committees have been assigned to this document.</p>
+                    </div>
+                <?php endif; ?>
+            </section>
         </div>
 
         <!-- Right: First Reading form -->
@@ -308,31 +333,43 @@ ob_start();
             </div>
             <?php endif; ?>
 
-            <!-- Event Timeline -->
-            <?php if (!empty($events)): ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">Event History</h2>
-                <ol class="relative border-l border-gray-200 ml-3 space-y-5">
-                    <?php foreach ($events as $ev): ?>
-                        <li class="ml-4">
-                            <div class="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border border-white bg-primary"></div>
-                            <div class="flex flex-col">
-                                <span class="text-xs font-semibold text-gray-700"><?= htmlspecialchars(str_replace('_', ' ', $ev['event_type'])) ?></span>
-                                <?php if (!empty($ev['remarks'])): ?>
-                                    <span class="text-xs text-gray-500 mt-0.5"><?= htmlspecialchars($ev['remarks']) ?></span>
-                                <?php endif; ?>
-                                <span class="text-xs text-gray-400 mt-1">
-                                    <?= htmlspecialchars(date('M j, Y g:i A', strtotime($ev['created_at']))) ?>
-                                    <?php if (!empty($ev['performed_by_username'])): ?>
-                                        by <?= htmlspecialchars($ev['performed_by_username']) ?>
-                                    <?php endif; ?>
+            <!-- Action history -->
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
+                <h2 class="mb-4 text-base font-semibold text-gray-900">Action History</h2>
+                <?php if (empty($events)): ?>
+                    <p class="text-sm text-gray-400">No action history recorded.</p>
+                <?php else: ?>
+                    <ol class="relative ml-3 space-y-5 border-l border-gray-200">
+                        <?php foreach ($events as $ev): ?>
+                            <?php
+                            $eventType = (string) ($ev['event_type'] ?? 'OTHER');
+                            $eventLabel = ucwords(strtolower(str_replace('_', ' ', $eventType)));
+                            ?>
+                            <li class="relative ml-6">
+                                <span class="absolute -left-[31px] flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white ring-4 ring-white" aria-hidden="true">
+                                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
                                 </span>
-                            </div>
-                        </li>
-                    <?php endforeach; ?>
-                </ol>
-            </div>
-            <?php endif; ?>
+                                <p class="text-sm font-semibold text-gray-800"><?= htmlspecialchars($eventLabel) ?></p>
+                                <p class="text-xs text-gray-500">
+                                    <?= htmlspecialchars($ev['phase'] ?? 'Plenary') ?>
+                                    <?php if (!empty($ev['performed_by_username'])): ?>
+                                        &middot; by <?= htmlspecialchars($ev['performed_by_username']) ?>
+                                    <?php endif; ?>
+                                    &middot; <?= !empty($ev['created_at']) ? htmlspecialchars(date('M j, Y g:i A', strtotime($ev['created_at']))) : 'Date unavailable' ?>
+                                </p>
+                                <?php if (!empty($ev['to_status_name'])): ?>
+                                    <p class="mt-1 text-xs text-gray-500">Status: <?= htmlspecialchars($ev['to_status_name']) ?></p>
+                                <?php endif; ?>
+                                <?php if (!empty($ev['remarks'])): ?>
+                                    <p class="mt-1 whitespace-pre-line text-xs italic text-gray-500"><?= htmlspecialchars($ev['remarks']) ?></p>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ol>
+                <?php endif; ?>
+            </section>
         </div>
     </div>
 </div>
@@ -357,7 +394,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-<?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
 
 <?php
 $content = ob_get_clean();

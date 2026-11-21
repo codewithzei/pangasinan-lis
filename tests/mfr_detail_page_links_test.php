@@ -230,6 +230,18 @@ foreach ($applicableViews as $viewRelPath => $expectedRoute) {
     // Allow for either the exact expected route or any route string
     $hasDetailRoute = str_contains($src, '$mfrDetailRoute');
     ok("1c: sets \$mfrDetailRoute — {$viewRelPath}", $hasDetailRoute);
+
+    $partialPosition = strpos($src, 'mfr-relationship.php');
+    $pageTitleEnd = strpos($src, '</h1>');
+    $documentHeading = $pageTitleEnd === false ? false : strpos($src, '<h2', $pageTitleEnd);
+    ok(
+        "1d: MFR links appear before document information — {$viewRelPath}",
+        $pageTitleEnd !== false
+            && $partialPosition !== false
+            && $partialPosition > $pageTitleEnd
+            && $documentHeading !== false
+            && $partialPosition < $documentHeading
+    );
 }
 
 // ============================================================================

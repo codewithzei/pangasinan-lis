@@ -698,9 +698,9 @@ async function toggleStatus(id, name) {
                 fd.append('id', id);
                 const res = await fetch('<?= BASE_URL ?>/master/positions/toggle-status', { method: 'POST', body: fd });
                 const data = await res.json();
-                showToast(data.message, data.success ? 'success' : 'error');
+                showStatusToast(data.message, data.success ? 'success' : 'error');
                 if (data.success) setTimeout(() => location.reload(), 800);
-            } catch (e) { showToast('Network error.', 'error'); }
+            } catch (e) { showStatusToast('Network error.', 'error'); }
         }
     });
 }

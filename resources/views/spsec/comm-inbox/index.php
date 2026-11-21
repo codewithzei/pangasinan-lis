@@ -24,6 +24,9 @@ $search       = $search       ?? '';
 $page         = $page         ?? 1;
 $totalPages   = $totalPages   ?? 1;
 $total        = $total        ?? 0;
+$documentTypeId = $documentTypeId ?? 0;
+$documentTypes  = $documentTypes ?? [];
+$typeFilterQuery = $documentTypeId > 0 ? '&document_type_id=' . (int) $documentTypeId : '';
 
 ob_start();
 ?>
@@ -100,14 +103,14 @@ ob_start();
         <!-- Tabs + Search -->
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
-                <a href="?tab=pending<?= $search !== '' ? '&search=' . urlencode($search) : '' ?>"
+                <a href="?tab=pending<?= $search !== '' ? '&search=' . urlencode($search) : '' ?><?= $typeFilterQuery ?>"
                    class="rounded-lg px-4 py-1.5 text-sm font-medium transition <?= $tab === 'pending' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' ?>">
                     Pending
                     <?php if ($pendingCount > 0): ?>
                         <span class="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"><?= $pendingCount ?></span>
                     <?php endif; ?>
                 </a>
-                <a href="?tab=sent<?= $search !== '' ? '&search=' . urlencode($search) : '' ?>"
+                <a href="?tab=sent<?= $search !== '' ? '&search=' . urlencode($search) : '' ?><?= $typeFilterQuery ?>"
                    class="rounded-lg px-4 py-1.5 text-sm font-medium transition <?= $tab === 'sent' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' ?>">
                     Sent to FR
                     <?php if ($sentCount > 0): ?>
@@ -116,7 +119,7 @@ ob_start();
                 </a>
             </div>
 
-            <form method="GET" action="<?= BASE_URL ?>/spsec/comm-inbox" class="flex items-center gap-3">
+            <form method="GET" action="<?= BASE_URL ?>/spsec/comm-inbox" class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
                 <div class="relative">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -126,8 +129,17 @@ ob_start();
                            placeholder="Search tracking # or subject…"
                            class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:w-64">
                 </div>
+                <select name="document_type_id" aria-label="Filter by document type"
+                        class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-52">
+                    <option value="">All document types</option>
+                    <?php foreach ($documentTypes as $documentType): ?>
+                        <option value="<?= (int) $documentType['id'] ?>" <?= (int) $documentTypeId === (int) $documentType['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($documentType['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
                 <button type="submit" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Filter</button>
-                <?php if ($search !== ''): ?>
+                <?php if ($search !== '' || $documentTypeId > 0): ?>
                     <a href="?tab=<?= htmlspecialchars($tab) ?>" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Clear</a>
                 <?php endif; ?>
             </form>
@@ -170,7 +182,7 @@ ob_start();
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="max-w-sm">
-                                        <p class="line-clamp-2 text-gray-900"><?= htmlspecialchars($row['subject_matter']) ?></p>
+                                        <p class="whitespace-normal break-words text-gray-900"><?= htmlspecialchars($row['subject_matter']) ?></p>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
@@ -217,7 +229,7 @@ ob_start();
             <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
                 <p class="text-xs text-gray-500">Page <span class="font-medium"><?= $page ?></span> of <span class="font-medium"><?= $totalPages ?></span></p>
                 <div class="flex items-center gap-1">
-                    <?php $qs = '?tab=' . urlencode($tab) . ($search !== '' ? '&search=' . urlencode($search) : ''); ?>
+                    <?php $qs = '?tab=' . urlencode($tab) . ($search !== '' ? '&search=' . urlencode($search) : '') . $typeFilterQuery; ?>
                     <?php if ($page > 1): ?><a href="<?= $qs ?>&page=<?= $page - 1 ?>" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Prev</a><?php endif; ?>
                     <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
                         <a href="<?= $qs ?>&page=<?= $i ?>" class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>"><?= $i ?></a>

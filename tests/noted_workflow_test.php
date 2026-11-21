@@ -648,6 +648,54 @@ try {
     check('5.25: Shared Noted Documents view uses role-specific list and copy URLs',
         str_contains($notedViewSrc, '$notedBaseUrl')
             && str_contains($notedViewSrc, '$documentViewUrl'));
+    check('5.25a: Admin Noted view opens the existing detail page with its list context',
+        str_contains($notedViewSrc, "'from' => 'noted'")
+            && str_contains($notedViewSrc, "'tab' => \$tab"));
+    $adminInboxViewSrc = (string) file_get_contents(__DIR__ . '/../resources/views/admin/inbox/show.php');
+    check('5.25b: Admin detail view returns to the filtered Noted Documents list',
+        str_contains($adminInboxViewSrc, "\$_GET['from'] ?? ''")
+            && str_contains($adminInboxViewSrc, "BASE_URL . '/admin/noted-documents?'")
+            && str_contains($adminInboxViewSrc, 'NOTED DOCUMENT'));
+    $spsecInboxViewSrc = (string) file_get_contents(__DIR__ . '/../resources/views/spsec/inbox/show.php');
+    check('5.25f: SP Secretary Noted view opens the detail page with its list context',
+        str_contains($notedViewSrc, "'/spsec/inbox/show?id='")
+            && str_contains($notedViewSrc, '$supportsNotedReturn')
+            && str_contains($notedViewSrc, "'from' => 'noted'"));
+    check('5.25g: SP Secretary detail view returns to the filtered Noted Documents list',
+        str_contains($spsecInboxViewSrc, "\$_GET['from'] ?? ''")
+            && str_contains($spsecInboxViewSrc, "BASE_URL . '/spsec/noted-documents?'")
+            && str_contains($spsecInboxViewSrc, 'NOTED DOCUMENT'));
+    check('5.25h: SP Secretary noted detail uses the same read-only histories layout as Admin',
+        str_contains($spsecInboxViewSrc, 'if (!$fromNotedDocuments)')
+            && str_contains($spsecInboxViewSrc, 'if (!$fromNotedDocuments && !$canAccept && !$canProcess)')
+            && str_contains($spsecInboxViewSrc, '>Action History<'));
+    check('5.25j: Admin and SP Secretary noted detail containers expand to full width',
+        str_contains($adminInboxViewSrc, "\$fromNotedDocuments ? 'xl:grid-cols-1' : 'xl:grid-cols-3'")
+            && str_contains($adminInboxViewSrc, "'order-1 space-y-6 xl:col-span-1'")
+            && str_contains($spsecInboxViewSrc, "\$fromNotedDocuments ? 'xl:grid-cols-1' : 'xl:grid-cols-3'")
+            && str_contains($spsecInboxViewSrc, "'order-1 space-y-6 xl:col-span-1'"));
+    check('5.25c: Admin detail omits the no-action panel and combines histories under Action History',
+        !str_contains($adminInboxViewSrc, 'No Action Available')
+            && str_contains($adminInboxViewSrc, '>Action History<')
+            && !str_contains($adminInboxViewSrc, '>Routing History<')
+            && !str_contains($adminInboxViewSrc, '>Workflow Events<'));
+    $detailHeaderStart = strpos($adminInboxViewSrc, '<!-- Back + Page header');
+    $detailContentStart = strpos($adminInboxViewSrc, '<!-- Main 2-column layout', $detailHeaderStart ?: 0);
+    $detailHeaderSrc = $detailHeaderStart !== false && $detailContentStart !== false
+        ? substr($adminInboxViewSrc, $detailHeaderStart, $detailContentStart - $detailHeaderStart)
+        : '';
+    check('5.25d: Subject matter is shown in Document Details instead of the page header',
+        $detailHeaderSrc !== ''
+            && !str_contains($detailHeaderSrc, "document['subject_matter']")
+            && str_contains($adminInboxViewSrc, '>Document Details<')
+            && str_contains($adminInboxViewSrc, 'Subject Matter'));
+    check('5.25e: Sidebar highlights Noted Documents when viewing a noted document',
+        str_contains($sidebarSrc, "\$currentRoute === 'admin/inbox/show'")
+            && str_contains($sidebarSrc, "\$_GET['from'] ?? '') === 'noted'")
+            && str_contains($sidebarSrc, "\$currentRoute = 'admin/noted-documents'"));
+    check('5.25i: Sidebar highlights SP Secretary Noted Documents from its detail page',
+        str_contains($sidebarSrc, "\$currentRoute === 'spsec/inbox/show'")
+            && str_contains($sidebarSrc, "\$currentRoute = 'spsec/noted-documents'"));
     check('5.26: Committee Noted action completes its assignment and records a phase-specific route',
         str_contains($committeeInboxCtrlSrc, "SET decision     = 'NOTED'")
             && str_contains($committeeInboxCtrlSrc, "VALUES (?, 'COMMITTEE', 'COMMITTEE', ?, ?, ?, ?)")

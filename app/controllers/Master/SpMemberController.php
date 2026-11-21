@@ -117,23 +117,24 @@ class SpMemberController
 
         $errors = $this->validateSpMember($data);
 
-        // Handle photo upload
-        $photoPath = null;
-        if (!empty($_FILES['photo']['name'])) {
-            $uploadResult = $this->handlePhotoUpload($_FILES['photo']);
-            if ($uploadResult['error']) {
-                $errors[] = $uploadResult['error'];
-            } else {
-                $photoPath = $uploadResult['path'];
-            }
-        }
-
         if (!empty($errors)) {
             flash_set('error', implode('<br>', $errors));
             old_set($_POST);
             redirect('master/sp-members');
         }
 
+        $photoPath = null;
+        if (!empty($_FILES['photo']['name'])) {
+            $uploadResult = $this->handlePhotoUpload($_FILES['photo']);
+            if ($uploadResult['error']) {
+                flash_set('error', $uploadResult['error']);
+                old_set($_POST);
+                redirect('master/sp-members');
+            }
+            $photoPath = $uploadResult['path'];
+        }
+
+        $memberCreated = false;
         try {
             $stmt = $this->pdo->prepare(
                 "INSERT INTO sp_members
@@ -154,6 +155,7 @@ class SpMemberController
                 $userId,
                 $userId,
             ]);
+            $memberCreated = true;
             $newId    = (int)$this->pdo->lastInsertId();
             $fullName = $this->buildFullName($data);
 
@@ -161,6 +163,9 @@ class SpMemberController
             system_log('INFO', "SP member created: {$fullName} (ID: {$newId})");
             flash_set('success', "SP member \"{$fullName}\" created successfully.");
         } catch (\Exception $e) {
+            if (!$memberCreated) {
+                $this->removePhotoFile($photoPath);
+            }
             system_log('ERROR', 'SP member create failed', ['error' => $e->getMessage(), 'data' => $data]);
             flash_set('error', 'Failed to create SP member: ' . $e->getMessage());
             old_set($_POST);
@@ -229,23 +234,13 @@ class SpMemberController
         ];
 
         $errors = $this->validateSpMember($data);
-
-        // Handle photo upload — keep existing photo if no new file uploaded
-        $photoPath = trim($_POST['existing_photo_path'] ?? '') ?: null;
-        if (!empty($_FILES['photo']['name'])) {
-            $uploadResult = $this->handlePhotoUpload($_FILES['photo']);
-            if ($uploadResult['error']) {
-                $errors[] = $uploadResult['error'];
-            } else {
-                $photoPath = $uploadResult['path'];
-            }
-        }
-
         if (!empty($errors)) {
             flash_set('error', implode('<br>', $errors));
             redirect('master/sp-members');
         }
 
+        $uploadedPhotoPath = null;
+        $recordUpdated = false;
         try {
             $oldStmt = $this->pdo->prepare(
                 "SELECT * FROM sp_members WHERE sp_member_id = ? AND is_deleted = 0 LIMIT 1"
@@ -256,6 +251,20 @@ class SpMemberController
             if (!$oldRecord) {
                 flash_set('error', 'SP member not found.');
                 redirect('master/sp-members');
+            }
+
+            $photoPath = $oldRecord['photo_path'] ?: null;
+            if (($_POST['remove_photo'] ?? '0') === '1') {
+                $photoPath = null;
+            }
+            if (!empty($_FILES['photo']['name'])) {
+                $uploadResult = $this->handlePhotoUpload($_FILES['photo']);
+                if ($uploadResult['error']) {
+                    flash_set('error', $uploadResult['error']);
+                    redirect('master/sp-members');
+                }
+                $uploadedPhotoPath = $uploadResult['path'];
+                $photoPath = $uploadedPhotoPath;
             }
 
             $stmt = $this->pdo->prepare(
@@ -278,12 +287,22 @@ class SpMemberController
                 $userId,
                 $id,
             ]);
+            $recordUpdated = true;
 
             $fullName = $this->buildFullName($data);
-            audit_log('UPDATE', 'SpMember', (string)$id, $oldRecord ?: null, $data, "Updated SP member: {$fullName}");
+            $updatedData = $data;
+            $updatedData['photo_path'] = $photoPath;
+            audit_log('UPDATE', 'SpMember', (string)$id, $oldRecord, $updatedData, "Updated SP member: {$fullName}");
             system_log('INFO', "SP member updated: {$fullName} (ID: {$id})");
             flash_set('success', "SP member \"{$fullName}\" updated successfully.");
+
+            if ($oldRecord['photo_path'] !== $photoPath) {
+                $this->removePhotoFile($oldRecord['photo_path']);
+            }
         } catch (\Exception $e) {
+            if (!$recordUpdated) {
+                $this->removePhotoFile($uploadedPhotoPath);
+            }
             system_log('ERROR', 'SP member update failed', ['error' => $e->getMessage(), 'sp_member_id' => $id, 'data' => $data]);
             flash_set('error', 'Failed to update SP member: ' . $e->getMessage());
         }
@@ -434,6 +453,33 @@ class SpMemberController
         }
 
         return ['path' => 'uploads/sp-members/' . $filename, 'error' => null];
+    }
+
+    protected function removePhotoFile(?string $photoPath): void
+    {
+        $prefix = 'uploads/sp-members/';
+        $normalizedPath = str_replace('\\', '/', trim((string)$photoPath));
+        if ($normalizedPath === '' || !str_starts_with($normalizedPath, $prefix)) {
+            return;
+        }
+
+        $filename = substr($normalizedPath, strlen($prefix));
+        if ($filename === '' || basename($filename) !== $filename) {
+            return;
+        }
+
+        $uploadDirectory = realpath(__DIR__ . '/../../../public/uploads/sp-members');
+        $filePath = $uploadDirectory !== false
+            ? realpath($uploadDirectory . DIRECTORY_SEPARATOR . $filename)
+            : false;
+        if ($uploadDirectory === false || $filePath === false
+            || !str_starts_with($filePath, $uploadDirectory . DIRECTORY_SEPARATOR)) {
+            return;
+        }
+
+        if (!unlink($filePath)) {
+            system_log('WARNING', 'Failed to remove SP member photo', ['photo_path' => $normalizedPath]);
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -23,6 +23,8 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <?php if (!empty($success)): ?>
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars($success) ?></div>
     <?php endif; ?>
@@ -48,6 +50,8 @@ ob_start();
 
         <!-- Left: Document details -->
         <div class="lg:col-span-1 space-y-4">
+
+            <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
 
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-600">Communication</h2>
@@ -159,7 +163,6 @@ ob_start();
     </div>
 </div>
 
-<?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
 
 <?php
 $content = ob_get_clean();

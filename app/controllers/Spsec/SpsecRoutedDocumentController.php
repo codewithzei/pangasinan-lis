@@ -40,8 +40,21 @@ class SpsecRoutedDocumentController
         // Filters
         $search         = trim($_GET['search']         ?? '');
         $filterStatus   = trim($_GET['status']         ?? '');
-        $filterOption   = trim($_GET['routing_option'] ?? '');
-        $filterDest     = trim($_GET['destination']    ?? '');
+        $filterPhase    = strtoupper(trim($_GET['current_phase'] ?? ''));
+        $filterType     = trim($_GET['document_type']   ?? '');
+
+        $documentPhases = [
+            'RECEIVING' => 'Receiving',
+            'ADMIN' => 'Admin',
+            'SP_SECRETARY' => 'SP Secretary',
+            'PLENARY' => 'Plenary',
+            'COMMITTEE' => 'Committee',
+            'FINALIZED' => 'Finalized',
+            'FILED' => 'Filed',
+        ];
+        if (!array_key_exists($filterPhase, $documentPhases)) {
+            $filterPhase = '';
+        }
 
         $filterConditions = [];
         $filterParams     = [];
@@ -57,14 +70,16 @@ class SpsecRoutedDocumentController
             $filterParams[]     = $filterStatus;
         }
 
-        if ($filterOption !== '') {
-            $filterConditions[] = 'ro.id = ?';
-            $filterParams[]     = $filterOption;
+        if ($filterPhase !== '') {
+            $filterConditions[] = 'd.current_phase = ?';
+            $filterParams[]     = $filterPhase;
         }
 
-        if ($filterDest !== '') {
-            $filterConditions[] = 'lr.to_phase = ?';
-            $filterParams[]     = $filterDest;
+        if ($filterType !== '' && ctype_digit($filterType)) {
+            $filterConditions[] = 'd.document_type_id = ?';
+            $filterParams[]     = (int) $filterType;
+        } else {
+            $filterType = '';
         }
 
         $extraWhere = count($filterConditions) > 0
@@ -122,7 +137,7 @@ class SpsecRoutedDocumentController
                 ro.id                AS routing_option_id,
                 ro.name              AS routing_option_name,
                 cc.name              AS communication_category_name,
-                c.name               AS committee_name,
+                committee_summary.committee_name AS committee_name,
                 rb.username          AS routed_by_username,
                 CONCAT(COALESCE(rbi.first_name, ''), ' ', COALESCE(rbi.last_name, '')) AS routed_by_fullname,
                 routed_to_role.name  AS routed_to_role_name
@@ -139,8 +154,14 @@ class SpsecRoutedDocumentController
             LEFT  JOIN document_types    dt             ON dt.id = d.document_type_id
             LEFT  JOIN document_statuses ds             ON ds.id = d.current_status_id
             LEFT  JOIN communication_categories cc     ON cc.id = d.communication_category_id
-            LEFT  JOIN document_committees  dc         ON dc.document_id = d.id
-            LEFT  JOIN committees           c          ON c.id = dc.committee_id
+            LEFT  JOIN (
+                SELECT
+                    dc.document_id,
+                    GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR ', ') AS committee_name
+                FROM document_committees dc
+                INNER JOIN committees c ON c.id = dc.committee_id
+                GROUP BY dc.document_id
+            ) committee_summary ON committee_summary.document_id = d.id
             LEFT  JOIN user_accounts     rb             ON rb.id = lr.routed_by
             LEFT  JOIN user_info         rbi            ON rbi.user_account_id = rb.id
             LEFT  JOIN roles             routed_to_role ON routed_to_role.id = lr.routed_to_role_id
@@ -161,12 +182,11 @@ class SpsecRoutedDocumentController
             ORDER BY name ASC
         ")->fetchAll();
 
-        $routingOptions = $this->pdo->query("
+        $documentTypes = $this->pdo->query("
             SELECT id, name
-            FROM routing_options
+            FROM document_types
             WHERE is_active = 1 AND is_deleted = 0
-              AND name IN ('Plenary', 'Committee')
-            ORDER BY sort_order ASC, name ASC
+            ORDER BY name ASC
         ")->fetchAll();
 
         // Statistics
@@ -309,23 +329,13 @@ class SpsecRoutedDocumentController
         $attStmt->execute([$documentId]);
         $attachments = $attStmt->fetchAll();
 
-        // Events
-        $eventStmt = $this->pdo->prepare("
-            SELECT de.*, ua.username AS performed_by_username
-            FROM document_events de
-            LEFT JOIN user_accounts ua ON de.performed_by = ua.id
-            WHERE de.document_id = ?
-            ORDER BY de.created_at ASC
-        ");
-        $eventStmt->execute([$documentId]);
-        $events = $eventStmt->fetchAll();
-
         $pageTitle    = 'Routed Document Details — ' . htmlspecialchars($document['tracking_number']);
-        $pageSubtitle = 'Detailed information and routing history';
+        $pageSubtitle = 'Detailed document information';
 
         // ── Motion for Reconsideration data ───────────────────────────────────
         require_once __DIR__ . '/../../services/DocumentService.php';
         $docService     = new DocumentService($this->pdo);
+        $documentEvents = $docService->getDocumentEvents($documentId);
         $mfrLink        = null;
         $relatedMotions = [];
         $docTypeName    = $document['document_type_name'] ?? '';

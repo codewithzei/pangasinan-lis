@@ -2,11 +2,10 @@
 ob_start();
 
 $document    = $document    ?? [];
-$attachments = $attachments ?? [];
-$routes      = $routes      ?? [];
-$assignments = $assignments ?? [];
-$events      = $events      ?? [];
-$pageTitle   = $pageTitle   ?? 'Routed Document Details';
+$attachments    = $attachments    ?? [];
+$routes         = $routes         ?? [];
+$assignments    = $assignments    ?? [];
+$pageTitle      = $pageTitle      ?? 'Routed Document Details';
 $pageSubtitle = $pageSubtitle ?? '';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -55,28 +54,21 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- ── Header ────────────────────────────────────────────────────────────── -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="flex items-center gap-3">
-                        <a href="<?= BASE_URL ?>/spsec/routed"
-                           class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white
-                                  hover:bg-white/20 transition">
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                            </svg>
-                        </a>
-                        <div>
-                            <p class="text-sm font-medium text-blue-100">DOCUMENT DETAILS</p>
-                            <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                                <?= htmlspecialchars($document['tracking_number'] ?? '') ?>
-                            </h1>
-                            <p class="mt-1 text-sm text-blue-100">
-                                <?= htmlspecialchars($pageSubtitle) ?>
-                            </p>
-                        </div>
+                    <div>
+                        <p class="text-sm font-medium text-blue-100">DOCUMENT DETAILS</p>
+                        <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                            <?= htmlspecialchars($document['tracking_number'] ?? '') ?>
+                        </h1>
+                        <p class="mt-1 text-sm text-blue-100">
+                            <?= htmlspecialchars($pageSubtitle) ?>
+                        </p>
                     </div>
                     <div class="flex items-center gap-3 shrink-0">
                         <!-- Current phase badge -->
@@ -91,15 +83,80 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
         </div>
     </section>
 
+    <?php
+    // MFR relationship links (Referenced Original Case / Related Motions)
+    $mfrDetailRoute = 'spsec/inbox';
+    require __DIR__ . '/../../partials/resubmission-relationship.php';
+    require __DIR__ . '/../../partials/mfr-relationship.php';
+    ?>
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-6">
+        <h2 class="text-lg font-semibold text-gray-900">Summary</h2>
+
+        <div class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div class="flex items-start justify-between gap-2">
+                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Tracking #</span>
+                <span class="break-all text-right font-semibold text-gray-900">
+                    <?= htmlspecialchars($document['tracking_number'] ?? '—') ?>
+                </span>
+            </div>
+            <div class="flex items-start justify-between gap-2">
+                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Type</span>
+                <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                      style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
+                             color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
+                    <?= htmlspecialchars($document['document_type_name'] ?? '—') ?>
+                </span>
+            </div>
+            <div class="flex items-start justify-between gap-2">
+                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Status</span>
+                <span class="inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold"
+                      style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
+                             border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
+                             color: white;">
+                    <?= htmlspecialchars($document['status'] ?? '—') ?>
+                </span>
+            </div>
+            <div class="flex items-start justify-between gap-2">
+                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Phase</span>
+                <span class="text-right text-xs font-medium text-gray-700">
+                    <?= htmlspecialchars(spsec_formatPhaseName($document['current_phase'] ?? '')) ?>
+                </span>
+            </div>
+            <?php if (!empty($document['committee_name'])): ?>
+            <div class="flex items-start justify-between gap-2">
+                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Committee</span>
+                <span class="text-right text-xs font-medium text-amber-700">
+                    <?= htmlspecialchars($document['committee_name']) ?>
+                </span>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($document['communication_category_name'])): ?>
+            <div class="flex items-start justify-between gap-2">
+                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Comm. Category</span>
+                <span class="text-right text-xs font-medium text-emerald-700">
+                    <?= htmlspecialchars($document['communication_category_name']) ?>
+                </span>
+            </div>
+            <?php endif; ?>
+            <div class="flex items-start justify-between gap-2">
+                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Received</span>
+                <span class="text-right text-xs text-gray-700">
+                    <?= htmlspecialchars(date('M j, Y', strtotime($document['date_received']))) ?>
+                </span>
+            </div>
+        </div>
+    </section>
+
     <!-- ── Main layout: 2-col on lg ──────────────────────────────────────────── -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
         <!-- ── Left / main column ─────────────────────────────────────────────── -->
-        <div class="lg:col-span-2 space-y-6">
+        <div class="lg:col-span-2 flex flex-col gap-6">
 
             <!-- Document Information ──────────────────────────────────────────── -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-gray-900">Document Information</h2>
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Document Information</h2>
 
                 <div class="mt-4 space-y-4">
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -124,49 +181,47 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                         <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap leading-relaxed"><?= escape_trimmed_text($document['subject_matter'] ?? '—') ?></p>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <p class="text-xs font-medium text-gray-500">Document Type</p>
-                            <span class="mt-1 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                                  style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
-                                         color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
-                                <?= htmlspecialchars($document['document_type_name'] ?? '—') ?>
-                            </span>
-                        </div>
-                        <div>
-                            <p class="text-xs font-medium text-gray-500">Current Status</p>
-                            <span class="mt-1 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5
-                                         text-xs font-semibold shadow-sm"
-                                  style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                         border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                         color: white;">
-                                <?= htmlspecialchars($document['status'] ?? '—') ?>
-                            </span>
-                        </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Document Type</p>
+                        <span class="mt-1 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                              style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
+                                     color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
+                            <?= htmlspecialchars($document['document_type_name'] ?? '—') ?>
+                        </span>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <p class="text-xs font-medium text-gray-500">Current Phase</p>
-                            <span class="mt-1 inline-flex items-center rounded-lg bg-gray-50 border border-gray-200
-                                         px-2.5 py-1 text-xs font-medium text-gray-700">
-                                <?= htmlspecialchars(spsec_formatPhaseName($document['current_phase'] ?? '')) ?>
-                            </span>
-                        </div>
-                        <?php if (!empty($document['committee_name'])): ?>
-                        <div>
-                            <p class="text-xs font-medium text-gray-500">Assigned Committee</p>
-                            <span class="mt-1 inline-flex items-center gap-1 rounded-lg bg-amber-50 border
-                                         border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700">
-                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 100-8 4 4 0 000 8z"/>
-                                </svg>
-                                <?= htmlspecialchars($document['committee_name']) ?>
-                            </span>
-                        </div>
-                        <?php endif; ?>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Current Status</p>
+                        <span class="mt-1 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5
+                                     text-xs font-semibold shadow-sm"
+                              style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
+                                     border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
+                                     color: white;">
+                            <?= htmlspecialchars($document['status'] ?? '—') ?>
+                        </span>
                     </div>
+
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Current Division / Phase</p>
+                        <span class="mt-1 inline-flex items-center rounded-lg border border-gray-200 bg-gray-50
+                                     px-2.5 py-1 text-xs font-medium text-gray-700">
+                            <?= htmlspecialchars(spsec_formatPhaseName($document['current_phase'] ?? '')) ?>
+                        </span>
+                    </div>
+
+                    <?php if (!empty($document['committee_name'])): ?>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Assigned Committee</p>
+                        <span class="mt-1 inline-flex items-center gap-1 rounded-lg border border-amber-200
+                                     bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 100-8 4 4 0 000 8z"/>
+                            </svg>
+                            <?= htmlspecialchars($document['committee_name']) ?>
+                        </span>
+                    </div>
+                    <?php endif; ?>
 
                     <?php if (!empty($document['communication_category_name'])): ?>
                     <div>
@@ -192,10 +247,10 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
             </section>
 
             <!-- Source Information ────────────────────────────────────────────── -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-gray-900">Source Information</h2>
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Source Information</h2>
 
-                <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="mt-4 space-y-4">
                     <div>
                         <p class="text-xs font-medium text-gray-500">Source Type</p>
                         <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_type'] ?? '—') ?></p>
@@ -207,7 +262,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                         <p class="mt-1 text-sm text-gray-900">
                             <?= htmlspecialchars($document['external_office_name']) ?>
                             <?php if (!empty($document['external_office_abbr'])): ?>
-                                <span class="text-gray-500">(<?= htmlspecialchars($document['external_office_abbr']) ?>)</span>
+                                (<?= htmlspecialchars($document['external_office_abbr']) ?>)
                             <?php endif; ?>
                         </p>
                     </div>
@@ -225,7 +280,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                         <p class="text-xs font-medium text-gray-500">Municipality / City</p>
                         <p class="mt-1 text-sm text-gray-900">
                             <?= htmlspecialchars($document['municipality_name']) ?>
-                            <?= ($document['municipality_type'] === 'City') ? '<span class="text-gray-400">(City)</span>' : '' ?>
+                            <?= ($document['municipality_type'] === 'City') ? '(City)' : '' ?>
                         </p>
                     </div>
                     <?php endif; ?>
@@ -260,106 +315,62 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                 </div>
             </section>
 
-            <!-- Routing History ───────────────────────────────────────────────── -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-gray-900">Routing History</h2>
-
-                <?php if (empty($routes)): ?>
-                    <div class="mt-4 py-8 text-center">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        <p class="mt-2 text-sm text-gray-500">No routing history available.</p>
-                    </div>
-                <?php else: ?>
-                    <div class="mt-4 flow-root">
-                        <ul role="list" class="-mb-8">
-                            <?php foreach ($routes as $index => $route): ?>
-                                <li>
-                                    <div class="relative pb-8">
-                                        <?php if ($index < count($routes) - 1): ?>
-                                            <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200"
-                                                  aria-hidden="true"></span>
-                                        <?php endif; ?>
-                                        <div class="relative flex space-x-3">
-                                            <div>
-                                                <span class="flex h-8 w-8 items-center justify-center rounded-full
-                                                             bg-blue-100 ring-8 ring-white">
-                                                    <svg class="h-4 w-4 text-primary" fill="none"
-                                                         stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                              stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                                                    </svg>
-                                                </span>
-                                            </div>
-                                            <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
-                                                <div>
-                                                    <p class="text-sm text-gray-900">
-                                                        Routed from
-                                                        <span class="font-semibold">
-                                                            <?= htmlspecialchars(spsec_formatPhaseName($route['from_phase'])) ?>
-                                                        </span>
-                                                        to
-                                                        <span class="font-semibold">
-                                                            <?= htmlspecialchars(spsec_formatPhaseName($route['to_phase'])) ?>
-                                                        </span>
-                                                        <?php if (!empty($route['routed_to_role_name'])): ?>
-                                                            <span class="text-gray-500">
-                                                                (<?= htmlspecialchars($route['routed_to_role_name']) ?>)
-                                                            </span>
-                                                        <?php endif; ?>
-                                                    </p>
-                                                    <?php if (!empty($route['routing_option_name'])): ?>
-                                                        <p class="mt-0.5 text-xs text-gray-500">
-                                                            Option:
-                                                            <span class="font-medium text-gray-700">
-                                                                <?= htmlspecialchars($route['routing_option_name']) ?>
-                                                            </span>
-                                                        </p>
-                                                    <?php endif; ?>
-                                                    <?php if (!empty($route['routed_by_username'])): ?>
-                                                        <p class="mt-0.5 text-xs text-gray-500">
-                                                            By:
-                                                            <span class="font-medium text-gray-700">
-                                                                <?= htmlspecialchars($route['routed_by_username']) ?>
-                                                            </span>
-                                                            <?php if (!empty(trim($route['routed_by_fullname'] ?? ''))): ?>
-                                                                — <?= htmlspecialchars(trim($route['routed_by_fullname'])) ?>
-                                                            <?php endif; ?>
-                                                        </p>
-                                                    <?php endif; ?>
-                                                    <?php if (!empty($route['remarks'])): ?>
-                                                        <p class="mt-1 text-xs text-gray-600 italic">
-                                                            "<?= htmlspecialchars($route['remarks']) ?>"
-                                                        </p>
-                                                    <?php endif; ?>
-                                                </div>
-                                                <div class="whitespace-nowrap text-right text-xs text-gray-500">
-                                                    <?= htmlspecialchars(date('M j, Y', strtotime($route['created_at']))) ?>
-                                                    <br>
-                                                    <?= htmlspecialchars(date('g:i A', strtotime($route['created_at']))) ?>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endif; ?>
-            </section>
-
             <!-- Assignments History ───────────────────────────────────────────── -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-gray-900">Assignment History</h2>
+            <section class="order-2 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 class="mb-4 text-base font-semibold text-gray-900">Assignment History</h2>
 
                 <?php if (empty($assignments)): ?>
-                    <div class="mt-4 py-8 text-center">
-                        <p class="text-sm text-gray-500">No assignment records found.</p>
-                    </div>
+                    <p class="text-sm text-gray-400">No assignment records found.</p>
                 <?php else: ?>
-                    <div class="mt-4 overflow-x-auto">
+                    <div class="space-y-3 sm:hidden">
+                        <?php foreach ($assignments as $asgn): ?>
+                            <article class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                            <?= htmlspecialchars(spsec_formatPhaseName($asgn['phase'] ?? '')) ?>
+                                        </p>
+                                        <p class="mt-1 break-words text-sm font-semibold text-gray-800">
+                                            <?= htmlspecialchars($asgn['role_name'] ?? $asgn['assigned_to_username'] ?? '—') ?>
+                                        </p>
+                                    </div>
+                                    <span class="inline-flex shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold
+                                                 <?= spsec_decisionBadge($asgn['decision'] ?? '') ?>">
+                                        <?= htmlspecialchars(ucfirst(strtolower($asgn['decision'] ?? '—'))) ?>
+                                    </span>
+                                </div>
+                                <dl class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                    <div>
+                                        <dt class="text-gray-400">Accepted By</dt>
+                                        <dd class="mt-0.5 break-words font-medium text-gray-700">
+                                            <?= htmlspecialchars($asgn['accepted_by_username'] ?? '—') ?>
+                                            <?php if (!empty(trim($asgn['accepted_by_fullname'] ?? ''))): ?>
+                                                <span class="block font-normal text-gray-400"><?= htmlspecialchars(trim($asgn['accepted_by_fullname'])) ?></span>
+                                            <?php endif; ?>
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-gray-400">Received</dt>
+                                        <dd class="mt-0.5 break-words text-gray-600">
+                                            <?= !empty($asgn['received_at'])
+                                                ? htmlspecialchars(date('M j, Y g:i A', strtotime($asgn['received_at'])))
+                                                : '—' ?>
+                                        </dd>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <dt class="text-gray-400">Completed</dt>
+                                        <dd class="mt-0.5 break-words text-gray-600">
+                                            <?= !empty($asgn['completed_at'])
+                                                ? htmlspecialchars(date('M j, Y g:i A', strtotime($asgn['completed_at'])))
+                                                : '—' ?>
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="mt-4 hidden overflow-x-auto sm:block">
                         <table class="w-full text-left text-sm">
                             <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                                 <tr>
@@ -375,7 +386,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                                 <?php foreach ($assignments as $asgn): ?>
                                     <tr class="hover:bg-gray-50/50">
                                         <td class="px-4 py-3 text-xs font-medium text-gray-700">
-                                            <?= htmlspecialchars($asgn['role_name'] ?? '—') ?>
+                                            <?= htmlspecialchars($asgn['role_name'] ?? $asgn['assigned_to_username'] ?? '—') ?>
                                         </td>
                                         <td class="px-4 py-3 text-xs text-gray-600">
                                             <?= htmlspecialchars(spsec_formatPhaseName($asgn['phase'] ?? '')) ?>
@@ -410,71 +421,13 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                 <?php endif; ?>
             </section>
 
-            <!-- Workflow Events ───────────────────────────────────────────────── -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-gray-900">Workflow Events</h2>
-
-                <?php if (empty($events)): ?>
-                    <div class="mt-4 py-8 text-center">
-                        <p class="text-sm text-gray-500">No events recorded.</p>
-                    </div>
-                <?php else: ?>
-                    <div class="mt-4 flow-root">
-                        <ul role="list" class="-mb-8">
-                            <?php foreach ($events as $idx => $evt): ?>
-                                <li>
-                                    <div class="relative pb-8">
-                                        <?php if ($idx < count($events) - 1): ?>
-                                            <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200"
-                                                  aria-hidden="true"></span>
-                                        <?php endif; ?>
-                                        <div class="relative flex space-x-3">
-                                            <div>
-                                                <span class="flex h-8 w-8 items-center justify-center rounded-full
-                                                             bg-gray-100 ring-8 ring-white">
-                                                    <svg class="h-4 w-4 text-gray-500" fill="none"
-                                                         stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                              stroke-width="2"
-                                                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                                    </svg>
-                                                </span>
-                                            </div>
-                                            <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
-                                                <div>
-                                                    <p class="text-sm font-medium text-gray-900">
-                                                        <?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $evt['event_type'] ?? '')))) ?>
-                                                    </p>
-                                                    <p class="text-xs text-gray-500">
-                                                        Phase: <?= htmlspecialchars(spsec_formatPhaseName($evt['phase'] ?? '')) ?>
-                                                        <?php if (!empty($evt['performed_by_username'])): ?>
-                                                            · By: <?= htmlspecialchars($evt['performed_by_username']) ?>
-                                                        <?php endif; ?>
-                                                    </p>
-                                                    <?php if (!empty($evt['remarks'])): ?>
-                                                        <p class="mt-0.5 text-xs text-gray-600 italic">
-                                                            "<?= htmlspecialchars($evt['remarks']) ?>"
-                                                        </p>
-                                                    <?php endif; ?>
-                                                </div>
-                                                <div class="whitespace-nowrap text-right text-xs text-gray-500">
-                                                    <?= htmlspecialchars(date('M j, Y', strtotime($evt['created_at']))) ?>
-                                                    <br>
-                                                    <?= htmlspecialchars(date('g:i A', strtotime($evt['created_at']))) ?>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endif; ?>
-            </section>
+            <div class="order-3">
+                <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+            </div>
 
             <!-- Attachments ──────────────────────────────────────────────────── -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-gray-900">Attachments</h2>
+            <section class="order-1 rounded-2xl border border-gray-200 bg-white p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Attachments</h2>
 
                 <?php if (empty($attachments)): ?>
                     <div class="mt-4 py-8 text-center">
@@ -488,7 +441,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                 <?php else: ?>
                     <div class="mt-4 space-y-2">
                         <?php foreach ($attachments as $attachment): ?>
-                            <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 p-3">
+                            <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
                                 <div class="flex items-center gap-3 min-w-0 flex-1">
                                     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg
                                                 bg-blue-100 text-primary">
@@ -536,81 +489,9 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
         <!-- ── Right / sidebar column ─────────────────────────────────────────── -->
         <div class="space-y-6">
 
-            <!-- Quick Summary card ────────────────────────────────────────────── -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-gray-900">Summary</h2>
-
-                <div class="mt-4 space-y-3 text-sm">
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Tracking #</span>
-                        <span class="font-semibold text-gray-900 text-right break-all">
-                            <?= htmlspecialchars($document['tracking_number'] ?? '—') ?>
-                        </span>
-                    </div>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Type</span>
-                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                              style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
-                                     color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
-                            <?= htmlspecialchars($document['document_type_name'] ?? '—') ?>
-                        </span>
-                    </div>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Status</span>
-                        <span class="inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold"
-                              style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                     border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                     color: white;">
-                            <?= htmlspecialchars($document['status'] ?? '—') ?>
-                        </span>
-                    </div>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Phase</span>
-                        <span class="text-xs font-medium text-gray-700">
-                            <?= htmlspecialchars(spsec_formatPhaseName($document['current_phase'] ?? '')) ?>
-                        </span>
-                    </div>
-                    <?php if (!empty($document['committee_name'])): ?>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Committee</span>
-                        <span class="text-xs font-medium text-amber-700 text-right">
-                            <?= htmlspecialchars($document['committee_name']) ?>
-                        </span>
-                    </div>
-                    <?php endif; ?>
-                    <?php if (!empty($document['communication_category_name'])): ?>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Comm. Category</span>
-                        <span class="text-xs font-medium text-emerald-700 text-right">
-                            <?= htmlspecialchars($document['communication_category_name']) ?>
-                        </span>
-                    </div>
-                    <?php endif; ?>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Received</span>
-                        <span class="text-xs text-gray-700 text-right">
-                            <?= htmlspecialchars(date('M j, Y', strtotime($document['date_received']))) ?>
-                        </span>
-                    </div>
-                </div>
-
-                <div class="mt-4 border-t border-gray-100 pt-4">
-                    <a href="<?= BASE_URL ?>/spsec/routed"
-                       class="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200
-                              bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-700
-                              hover:bg-gray-100 hover:border-gray-300 transition">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M15 19l-7-7 7-7"/>
-                        </svg>
-                        Back to Routed List
-                    </a>
-                </div>
-            </section>
-
             <!-- Metadata ─────────────────────────────────────────────────────── -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-gray-900">Metadata</h2>
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Metadata</h2>
 
                 <div class="mt-4 space-y-3">
                     <div>
@@ -668,12 +549,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
 </div>
 
-<?php
-// MFR relationship links (Referenced Original Case / Related Motions)
-$mfrDetailRoute = 'spsec/inbox';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content = ob_get_clean();

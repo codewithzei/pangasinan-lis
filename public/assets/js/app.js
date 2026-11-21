@@ -137,3 +137,48 @@ if (logoutConfirmBtn && logoutForm) {
         logoutForm.submit();
     });
 }
+
+if (window.location.pathname.split('/').includes('master')) {
+    window.showToast = function (message, type = 'success') {
+        let container = document.getElementById('statusToastContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'statusToastContainer';
+            container.className = 'fixed top-24 right-6 z-50 space-y-2 pointer-events-none';
+            document.body.appendChild(container);
+        }
+
+        const isError = type === 'error';
+        const toast = document.createElement('div');
+        toast.className = `pointer-events-auto flex max-w-sm items-center gap-3 rounded-xl border ${isError ? 'border-red-100 bg-red-50' : 'border-emerald-100 bg-emerald-50'} px-4 py-3 shadow-lg ${isError ? '' : 'animate-slide-in-right'}`;
+        toast.setAttribute('role', isError ? 'alert' : 'status');
+
+        const iconBox = document.createElement('div');
+        iconBox.className = `flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isError ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`;
+        iconBox.innerHTML = `<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="${isError ? 'M6 18L18 6M6 6l12 12' : 'M5 13l4 4L19 7'}"/></svg>`;
+
+        const content = document.createElement('div');
+        content.className = 'min-w-0 flex-1';
+
+        const title = document.createElement('p');
+        title.className = `text-sm font-semibold ${isError ? 'text-red-800' : 'text-emerald-800'}`;
+        title.textContent = isError ? 'Error' : 'Success';
+
+        const text = document.createElement('p');
+        text.className = `text-xs break-words ${isError ? 'text-red-700' : 'text-emerald-700'}`;
+        text.textContent = String(message ?? '');
+
+        content.append(title, text);
+        toast.append(iconBox, content);
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.transition = 'opacity 300ms, transform 300ms';
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(20px)';
+        }, 4500);
+        setTimeout(() => toast.remove(), 5000);
+    };
+
+    window.showStatusToast = window.showToast;
+}

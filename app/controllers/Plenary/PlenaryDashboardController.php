@@ -59,15 +59,60 @@ class PlenaryDashboardController
                      AND da.completed_at IS NULL
                      AND da.accepted_by IS NULL
                      AND (da.assigned_to_user_id IS NULL OR da.assigned_to_user_id = ?)
+                     AND d.current_phase = 'PLENARY'
+                     AND d.finalized_at IS NULL
+                     AND d.current_status_id NOT IN (
+                         SELECT id FROM document_statuses
+                         WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
+                           AND is_active = 1
+                           AND is_deleted = 0
+                     )
+                     AND NOT EXISTS (
+                         SELECT 1
+                         FROM document_assignments newer_da
+                         WHERE newer_da.document_id = da.document_id
+                           AND newer_da.id > da.id
+                     )
                     THEN da.document_id
                 END) AS pending_count,
                 COUNT(DISTINCT CASE
                     WHEN da.decision = 'ACCEPTED'
                      AND da.completed_at IS NULL
                      AND (da.accepted_by = ? OR da.assigned_to_user_id = ?)
+                     AND d.current_phase = 'PLENARY'
+                     AND d.finalized_at IS NULL
+                     AND d.current_status_id NOT IN (
+                         SELECT id FROM document_statuses
+                         WHERE name IN (
+                             'Awaiting First Reading',
+                             'Returned to Plenary',
+                             'Approved',
+                             'Plenary Comm: Finalized',
+                             'Plenary Cases: Finalized',
+                             'Plenary: Committee Report Adopted'
+                         )
+                           AND is_active = 1
+                           AND is_deleted = 0
+                     )
+                     AND NOT EXISTS (
+                         SELECT 1 FROM plenary_readings pr
+                         WHERE pr.document_id = da.document_id
+                     )
+                     AND (
+                         pdd.status_id IS NULL
+                         OR pdd.status_id = (
+                             SELECT id FROM document_statuses
+                             WHERE name = 'For Encoding'
+                               AND is_active = 1
+                               AND is_deleted = 0
+                             LIMIT 1
+                         )
+                     )
                     THEN da.document_id
                 END) AS accepted_count
             FROM document_assignments da
+            INNER JOIN documents d ON d.id = da.document_id
+            LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
             WHERE da.assigned_to_role_id = ?
               AND da.phase = 'PLENARY'
         ");

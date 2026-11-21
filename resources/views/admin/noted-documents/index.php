@@ -10,6 +10,8 @@ $tabLabels = [
 if (!empty($includeCommunications)) {
     $tabLabels['communications'] = 'Communications';
 }
+$supportsNotedReturn = strpos($documentViewUrl, '/admin/inbox/show?id=') !== false
+    || strpos($documentViewUrl, '/spsec/inbox/show?id=') !== false;
 ?>
 
 <div class="space-y-6">
@@ -29,15 +31,42 @@ if (!empty($includeCommunications)) {
         </div>
     </section>
 
-    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <p class="text-sm text-gray-500">All Noted Documents</p>
-            <p class="mt-2 text-3xl font-bold text-emerald-700"><?= number_format($totalNoted) ?></p>
-        </div>
-        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <p class="text-sm text-gray-500"><?= htmlspecialchars($tabLabels[$tab]) ?></p>
-            <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalRows) ?></p>
-            <p class="mt-1 text-xs text-gray-500">Matching this tab and the current filters</p>
+    <section>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500">All Noted Documents</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalNoted) ?></p>
+                    </div>
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-7 7h6m-6 4h6"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center gap-2 text-xs">
+                    <span class="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-700">Across all document types</span>
+                </div>
+            </div>
+            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-sm text-gray-500"><?= htmlspecialchars($tabLabels[$tab]) ?></p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalRows) ?></p>
+                    </div>
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                  d="M4 5a2 2 0 012-2h8l6 6v10a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm10-2v6h6m-12 4h8m-8 4h8"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 flex items-center gap-2 text-xs">
+                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-primary">Matching current filters</span>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -70,14 +99,24 @@ if (!empty($includeCommunications)) {
                 </p>
             </div>
             <form method="GET" action="<?= htmlspecialchars($notedBaseUrl) ?>"
-                  class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  class="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
-                <input type="search" name="search" value="<?= htmlspecialchars($search) ?>"
-                       placeholder="Search tracking number or subject"
-                       class="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                <div class="relative w-full sm:w-64">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="search" name="search" value="<?= htmlspecialchars($search) ?>"
+                           placeholder="Search tracking # or subject…"
+                           class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm
+                                  text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
+                                  focus:ring-2 focus:ring-primary/20 lg:w-64">
+                </div>
                 <select name="status"
-                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <option value="">All statuses</option>
+                        class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800
+                               focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:w-48">
+                    <option value="">All Statuses</option>
                     <?php foreach ($documentStatuses as $statusOption): ?>
                         <option value="<?= (int) $statusOption['id'] ?>"
                             <?= $filterStatus === (string) $statusOption['id'] ? 'selected' : '' ?>>
@@ -86,12 +125,14 @@ if (!empty($includeCommunications)) {
                     <?php endforeach; ?>
                 </select>
                 <button type="submit"
-                        class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
+                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium
+                               text-gray-700 transition hover:bg-gray-50">
                     Filter
                 </button>
                 <?php if ($search !== '' || $filterStatus !== ''): ?>
                     <a href="<?= htmlspecialchars($notedBaseUrl) ?>?tab=<?= urlencode($tab) ?>"
-                       class="rounded-xl border border-gray-200 px-4 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-50">
+                       class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-center text-sm font-medium
+                              text-gray-700 transition hover:bg-gray-50">
                         Clear
                     </a>
                 <?php endif; ?>
@@ -102,59 +143,99 @@ if (!empty($includeCommunications)) {
             <table class="w-full text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="px-6 py-3 font-medium">Tracking Number</th>
+                        <th class="whitespace-nowrap px-6 py-3 font-medium">Tracking Number</th>
                         <th class="px-6 py-3 font-medium">Subject Matter</th>
-                        <th class="px-6 py-3 font-medium">Document Type</th>
-                        <th class="px-6 py-3 font-medium">Attachments</th>
-                        <th class="px-6 py-3 font-medium">Date Noted</th>
+                        <th class="whitespace-nowrap px-6 py-3 font-medium">Document Type</th>
+                        <th class="whitespace-nowrap px-6 py-3 font-medium">Attachments</th>
+                        <th class="whitespace-nowrap px-6 py-3 font-medium">Date Noted</th>
                         <th class="px-6 py-3 font-medium">Status</th>
-                        <th class="px-6 py-3 text-right font-medium">Copy</th>
+                        <th class="px-6 py-3 text-right font-medium">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php if (!$documents): ?>
                         <tr>
                             <td colspan="7" class="px-6 py-16 text-center">
-                                <p class="text-sm font-medium text-gray-700">No noted documents found in this tab.</p>
-                                <p class="mt-1 text-xs text-gray-500">Documents marked as Noted will be stored here.</p>
+                                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
+                                    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a3 3 0 016 0"/>
+                                    </svg>
+                                </div>
+                                <p class="mt-4 text-sm font-medium text-gray-700">No noted documents found.</p>
+                                <p class="mt-1 text-xs text-gray-500">
+                                    <?= ($search !== '' || $filterStatus !== '')
+                                        ? 'Try adjusting your filters or search criteria.'
+                                        : 'Documents marked as Noted will appear here.' ?>
+                                </p>
                             </td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($documents as $doc): ?>
                             <?php $typeColor = $doc['document_type_badge_color'] ?: '#2563EB'; ?>
                             <?php $statusColor = $doc['status_badge_color'] ?: '#6B7280'; ?>
-                            <tr class="hover:bg-gray-50/60">
-                                <td class="whitespace-nowrap px-6 py-4 font-medium text-gray-900">
-                                    <?= htmlspecialchars($doc['tracking_number']) ?>
-                                    <div class="mt-1 text-xs font-normal text-gray-400">
-                                        Received <?= htmlspecialchars(date('M j, Y', strtotime($doc['date_received']))) ?>
+                            <tr class="transition hover:bg-gray-50/50">
+                                <td class="whitespace-nowrap px-6 py-4">
+                                    <div class="font-medium text-gray-900"><?= htmlspecialchars($doc['tracking_number']) ?></div>
+                                    <div class="mt-0.5 text-xs text-gray-500">
+                                        Received: <?= htmlspecialchars(date('M j, Y', strtotime($doc['date_received']))) ?>
                                     </div>
                                 </td>
-                                <td class="max-w-sm px-6 py-4 text-gray-800">
-                                    <span class="line-clamp-2"><?= htmlspecialchars($doc['subject_matter']) ?></span>
-                                </td>
                                 <td class="px-6 py-4">
-                                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
-                                          style="background-color: <?= htmlspecialchars($typeColor) ?>1a; color: <?= htmlspecialchars($typeColor) ?>">
+                                    <div class="max-w-sm text-sm font-medium text-gray-900 line-clamp-2">
+                                        <?= htmlspecialchars($doc['subject_matter']) ?>
+                                    </div>
+                                </td>
+                                <td class="whitespace-nowrap px-6 py-4">
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                                          style="background-color: <?= htmlspecialchars($typeColor) ?>1a; color: <?= htmlspecialchars($typeColor) ?>;">
                                         <?= htmlspecialchars($doc['document_type_name']) ?>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-gray-600">
+                                <td class="px-6 py-4 text-sm text-gray-700">
                                     <?= number_format((int) $doc['attachment_count']) ?>
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-4 text-gray-600">
-                                    <?= htmlspecialchars(date('M j, Y g:i A', strtotime($doc['noted_at']))) ?>
+                                    <div class="text-sm text-gray-900">
+                                        <?= htmlspecialchars(date('M j, Y', strtotime($doc['noted_at']))) ?>
+                                    </div>
+                                    <div class="text-xs text-gray-500">
+                                        <?= htmlspecialchars(date('g:i A', strtotime($doc['noted_at']))) ?>
+                                    </div>
                                 </td>
-                                <td class="px-6 py-4">
-                                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
-                                          style="background-color: <?= htmlspecialchars($statusColor) ?>1a; color: <?= htmlspecialchars($statusColor) ?>">
+                                <td class="whitespace-nowrap px-6 py-4">
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                                          style="background-color: <?= htmlspecialchars($statusColor) ?>1a; color: <?= htmlspecialchars($statusColor) ?>;">
                                         <?= htmlspecialchars($doc['status'] ?? '—') ?>
                                     </span>
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-4 text-right">
-                                    <a href="<?= htmlspecialchars($documentViewUrl) ?><?= (int) $doc['id'] ?>"
-                                       class="inline-flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-blue-50">
-                                        View Copy
+                                    <?php
+                                    $viewUrl = $documentViewUrl . (int) $doc['id'];
+                                    if ($supportsNotedReturn) {
+                                        $viewQuery = [
+                                            'from' => 'noted',
+                                            'tab' => $tab,
+                                            'page' => $page,
+                                        ];
+                                        if ($search !== '') $viewQuery['search'] = $search;
+                                        if ($filterStatus !== '') $viewQuery['status'] = $filterStatus;
+                                        $viewUrl .= '&' . http_build_query($viewQuery);
+                                    }
+                                    ?>
+                                    <a href="<?= htmlspecialchars($viewUrl) ?>"
+                                       class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200
+                                              px-3 py-1.5 text-xs font-medium text-gray-700 transition
+                                              hover:border-primary hover:bg-blue-50 hover:text-primary"
+                                       title="View noted document">
+                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7
+                                                     -1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                        </svg>
+                                        View
                                     </a>
                                 </td>
                             </tr>

@@ -26,6 +26,9 @@ $currentView   = $currentView   ?? 'inbox';
 $pendingCount  = $pendingCount  ?? 0;
 $acceptedCount = $acceptedCount ?? 0;
 $totalCount    = $totalCount    ?? 0;
+$documentTypeId = $documentTypeId ?? 0;
+$documentTypes  = $documentTypes ?? [];
+$typeFilterQuery = $documentTypeId > 0 ? '&document_type_id=' . (int) $documentTypeId : '';
 
 ob_start();
 
@@ -122,7 +125,7 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
     <section>
         <div class="border-b border-gray-200">
             <nav class="-mb-px flex gap-6">
-                <a href="<?= BASE_URL ?>/committee/inbox?view=inbox<?= $search ? '&search=' . urlencode($search) : '' ?>"
+                <a href="<?= BASE_URL ?>/committee/inbox?view=inbox<?= $search ? '&search=' . urlencode($search) : '' ?><?= $typeFilterQuery ?>"
                    class="<?= $currentView === 'inbox' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?> whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
                     Inbox
                     <?php if ($pendingCount > 0): ?>
@@ -131,7 +134,7 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                         </span>
                     <?php endif; ?>
                 </a>
-                <a href="<?= BASE_URL ?>/committee/inbox?view=accepted<?= $search ? '&search=' . urlencode($search) : '' ?>"
+                <a href="<?= BASE_URL ?>/committee/inbox?view=accepted<?= $search ? '&search=' . urlencode($search) : '' ?><?= $typeFilterQuery ?>"
                    class="<?= $currentView === 'accepted' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?> whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
                     Accepted
                     <?php if ($acceptedCount > 0): ?>
@@ -168,12 +171,22 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                   placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2
                                   focus:ring-primary/20 lg:w-64">
                 </div>
+                <select name="document_type_id" aria-label="Filter by document type"
+                        class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700
+                               focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:w-52">
+                    <option value="">All document types</option>
+                    <?php foreach ($documentTypes as $documentType): ?>
+                        <option value="<?= (int) $documentType['id'] ?>" <?= (int) $documentTypeId === (int) $documentType['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($documentType['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
                 <button type="submit"
                         class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700
                                hover:bg-gray-50 transition">
                     Filter
                 </button>
-                <?php if ($search !== ''): ?>
+                <?php if ($search !== '' || $documentTypeId > 0): ?>
                     <a href="<?= BASE_URL ?>/committee/inbox?view=<?= htmlspecialchars($currentView) ?>"
                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700
                               hover:bg-gray-50 transition text-center">
@@ -251,7 +264,7 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="max-w-xs">
-                                        <div class="text-sm font-medium text-gray-900 line-clamp-2">
+                                        <div class="text-sm font-medium text-gray-900 whitespace-normal break-words">
                                             <?= htmlspecialchars($row['subject_matter']) ?>
                                         </div>
                                         <div class="mt-1">
@@ -367,6 +380,9 @@ $pageSubtitle = $viewTitles[$currentView]['subtitle'] ?? '';
                     $query = ['view' => $currentView];
                     if ($search !== '') {
                         $query['search'] = $search;
+                    }
+                    if ($documentTypeId > 0) {
+                        $query['document_type_id'] = $documentTypeId;
                     }
                     $queryString = !empty($query) ? '&' . http_build_query($query) : '';
                     ?>

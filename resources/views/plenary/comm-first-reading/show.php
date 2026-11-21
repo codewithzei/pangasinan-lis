@@ -38,6 +38,8 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- Back + title -->
     <div class="flex items-center gap-4">
         <a href="<?= BASE_URL ?>/plenary/first-reading"
@@ -68,6 +70,13 @@ ob_start();
 
         <!-- Left: Document info -->
         <div class="lg:col-span-1 space-y-4">
+            <?php
+// MFR relationship links — Comm First Reading shows the original case link when this is an MFR
+$mfrDetailRoute = 'plenary/comm-first-reading';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
+
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
                 <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Communication</h2>
                 <div>
@@ -714,12 +723,7 @@ ob_start();
 }());
 </script>
 
-<?php
-// MFR relationship links — Comm First Reading shows the original case link when this is an MFR
-$mfrDetailRoute = 'plenary/comm-first-reading';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content = ob_get_clean();

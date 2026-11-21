@@ -119,6 +119,8 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- Back + Page header --------------------------------------------------->
     <div class="flex items-center gap-4">
         <a href="<?= htmlspecialchars($committeeShowBackUrl, ENT_QUOTES, 'UTF-8') ?>"
@@ -138,9 +140,16 @@ ob_start();
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
 
         <!-- Left column (2/3): document info + history ----------------------->
-        <div class="space-y-6 xl:col-span-2">
+        <div class="order-2 space-y-6 xl:order-none xl:col-span-2">
 
             <!-- Document summary -------------------------------------------->
+            <?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'committee/inbox';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
+
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="mb-4 text-base font-semibold text-gray-900">Document Summary</h2>
                 <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -564,14 +573,14 @@ ob_start();
                     <p class="text-sm text-gray-400">No assignments yet.</p>
                 <?php else: ?>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full text-sm divide-y divide-gray-100">
+                        <table class="w-full text-sm divide-y divide-gray-100">
                             <thead>
                                 <tr class="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                    <th class="pb-2 text-left">Phase</th>
-                                    <th class="pb-2 text-left">Assigned To</th>
-                                    <th class="pb-2 text-left">By</th>
-                                    <th class="pb-2 text-left">Accepted By</th>
-                                    <th class="pb-2 text-left">Decision</th>
+                                    <th class="pb-2 pr-3 text-left">Phase</th>
+                                    <th class="pb-2 pr-3 text-left">Assigned To</th>
+                                    <th class="pb-2 pr-3 text-left">By</th>
+                                    <th class="pb-2 pr-3 text-left">Accepted By</th>
+                                    <th class="pb-2 pr-3 text-left">Decision</th>
                                     <th class="pb-2 text-left">Date</th>
                                 </tr>
                             </thead>
@@ -633,15 +642,6 @@ ob_start();
                                             <?= htmlspecialchars(date('M j, Y', strtotime($asgn['created_at']))) ?>
                                         </td>
                                     </tr>
-                                    <?php if (!empty($asgn['decline_reason'])): ?>
-                                        <tr>
-                                            <td colspan="6" class="pb-2 pl-4">
-                                                <span class="text-xs text-red-600 italic">
-                                                    Reason: <?= htmlspecialchars($asgn['decline_reason']) ?>
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
@@ -773,8 +773,8 @@ ob_start();
         </div><!-- /left column -->
 
         <!-- Right column (1/3): action panel --------------------------------->
-        <div class="xl:col-span-1">
-            <div class="sticky top-6 space-y-4">
+        <div class="order-1 xl:order-none xl:col-span-1">
+            <div class="space-y-4 xl:sticky xl:top-6">
 
                 <!-- ═══════════════════════════════════════════════════════════
                      SECTION A — PENDING: Accept button
@@ -1181,6 +1181,8 @@ ob_start();
          sticky / transformed / overflow ancestor) so that `position:fixed`
          covers the full viewport without clipping.
     ═══════════════════════════════════════════════════════════════════ -->
+    <?php require __DIR__ . '/../../partials/accept-document-modal.php'; ?>
+
     <div id="confirmModal"
          class="fixed inset-0 z-[9999] hidden items-center justify-center"
          role="dialog"
@@ -1265,7 +1267,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const acceptForm = document.getElementById('acceptForm');
     const acceptBtn  = document.getElementById('acceptBtn');
     if (acceptForm && acceptBtn) {
-        acceptForm.addEventListener('submit', function () {
+        acceptForm.addEventListener('submit', function (event) {
+            if (acceptForm.dataset.confirmed !== 'true') {
+                event.preventDefault();
+                return;
+            }
             acceptBtn.disabled = true;
             acceptBtn.innerHTML =
                 '<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">' +
@@ -1423,12 +1429,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-<?php
-// MFR relationship links (Referenced Original Case / Related Motions)
-$mfrDetailRoute = 'committee/inbox';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content = ob_get_clean();

@@ -5,6 +5,7 @@ $resubmissionDetailRoute = rtrim(
     $resubmissionDetailRoute ?? $mfrDetailRoute ?? 'admin/inbox',
     '/'
 );
+$resubmissionTopMargin = $resubmissionTopMargin ?? 'mt-6';
 
 if (empty($resubmissionReference) && empty($relatedResubmissions)) {
     return;
@@ -12,7 +13,7 @@ if (empty($resubmissionReference) && empty($relatedResubmissions)) {
 ?>
 
 <?php if (!empty($resubmissionReference)): ?>
-<section class="mt-6 rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
+<section class="<?= htmlspecialchars($resubmissionTopMargin) ?> rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
     <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-lg font-semibold text-indigo-900">Resubmission</h2>
         <span class="inline-flex rounded-full border border-indigo-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
@@ -74,7 +75,7 @@ if (empty($resubmissionReference) && empty($relatedResubmissions)) {
 <?php endif; ?>
 
 <?php if (!empty($relatedResubmissions)): ?>
-<section class="mt-6 rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
+<section class="<?= htmlspecialchars($resubmissionTopMargin) ?> rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
     <h2 class="text-lg font-semibold text-indigo-900">Submission History</h2>
     <p class="mt-1 text-sm text-indigo-700">All submissions in this legislative document lineage.</p>
 

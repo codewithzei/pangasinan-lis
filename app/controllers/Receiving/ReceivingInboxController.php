@@ -105,7 +105,6 @@ class ReceivingInboxController
             $where[]  = 'd.document_type_id = ?';
             $params[] = $documentTypeId;
         }
-
         $whereClause = implode(' AND ', $where);
 
         // Count total records

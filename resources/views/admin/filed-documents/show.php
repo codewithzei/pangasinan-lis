@@ -50,6 +50,8 @@ function _typeLabel(string $type): string
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- ── Page header ──────────────────────────────────────────────────────── -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
@@ -70,7 +72,6 @@ function _typeLabel(string $type): string
                         </h1>
                     </div>
 
-                    <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
                 </div>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
@@ -85,6 +86,10 @@ function _typeLabel(string $type): string
         <div class="lg:col-span-2 space-y-6">
 
             <!-- Document Information -->
+            <?php $resubmissionTopMargin = 'mt-0'; ?>
+            <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+            <?php unset($resubmissionTopMargin); ?>
+
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="text-base font-semibold text-gray-900">Document Information</h2>
                 <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -162,6 +167,52 @@ function _typeLabel(string $type): string
                     <div class="sm:col-span-2">
                         <p class="text-xs font-medium text-gray-500">Remarks</p>
                         <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap"><?= escape_trimmed_text($document['remarks']) ?></p>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </section>
+
+            <!-- Source Information -->
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
+                <h2 class="text-base font-semibold text-gray-900">Source Information</h2>
+                <div class="mt-4 space-y-3">
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Source Type</p>
+                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_type'] ?? '—') ?></p>
+                    </div>
+
+                    <?php if (!empty($document['external_office_name'])): ?>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Provincial Government Offices</p>
+                        <p class="mt-1 text-sm text-gray-900">
+                            <?= htmlspecialchars($document['external_office_name']) ?>
+                            <?php if (!empty($document['external_office_abbr'])): ?>
+                                (<?= htmlspecialchars($document['external_office_abbr']) ?>)
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($document['hospital_name'])): ?>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Hospital</p>
+                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['hospital_name']) ?></p>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($document['municipality_name'])): ?>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Municipality / City</p>
+                        <p class="mt-1 text-sm text-gray-900">
+                            <?= htmlspecialchars($document['municipality_name']) ?>
+                        </p>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($document['source_name'])): ?>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Source Name</p>
+                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_name']) ?></p>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -265,32 +316,48 @@ function _typeLabel(string $type): string
             <!-- All Document Attachments (full history) -->
             <?php if (!empty($allAttachments)): ?>
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="text-base font-semibold text-gray-900">All Document Attachments</h2>
-                <p class="mt-1 text-xs text-gray-500">All files uploaded across every workflow phase for this document.</p>
-                <ul class="mt-4 divide-y divide-gray-100">
+                <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="text-base font-semibold text-gray-900">All Document Attachments</h2>
+                        <p class="mt-1 text-xs text-gray-500">Files uploaded across every workflow phase for this document.</p>
+                    </div>
+                    <span class="inline-flex w-fit items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                        <?= number_format(count($allAttachments)) ?> file<?= count($allAttachments) !== 1 ? 's' : '' ?>
+                    </span>
+                </div>
+                <ul class="mt-4 space-y-3">
                     <?php foreach ($allAttachments as $att): ?>
-                        <li class="flex items-center justify-between py-3">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400">
-                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <?php
+                        $attachmentExtension = strtolower(pathinfo($att['file_name'], PATHINFO_EXTENSION));
+                        $attachmentIconClass = match (true) {
+                            $attachmentExtension === 'pdf' => 'bg-red-50 text-red-500',
+                            in_array($attachmentExtension, ['doc', 'docx'], true) => 'bg-blue-50 text-blue-500',
+                            in_array($attachmentExtension, ['xls', 'xlsx'], true) => 'bg-emerald-50 text-emerald-600',
+                            in_array($attachmentExtension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true) => 'bg-violet-50 text-violet-500',
+                            default => 'bg-gray-100 text-gray-500',
+                        };
+                        ?>
+                        <li class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 transition
+                                   hover:border-gray-300 hover:bg-gray-50/50 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                            <div class="flex min-w-0 items-start gap-3 sm:items-center">
+                                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl <?= $attachmentIconClass ?>">
+                                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                     </svg>
                                 </div>
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm text-gray-800">
+                                <div class="min-w-0 flex-1">
+                                    <p class="break-all text-sm font-medium leading-5 text-gray-900 sm:break-words">
                                         <?= htmlspecialchars($att['file_name']) ?>
                                     </p>
-                                    <div class="flex items-center gap-2 mt-0.5">
-                                        <span class="text-[11px] text-gray-400">
+                                    <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                        <span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
                                             <?= htmlspecialchars(_phaseLabel($att['phase'])) ?>
                                         </span>
-                                        <span class="text-gray-300">·</span>
-                                        <span class="text-[11px] text-gray-400">
+                                        <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
                                             <?= htmlspecialchars(_typeLabel($att['attachment_type'])) ?>
                                         </span>
-                                        <span class="text-gray-300">·</span>
-                                        <span class="text-[11px] text-gray-400">
+                                        <span class="text-[11px] text-gray-500">
                                             <?= htmlspecialchars(_formatBytes((int)$att['file_size'])) ?>
                                         </span>
                                     </div>
@@ -300,10 +367,11 @@ function _typeLabel(string $type): string
                                data-attachment-preview
                                data-preview-url="<?= BASE_URL ?>/admin/filed/download?attachment_id=<?= (int)$att['id'] ?>&amp;document_id=<?= (int)$document['id'] ?>&amp;mode=inline"
                                data-preview-name="<?= htmlspecialchars($att['file_name']) ?>"
-                               class="ml-4 shrink-0 inline-flex items-center gap-1 rounded-lg border border-gray-200
-                                      px-2.5 py-1 text-xs text-gray-600
-                                      hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 transition">
-                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                               class="inline-flex w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-200
+                                      bg-white px-3 py-2 text-xs font-medium text-gray-700 transition
+                                      hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 sm:ml-4 sm:w-auto"
+                               title="Download">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                                 </svg>
@@ -387,52 +455,6 @@ function _typeLabel(string $type): string
                     </div>
                     <?php endif; ?>
 
-                </div>
-            </section>
-
-            <!-- Source Information -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="text-base font-semibold text-gray-900">Source Information</h2>
-                <div class="mt-4 space-y-3">
-                    <div>
-                        <p class="text-xs font-medium text-gray-500">Source Type</p>
-                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_type'] ?? '—') ?></p>
-                    </div>
-
-                    <?php if (!empty($document['external_office_name'])): ?>
-                    <div>
-                        <p class="text-xs font-medium text-gray-500">Provincial Government Offices</p>
-                        <p class="mt-1 text-sm text-gray-900">
-                            <?= htmlspecialchars($document['external_office_name']) ?>
-                            <?php if (!empty($document['external_office_abbr'])): ?>
-                                (<?= htmlspecialchars($document['external_office_abbr']) ?>)
-                            <?php endif; ?>
-                        </p>
-                    </div>
-                    <?php endif; ?>
-
-                    <?php if (!empty($document['hospital_name'])): ?>
-                    <div>
-                        <p class="text-xs font-medium text-gray-500">Hospital</p>
-                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['hospital_name']) ?></p>
-                    </div>
-                    <?php endif; ?>
-
-                    <?php if (!empty($document['municipality_name'])): ?>
-                    <div>
-                        <p class="text-xs font-medium text-gray-500">Municipality / City</p>
-                        <p class="mt-1 text-sm text-gray-900">
-                            <?= htmlspecialchars($document['municipality_name']) ?>
-                        </p>
-                    </div>
-                    <?php endif; ?>
-
-                    <?php if (!empty($document['source_name'])): ?>
-                    <div>
-                        <p class="text-xs font-medium text-gray-500">Source Name</p>
-                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_name']) ?></p>
-                    </div>
-                    <?php endif; ?>
                 </div>
             </section>
 

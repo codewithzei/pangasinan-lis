@@ -198,7 +198,7 @@ $accent            = $accent            ?? 'primary';
                             $suffix     = $sm['suffix'] ?? null;
                             $initials   = mb_strtoupper(mb_substr($sm['first_name'], 0, 1) . mb_substr($sm['last_name'], 0, 1));
                             $hasPhoto   = !empty($sm['photo_path']);
-                            $safeDisplay = htmlspecialchars($fullName . ($suffix ? ' ' . $suffix : ''));
+                            $displayName = $fullName . ($suffix ? ' ' . $suffix : '');
                         ?>
                         <tr class="hover:bg-gray-50/50 transition">
                             <!-- Member -->
@@ -268,7 +268,8 @@ $accent            = $accent            ?? 'primary';
                                                   d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                         </svg>
                                     </button>
-                                    <button type="button" onclick="toggleStatus(<?= (int)$sm['sp_member_id'] ?>, '<?= addslashes($safeDisplay) ?>')"
+                                    <button type="button" data-member-name="<?= htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8') ?>"
+                                        onclick="toggleStatus(<?= (int)$sm['sp_member_id'] ?>, this.dataset.memberName)"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 transition"
                                         title="<?= $sm['is_active'] ? 'Set Inactive' : 'Set Active' ?>">
                                         <?php if ($sm['is_active']): ?>
@@ -283,7 +284,8 @@ $accent            = $accent            ?? 'primary';
                                         </svg>
                                         <?php endif; ?>
                                     </button>
-                                    <button type="button" onclick="deleteSpMember(<?= (int)$sm['sp_member_id'] ?>, '<?= addslashes($safeDisplay) ?>')"
+                                    <button type="button" data-member-name="<?= htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8') ?>"
+                                        onclick="deleteSpMember(<?= (int)$sm['sp_member_id'] ?>, this.dataset.memberName)"
                                         class="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:border-red-400 hover:bg-red-50 hover:text-red-600 transition"
                                         title="Delete">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -355,6 +357,7 @@ $accent            = $accent            ?? 'primary';
         <form id="spMemberForm" method="POST" action="<?= BASE_URL ?>/master/sp-members/store" enctype="multipart/form-data">
             <input type="hidden" name="id"                  id="spMemberId"          value="">
             <input type="hidden" name="existing_photo_path" id="smExistingPhotoPath" value="">
+            <input type="hidden" name="remove_photo"        id="smRemovePhoto"       value="0">
 
             <!-- Modal header -->
             <div class="flex items-center justify-between border-b border-gray-100 px-6 py-5">
@@ -375,27 +378,34 @@ $accent            = $accent            ?? 'primary';
 
                 <!-- Photo upload -->
                 <div>
-                    <label class="mb-1.5 block text-xs font-semibold text-gray-700">Photo</label>
-                    <div class="flex items-center gap-4">
+                    <label class="mb-2 block text-sm font-semibold text-gray-800">Profile photo</label>
+                    <div class="flex flex-col gap-4 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 sm:flex-row sm:items-center">
                         <div id="smPhotoPreviewWrap"
-                             class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-lg overflow-hidden ring-2 ring-gray-200">
+                             class="flex h-20 w-20 shrink-0 items-center justify-center self-center overflow-hidden rounded-2xl bg-primary/10 text-primary ring-2 ring-white shadow-sm sm:self-auto">
                             <span id="smPhotoInitials"></span>
                             <img id="smPhotoPreviewImg" src="" alt="Preview" class="hidden h-full w-full object-cover">
                         </div>
-                        <div class="flex-1">
-                            <label for="smPhoto"
-                                   class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-                                <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="min-w-0 flex-1 text-center sm:text-left">
+                            <p class="text-sm font-semibold text-gray-800">Add a member photo</p>
+                            <p class="mt-1 text-xs leading-5 text-gray-500">Choose a clear portrait. JPG, PNG, WebP or GIF, up to 2 MB.</p>
+                            <div class="mt-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                                <label for="smPhoto"
+                                   class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                 </svg>
-                                Choose Photo
-                            </label>
+                                Choose photo
+                                </label>
+                                <button type="button" id="smPhotoRemoveBtn" onclick="removeSpMemberPhoto()"
+                                        class="hidden items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                                    Remove photo
+                                </button>
+                            </div>
                             <input type="file" name="photo" id="smPhoto"
                                    accept="image/jpeg,image/png,image/webp,image/gif"
                                    class="sr-only" onchange="previewPhoto(this)">
-                            <p class="mt-1.5 text-[11px] text-gray-500">JPG, PNG, WebP or GIF · max 2 MB · optional</p>
-                            <p id="smPhotoFileName" class="mt-0.5 text-[11px] text-primary font-medium hidden"></p>
+                            <p id="smPhotoFileName" class="mt-2 truncate text-xs font-medium text-primary hidden"></p>
                         </div>
                     </div>
                 </div>
@@ -593,8 +603,12 @@ function updatePhotoInitials() {
 function previewPhoto(input) {
     const file = input.files[0];
     if (!file) return;
+    document.getElementById('smRemovePhoto').value = '0';
     document.getElementById('smPhotoFileName').textContent = file.name;
     document.getElementById('smPhotoFileName').classList.remove('hidden');
+    const removeButton = document.getElementById('smPhotoRemoveBtn');
+    removeButton.classList.remove('hidden');
+    removeButton.classList.add('inline-flex');
     const reader = new FileReader();
     reader.onload = e => {
         document.getElementById('smPhotoPreviewImg').src = e.target.result;
@@ -602,6 +616,43 @@ function previewPhoto(input) {
         document.getElementById('smPhotoInitials').classList.add('hidden');
     };
     reader.readAsDataURL(file);
+}
+
+function removeSpMemberPhoto() {
+    const input = document.getElementById('smPhoto');
+    const existingPath = document.getElementById('smExistingPhotoPath').value;
+    const removePhoto = document.getElementById('smRemovePhoto');
+    const image = document.getElementById('smPhotoPreviewImg');
+    const initials = document.getElementById('smPhotoInitials');
+    const fileName = document.getElementById('smPhotoFileName');
+    const removeButton = document.getElementById('smPhotoRemoveBtn');
+
+    if (removePhoto.value === '1') {
+        removePhoto.value = '0';
+        if (existingPath) {
+            image.src = `${BASE}/public/${existingPath}`;
+            image.classList.remove('hidden');
+            initials.classList.add('hidden');
+        } else {
+            image.src = '';
+            image.classList.add('hidden');
+            initials.classList.remove('hidden');
+            updatePhotoInitials();
+        }
+        removeButton.textContent = 'Remove photo';
+        fileName.classList.add('hidden');
+        return;
+    }
+
+    input.value = '';
+    removePhoto.value = '1';
+    image.src = '';
+    image.classList.add('hidden');
+    initials.classList.remove('hidden');
+    updatePhotoInitials();
+    fileName.textContent = existingPath ? 'Photo will be removed when you save.' : '';
+    fileName.classList.toggle('hidden', !existingPath);
+    removeButton.textContent = 'Undo remove';
 }
 
 /* ------------------------------------------------------------------ */
@@ -680,6 +731,7 @@ function resetSpMemberForm() {
     document.getElementById('spMemberForm').reset();
     document.getElementById('spMemberId').value          = '';
     document.getElementById('smExistingPhotoPath').value = '';
+    document.getElementById('smRemovePhoto').value       = '0';
     document.getElementById('smFirstName').value         = '';
     document.getElementById('smMiddleName').value        = '';
     document.getElementById('smLastName').value          = '';
@@ -695,6 +747,11 @@ function resetSpMemberForm() {
     document.getElementById('smPhotoInitials').textContent = '';
     document.getElementById('smPhotoFileName').classList.add('hidden');
     document.getElementById('smPhotoFileName').textContent = '';
+    document.getElementById('smPhoto').value = '';
+    const removePhotoBtn = document.getElementById('smPhotoRemoveBtn');
+    removePhotoBtn.classList.add('hidden');
+    removePhotoBtn.classList.remove('inline-flex');
+    removePhotoBtn.textContent = 'Remove photo';
     document.getElementById('spMemberForm').action = `${BASE}/master/sp-members/store`;
     document.getElementById('spMemberModalTitle').textContent = 'Create New SP Member';
     document.getElementById('spMemberSubmitBtn').innerHTML = `
@@ -761,6 +818,8 @@ async function editSpMember(id) {
         // Populate all fields
         document.getElementById('spMemberId').value          = d.sp_member_id;
         document.getElementById('smExistingPhotoPath').value = d.photo_path  ?? '';
+        document.getElementById('smRemovePhoto').value       = '0';
+        document.getElementById('smPhoto').value              = '';
         document.getElementById('smFirstName').value         = d.first_name  ?? '';
         document.getElementById('smMiddleName').value        = d.middle_name ?? '';
         document.getElementById('smLastName').value          = d.last_name   ?? '';
@@ -777,11 +836,15 @@ async function editSpMember(id) {
             img.src = `${BASE}/public/${d.photo_path}`;
             img.classList.remove('hidden');
             init.classList.add('hidden');
+            document.getElementById('smPhotoRemoveBtn').classList.remove('hidden');
+            document.getElementById('smPhotoRemoveBtn').classList.add('inline-flex');
         } else {
             img.src = '';
             img.classList.add('hidden');
             init.classList.remove('hidden');
-            init.textContent = ((d.first_name[0] || '') + (d.last_name[0] || '')).toUpperCase();
+            init.textContent = ((d.first_name?.[0] || '') + (d.last_name?.[0] || '')).toUpperCase();
+            document.getElementById('smPhotoRemoveBtn').classList.add('hidden');
+            document.getElementById('smPhotoRemoveBtn').classList.remove('inline-flex');
         }
         document.getElementById('smPhotoFileName').classList.add('hidden');
 
@@ -842,11 +905,10 @@ function openConfirmModal({ title, message, confirmText = 'Confirm', cancelText 
     pendingAction = onConfirm;
     confirmModalOpen = true;
     const m = document.getElementById('confirmModal');
-    const b = document.getElementById('confirmModalBackdrop');
     const p = document.getElementById('confirmModalPanel');
-    m.classList.remove('hidden'); m.classList.add('flex');
+    m.style.opacity = '';
+    m.classList.remove('hidden', 'opacity-0'); m.classList.add('flex');
     requestAnimationFrame(() => {
-        b.classList.remove('opacity-0');
         p.classList.remove('scale-95', 'opacity-0');
         p.classList.add('scale-100', 'opacity-100');
     });
@@ -858,7 +920,7 @@ function closeConfirmModal() {
     pendingAction = null;
     const m = document.getElementById('confirmModal');
     const p = document.getElementById('confirmModalPanel');
-    m.style.opacity = '0';
+    m.classList.add('opacity-0');
     p.classList.remove('scale-100', 'opacity-100');
     p.classList.add('scale-95', 'opacity-0');
     setTimeout(() => { m.classList.remove('flex'); m.classList.add('hidden'); }, 200);
@@ -874,13 +936,23 @@ function executeConfirmAction() {
 
 document.getElementById('confirmModal')?.addEventListener('click', function(e) { if (e.target === document.getElementById('confirmModal')) closeConfirmModal(); });
 
+function escapeConfirmText(value) {
+    return String(value).replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;',
+    })[character]);
+}
+
 /* ------------------------------------------------------------------ */
 /* Toggle Status                                                        */
 /* ------------------------------------------------------------------ */
 function toggleStatus(id, name) {
     openConfirmModal({
         title:       'Toggle Status',
-        message:     `This will toggle the active status of <strong class="text-gray-800">${name}</strong>.<br><span class="text-xs text-gray-500">Inactive members are hidden from selection dropdowns.</span>`,
+        message:     `This will toggle the active status of <strong class="text-gray-800">${escapeConfirmText(name)}</strong>.<br><span class="text-xs text-gray-500">Inactive members are hidden from selection dropdowns.</span>`,
         confirmText: 'Proceed',
         cancelText:  'Cancel',
         type:        'info',
@@ -890,10 +962,10 @@ function toggleStatus(id, name) {
                 fd.append('id', id);
                 const res  = await fetch(`${BASE}/master/sp-members/toggle-status`, { method: 'POST', body: fd });
                 const json = await res.json();
-                showToast(json.message || 'Status updated.', json.success ? 'success' : 'error');
+                showStatusToast(json.message || 'Status updated.', json.success ? 'success' : 'error');
                 if (json.success) setTimeout(() => location.reload(), 800);
             } catch {
-                showToast('An error occurred while updating status.', 'error');
+                showStatusToast('An error occurred while updating status.', 'error');
             }
         },
     });
@@ -905,7 +977,7 @@ function toggleStatus(id, name) {
 function deleteSpMember(id, name) {
     openConfirmModal({
         title:       'Delete SP Member',
-        message:     `Are you sure you want to delete <strong class="text-gray-800">${name}</strong>?<br><span class="text-xs text-gray-500">This action soft-deletes the record and hides it from dropdowns.</span>`,
+        message:     `Are you sure you want to delete <strong class="text-gray-800">${escapeConfirmText(name)}</strong>?<br><span class="text-xs text-gray-500">This action soft-deletes the record and hides it from dropdowns.</span>`,
         confirmText: 'Delete',
         cancelText:  'Cancel',
         type:        'danger',

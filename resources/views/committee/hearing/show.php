@@ -97,6 +97,8 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- Page header -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-7 sm:px-8">
@@ -122,7 +124,9 @@ ob_start();
         <span class="font-medium text-gray-700">Record Outcome</span>
     </nav>
 
-    <section class="space-y-4">
+    <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+
+            <section class="space-y-4">
         <h2 class="text-lg font-semibold text-gray-900">Full Document Details</h2>
         <?php
         $backUrl = $detailBackUrl;
@@ -585,7 +589,6 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-<?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
 
 <?php
 $content = ob_get_clean();

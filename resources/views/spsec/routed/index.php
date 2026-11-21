@@ -9,11 +9,12 @@ $committeeCount   = $committeeCount   ?? 0;
 $totalRows        = $totalRows        ?? 0;
 $search           = $search           ?? '';
 $filterStatus     = $filterStatus     ?? '';
-$filterOption     = $filterOption     ?? '';
-$filterDest       = $filterDest       ?? '';
+$filterPhase      = $filterPhase      ?? '';
+$filterType       = $filterType       ?? '';
 $documents        = $documents        ?? [];
 $documentStatuses = $documentStatuses ?? [];
-$routingOptions   = $routingOptions   ?? [];
+$documentPhases   = $documentPhases   ?? [];
+$documentTypes    = $documentTypes    ?? [];
 $totalPages       = $totalPages       ?? 1;
 $page             = $page             ?? 1;
 
@@ -36,6 +37,26 @@ function formatDestination(array $doc): string
         return 'Noted';
     }
     return $toPhase !== '' ? $toPhase : '—';
+}
+
+function formatCurrentLocation(array $doc): string
+{
+    $phase = strtoupper($doc['current_phase'] ?? '');
+    $phaseName = [
+        'RECEIVING' => 'Receiving',
+        'ADMIN' => 'Admin',
+        'SP_SECRETARY' => 'SP Secretary',
+        'PLENARY' => 'Plenary',
+        'COMMITTEE' => 'Committee',
+        'FINALIZED' => 'Finalized',
+        'FILED' => 'Filed',
+    ][$phase] ?? ($doc['current_phase'] ?? '');
+
+    if ($phase === 'COMMITTEE' && !empty($doc['committee_name'])) {
+        return 'Committee: ' . $doc['committee_name'];
+    }
+
+    return $phaseName !== '' ? $phaseName : '—';
 }
 ?>
 
@@ -134,19 +155,19 @@ function formatDestination(array $doc): string
     <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
 
         <!-- Table Filters -->
-        <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-                <h2 class="font-semibold text-gray-900">SP Secretary Routed Documents</h2>
+        <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 xl:flex-row xl:items-center xl:justify-between">
+            <div class="shrink-0">
+                <h2 class="whitespace-nowrap font-semibold text-gray-900">Routed Documents</h2>
                 <p class="mt-1 text-xs text-gray-500">
                     <?= $totalRows ?> record<?= $totalRows !== 1 ? 's' : '' ?> found
                 </p>
             </div>
 
             <form method="GET" action="<?= BASE_URL ?>/spsec/routed"
-                  class="flex flex-col gap-3 lg:flex-row lg:items-center">
+                  class="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:flex xl:flex-1 xl:flex-wrap xl:items-center xl:justify-end xl:gap-2">
 
                 <!-- Search -->
-                <div class="relative">
+                <div class="relative min-w-0 xl:w-[360px] xl:flex-none">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -154,16 +175,16 @@ function formatDestination(array $doc): string
                     </svg>
                     <input type="text" name="search" value="<?= htmlspecialchars($search) ?>"
                            placeholder="Search tracking # or subject…"
-                           class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm
+                           class="block w-full min-w-0 rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm
                                   text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
-                                  focus:ring-2 focus:ring-primary/20 lg:w-56">
+                                  focus:ring-2 focus:ring-primary/20">
                 </div>
 
-                <!-- Status Filter -->
+                <!-- Document Status Filter -->
                 <select name="status"
-                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800
+                        class="block w-full min-w-0 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-800 xl:w-[200px] xl:flex-none
                                focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <option value="">All Statuses</option>
+                    <option value="">All Document Statuses</option>
                     <?php foreach ($documentStatuses as $st): ?>
                         <option value="<?= (int) $st['id'] ?>"
                             <?= ($filterStatus == $st['id']) ? 'selected' : '' ?>>
@@ -172,37 +193,41 @@ function formatDestination(array $doc): string
                     <?php endforeach; ?>
                 </select>
 
-                <!-- Destination Filter -->
-                <select name="destination"
-                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800
+                <!-- Current Phase Filter -->
+                <select name="current_phase"
+                        class="block w-full min-w-0 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-800 xl:w-[200px] xl:flex-none
                                focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <option value="">All Destinations</option>
-                    <option value="PLENARY" <?= ($filterDest === 'PLENARY') ? 'selected' : '' ?>>Plenary</option>
-                    <option value="COMMITTEE" <?= ($filterDest === 'COMMITTEE') ? 'selected' : '' ?>>Committee</option>
+                    <option value="">All Current Phases</option>
+                    <?php foreach ($documentPhases as $phaseValue => $phaseLabel): ?>
+                        <option value="<?= htmlspecialchars($phaseValue) ?>"
+                            <?= ($filterPhase === $phaseValue) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($phaseLabel) ?>
+                        </option>
+                    <?php endforeach; ?>
                 </select>
 
-                <!-- Routing Option Filter -->
-                <select name="routing_option"
-                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800
+                <!-- Document Type Filter -->
+                <select name="document_type"
+                        class="block w-full min-w-0 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-800 xl:w-[200px] xl:flex-none
                                focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <option value="">All Routing Options</option>
-                    <?php foreach ($routingOptions as $ro): ?>
-                        <option value="<?= (int) $ro['id'] ?>"
-                            <?= ($filterOption == $ro['id']) ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($ro['name']) ?>
+                    <option value="">All Document Types</option>
+                    <?php foreach ($documentTypes as $type): ?>
+                        <option value="<?= (int) $type['id'] ?>"
+                            <?= ($filterType == $type['id']) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($type['name']) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
 
                 <button type="submit"
-                        class="rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium
+                        class="w-auto shrink-0 justify-self-end whitespace-nowrap rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium
                                text-gray-700 hover:bg-gray-50 transition">
                     Filter
                 </button>
 
-                <?php if ($search !== '' || $filterStatus !== '' || $filterDest !== '' || $filterOption !== ''): ?>
+                <?php if ($search !== '' || $filterStatus !== '' || $filterPhase !== '' || $filterType !== ''): ?>
                     <a href="<?= BASE_URL ?>/spsec/routed"
-                       class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium
+                       class="inline-flex w-auto shrink-0 justify-self-end items-center justify-center whitespace-nowrap rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium
                               text-gray-700 hover:bg-gray-50 transition text-center">
                         Clear
                     </a>
@@ -217,10 +242,8 @@ function formatDestination(array $doc): string
                     <tr>
                         <th class="px-6 py-3 font-medium">Tracking Number</th>
                         <th class="px-6 py-3 font-medium">Subject Matter</th>
-                        <th class="px-6 py-3 font-medium">Document Type</th>
-                        <th class="px-6 py-3 font-medium">Destination</th>
-                        <th class="px-6 py-3 font-medium">Routing Option</th>
-                        <th class="px-6 py-3 font-medium">Communication Category</th>
+                        <th class="px-6 py-3 font-medium">Routed To</th>
+                        <th class="px-6 py-3 font-medium">Current Phase</th>
                         <th class="px-6 py-3 font-medium">Date Routed</th>
                         <th class="px-6 py-3 font-medium">Current Status</th>
                         <th class="px-6 py-3 font-medium">Routed By</th>
@@ -230,7 +253,7 @@ function formatDestination(array $doc): string
                 <tbody class="divide-y divide-gray-100">
                     <?php if (empty($documents)): ?>
                         <tr>
-                            <td colspan="10" class="px-6 py-16 text-center">
+                            <td colspan="8" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
@@ -239,7 +262,7 @@ function formatDestination(array $doc): string
                                 </div>
                                 <p class="mt-4 text-sm font-medium text-gray-700">No routed documents found.</p>
                                 <p class="mt-1 text-xs text-gray-500">
-                                    <?= ($search !== '' || $filterStatus !== '' || $filterDest !== '' || $filterOption !== '')
+                                    <?= ($search !== '' || $filterStatus !== '' || $filterPhase !== '' || $filterType !== '')
                                         ? 'Try adjusting your search criteria or clearing filters.'
                                         : 'Documents you route to Plenary or Committee will appear here.' ?>
                                 </p>
@@ -250,6 +273,9 @@ function formatDestination(array $doc): string
                             <?php
                             $statusColor = !empty($doc['status_badge_color']) ? $doc['status_badge_color'] : '#6B7280';
                             $destination = formatDestination($doc);
+                            $currentLocation = formatCurrentLocation($doc);
+                            $subjectMatter = trim((string) ($doc['subject_matter'] ?? ''));
+                            $subjectMatter = preg_replace('/\s+/u', ' ', $subjectMatter) ?? $subjectMatter;
                             ?>
                             <tr class="hover:bg-gray-50/50 transition">
 
@@ -264,25 +290,21 @@ function formatDestination(array $doc): string
                                 </td>
 
                                 <!-- Subject matter -->
-                                <td class="px-6 py-4 max-w-xs">
-                                    <div class="text-sm font-medium text-gray-900 line-clamp-2">
-                                        <?= htmlspecialchars($doc['subject_matter']) ?>
+                                <td class="min-w-[24rem] px-6 py-4">
+                                    <div class="break-words text-sm font-medium leading-relaxed text-gray-900">
+                                        <?= escape_trimmed_text($subjectMatter !== '' ? $subjectMatter : '—') ?>
                                     </div>
+                                    <span class="mt-2 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                          style="background-color: <?= htmlspecialchars($doc['document_type_badge_color'] ?? '#2563EB') ?>1a;
+                                                 color: <?= htmlspecialchars($doc['document_type_badge_color'] ?? '#2563EB') ?>;">
+                                        <?= htmlspecialchars($doc['document_type_name'] ?? '—') ?>
+                                    </span>
                                     <?php if (!empty($doc['is_resubmission'])): ?>
                                         <span class="mt-1 inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Resubmission</span>
                                     <?php endif; ?>
                                 </td>
 
-                                <!-- Document type -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                                          style="background-color: <?= htmlspecialchars($doc['document_type_badge_color'] ?? '#2563EB') ?>1a;
-                                                 color: <?= htmlspecialchars($doc['document_type_badge_color'] ?? '#2563EB') ?>;">
-                                        <?= htmlspecialchars($doc['document_type_name'] ?? '—') ?>
-                                    </span>
-                                </td>
-
-                                <!-- Destination: Plenary or Committee -->
+                                <!-- Routed to: Plenary or Committee -->
                                 <td class="px-6 py-4">
                                     <?php if ($doc['to_phase'] === 'PLENARY'): ?>
                                         <span class="inline-flex items-center gap-1 rounded-lg bg-violet-50 border border-violet-200 px-2.5 py-1 text-xs font-medium text-violet-700">
@@ -305,25 +327,11 @@ function formatDestination(array $doc): string
                                     <?php endif; ?>
                                 </td>
 
-                                <!-- Routing option -->
+                                <!-- Current location -->
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="inline-flex items-center rounded-lg bg-gray-100 border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-800">
-                                        <?= htmlspecialchars($doc['routing_option_name'] ?? '—') ?>
+                                        <?= htmlspecialchars($currentLocation) ?>
                                     </span>
-                                </td>
-
-                                <!-- Communication category (when applicable) -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <?php if (!empty($doc['communication_category_name'])): ?>
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200">
-                                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-                                            </svg>
-                                            <?= htmlspecialchars($doc['communication_category_name']) ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-xs text-gray-400">—</span>
-                                    <?php endif; ?>
                                 </td>
 
                                 <!-- Date routed -->
@@ -395,8 +403,8 @@ function formatDestination(array $doc): string
                 $qArgs = [];
                 if ($search !== '')       $qArgs['search']         = $search;
                 if ($filterStatus !== '') $qArgs['status']         = $filterStatus;
-                if ($filterDest !== '')   $qArgs['destination']    = $filterDest;
-                if ($filterOption !== '') $qArgs['routing_option'] = $filterOption;
+                if ($filterPhase !== '')  $qArgs['current_phase']  = $filterPhase;
+                if ($filterType !== '')   $qArgs['document_type']  = $filterType;
                 $qs = !empty($qArgs) ? '&' . http_build_query($qArgs) : '';
                 ?>
                 <?php if ($page > 1): ?>

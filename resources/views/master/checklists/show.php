@@ -519,7 +519,7 @@ async function executeStatusUpdate() {
     // Get the selected radio button value
     const selectedRadio = document.querySelector('input[name="status_choice"]:checked');
     if (!selectedRadio) {
-        showToast('Please select a status.', 'error');
+        showStatusToast('Please select a status.', 'error');
         return;
     }
     
@@ -536,13 +536,13 @@ async function executeStatusUpdate() {
         });
         const result = await response.json();
         if (result.success) {
-            showToast(result.message || 'Status updated successfully.', 'success');
+            showStatusToast(result.message || 'Status updated successfully.', 'success');
             setTimeout(() => location.reload(), 800);
         } else {
-            showToast(result.message || 'Failed to update status.', 'error');
+            showStatusToast(result.message || 'Failed to update status.', 'error');
         }
     } catch (error) {
-        showToast('An error occurred while updating status.', 'error');
+        showStatusToast('An error occurred while updating status.', 'error');
     }
 }
 

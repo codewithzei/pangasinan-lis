@@ -614,7 +614,7 @@ function toggleStatus(id, name) {
                 body: formData,
             });
             const result = await response.json();
-            showToast(result.message || (result.success ? 'Status updated successfully.' : 'Unable to update communication category.'), result.success ? 'success' : 'error');
+            showStatusToast(result.message || (result.success ? 'Status updated successfully.' : 'Unable to update communication category.'), result.success ? 'success' : 'error');
             if (result.success) setTimeout(() => location.reload(), 800);
         }
     });

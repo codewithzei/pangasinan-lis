@@ -225,9 +225,9 @@ $prevIsPublic    = !empty($_POST['is_public']);
             </div>
 
             <form method="GET" action="<?= BASE_URL ?>/admin/filed"
-                  class="flex flex-wrap gap-3 items-center">
+                  class="flex min-w-0 flex-wrap items-center gap-3 lg:flex-1 lg:justify-end">
 
-                <div class="relative">
+                <div class="relative w-full min-w-0 lg:w-60 lg:flex-none">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -235,14 +235,15 @@ $prevIsPublic    = !empty($_POST['is_public']);
                     </svg>
                     <input type="text" name="search" value="<?= htmlspecialchars($search) ?>"
                            placeholder="Tracking #, subject, approved no…"
-                           class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm
+                           class="w-full min-w-0 rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm
                                   text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
-                                  focus:ring-2 focus:ring-primary/20 lg:w-60">
+                                  focus:ring-2 focus:ring-primary/20">
                 </div>
 
                 <select name="type"
-                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800
-                               focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        class="w-full min-w-0 max-w-full truncate rounded-xl border border-gray-200 bg-white px-3 py-2
+                               text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2
+                               focus:ring-primary/20 lg:w-48 lg:flex-none">
                     <option value="">All Types</option>
                     <?php foreach ($documentTypes as $dt): ?>
                         <option value="<?= (int)$dt['id'] ?>" <?= $filterType == $dt['id'] ? 'selected' : '' ?>>
@@ -252,8 +253,9 @@ $prevIsPublic    = !empty($_POST['is_public']);
                 </select>
 
                 <select name="year"
-                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800
-                               focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                        class="w-full min-w-0 max-w-full rounded-xl border border-gray-200 bg-white px-3 py-2
+                               text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2
+                               focus:ring-primary/20 lg:w-36 lg:flex-none">
                     <option value="">All Years</option>
                     <?php foreach ($approvalYears as $yr): ?>
                         <option value="<?= (int)$yr ?>" <?= $filterYear == $yr ? 'selected' : '' ?>>
@@ -264,14 +266,14 @@ $prevIsPublic    = !empty($_POST['is_public']);
 
                 <button type="submit"
                         class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium
-                               text-gray-700 hover:bg-gray-50 transition">
+                               text-gray-700 transition hover:bg-gray-50">
                     Filter
                 </button>
 
                 <?php if ($search !== '' || $filterType !== '' || $filterYear !== ''): ?>
                     <a href="<?= BASE_URL ?>/admin/filed"
                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium
-                              text-gray-700 hover:bg-gray-50 transition">
+                              text-gray-700 transition hover:bg-gray-50">
                         Clear
                     </a>
                 <?php endif; ?>
@@ -284,7 +286,7 @@ $prevIsPublic    = !empty($_POST['is_public']);
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
                         <th class="px-5 py-3 font-medium">Approved No.</th>
-                        <th class="px-5 py-3 font-medium">Type &amp; Subject</th>
+                        <th class="px-5 py-3 font-medium">Subject &amp; Type</th>
                         <th class="px-5 py-3 font-medium">Authors / Sponsors</th>
                         <th class="px-5 py-3 font-medium">Tags</th>
                         <th class="px-5 py-3 font-medium whitespace-nowrap">Date Approved</th>
@@ -341,15 +343,15 @@ $prevIsPublic    = !empty($_POST['is_public']);
                                     <?php endif; ?>
                                 </td>
 
-                                <!-- Type & Subject -->
+                                <!-- Subject & Type -->
                                 <td class="px-5 py-4 max-w-[260px]">
+                                    <p class="text-sm text-gray-800 line-clamp-2">
+                                        <?= htmlspecialchars($fd['subject_matter']) ?>
+                                    </p>
                                     <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold"
                                           style="background-color:<?= htmlspecialchars($typeColor) ?>1a; color:<?= htmlspecialchars($typeColor) ?>;">
                                         <?= htmlspecialchars($fd['document_type_name'] ?? '—') ?>
                                     </span>
-                                    <p class="mt-1 text-sm text-gray-800 line-clamp-2">
-                                        <?= htmlspecialchars($fd['subject_matter']) ?>
-                                    </p>
                                 </td>
 
                                 <!-- Authors/Sponsors -->

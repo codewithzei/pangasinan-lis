@@ -59,6 +59,8 @@ function normalizeTimeForInput(?string $time): string {
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- Page Header -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative flex flex-col gap-5 px-4 py-6 sm:px-8 sm:py-8 md:flex-row md:items-start md:justify-between">
@@ -148,7 +150,14 @@ function normalizeTimeForInput(?string $time): string {
     </section>
 
     <!-- Document Info Card -->
-    <section class="rounded-2xl border border-gray-200 bg-white p-6">
+    <?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'receiving/inbox';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
+
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
         <div class="border-b border-gray-100 pb-4">
             <div>
                 <h2 class="text-lg font-semibold text-gray-900">Document Information</h2>
@@ -1253,12 +1262,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <?php endif; // end $isAccepted ?>
 
-<?php
-// MFR relationship links (Referenced Original Case / Related Motions)
-$mfrDetailRoute = 'receiving/inbox';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content   = ob_get_clean();

@@ -72,6 +72,20 @@ class AdminInboxController
 
         // Filters
         $search = trim($_GET['search'] ?? '');
+        $documentTypes = $this->pdo->query("
+            SELECT id, name
+            FROM document_types
+            WHERE is_active = 1 AND is_deleted = 0
+            ORDER BY sort_order ASC, name ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        $documentTypeId = isset($_GET['document_type_id'])
+            && is_scalar($_GET['document_type_id'])
+            && ctype_digit((string) $_GET['document_type_id'])
+            ? (int) $_GET['document_type_id']
+            : 0;
+        if ($documentTypeId > 0 && !in_array($documentTypeId, array_column($documentTypes, 'id'), false)) {
+            $documentTypeId = 0;
+        }
 
         // Pagination
         $page    = max(1, (int) ($_GET['page'] ?? 1));
@@ -116,6 +130,10 @@ class AdminInboxController
             $where[]  = '(d.tracking_number LIKE ? OR d.subject_matter LIKE ?)';
             $params[] = "%{$search}%";
             $params[] = "%{$search}%";
+        }
+        if ($documentTypeId > 0) {
+            $where[]  = 'd.document_type_id = ?';
+            $params[] = $documentTypeId;
         }
 
         $whereClause = implode(' AND ', $where);
@@ -382,7 +400,7 @@ class AdminInboxController
             FROM document_events de
             LEFT JOIN user_accounts ua ON de.performed_by = ua.id
             WHERE de.document_id = ?
-            ORDER BY de.created_at ASC
+            ORDER BY de.created_at DESC, de.id DESC
         ");
         $eventStmt->execute([$documentId]);
         $events = $eventStmt->fetchAll();

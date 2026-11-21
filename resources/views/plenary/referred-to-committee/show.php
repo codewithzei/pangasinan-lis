@@ -62,6 +62,8 @@ function rtcHistoryFileUrl(string $path): string
 ob_start();
 ?>
 <div class="detail-page space-y-6">
+
+
     <a href="<?= htmlspecialchars($backUrl ?? BASE_URL . '/plenary/referred-to-committee', ENT_QUOTES, 'UTF-8') ?>"
        class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary">
         <span aria-hidden="true">←</span> Back to Referred to Committee
@@ -107,7 +109,9 @@ ob_start();
         </div>
     </section>
 
-    <section class="rounded-2xl border border-gray-200 bg-white p-6">
+    <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
         <h2 class="text-lg font-semibold text-gray-900">Document and source information</h2>
         <dl class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <?php foreach ([
@@ -391,7 +395,6 @@ ob_start();
     </section>
 </div>
 
-<?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
 
 <?php
 $content = ob_get_clean();

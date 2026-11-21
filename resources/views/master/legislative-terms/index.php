@@ -41,14 +41,6 @@ $accent = $accent ?? 'primary';
                         </svg>
                         New Term
                     </button>
-                    <a href="<?= BASE_URL ?>/master/legislative-terms/export-csv"
-                        class="inline-flex items-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                        Export CSV
-                    </a>
                 </div>
             </div>
             <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
@@ -880,9 +872,9 @@ async function toggleActive(id) {
         fd.append('id', id);
         const res = await fetch('<?= BASE_URL ?>/master/legislative-terms/set-active', { method: 'POST', body: fd });
         const data = await res.json();
-        showToast(data.message, data.success ? 'success' : 'error');
+        showStatusToast(data.message, data.success ? 'success' : 'error');
         if (data.success) setTimeout(() => location.reload(), 800);
-    } catch (e) { showToast('Network error.', 'error'); }
+    } catch (e) { showStatusToast('Network error.', 'error'); }
 }
 
 async function cloneTerm(id) {

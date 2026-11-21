@@ -54,7 +54,14 @@ declare(strict_types=1);
 const ACCEPTED_STILL_PROCESSING = "
     d.current_status_id NOT IN (
         SELECT id FROM document_statuses
-        WHERE name = 'Awaiting First Reading'
+        WHERE name IN (
+            'Awaiting First Reading',
+            'Returned to Plenary',
+            'Approved',
+            'Plenary Comm: Finalized',
+            'Plenary Cases: Finalized',
+            'Plenary: Committee Report Adopted'
+        )
           AND is_active  = 1
           AND is_deleted = 0
     )
@@ -62,6 +69,17 @@ const ACCEPTED_STILL_PROCESSING = "
         SELECT 1 FROM plenary_readings pr WHERE pr.document_id = da.document_id
     )
     AND d.current_phase = 'PLENARY'
+    AND d.finalized_at IS NULL
+    AND (
+        pdd.status_id IS NULL
+        OR pdd.status_id = (
+            SELECT id FROM document_statuses
+            WHERE name = 'For Encoding'
+              AND is_active = 1
+              AND is_deleted = 0
+            LIMIT 1
+        )
+    )
 ";
 
 const OUTCOME_STATUS_IDS_SQL = "

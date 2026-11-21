@@ -798,7 +798,7 @@ class CommitteeReferredController
         $document = array_merge($document, $documentDetailsStmt->fetch(PDO::FETCH_ASSOC) ?: []);
 
         $plenaryDetailsStmt = $this->pdo->prepare("
-            SELECT proposed_number, target_first_reading_date, session_type,
+            SELECT proposed_number, legislative_term_name, target_first_reading_date, session_type,
                    additional_details, authors_all, co_authors_all
             FROM plenary_document_details
             WHERE document_id = ?

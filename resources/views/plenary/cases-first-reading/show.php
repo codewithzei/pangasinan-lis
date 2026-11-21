@@ -34,6 +34,8 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- Back + title -->
     <div class="flex items-center gap-4">
         <a href="<?= BASE_URL ?>/plenary/first-reading?tab=petitions"
@@ -71,6 +73,13 @@ ob_start();
 
         <!-- Left: Document info -->
         <div class="lg:col-span-1 space-y-4">
+            <?php
+// MFR relationship links — Cases First Reading shows related MFRs filed against this Case
+$mfrDetailRoute = 'plenary/cases-first-reading';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
+
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
                 <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Document</h2>
                 <div>
@@ -389,12 +398,7 @@ ob_start();
 }());
 </script>
 
-<?php
-// MFR relationship links — Cases First Reading shows related MFRs filed against this Case
-$mfrDetailRoute = 'plenary/cases-first-reading';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content = ob_get_clean();

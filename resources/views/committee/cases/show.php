@@ -94,6 +94,8 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- Back + header --------------------------------------------------------->
     <div class="flex items-center gap-4">
         <a href="<?= htmlspecialchars($caseBackUrl) ?>"
@@ -120,8 +122,15 @@ ob_start();
         <!-- Left: case info + timeline (2/3) --------------------------------->
         <div class="space-y-6 xl:col-span-2">
 
+            <?php
+            // MFR relationship links — Cases show related MFRs; use committee/inbox for document detail links
+            $mfrDetailRoute = 'committee/inbox';
+            require __DIR__ . '/../../partials/resubmission-relationship.php';
+            require __DIR__ . '/../../partials/mfr-relationship.php';
+            ?>
+
             <?php if (!$caseDetailsComplete): ?>
-                <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+            <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
                     <div class="mb-4">
                         <h2 class="text-base font-semibold text-amber-900">Complete Case Details</h2>
                         <p class="mt-1 text-sm text-amber-800">
@@ -1435,12 +1444,7 @@ openActionModal();
 </script>
 <?php endif; ?>
 
-<?php
-// MFR relationship links — Cases show related MFRs; use committee/inbox for document detail links
-$mfrDetailRoute = 'committee/inbox';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content = ob_get_clean();

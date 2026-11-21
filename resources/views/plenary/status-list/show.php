@@ -361,7 +361,9 @@ usort($timeline, static fn($a, $b) => strcmp((string) $a['ts'], (string) $b['ts'
 ob_start();
 ?>
 
-<div class="detail-page space-y-6">
+<div class="detail-page flex flex-col gap-6">
+
+
 
     <?php if (!empty($success)): ?>
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars($success) ?></div>
@@ -393,7 +395,14 @@ ob_start();
     </div>
 
     <!-- Document details -->
-    <section class="rounded-2xl border border-gray-200 bg-white p-6">
+    <?php
+// MFR relationship links — Finalized Document detail (status-list)
+$mfrDetailRoute = 'plenary/status-list';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
+
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
         <h2 class="mb-4 text-base font-semibold text-gray-900">Document Details</h2>
         <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
@@ -427,6 +436,14 @@ ob_start();
                 <dd class="mt-1 text-sm font-medium text-emerald-700"><?= slShowDateTime($document['finalized_at'] ?? null) ?></dd>
             </div>
             <?php if ($plenaryDetails): ?>
+                <div>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Legislative Term</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
+                        <?= !empty($plenaryDetails['legislative_term_name'])
+                            ? htmlspecialchars($plenaryDetails['legislative_term_name'])
+                            : '<span class="italic text-gray-400">—</span>' ?>
+                    </dd>
+                </div>
                 <div>
                     <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Proposed Number</dt>
                     <dd class="mt-1 font-mono text-sm text-gray-900">
@@ -1024,7 +1041,7 @@ ob_start();
 
     <!-- Assignment history -->
     <?php if (!empty($assignments)): ?>
-        <section class="rounded-2xl border border-gray-200 bg-white p-6">
+        <section class="order-2 rounded-2xl border border-gray-200 bg-white p-6">
             <h2 class="mb-4 text-base font-semibold text-gray-900">Assignment History</h2>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs">
@@ -1055,7 +1072,7 @@ ob_start();
 
     <!-- Attachments -->
     <?php if (!empty($attachments)): ?>
-        <section class="rounded-2xl border border-gray-200 bg-white p-6">
+        <section class="order-1 rounded-2xl border border-gray-200 bg-white p-6">
             <h2 class="mb-4 text-base font-semibold text-gray-900">
                 Attachments <span class="ml-1 text-xs font-normal text-gray-400">(<?= count($attachments) ?>)</span>
             </h2>
@@ -1091,12 +1108,7 @@ ob_start();
 
 </div>
 
-<?php
-// MFR relationship links — Finalized Document detail (status-list)
-$mfrDetailRoute = 'plenary/status-list';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content = ob_get_clean();

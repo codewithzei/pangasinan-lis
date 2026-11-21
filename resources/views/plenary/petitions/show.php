@@ -22,6 +22,8 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <?php if (!empty($success)): ?>
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars($success) ?></div>
     <?php endif; ?>
@@ -50,6 +52,13 @@ ob_start();
         <div class="lg:col-span-1 space-y-4">
 
             <!-- Document info -->
+            <?php
+// MFR relationship links — Petitions show related MFRs filed against this Case
+$mfrDetailRoute = 'plenary/petitions';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
+
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-600">Petition</h2>
                 <div>
@@ -165,12 +174,7 @@ ob_start();
     </div>
 </div>
 
-<?php
-// MFR relationship links — Petitions show related MFRs filed against this Case
-$mfrDetailRoute = 'plenary/petitions';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content = ob_get_clean();

@@ -2923,8 +2923,20 @@ class PlenaryReadingController
         $userId = auth_id();
         if ($userId === null) { flash_set('error', 'You must be logged in.'); redirect('login'); }
 
-        $tab    = trim($_GET['tab'] ?? 'all');
-        $validTabs = ['all', 'ordinance', 'resolution', 'communication', 'petitions'];
+        $tab = trim((string) ($_GET['tab'] ?? 'all'));
+        if ($tab === 'petitions') {
+            $tab = 'cases';
+        }
+        $validTabs = [
+            'all',
+            'ordinance',
+            'resolution',
+            'municipal_ordinances',
+            'municipal_resolutions',
+            'cases',
+            'others',
+            'communication',
+        ];
         if (!in_array($tab, $validTabs, true)) { $tab = 'all'; }
 
         $search  = trim($_GET['search'] ?? '');
@@ -2996,23 +3008,11 @@ class PlenaryReadingController
                 dt.badge_color     AS document_type_badge_color,
                 pdd.proposed_number,
                 pdd.target_first_reading_date,
-                pdd.session_type,
-                da.accepted_by,
-                ab.username        AS accepted_by_username,
-                CONCAT_WS(' ', NULLIF(aui.first_name,''), NULLIF(aui.last_name,''))
-                                   AS accepted_by_name
+                pdd.session_type
             FROM documents d
             LEFT JOIN document_statuses        ds  ON ds.id  = d.current_status_id
             LEFT JOIN document_types           dt  ON dt.id  = d.document_type_id AND dt.is_deleted = 0
             LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
-            LEFT JOIN (
-                SELECT document_id, accepted_by
-                FROM document_assignments
-                WHERE phase = 'PLENARY' AND decision = 'ACCEPTED' AND completed_at IS NULL
-                ORDER BY id DESC LIMIT 1
-            ) da ON da.document_id = d.id
-            LEFT JOIN user_accounts ab  ON ab.id  = da.accepted_by
-            LEFT JOIN user_info     aui ON aui.user_account_id = da.accepted_by
             WHERE {$whereSql}
             ORDER BY pdd.target_first_reading_date ASC, d.id ASC
             LIMIT ? OFFSET ?
@@ -3020,7 +3020,7 @@ class PlenaryReadingController
         $listStmt->execute([...$whereParams, $perPage, $offset]);
         $documents = $listStmt->fetchAll();
 
-        // Tab counts (all, ordinance, resolution, communication, petitions) — no search filter applied
+        // Tab counts — no search filter applied
         $tabCounts = $this->fetchFirstReadingTabCounts($awaitingStatusId);
 
         // Count for referred (in committee, awaiting return for comm flow)
@@ -3777,49 +3777,45 @@ class PlenaryReadingController
      */
     private function buildFirstReadingTabCondition(string $tab): array
     {
-        switch ($tab) {
-            case 'communication':
-                return [
-                    " AND (dt.name LIKE '%Communication%' OR dt.name LIKE '%Motion for Reconsideration%')",
-                    [],
-                ];
-
-            case 'ordinance':
-                // Provincial Ordinance types (partial match is safe; exact names
-                // are user-managed but follow a predictable pattern)
-                return [
-                    " AND (
-                        dt.name LIKE '%Ordinance%'
-                        AND dt.name NOT LIKE '%Resolution%'
-                        AND dt.name NOT LIKE '%Communication%'
-                    )",
-                    [],
-                ];
-
-            case 'resolution':
-                return [
-                    " AND dt.name LIKE '%Provincial Resolution%'",
-                    [],
-                ];
-
-            case 'petitions':
-                // Administrative Cases and Complaint document types
-                return [
-                    " AND (
-                        dt.name LIKE '%Administrative Case%'
-                        OR dt.name LIKE '%Complaint%'
-                    )",
-                    [],
-                ];
-
-            default: // 'all'
-                return ['', []];
+        if ($tab === 'all') {
+            return ['', []];
         }
+
+        if ($tab === 'petitions') {
+            $tab = 'cases';
+        }
+
+        return [
+            ' AND (' . $this->firstReadingCategoryExpression() . ') = ?',
+            [$tab],
+        ];
+    }
+
+    /**
+     * Keep First Reading's document groups aligned with Admin Noted Documents.
+     */
+    private function firstReadingCategoryExpression(): string
+    {
+        return "
+            CASE
+                WHEN LOWER(dt.name) LIKE '%communication%'
+                  OR LOWER(dt.name) LIKE '%motion for reconsideration%' THEN 'communication'
+                WHEN LOWER(dt.name) LIKE 'provincial%ordinance%' THEN 'ordinance'
+                WHEN LOWER(dt.name) LIKE 'provincial%resolution%' THEN 'resolution'
+                WHEN LOWER(dt.name) LIKE 'municipal%ordinance%'
+                  OR LOWER(dt.name) LIKE 'city%ordinance%' THEN 'municipal_ordinances'
+                WHEN LOWER(dt.name) LIKE 'municipal%resolution%'
+                  OR LOWER(dt.name) LIKE 'city%resolution%' THEN 'municipal_resolutions'
+                WHEN LOWER(dt.name) LIKE '%complaint%'
+                  OR LOWER(dt.name) LIKE '%case%' THEN 'cases'
+                ELSE 'others'
+            END
+        ";
     }
 
     /**
      * Return tab counts for the First Reading index.
-     * Keys: all, ordinance, resolution, communication.
+     * Counts use the same document groups as the Admin Noted Documents page.
      */
     private function fetchFirstReadingTabCounts(int $awaitingStatusId): array
     {
@@ -3839,56 +3835,32 @@ class PlenaryReadingController
             )
         ";
 
-        $counts = ['all' => 0, 'ordinance' => 0, 'resolution' => 0, 'communication' => 0, 'petitions' => 0];
-
-        // All
-        $allStmt = $this->pdo->prepare("
-            SELECT COUNT(*) FROM documents d
+        $counts = [
+            'all' => 0,
+            'ordinance' => 0,
+            'resolution' => 0,
+            'municipal_ordinances' => 0,
+            'municipal_resolutions' => 0,
+            'cases' => 0,
+            'others' => 0,
+            'communication' => 0,
+        ];
+        $categoryExpression = $this->firstReadingCategoryExpression();
+        $stmt = $this->pdo->prepare("
+            SELECT ({$categoryExpression}) AS category, COUNT(*) AS total
+            FROM documents d
             LEFT JOIN document_types dt ON dt.id = d.document_type_id AND dt.is_deleted = 0
             WHERE {$baseWhere}
+            GROUP BY category
         ");
-        $allStmt->execute([$awaitingStatusId]);
-        $counts['all'] = (int) $allStmt->fetchColumn();
-
-        // Communication (includes Motion for Reconsideration which follows the same flow)
-        $commStmt = $this->pdo->prepare("
-            SELECT COUNT(*) FROM documents d
-            LEFT JOIN document_types dt ON dt.id = d.document_type_id AND dt.is_deleted = 0
-            WHERE {$baseWhere} AND (dt.name LIKE '%Communication%' OR dt.name LIKE '%Motion for Reconsideration%')
-        ");
-        $commStmt->execute([$awaitingStatusId]);
-        $counts['communication'] = (int) $commStmt->fetchColumn();
-
-        // Ordinance
-        $ordStmt = $this->pdo->prepare("
-            SELECT COUNT(*) FROM documents d
-            LEFT JOIN document_types dt ON dt.id = d.document_type_id AND dt.is_deleted = 0
-            WHERE {$baseWhere}
-              AND dt.name LIKE '%Ordinance%'
-              AND dt.name NOT LIKE '%Resolution%'
-              AND dt.name NOT LIKE '%Communication%'
-        ");
-        $ordStmt->execute([$awaitingStatusId]);
-        $counts['ordinance'] = (int) $ordStmt->fetchColumn();
-
-        // Resolution
-        $resStmt = $this->pdo->prepare("
-            SELECT COUNT(*) FROM documents d
-            LEFT JOIN document_types dt ON dt.id = d.document_type_id AND dt.is_deleted = 0
-            WHERE {$baseWhere} AND dt.name LIKE '%Provincial Resolution%'
-        ");
-        $resStmt->execute([$awaitingStatusId]);
-        $counts['resolution'] = (int) $resStmt->fetchColumn();
-
-        // Petitions (Administrative Cases / Complaint)
-        $petStmt = $this->pdo->prepare("
-            SELECT COUNT(*) FROM documents d
-            LEFT JOIN document_types dt ON dt.id = d.document_type_id AND dt.is_deleted = 0
-            WHERE {$baseWhere}
-              AND (dt.name LIKE '%Administrative Case%' OR dt.name LIKE '%Complaint%')
-        ");
-        $petStmt->execute([$awaitingStatusId]);
-        $counts['petitions'] = (int) $petStmt->fetchColumn();
+        $stmt->execute([$awaitingStatusId]);
+        foreach ($stmt->fetchAll() as $row) {
+            $category = $row['category'];
+            if (isset($counts[$category])) {
+                $counts[$category] = (int) $row['total'];
+            }
+        }
+        $counts['all'] = array_sum($counts);
 
         return $counts;
     }

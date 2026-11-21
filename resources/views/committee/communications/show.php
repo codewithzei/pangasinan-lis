@@ -49,6 +49,8 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- Back + header --------------------------------------------------------->
     <div class="flex items-center gap-4">
         <a href="<?= htmlspecialchars($communicationsBackUrl) ?>"
@@ -74,6 +76,13 @@ ob_start();
         <div class="space-y-6 xl:col-span-2">
 
             <!-- Communication summary ---------------------------------------->
+            <?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'committee/communications';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
+
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
                 <div class="mb-5 flex items-center justify-between">
                     <h2 class="text-base font-semibold text-gray-900">Communication Information</h2>
@@ -529,12 +538,7 @@ ob_start();
 
 </div>
 
-<?php
-// MFR relationship links (Referenced Original Case / Related Motions)
-$mfrDetailRoute = 'committee/communications';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content = ob_get_clean();

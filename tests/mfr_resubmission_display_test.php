@@ -118,6 +118,19 @@ foreach ($detailViews as $viewPath) {
         $view !== false && str_contains($view, 'partials/resubmission-relationship.php'),
         "Resubmission partial is missing from {$viewPath}."
     );
+    if ($view !== false) {
+        $partialPosition = strpos($view, 'partials/resubmission-relationship.php');
+        $pageTitleEnd = strpos($view, '</h1>');
+        $documentHeading = $pageTitleEnd === false ? false : strpos($view, '<h2', $pageTitleEnd);
+        verifyResubmissionCheck(
+            $pageTitleEnd !== false
+                && $partialPosition !== false
+                && $partialPosition > $pageTitleEnd
+                && $documentHeading !== false
+                && $partialPosition < $documentHeading,
+            "Resubmission details must appear after the page title and before document information in {$viewPath}."
+        );
+    }
 }
 
 $adminInboxView = file_get_contents(__DIR__ . '/../resources/views/admin/inbox/show.php');

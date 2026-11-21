@@ -182,12 +182,31 @@ function accepted_still_processing(): string
     return "
         d.current_status_id NOT IN (
             SELECT id FROM document_statuses
-            WHERE name = 'Awaiting First Reading'
+            WHERE name IN (
+                'Awaiting First Reading',
+                'Returned to Plenary',
+                'Approved',
+                'Plenary Comm: Finalized',
+                'Plenary Cases: Finalized',
+                'Plenary: Committee Report Adopted'
+            )
               AND is_active  = 1
               AND is_deleted = 0
         )
         AND NOT EXISTS (
             SELECT 1 FROM plenary_readings pr WHERE pr.document_id = da.document_id
+        )
+        AND d.current_phase = 'PLENARY'
+        AND d.finalized_at IS NULL
+        AND (
+            pdd.status_id IS NULL
+            OR pdd.status_id = (
+                SELECT id FROM document_statuses
+                WHERE name = 'For Encoding'
+                  AND is_active = 1
+                  AND is_deleted = 0
+                LIMIT 1
+            )
         )
     ";
 }
@@ -209,6 +228,7 @@ function is_visible_in_accepted(PDO $pdo, int $assignmentId, int $userId): bool
         SELECT 1
         FROM document_assignments da
         INNER JOIN documents d ON d.id = da.document_id
+        LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
         WHERE da.id = :aid
           AND (" . accepted_predicate() . ")
         LIMIT 1
@@ -224,6 +244,7 @@ function accepted_list_count(PDO $pdo, int $roleId, int $userId): int
         SELECT COUNT(*) AS cnt
         FROM document_assignments da
         INNER JOIN documents d ON d.id = da.document_id
+        LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
         WHERE da.assigned_to_role_id = :rid
           AND da.phase               = 'PLENARY'
           AND (" . accepted_predicate() . ")
@@ -239,6 +260,7 @@ function accepted_stats_count(PDO $pdo, int $roleId, int $userId): int
         SELECT COUNT(*) AS cnt
         FROM document_assignments da
         INNER JOIN documents d ON d.id = da.document_id
+        LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
         WHERE da.assigned_to_role_id = :rid
           AND da.phase               = 'PLENARY'
           AND " . accepted_predicate() . "
@@ -327,6 +349,17 @@ try {
         $awaitingStatusId = (int) $pdo->lastInsertId();
     }
 
+    $adoptedOnlyRow = $pdo->query(
+        "SELECT id FROM document_statuses
+         WHERE name = 'Plenary: Committee Report Adopted' AND is_active = 1 AND is_deleted = 0 LIMIT 1"
+    )->fetch();
+    if ($adoptedOnlyRow) {
+        $adoptedOnlyStatusId = (int) $adoptedOnlyRow['id'];
+    } else {
+        $pdo->exec("INSERT INTO document_statuses (name, badge_color) VALUES ('Plenary: Committee Report Adopted', '#6B7280')");
+        $adoptedOnlyStatusId = (int) $pdo->lastInsertId();
+    }
+
     // ── A "still processing" status (anything but Awaiting First Reading) ─
     $processingRow = $pdo->query(
         "SELECT id FROM document_statuses
@@ -393,6 +426,16 @@ try {
     $asn1   = $insertAccepted($docId1, $testUser);
     check('B1: ACCEPTED document still processing appears in the Accepted list',
         is_visible_in_accepted($pdo, $asn1, $testUser));
+
+    // ── B1b — Report-only adoption is not ongoing Plenary processing ───────
+    $docAdoptedOnly = $insertDoc($adoptedOnlyStatusId);
+    $asnAdoptedOnly = $insertAccepted($docAdoptedOnly, $testUser);
+    $pdo->prepare("
+        INSERT INTO plenary_document_details (document_id, status_id, created_by, updated_by)
+        VALUES (?, ?, ?, ?)
+    ")->execute([$docAdoptedOnly, $adoptedOnlyStatusId, $testUser, $testUser]);
+    check('B1b: adopted Committee Report document is excluded from Accepted',
+        !is_visible_in_accepted($pdo, $asnAdoptedOnly, $testUser));
 
     // ══════════════════════════════════════════════════════════════════════
     // B2 — Processing details saved (status = Awaiting First Reading)

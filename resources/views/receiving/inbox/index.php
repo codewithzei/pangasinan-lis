@@ -267,7 +267,7 @@ $acceptedQuery['view'] = 'accepted';
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="max-w-md">
-                                        <p class="line-clamp-2 font-medium text-gray-900">
+                                        <p class="whitespace-normal break-words font-medium text-gray-900">
                                             <?= htmlspecialchars($assignment['subject_matter']) ?>
                                         </p>
                                     </div>

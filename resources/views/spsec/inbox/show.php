@@ -27,6 +27,32 @@ $isCommunication  = $isCommunication  ?? false;
 
 $documentId     = (int) ($document['id'] ?? 0);
 $trackingNumber = $document['tracking_number'] ?? '';
+$fromNotedDocuments = (($_GET['from'] ?? '') === 'noted');
+$detailBackUrl = BASE_URL . '/spsec/inbox';
+if ($fromNotedDocuments) {
+    $validNotedTabs = [
+        'ordinances',
+        'resolutions',
+        'municipal_ordinances',
+        'municipal_resolutions',
+        'cases',
+        'others',
+    ];
+    $returnTab = (string) ($_GET['tab'] ?? 'ordinances');
+    if (!in_array($returnTab, $validNotedTabs, true)) {
+        $returnTab = 'ordinances';
+    }
+
+    $returnQuery = ['tab' => $returnTab];
+    $returnSearch = trim((string) ($_GET['search'] ?? ''));
+    $returnStatus = (string) ($_GET['status'] ?? '');
+    $returnPage = max(1, (int) ($_GET['page'] ?? 1));
+    if ($returnSearch !== '') $returnQuery['search'] = $returnSearch;
+    if (ctype_digit($returnStatus)) $returnQuery['status'] = $returnStatus;
+    if ($returnPage > 1) $returnQuery['page'] = $returnPage;
+
+    $detailBackUrl = BASE_URL . '/spsec/noted-documents?' . http_build_query($returnQuery);
+}
 
 // ── Assignment state ──────────────────────────────────────────────────────────
 $assignmentDecision = $activeAssignment !== false
@@ -106,29 +132,49 @@ ob_start();
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- Back + Page header --------------------------------------------------->
-    <div class="flex items-center gap-4">
-        <a href="<?= BASE_URL ?>/spsec/inbox"
-           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-        </a>
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">SP Secretary Inbox</p>
-            <h1 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($trackingNumber) ?></h1>
+    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative px-6 py-7 sm:px-8">
+            <div class="relative z-10 flex items-center gap-3">
+                <a href="<?= htmlspecialchars($detailBackUrl) ?>"
+                   class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
+                   aria-label="<?= $fromNotedDocuments ? 'Back to Noted Documents' : 'Back to SP Secretary Inbox' ?>">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-blue-100">
+                        <?= $fromNotedDocuments ? 'NOTED DOCUMENT' : 'DOCUMENT DETAILS' ?>
+                    </p>
+                    <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl"><?= htmlspecialchars($trackingNumber) ?></h1>
+                </div>
+            </div>
+            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
-    </div>
+    </section>
 
     <!-- Main 2-column layout ------------------------------------------------->
-    <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 <?= $fromNotedDocuments ? 'xl:grid-cols-1' : 'xl:grid-cols-3' ?>">
 
         <!-- Left column (2/3): document info + history ----------------------->
-        <div class="space-y-6 xl:col-span-2">
+        <div class="<?= $fromNotedDocuments
+            ? 'order-1 space-y-6 xl:col-span-1'
+            : 'order-2 space-y-6 xl:order-none xl:col-span-2' ?>">
 
             <!-- Document summary -------------------------------------------->
+            <?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'spsec/inbox';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
+
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="mb-4 text-base font-semibold text-gray-900">Document Summary</h2>
+                <h2 class="mb-4 text-base font-semibold text-gray-900">Document Details</h2>
 
                 <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
@@ -184,69 +230,6 @@ ob_start();
                     <?php endif; ?>
                 </dl>
             </div>
-
-            <!-- Accountability / Ownership ------------------------------------>
-            <?php
-            $accountabilityAssignment = null;
-            foreach ($allAssignments as $asgn) {
-                if ($asgn['phase'] === 'SP_SECRETARY' && !empty($asgn['accepted_by'])) {
-                    $accountabilityAssignment = $asgn;
-                }
-            }
-            ?>
-            <?php if ($accountabilityAssignment !== null): ?>
-                <div class="rounded-2xl border border-blue-100 bg-blue-50 p-6">
-                    <h2 class="mb-4 text-base font-semibold text-blue-900">Accountability</h2>
-                    <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-blue-500">Accepted By</dt>
-                            <dd class="mt-1 text-sm font-semibold text-blue-900">
-                                <?= htmlspecialchars($accountabilityAssignment['accepted_by_username'] ?? '—') ?>
-                            </dd>
-                            <?php
-                            $acceptedFullName = trim($accountabilityAssignment['accepted_by_name'] ?? '');
-                            if ($acceptedFullName !== ''): ?>
-                                <dd class="text-xs text-blue-600"><?= htmlspecialchars($acceptedFullName) ?></dd>
-                            <?php endif; ?>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-blue-500">Accepted At</dt>
-                            <dd class="mt-1 text-sm text-blue-900">
-                                <?php if (!empty($accountabilityAssignment['accepted_at'])): ?>
-                                    <?= htmlspecialchars(date('F j, Y', strtotime($accountabilityAssignment['accepted_at']))) ?>
-                                    <span class="block text-xs text-blue-600">
-                                        <?= htmlspecialchars(date('g:i A', strtotime($accountabilityAssignment['accepted_at']))) ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span class="text-blue-400">—</span>
-                                <?php endif; ?>
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-blue-500">Assignment Decision</dt>
-                            <dd class="mt-1">
-                                <?php
-                                $dColor = match ($accountabilityAssignment['decision']) {
-                                    'ACCEPTED'  => 'bg-blue-100 text-blue-700',
-                                    'COMPLETED' => 'bg-green-100 text-green-700',
-                                    'DECLINED'  => 'bg-red-100 text-red-700',
-                                    default     => 'bg-gray-100 text-gray-700',
-                                };
-                                ?>
-                                <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold <?= $dColor ?>">
-                                    <?= htmlspecialchars(spsecShowDecision($accountabilityAssignment['decision'])) ?>
-                                </span>
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-blue-500">Current Owner</dt>
-                            <dd class="mt-1 text-sm text-blue-900">
-                                <?= htmlspecialchars($accountabilityAssignment['accepted_by_username'] ?? '—') ?>
-                            </dd>
-                        </div>
-                    </dl>
-                </div>
-            <?php endif; ?>
 
             <!-- Source information ------------------------------------------>
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
@@ -327,19 +310,23 @@ ob_start();
                 <?php else: ?>
                     <div class="space-y-2">
                         <?php foreach ($attachments as $att): ?>
-                            <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                                <div class="flex items-center gap-3 min-w-0">
-                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary">
+                            <?php
+                            $attachmentUrl = BASE_URL . '/public/' . ltrim((string) ($att['stored_path'] ?? ''), '/');
+                            $attachmentName = (string) ($att['file_name'] ?? 'Attachment');
+                            ?>
+                            <div class="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="flex items-start gap-3 min-w-0 sm:items-center">
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                                         </svg>
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="truncate text-sm font-medium text-gray-800">
-                                            <?= htmlspecialchars($att['file_name']) ?>
+                                        <p class="break-words text-sm font-medium text-gray-800 sm:truncate">
+                                            <?= htmlspecialchars($attachmentName) ?>
                                         </p>
-                                        <p class="text-xs text-gray-400">
+                                        <p class="mt-0.5 break-words text-xs leading-relaxed text-gray-500">
                                             <?= htmlspecialchars(number_format($att['file_size'] / 1024, 1)) ?> KB
                                             &middot; <?= htmlspecialchars($att['phase']) ?>
                                             <?php if (!empty($att['uploaded_by_username'])): ?>
@@ -349,11 +336,21 @@ ob_start();
                                         </p>
                                     </div>
                                 </div>
-                                <a href="<?= BASE_URL ?>/public/<?= htmlspecialchars($att['stored_path']) ?>"
-                                   target="_blank"
-                                   class="ml-4 shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition">
-                                    Download
-                                </a>
+                                <div class="grid grid-cols-2 gap-2 sm:ml-4 sm:flex sm:shrink-0 sm:items-center">
+                                    <a href="<?= htmlspecialchars($attachmentUrl) ?>"
+                                       data-attachment-preview
+                                       data-preview-url="<?= htmlspecialchars($attachmentUrl) ?>"
+                                       data-preview-name="<?= htmlspecialchars($attachmentName) ?>"
+                                       data-download-url="<?= htmlspecialchars($attachmentUrl) ?>"
+                                       class="inline-flex justify-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary-hover transition sm:py-1.5">
+                                        Preview
+                                    </a>
+                                    <a href="<?= htmlspecialchars($attachmentUrl) ?>"
+                                       download
+                                       class="inline-flex justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition sm:py-1.5">
+                                        Download
+                                    </a>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -406,15 +403,58 @@ ob_start();
                 <?php if (empty($allAssignments)): ?>
                     <p class="text-sm text-gray-400">No assignments yet.</p>
                 <?php else: ?>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full text-sm divide-y divide-gray-100">
+                    <div class="space-y-3 sm:hidden">
+                        <?php foreach ($allAssignments as $asgn): ?>
+                            <?php
+                            $dClass = match ($asgn['decision']) {
+                                'COMPLETED', 'NOTED' => 'bg-green-50 text-green-700',
+                                'ACCEPTED' => 'bg-blue-50 text-blue-700',
+                                'DECLINED', 'REJECTED' => 'bg-red-50 text-red-700',
+                                default => 'bg-amber-50 text-amber-700',
+                            };
+                            ?>
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= htmlspecialchars(spsecShowPhase($asgn['phase'])) ?></p>
+                                        <p class="mt-1 break-words text-sm font-semibold text-gray-800">
+                                            <?= htmlspecialchars($asgn['role_name'] ?? $asgn['assigned_to_username'] ?? '—') ?>
+                                        </p>
+                                    </div>
+                                    <span class="shrink-0 rounded-full px-2 py-1 text-xs font-semibold <?= $dClass ?>">
+                                        <?= htmlspecialchars(spsecShowDecision($asgn['decision'])) ?>
+                                    </span>
+                                </div>
+                                <dl class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                    <div>
+                                        <dt class="text-gray-400">Assigned By</dt>
+                                        <dd class="mt-0.5 break-words font-medium text-gray-700"><?= htmlspecialchars($asgn['assigned_by_username'] ?? '—') ?></dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-gray-400">Accepted By</dt>
+                                        <dd class="mt-0.5 break-words font-medium text-blue-700"><?= htmlspecialchars($asgn['accepted_by_username'] ?? '—') ?></dd>
+                                        <?php if (!empty($asgn['accepted_by_name'])): ?>
+                                            <dd class="mt-0.5 break-words text-gray-500"><?= htmlspecialchars($asgn['accepted_by_name']) ?></dd>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <dt class="text-gray-400">Date</dt>
+                                        <dd class="mt-0.5 text-gray-600"><?= htmlspecialchars(date('M j, Y', strtotime($asgn['created_at']))) ?></dd>
+                                    </div>
+                                </dl>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="hidden overflow-x-auto sm:block">
+                        <table class="w-full text-sm divide-y divide-gray-100">
                             <thead>
                                 <tr class="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                    <th class="pb-2 text-left">Phase</th>
-                                    <th class="pb-2 text-left">Assigned To</th>
-                                    <th class="pb-2 text-left">By</th>
-                                    <th class="pb-2 text-left">Accepted By</th>
-                                    <th class="pb-2 text-left">Decision</th>
+                                    <th class="pb-2 pr-3 text-left">Phase</th>
+                                    <th class="pb-2 pr-3 text-left">Assigned To</th>
+                                    <th class="pb-2 pr-3 text-left">By</th>
+                                    <th class="pb-2 pr-3 text-left">Accepted By</th>
+                                    <th class="pb-2 pr-3 text-left">Decision</th>
                                     <th class="pb-2 text-left">Date</th>
                                 </tr>
                             </thead>
@@ -458,7 +498,7 @@ ob_start();
                                         <td class="py-2">
                                             <?php
                                             $dClass = match ($asgn['decision']) {
-                                                'COMPLETED'            => 'bg-green-50 text-green-700',
+                                                'COMPLETED', 'NOTED'   => 'bg-green-50 text-green-700',
                                                 'ACCEPTED'             => 'bg-blue-50 text-blue-700',
                                                 'DECLINED', 'REJECTED' => 'bg-red-50 text-red-700',
                                                 default                => 'bg-amber-50 text-amber-700',
@@ -472,15 +512,6 @@ ob_start();
                                             <?= htmlspecialchars(date('M j, Y', strtotime($asgn['created_at']))) ?>
                                         </td>
                                     </tr>
-                                    <?php if (!empty($asgn['decline_reason'])): ?>
-                                        <tr>
-                                            <td colspan="6" class="pb-2 pl-4">
-                                                <span class="text-xs text-red-600 italic">
-                                                    Return reason: <?= htmlspecialchars($asgn['decline_reason']) ?>
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
@@ -488,6 +519,7 @@ ob_start();
                 <?php endif; ?>
             </div>
 
+            <?php if (!$fromNotedDocuments): ?>
             <!-- Route history ------------------------------------------------>
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="mb-4 text-base font-semibold text-gray-900">Routing History</h2>
@@ -525,10 +557,11 @@ ob_start();
                     </ol>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
 
-            <!-- Workflow events ---------------------------------------------->
+            <!-- Action history ----------------------------------------------->
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="mb-4 text-base font-semibold text-gray-900">Workflow Events</h2>
+                <h2 class="mb-4 text-base font-semibold text-gray-900">Action History</h2>
                 <?php if (empty($events)): ?>
                     <p class="text-sm text-gray-400">No events recorded.</p>
                 <?php else: ?>
@@ -564,7 +597,34 @@ ob_start();
                 <?php if (empty($revisions)): ?>
                     <p class="text-sm text-gray-400">No revisions recorded.</p>
                 <?php else: ?>
-                    <div class="overflow-x-auto">
+                    <div class="space-y-3 sm:hidden">
+                        <?php foreach ($revisions as $rev): ?>
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <p class="font-mono text-xs font-semibold text-gray-500">#<?= (int) $rev['revision_number'] ?></p>
+                                    <p class="text-xs text-gray-400"><?= htmlspecialchars(date('M j, Y', strtotime($rev['created_at']))) ?></p>
+                                </div>
+                                <dl class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                    <div>
+                                        <dt class="text-gray-400">Phase</dt>
+                                        <dd class="mt-0.5 font-medium text-gray-700"><?= htmlspecialchars(spsecShowPhase($rev['phase'])) ?></dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-gray-400">Changed By</dt>
+                                        <dd class="mt-0.5 break-words font-medium text-gray-700"><?= htmlspecialchars($rev['changed_by_username'] ?? '—') ?></dd>
+                                    </div>
+                                    <?php if (!empty($rev['change_reason'])): ?>
+                                        <div class="col-span-2">
+                                            <dt class="text-gray-400">Reason</dt>
+                                            <dd class="mt-1 break-words rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-600"><?= htmlspecialchars($rev['change_reason']) ?></dd>
+                                        </div>
+                                    <?php endif; ?>
+                                </dl>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="hidden overflow-x-auto sm:block">
                         <table class="min-w-full text-sm divide-y divide-gray-100">
                             <thead>
                                 <tr class="text-xs font-semibold uppercase tracking-wide text-gray-400">
@@ -597,11 +657,75 @@ ob_start();
                 <?php endif; ?>
             </div>
 
+            <!-- Accountability / Ownership ------------------------------------>
+            <?php
+            $accountabilityAssignment = null;
+            foreach ($allAssignments as $asgn) {
+                if ($asgn['phase'] === 'SP_SECRETARY' && !empty($asgn['accepted_by'])) {
+                    $accountabilityAssignment = $asgn;
+                }
+            }
+            ?>
+            <?php if ($accountabilityAssignment !== null): ?>
+                <div class="rounded-2xl border border-blue-100 bg-blue-50 p-6">
+                    <h2 class="mb-4 text-base font-semibold text-blue-900">Accountability</h2>
+                    <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-blue-500">Accepted By</dt>
+                            <dd class="mt-1 text-sm font-semibold text-blue-900">
+                                <?= htmlspecialchars($accountabilityAssignment['accepted_by_username'] ?? '—') ?>
+                            </dd>
+                            <?php
+                            $acceptedFullName = trim($accountabilityAssignment['accepted_by_name'] ?? '');
+                            if ($acceptedFullName !== ''): ?>
+                                <dd class="text-xs text-blue-600"><?= htmlspecialchars($acceptedFullName) ?></dd>
+                            <?php endif; ?>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-blue-500">Accepted At</dt>
+                            <dd class="mt-1 text-sm text-blue-900">
+                                <?php if (!empty($accountabilityAssignment['accepted_at'])): ?>
+                                    <?= htmlspecialchars(date('F j, Y', strtotime($accountabilityAssignment['accepted_at']))) ?>
+                                    <span class="block text-xs text-blue-600">
+                                        <?= htmlspecialchars(date('g:i A', strtotime($accountabilityAssignment['accepted_at']))) ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-blue-400">—</span>
+                                <?php endif; ?>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-blue-500">Assignment Decision</dt>
+                            <dd class="mt-1">
+                                <?php
+                                $dColor = match ($accountabilityAssignment['decision']) {
+                                    'ACCEPTED'  => 'bg-blue-100 text-blue-700',
+                                    'COMPLETED' => 'bg-green-100 text-green-700',
+                                    'DECLINED'  => 'bg-red-100 text-red-700',
+                                    default     => 'bg-gray-100 text-gray-700',
+                                };
+                                ?>
+                                <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold <?= $dColor ?>">
+                                    <?= htmlspecialchars(spsecShowDecision($accountabilityAssignment['decision'])) ?>
+                                </span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-blue-500">Current Owner</dt>
+                            <dd class="mt-1 text-sm text-blue-900">
+                                <?= htmlspecialchars($accountabilityAssignment['accepted_by_username'] ?? '—') ?>
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            <?php endif; ?>
+
         </div><!-- /left column -->
 
+        <?php if (!$fromNotedDocuments): ?>
         <!-- Right column (1/3): processing panel ---------------------------->
-        <div class="xl:col-span-1">
-            <div class="sticky top-6 space-y-4">
+        <div class="order-1 xl:order-none xl:col-span-1">
+            <div class="space-y-4 xl:sticky xl:top-6">
 
                 <!-- ═══════════════════════════════════════════════════════════
                      SECTION A — PENDING: Accept button
@@ -765,7 +889,7 @@ ob_start();
                 <!-- ═══════════════════════════════════════════════════════════
                      SECTION C — No action available
                 ════════════════════════════════════════════════════════════ -->
-                <?php if (!$canAccept && !$canProcess): ?>
+                <?php if (!$fromNotedDocuments && !$canAccept && !$canProcess): ?>
                     <div class="rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">
                         <div class="mb-3 flex justify-center">
                             <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200">
@@ -792,6 +916,7 @@ ob_start();
 
             </div><!-- /sticky -->
         </div><!-- /right column -->
+        <?php endif; ?>
 
     </div><!-- /grid -->
 
@@ -801,6 +926,8 @@ ob_start();
          sticky / transformed / overflow ancestor) so that `position:fixed`
          covers the full viewport without clipping.
     ═══════════════════════════════════════════════════════════════════ -->
+    <?php require __DIR__ . '/../../partials/accept-document-modal.php'; ?>
+
     <div id="confirmModal"
          class="fixed inset-0 z-[9999] hidden items-center justify-center"
          role="dialog"
@@ -887,7 +1014,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const acceptForm = document.getElementById('acceptForm');
     const acceptBtn  = document.getElementById('acceptBtn');
     if (acceptForm && acceptBtn) {
-        acceptForm.addEventListener('submit', function () {
+        acceptForm.addEventListener('submit', function (event) {
+            if (acceptForm.dataset.confirmed !== 'true') {
+                event.preventDefault();
+                return;
+            }
             acceptBtn.disabled = true;
             acceptBtn.innerHTML = '<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> <span class="ml-2">Accepting\u2026</span>';
         });
@@ -1102,12 +1233,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-<?php
-// MFR relationship links (Referenced Original Case / Related Motions)
-$mfrDetailRoute = 'spsec/inbox';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content = ob_get_clean();

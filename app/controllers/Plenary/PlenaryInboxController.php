@@ -170,6 +170,8 @@ class PlenaryInboxController
      * Additionally, documents that have moved to another phase (e.g., FINALIZED
      * or COMMITTEE) must not appear in the Accepted tab. The current_phase
      * check ensures this.
+     * The Accepted tab only contains documents with no recorded pre-decision
+     * yet or with the active "For Encoding" pre-decision status.
      *
      * Requires the query to join `documents d` and `document_assignments da`.
      * Used verbatim by both the Accepted list query and the accepted count so
@@ -189,7 +191,12 @@ class PlenaryInboxController
         AND d.finalized_at IS NULL
         AND d.current_status_id NOT IN (
             SELECT id FROM document_statuses
-            WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
+            WHERE name IN (
+                'Approved',
+                'Plenary Comm: Finalized',
+                'Plenary Cases: Finalized',
+                'Plenary: Committee Report Adopted'
+            )
               AND is_active = 1
               AND is_deleted = 0
         )
@@ -228,6 +235,20 @@ class PlenaryInboxController
         $isOutcomeView = isset(self::OUTCOME_TABS[$view]);
 
         $search  = trim($_GET['search'] ?? '');
+        $documentTypes = $this->pdo->query("
+            SELECT id, name
+            FROM document_types
+            WHERE is_active = 1 AND is_deleted = 0
+            ORDER BY sort_order ASC, name ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        $documentTypeId = isset($_GET['document_type_id'])
+            && is_scalar($_GET['document_type_id'])
+            && ctype_digit((string) $_GET['document_type_id'])
+            ? (int) $_GET['document_type_id']
+            : 0;
+        if ($documentTypeId > 0 && !in_array($documentTypeId, array_column($documentTypes, 'id'), false)) {
+            $documentTypeId = 0;
+        }
         $page    = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 20;
         $offset  = ($page - 1) * $perPage;
@@ -241,6 +262,12 @@ class PlenaryInboxController
             $where[] = '(da.assigned_to_user_id IS NULL OR da.assigned_to_user_id = ?)';
             $where[] = 'da.accepted_by IS NULL';
             $where[] = "d.current_phase = 'PLENARY'";
+            $where[] = 'NOT EXISTS (
+                SELECT 1
+                FROM document_assignments newer_da
+                WHERE newer_da.document_id = da.document_id
+                  AND newer_da.id > da.id
+            )';
             $where[] = 'd.finalized_at IS NULL';
             $where[] = "d.current_status_id NOT IN (
                 SELECT id FROM document_statuses
@@ -285,6 +312,10 @@ class PlenaryInboxController
             $where[]  = '(d.tracking_number LIKE ? OR d.subject_matter LIKE ?)';
             $params[] = '%' . $search . '%';
             $params[] = '%' . $search . '%';
+        }
+        if ($documentTypeId > 0) {
+            $where[]  = 'd.document_type_id = ?';
+            $params[] = $documentTypeId;
         }
 
         $whereClause = implode(' AND ', $where);
@@ -492,6 +523,22 @@ class PlenaryInboxController
         // No Proposed Number, Authors, Committees, Session Type, or Subject Matter
         // override is shown or required.
         $isCases                = $this->isCasesType($documentTypeName);
+
+        $legislativeTerm = $this->fetchActiveLegislativeTerm();
+        $standardPrefix = $this->getStandardProposedNumberPrefix($document['document_type_name'] ?? '');
+        $currentProposedSequence = '';
+        $currentProposedYear = (int) date('Y');
+        if ($standardPrefix !== '' && !empty($plenaryDetails['proposed_number'])) {
+            $currentProposedSequence = $this->extractProposedNumberSequence(
+                (string) $plenaryDetails['proposed_number'],
+                $standardPrefix
+            );
+            if (preg_match('/^' . preg_quote($standardPrefix, '/') . '-\\d{1,10}-(\\d{4})$/i',
+                (string) $plenaryDetails['proposed_number'], $yearMatches
+            )) {
+                $currentProposedYear = (int) $yearMatches[1];
+            }
+        }
 
         // ── Motion for Reconsideration: load the linked finalized case ────────
         // Show the linked Complaint / Administrative Cases document on the Plenary
@@ -764,6 +811,11 @@ class PlenaryInboxController
 
                 if ($action === 'return_to_admin') {
                     redirect('plenary/inbox');
+                } elseif ($action === 'save_processing') {
+                    // Processing advances the document to the First Reading queue.
+                    // Use the generic detail route so it dispatches to the correct
+                    // Communication, Cases, or legislative First Reading page.
+                    redirect('plenary/first-reading/show?id=' . $documentId);
                 } else {
                     redirect('plenary/inbox/show?id=' . $documentId);
                 }
@@ -1016,7 +1068,9 @@ class PlenaryInboxController
 
         // ── 1. Verify pre-decision is "For Encoding" ───────────────────
         $pddStmt = $this->pdo->prepare("
-            SELECT pdd.id, pdd.status_id, ds.name AS status_name
+            SELECT pdd.id, pdd.status_id, pdd.proposed_number,
+                   pdd.legislative_term_id, pdd.legislative_term_name,
+                   ds.name AS status_name
             FROM plenary_document_details pdd
             LEFT JOIN document_statuses ds ON ds.id = pdd.status_id
             WHERE pdd.document_id = ?
@@ -1054,6 +1108,7 @@ class PlenaryInboxController
         // ── 2. Collect and validate POST fields ───────────────────────────
         $subjectMatter      = trim($_POST['subject_matter']           ?? '');
         $proposedNumber     = trim($_POST['proposed_number']          ?? '');
+        $proposedNumberSequence = trim($_POST['proposed_number_sequence'] ?? '');
         $targetDate         = trim($_POST['target_first_reading_date'] ?? '');
         $sessionType        = trim($_POST['session_type']             ?? '');
         $additionalDetails  = trim($_POST['additional_details']       ?? '');
@@ -1085,12 +1140,56 @@ class PlenaryInboxController
         $documentTypeName = strtolower(trim($dtRow['name'] ?? ''));
 
         $proposedNumberExempt = $this->isProposedNumberExempt($documentTypeName);
+
+        $standardPrefix = $this->getStandardProposedNumberPrefix($documentTypeName);
+        $legislativeTerm = null;
+        $legislativeTermId = null;
+        $legislativeTermName = null;
+        $updateStandardSequence = false;
+        if ($standardPrefix !== '') {
+            $legislativeTerm = $this->fetchActiveLegislativeTerm();
+            if (!$legislativeTerm) {
+                $errors[] = 'An active Legislative Term is required before assigning a Proposed Number.';
+            } else {
+                $legislativeTermId = (int) $legislativeTerm['id'];
+                $legislativeTermName = trim((string) $legislativeTerm['name']);
+
+                $existingProposedNumber = trim((string) ($pdd['proposed_number'] ?? ''));
+                if ($proposedNumberSequence === '' && $existingProposedNumber !== '') {
+                    $proposedNumberSequence = $this->extractProposedNumberSequence(
+                        $existingProposedNumber,
+                        $standardPrefix
+                    );
+                }
+
+                if ($proposedNumberSequence === '') {
+                    $errors[] = 'Proposed Number sequence is required.';
+                } elseif (!preg_match('/^\\d{1,10}$/D', $proposedNumberSequence)
+                    || (int) $proposedNumberSequence < 1
+                ) {
+                    $errors[] = 'Proposed Number sequence must be a positive number with up to 10 digits.';
+                } else {
+                    $year = (int) date('Y');
+                    if (preg_match('/^' . preg_quote($standardPrefix, '/') . '-\d{1,10}-(\d{4})$/i', $existingProposedNumber, $yearMatches)) {
+                        $year = (int) $yearMatches[1];
+                    }
+                    $proposedNumber = $this->buildStandardProposedNumber(
+                        $standardPrefix,
+                        $proposedNumberSequence,
+                        $year
+                    );
+                    $updateStandardSequence = true;
+                }
+            }
+        }
+
         // MFRs follow the same reduced form as Communications: no Proposed Number,
         // Authors, Co-Authors, Committees, or Session Type.
         $isCommunication      = $this->isCommunicationType($documentTypeName)
                              || $this->isMotionForReconsiderationType($documentTypeName);
 
-        if (!$isCommunication && !$proposedNumberExempt && $proposedNumber === '') {
+        if (!$isCommunication && !$proposedNumberExempt
+            && $standardPrefix === '' && $proposedNumber === '') {
             $errors[] = 'Proposed Number is required for this document type.';
         }
 
@@ -1245,17 +1344,27 @@ class PlenaryInboxController
             }
         }
 
+        if ($updateStandardSequence) {
+            $this->updateProposedNumberSequence(
+                $legislativeTermId,
+                $standardPrefix,
+                (int) $proposedNumberSequence
+            );
+        }
+
         // ── 4. Upsert plenary_document_details ────────────────────────────
         // Use INSERT ... ON DUPLICATE KEY UPDATE to prevent concurrent duplicates.
         // document_id has a UNIQUE constraint.
         $this->pdo->prepare("
             INSERT INTO plenary_document_details
-                (document_id, proposed_number, target_first_reading_date,
-                 session_type, additional_details, remarks,
+                (document_id, proposed_number, legislative_term_id, legislative_term_name,
+                 target_first_reading_date, session_type, additional_details, remarks,
                  authors_all, co_authors_all, status_id, created_by, updated_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 proposed_number           = VALUES(proposed_number),
+                legislative_term_id       = VALUES(legislative_term_id),
+                legislative_term_name     = VALUES(legislative_term_name),
                 target_first_reading_date = VALUES(target_first_reading_date),
                 session_type              = VALUES(session_type),
                 additional_details        = VALUES(additional_details),
@@ -1267,6 +1376,8 @@ class PlenaryInboxController
             // Communications hide Proposed Number / Session Type / Additional
             // Details, so those columns are left empty for that document type.
             $isCommunication ? null : ($proposedNumber    ?: null),
+            $isCommunication ? null : $legislativeTermId,
+            $isCommunication ? null : $legislativeTermName,
             $targetDate ?: null,
             $isCommunication ? null : ($sessionType       ?: null),
             $isCommunication ? null : ($additionalDetails ?: null),
@@ -1696,6 +1807,12 @@ class PlenaryInboxController
               AND da.accepted_by         IS NULL
               AND (da.assigned_to_user_id IS NULL OR da.assigned_to_user_id = ?)
               AND d.current_phase = 'PLENARY'
+              AND NOT EXISTS (
+                    SELECT 1
+                    FROM document_assignments newer_da
+                    WHERE newer_da.document_id = da.document_id
+                      AND newer_da.id > da.id
+              )
               AND d.finalized_at IS NULL
               AND d.current_status_id NOT IN (
                     SELECT id FROM document_statuses
@@ -1983,6 +2100,63 @@ class PlenaryInboxController
         ");
         $stmt->execute([$documentId]);
         return $stmt->fetchAll();
+    }
+
+    private function fetchActiveLegislativeTerm(): ?array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT id, name, year, start_date, end_date
+            FROM terms
+            WHERE is_deleted = 0 AND is_active = 1
+            ORDER BY start_date DESC
+            LIMIT 1
+        ");
+        $stmt->execute();
+        $term = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $term ?: null;
+    }
+
+    private function getStandardProposedNumberPrefix(string $documentTypeName): string
+    {
+        $name = strtolower(trim($documentTypeName));
+        if (str_contains($name, 'provincial') && str_contains($name, 'resolution')) {
+            return 'PPR';
+        }
+        if (str_contains($name, 'provincial') && str_contains($name, 'ordinance')) {
+            return 'PPO';
+        }
+        if ((str_contains($name, 'municipal') || str_contains($name, 'city'))
+            && str_contains($name, 'resolution')) {
+            return 'PR';
+        }
+        if ((str_contains($name, 'municipal') || str_contains($name, 'city'))
+            && str_contains($name, 'ordinance')) {
+            return 'PO';
+        }
+        return '';
+    }
+
+    private function buildStandardProposedNumber(string $prefix, string $sequence, int $year): string
+    {
+        return sprintf('%s-%d-%04d', $prefix, (int) $sequence, $year);
+    }
+
+    private function extractProposedNumberSequence(string $number, string $prefix): string
+    {
+        if (preg_match('/^' . preg_quote($prefix, '/') . '-(\\d{1,10})-\\d{4}$/i', trim($number), $matches)) {
+            return (string) ((int) $matches[1]);
+        }
+        return '';
+    }
+
+    private function updateProposedNumberSequence(int $termId, string $prefix, int $sequence): void
+    {
+        $stmt = $this->pdo->prepare("
+            INSERT INTO proposed_number_sequences (legislative_term_id, prefix, last_sequence)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE last_sequence = GREATEST(last_sequence, VALUES(last_sequence))
+        ");
+        $stmt->execute([$termId, $prefix, $sequence]);
     }
 
     /**

@@ -76,12 +76,31 @@ function check(string $label, bool $cond, string $detail = ''): void {
 const ACCEPTED_STILL_PROCESSING = "
     d.current_status_id NOT IN (
         SELECT id FROM document_statuses
-        WHERE name = 'Awaiting First Reading'
+        WHERE name IN (
+            'Awaiting First Reading',
+            'Returned to Plenary',
+            'Approved',
+            'Plenary Comm: Finalized',
+            'Plenary Cases: Finalized',
+            'Plenary: Committee Report Adopted'
+        )
           AND is_active  = 1
           AND is_deleted = 0
     )
     AND NOT EXISTS (
         SELECT 1 FROM plenary_readings pr WHERE pr.document_id = da.document_id
+    )
+    AND d.current_phase = 'PLENARY'
+    AND d.finalized_at IS NULL
+    AND (
+        pdd.status_id IS NULL
+        OR pdd.status_id = (
+            SELECT id FROM document_statuses
+            WHERE name = 'For Encoding'
+              AND is_active = 1
+              AND is_deleted = 0
+            LIMIT 1
+        )
     )
 ";
 
@@ -151,6 +170,13 @@ $ftBody = ($fetchTabStart !== false && $fetchTabEnd !== false && $fetchTabEnd > 
     : '';
 check('S5: fetchTabCounts() still joins plenary_document_details pdd',
     str_contains($ftBody, 'JOIN plenary_document_details pdd'));
+$pendingCountStart = strpos($ftBody, '$pendingRow = $this->pdo->prepare(');
+$pendingCountEnd = strpos($ftBody, '$pendingRow->execute', $pendingCountStart ?: 0);
+$pendingCountSql = ($pendingCountStart !== false && $pendingCountEnd !== false)
+    ? substr($ftBody, $pendingCountStart, $pendingCountEnd - $pendingCountStart)
+    : '';
+check('S6: pending inbox count does not reference pdd without joining it',
+    $pendingCountSql !== '' && !str_contains($pendingCountSql, 'pdd.status_id'));
 
 // =====================================================================
 // GROUP F — Functional: the exact controller SQL runs against the live
@@ -174,6 +200,20 @@ function countForView(PDO $pdo, int $roleId, int $userId, string $view, string $
         $where[] = 'da.completed_at IS NULL';
         $where[] = '(da.assigned_to_user_id IS NULL OR da.assigned_to_user_id = ?)';
         $where[] = 'da.accepted_by IS NULL';
+        $where[] = "d.current_phase = 'PLENARY'";
+        $where[] = 'NOT EXISTS (
+            SELECT 1
+            FROM document_assignments newer_da
+            WHERE newer_da.document_id = da.document_id
+              AND newer_da.id > da.id
+        )';
+        $where[] = 'd.finalized_at IS NULL';
+        $where[] = "d.current_status_id NOT IN (
+            SELECT id FROM document_statuses
+            WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
+              AND is_active = 1
+              AND is_deleted = 0
+        )";
         $params[] = $userId;
     } elseif ($isOutcomeView) {
         $where[] = "da.decision = 'ACCEPTED'";
@@ -230,6 +270,20 @@ function listForView(PDO $pdo, int $roleId, int $userId, string $view, string $s
         $where[] = 'da.completed_at IS NULL';
         $where[] = '(da.assigned_to_user_id IS NULL OR da.assigned_to_user_id = ?)';
         $where[] = 'da.accepted_by IS NULL';
+        $where[] = "d.current_phase = 'PLENARY'";
+        $where[] = 'NOT EXISTS (
+            SELECT 1
+            FROM document_assignments newer_da
+            WHERE newer_da.document_id = da.document_id
+              AND newer_da.id > da.id
+        )';
+        $where[] = 'd.finalized_at IS NULL';
+        $where[] = "d.current_status_id NOT IN (
+            SELECT id FROM document_statuses
+            WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
+              AND is_active = 1
+              AND is_deleted = 0
+        )";
         $params[] = $userId;
     } elseif ($isOutcomeView) {
         $where[] = "da.decision = 'ACCEPTED'";
@@ -321,7 +375,10 @@ try {
     // Pre-decision statuses (seeded by migrations 065 / 069).
     $rows = $pdo->query("
         SELECT id, name FROM document_statuses
-        WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','For Encoding','Withdrawn')
+        WHERE name IN (
+            'Deferred','Lay on the Table','Noted','Remanded','For Encoding','Withdrawn',
+            'Plenary: Committee Report Adopted'
+        )
           AND is_active=1 AND is_deleted=0
     ")->fetchAll(PDO::FETCH_ASSOC);
     $status = [];
@@ -329,7 +386,15 @@ try {
         $status[$r['name']] = (int) $r['id'];
     }
     $missing = array_diff(
-        ['Deferred', 'Lay on the Table', 'Noted', 'Remanded', 'For Encoding', 'Withdrawn'],
+        [
+            'Deferred',
+            'Lay on the Table',
+            'Noted',
+            'Remanded',
+            'For Encoding',
+            'Withdrawn',
+            'Plenary: Committee Report Adopted',
+        ],
         array_keys($status)
     );
     if (!empty($missing)) {
@@ -379,6 +444,7 @@ try {
     $docRemanded   = $createAccepted($userA, $status['Remanded']);
     $docWithdrawn  = $createAccepted($userA, $status['Withdrawn']);
     $docOnProcess  = $createAccepted($userA, $status['For Encoding']);
+    $docAdoptedOnly = $createAccepted($userA, $status['Plenary: Committee Report Adopted']);
 
     // Document with no plenary_document_details row (no pre-decision yet):
     $seq++;
@@ -397,6 +463,50 @@ try {
              received_at, accepted_at, accepted_by, assigned_to_user_id)
         VALUES (?, ?, 'PLENARY', ?, 'ACCEPTED', NOW(), NOW(), ?, ?)
     ")->execute([$docNoPdd, $plenaryRoleId, $userA, $userA, $userA]);
+    // A previous Plenary PENDING row must not resurface after a newer
+    // assignment has already routed the document into another phase.
+    $committeeRoleRow = $pdo->query("
+        SELECT id FROM roles WHERE name='Committee' AND is_active=1 AND is_deleted=0 LIMIT 1
+    ")->fetch();
+    if (!$committeeRoleRow) {
+        echo "FATAL: 'Committee' role missing — run migrations first." . PHP_EOL;
+        $pdo->rollBack();
+        exit(1);
+    }
+    $seq++;
+    $pdo->prepare("
+        INSERT INTO documents
+            (tracking_number, tracking_year, tracking_sequence, subject_matter,
+             document_type_id, source_type_id, current_status_id,
+             date_received, time_received, current_phase)
+        VALUES (?, YEAR(CURDATE()), ?, 'current plenary assignment', ?, ?, ?, CURDATE(), CURTIME(), 'PLENARY')
+    ")->execute(['PLC-CURRENT-PLENARY', $seq, $docTypeId, $sourceTypeId, $neutralStatusId]);
+    $docCurrentPlenary = (int) $pdo->lastInsertId();
+    $pdo->prepare("
+        INSERT INTO document_assignments
+            (document_id, assigned_to_role_id, phase, assigned_by, decision, received_at)
+        VALUES (?, ?, 'PLENARY', ?, 'PENDING', NOW())
+    ")->execute([$docCurrentPlenary, $plenaryRoleId, $userA]);
+
+    $seq++;
+    $pdo->prepare("
+        INSERT INTO documents
+            (tracking_number, tracking_year, tracking_sequence, subject_matter,
+             document_type_id, source_type_id, current_status_id,
+             date_received, time_received, current_phase)
+        VALUES (?, YEAR(CURDATE()), ?, 'stale plenary assignment', ?, ?, ?, CURDATE(), CURTIME(), 'PLENARY')
+    ")->execute(['PLC-STALE-PLENARY', $seq, $docTypeId, $sourceTypeId, $neutralStatusId]);
+    $docStalePlenary = (int) $pdo->lastInsertId();
+    $pdo->prepare("
+        INSERT INTO document_assignments
+            (document_id, assigned_to_role_id, phase, assigned_by, decision, received_at)
+        VALUES (?, ?, 'PLENARY', ?, 'PENDING', NOW())
+    ")->execute([$docStalePlenary, $plenaryRoleId, $userA]);
+    $pdo->prepare("
+        INSERT INTO document_assignments
+            (document_id, assigned_to_role_id, phase, assigned_by, decision, received_at)
+        VALUES (?, ?, 'COMMITTEE', ?, 'PENDING', NOW())
+    ")->execute([$docStalePlenary, (int) $committeeRoleRow['id'], $userA]);
 
     // ── F1: every view query runs without "Unknown column 'pdd.status_id'" ──
     $views = array_merge(['inbox', 'accepted'], array_keys(OUTCOME_TABS));
@@ -410,6 +520,13 @@ try {
             check("F1.{$v}: query executes without 'Unknown column pdd.status_id'", false, $e->getMessage());
         }
     }
+
+    // ── F1b: a stale Plenary assignment cannot surface after later routing.
+    $inboxList = listForView($pdo, $plenaryRoleId, $userA, 'inbox');
+    check('F1b: current Plenary PENDING assignment remains visible',
+        in_array($docCurrentPlenary, $inboxList, true));
+    check('F1b: stale Plenary PENDING assignment is hidden after newer Committee routing',
+        !in_array($docStalePlenary, $inboxList, true));
 
     // ── F2: Deferred doc is in the deferred tab, NOT in accepted, NOT in others
     $deferredList = listForView($pdo, $plenaryRoleId, $userA, 'deferred');
@@ -450,6 +567,8 @@ try {
     }
     $acc2 = listForView($pdo, $plenaryRoleId, $userA, 'accepted');
     check('F4b: For Encoding doc stays in accepted', in_array($docOnProcess, $acc2, true));
+    check('F4c: adopted Committee Report document is excluded from accepted',
+        !in_array($docAdoptedOnly, $acc2, true));
 
     // ── F5: doc with no pdd row stays in accepted (pdd.status_id IS NULL branch)
     check('F5: doc with no plenary_document_details stays in accepted', in_array($docNoPdd, $acc2, true));

@@ -39,6 +39,8 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
 <div class="detail-page space-y-6">
 
+
+
     <!-- ── Page header ─────────────────────────────────────────────────────── -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-8 sm:px-8">
@@ -71,6 +73,13 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
         <div class="lg:col-span-2 space-y-6">
 
             <!-- Document Information -->
+            <?php
+// MFR relationship links (Referenced Original Case / Related Motions)
+$mfrDetailRoute = 'admin/routed';
+require __DIR__ . '/../../partials/resubmission-relationship.php';
+require __DIR__ . '/../../partials/mfr-relationship.php';
+?>
+
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="text-lg font-semibold text-gray-900">Document Information</h2>
 
@@ -473,12 +482,7 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
 </div>
 
-<?php
-// MFR relationship links (Referenced Original Case / Related Motions)
-$mfrDetailRoute = 'admin/routed';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
+
 
 <?php
 $content = ob_get_clean();

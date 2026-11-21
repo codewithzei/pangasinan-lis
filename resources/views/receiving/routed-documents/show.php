@@ -75,6 +75,18 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
         <div class="lg:col-span-2 space-y-6">
             
             <!-- Document Information -->
+            <?php
+            $mfrDetailRoute = 'receiving/routed-documents';
+            require __DIR__ . '/../../partials/resubmission-relationship.php';
+            ?>
+            <?php if ($showMfrRelationship): ?>
+                <?php
+                // MFR relationship sections: delegated to shared partial.
+                $mfrDetailRoute = 'receiving/routed-documents';
+                require __DIR__ . '/../../partials/mfr-relationship.php';
+                ?>
+            <?php endif; ?>
+
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="text-lg font-semibold text-gray-900">Document Information</h2>
                 
@@ -500,19 +512,6 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
     </div>
 
 </div>
-
-<?php if ($showMfrRelationship): ?>
-    <?php
-    // MFR relationship sections: delegated to shared partial.
-    $mfrDetailRoute = 'receiving/routed-documents';
-    require __DIR__ . '/../../partials/mfr-relationship.php';
-    ?>
-<?php endif; ?>
-
-<?php
-$mfrDetailRoute = 'receiving/routed-documents';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-?>
 
 <?php
 $content = ob_get_clean();

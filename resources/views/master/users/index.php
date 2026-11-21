@@ -825,7 +825,7 @@ async function submitStatusChange() {
     const id = document.getElementById('statusModalAccountId').value;
     const status = document.getElementById('statusModalSelect').value;
     if (statusModalIsSelf && status !== 'active') {
-        showToast('You cannot deactivate or block your own signed-in account.', 'error');
+        showStatusToast('You cannot deactivate or block your own signed-in account.', 'error');
         return;
     }
     try {
@@ -834,13 +834,13 @@ async function submitStatusChange() {
         fd.append('status', status);
         const res = await fetch('<?= BASE_URL ?>/master/users/update-status', { method: 'POST', body: fd });
         const data = await res.json();
-        showToast(data.message, data.success ? 'success' : 'error');
+        showStatusToast(data.message, data.success ? 'success' : 'error');
         if (data.success) {
             closeStatusModal();
             setTimeout(() => location.reload(), 800);
         }
     } catch (e) {
-        showToast('Network error.', 'error');
+        showStatusToast('Network error.', 'error');
     }
 }
 
