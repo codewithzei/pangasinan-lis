@@ -50,6 +50,7 @@ $mfrLink        = $mfrLink        ?? null;
 $relatedMotions = $relatedMotions ?? [];
 $mfrDetailRoute = rtrim($mfrDetailRoute ?? 'admin/inbox', '/');
 $mfrDetailAction = $mfrDetailAction ?? 'show';
+$mfrRelationshipTopMargin = $mfrRelationshipTopMargin ?? 'mt-6';
 
 // ── Nothing to show? Exit immediately ─────────────────────────────────────────
 if (empty($mfrLink) && empty($relatedMotions)) {
@@ -61,7 +62,7 @@ if (empty($mfrLink) && empty($relatedMotions)) {
       // Section A: current doc IS an MFR → show the referenced original case
       // ═════════════════════════════════════════════════════════════════════ ?>
 <?php if (!empty($mfrLink)): ?>
-<section class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-6">
+<section class="<?= htmlspecialchars($mfrRelationshipTopMargin) ?> rounded-2xl border border-amber-200 bg-amber-50 p-6">
     <h2 class="text-lg font-semibold text-amber-900">Referenced Original Case</h2>
     <p class="mt-1 text-sm text-amber-700">
         This Motion for Reconsideration challenges the following finalized case.
@@ -187,7 +188,7 @@ if (empty($mfrLink) && empty($relatedMotions)) {
       // ═════════════════════════════════════════════════════════════════════ ?>
 <?php if (!empty($relatedMotions)): ?>
 <?php $mfrBodyId = 'relatedMotionsBody_' . md5($mfrDetailRoute); ?>
-<section class="mt-6 rounded-2xl border border-purple-200 bg-purple-50 p-6">
+<section class="<?= htmlspecialchars($mfrRelationshipTopMargin) ?> rounded-2xl border border-purple-200 bg-purple-50 p-6">
     <div class="flex flex-wrap items-start justify-between gap-2">
         <div>
             <h2 class="text-lg font-semibold text-purple-900">

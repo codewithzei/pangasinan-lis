@@ -486,9 +486,10 @@ $prevIsPublic    = !empty($_POST['is_public']);
 
                                 <!-- Date Approved -->
                                 <td class="px-5 py-4 whitespace-nowrap">
-                                    <?php if (!empty($fd['date_approved'])): ?>
+                                    <?php $displayDate = $fd['date_approved'] ?: $fd['finalized_at']; ?>
+                                    <?php if (!empty($displayDate)): ?>
                                         <div class="text-sm text-gray-900">
-                                            <?= htmlspecialchars(date('M j, Y', strtotime($fd['date_approved']))) ?>
+                                            <?= htmlspecialchars(date('M j, Y', strtotime($displayDate))) ?>
                                         </div>
                                     <?php else: ?>
                                         <span class="text-xs text-gray-400">—</span>
@@ -625,9 +626,8 @@ $prevIsPublic    = !empty($_POST['is_public']);
                             <div>
                                 <p class="text-[11px] font-medium uppercase tracking-wide text-gray-400">Date Approved</p>
                                 <p class="mt-1 text-sm text-gray-600">
-                                    <?= !empty($fd['date_approved'])
-                                        ? htmlspecialchars(date('M j, Y', strtotime($fd['date_approved'])))
-                                        : '—' ?>
+                                    <?php $displayDate = $fd['date_approved'] ?: $fd['finalized_at']; ?>
+                                    <?= !empty($displayDate) ? htmlspecialchars(date('M j, Y', strtotime($displayDate))) : '—' ?>
                                 </p>
                             </div>
                         </div>

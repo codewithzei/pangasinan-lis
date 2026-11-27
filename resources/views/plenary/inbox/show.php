@@ -145,22 +145,25 @@ ob_start();
 ?>
 
 <div class="detail-page flex min-w-0 flex-col space-y-5 sm:space-y-6">
-    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
-
     <!-- Back + Page header --------------------------------------------------->
-    <div class="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
-        <a href="<?= BASE_URL ?>/plenary/inbox"
-           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200
-                  bg-white text-gray-500 hover:bg-gray-50 transition">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-        </a>
-        <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Plenary Inbox</p>
-            <h1 class="break-words text-xl font-bold text-gray-900"><?= htmlspecialchars($trackingNumber) ?></h1>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex items-center gap-3 px-5 py-6 sm:px-8 sm:py-7">
+            <a href="<?= BASE_URL ?>/plenary/inbox"
+               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white
+                      transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+               aria-label="Back to Plenary Inbox">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">DOCUMENT DETAILS</p>
+                <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl"><?= htmlspecialchars($trackingNumber) ?></h1>
+            </div>
         </div>
-    </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
+    </section>
 
     <!-- Flash messages -------------------------------------------------------->
     <?php if (!empty($success ?? null)): ?>
@@ -268,6 +271,8 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
             <?php endif; ?>
         </dl>
     </section>
+
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
     <!-- Attachments --------------------------------------------------------->
     <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">

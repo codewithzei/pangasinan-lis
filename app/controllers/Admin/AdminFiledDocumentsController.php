@@ -116,6 +116,7 @@ class AdminFiledDocumentsController
                 d.tracking_number,
                 d.subject_matter,
                 d.filed_at,
+                d.finalized_at,
                 dt.name            AS document_type_name,
                 dt.badge_color     AS document_type_badge_color,
                 da_appr.approved_number,
@@ -448,6 +449,7 @@ class AdminFiledDocumentsController
                 da.sort_order,
                 pdd.authors_all,
                 pdd.co_authors_all,
+                sm.position AS member_position,
                 TRIM(CONCAT_WS(' ',
                     sm.first_name,
                     COALESCE(NULLIF(TRIM(sm.middle_name),''), NULL),
@@ -462,6 +464,16 @@ class AdminFiledDocumentsController
         ");
         $authorsStmt->execute([$documentId]);
         $authors = $this->markAllSelectedAuthorGroups($authorsStmt->fetchAll());
+
+        $committeesStmt = $this->pdo->prepare("
+            SELECT dc.committee_id, c.name AS committee_name
+            FROM document_committees dc
+            LEFT JOIN committees c ON c.id = dc.committee_id
+            WHERE dc.document_id = ?
+            ORDER BY c.name ASC, dc.id ASC
+        ");
+        $committeesStmt->execute([$documentId]);
+        $committees = $committeesStmt->fetchAll();
 
         // All attachments for this document
         $allAttachmentsStmt = $this->pdo->prepare("
@@ -752,6 +764,7 @@ class AdminFiledDocumentsController
                 da.sort_order,
                 pdd.authors_all,
                 pdd.co_authors_all,
+                sm.position AS member_position,
                 TRIM(CONCAT_WS(' ',
                     sm.first_name,
                     COALESCE(NULLIF(TRIM(sm.middle_name),''), NULL),
@@ -766,6 +779,16 @@ class AdminFiledDocumentsController
         ");
         $authorsStmt->execute([$documentId]);
         $authors = $this->markAllSelectedAuthorGroups($authorsStmt->fetchAll());
+
+        $committeesStmt = $this->pdo->prepare("
+            SELECT dc.committee_id, c.name AS committee_name
+            FROM document_committees dc
+            LEFT JOIN committees c ON c.id = dc.committee_id
+            WHERE dc.document_id = ?
+            ORDER BY c.name ASC, dc.id ASC
+        ");
+        $committeesStmt->execute([$documentId]);
+        $committees = $committeesStmt->fetchAll();
 
         // Final scans are uploaded when Plenary approves the document at second reading.
         $finalScannedAttachmentsStmt = $this->pdo->prepare("

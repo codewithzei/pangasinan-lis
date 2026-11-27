@@ -2,6 +2,8 @@
 ob_start();
 
 $document       = $document       ?? [];
+$authors        = $authors        ?? [];
+$committees     = $committees     ?? [];
 $attachments    = $attachments    ?? [];
 $routes         = $routes         ?? [];
 $checklistItems = $checklistItems ?? [];
@@ -209,6 +211,87 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                     </div>
                     <?php endif; ?>
                 </div>
+            </section>
+
+            <!-- Authors -->
+            <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Authors &amp; Sponsors</h2>
+                <?php if (!empty($authors)): ?>
+                    <div class="mt-5 space-y-5">
+                        <?php foreach ([
+                            ['AUTHOR', 'Authors / Sponsors', 'Author'],
+                            ['CO_AUTHOR', 'Co-authors / Co-sponsors', 'Co-Author'],
+                        ] as [$role, $groupLabel, $roleLabel]): ?>
+                            <?php
+                            $roleAuthors = array_values(array_filter(
+                                $authors,
+                                static fn(array $author): bool => $author['author_role'] === $role
+                            ));
+                            ?>
+                            <?php if (!empty($roleAuthors)): ?>
+                                <div>
+                                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                        <?= htmlspecialchars($groupLabel) ?>
+                                    </p>
+                                    <div class="space-y-2">
+                                        <?php if (!empty($roleAuthors[0]['is_all_selected'])): ?>
+                                            <div class="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                                                <div class="min-w-0">
+                                                    <p class="text-sm font-semibold text-gray-900">All</p>
+                                                </div>
+                                                <span class="ml-auto inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold <?= $role === 'CO_AUTHOR' ? 'bg-purple-50 text-purple-700' : 'bg-blue-50 text-blue-700' ?>">
+                                                    <?= htmlspecialchars($roleLabel) ?>
+                                                </span>
+                                            </div>
+                                        <?php else: ?>
+                                            <?php foreach ($roleAuthors as $rank => $author): ?>
+                                                <div class="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                                                    <span class="shrink-0 pt-0.5 text-xs font-semibold text-gray-500"><?= $rank + 1 ?>.</span>
+                                                    <div class="min-w-0">
+                                                        <p class="truncate text-sm font-semibold text-gray-900">
+                                                            <?= htmlspecialchars($author['full_name']) ?>
+                                                        </p>
+                                                        <?php if (!empty($author['member_position'])): ?>
+                                                            <p class="text-xs text-gray-500"><?= htmlspecialchars($author['member_position']) ?></p>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 p-4">
+                        <svg class="h-5 w-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        <p class="text-sm text-gray-400 italic">No authors have been assigned to this document.</p>
+                    </div>
+                <?php endif; ?>
+            </section>
+
+            <!-- Committees -->
+            <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Committees</h2>
+                <?php if (!empty($committees)): ?>
+                    <ul class="mt-3 divide-y divide-gray-100">
+                        <?php foreach ($committees as $committee): ?>
+                            <li class="py-3 first:pt-0 last:pb-0">
+                                <p class="break-words text-sm font-medium text-gray-900">
+                                    <?= htmlspecialchars($committee['committee_name'] ?? '—') ?>
+                                </p>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <div class="mt-3 border-t border-gray-100 pt-3">
+                        <p class="text-sm text-gray-500">No committees have been assigned to this document.</p>
+                    </div>
+                <?php endif; ?>
             </section>
 
             <!-- Attachments -->

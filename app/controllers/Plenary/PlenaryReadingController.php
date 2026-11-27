@@ -164,6 +164,7 @@ class PlenaryReadingController
         $docCommittees   = $this->fetchDocumentCommittees($documentId);
         $committees      = $this->fetchCommittees($documentId);
         $events          = $this->fetchEvents($documentId);
+        $assignments     = $this->fetchAllAssignments($documentId);
         $existingReading = $this->fetchReading($documentId, 1);
         $documentAttachments = $this->fetchDocumentAttachments($documentId);
 

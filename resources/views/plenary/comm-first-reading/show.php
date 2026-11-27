@@ -37,23 +37,39 @@ ob_start();
 ?>
 
 <div class="detail-page space-y-6">
-    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
-
-
-
     <!-- Back + title -->
-    <div class="flex items-center gap-4">
-        <a href="<?= BASE_URL ?>/plenary/first-reading"
-           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-        </a>
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Plenary / Communication First Reading</p>
-            <h1 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($trackingNumber) ?></h1>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex items-center gap-3 px-5 py-6 sm:px-8 sm:py-7">
+            <a href="<?= BASE_URL ?>/plenary/first-reading"
+               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white
+                      transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+               aria-label="Back to First Reading">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">DOCUMENT DETAILS</p>
+                <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl"><?= htmlspecialchars($trackingNumber) ?></h1>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <?php if (!empty($resubmissionReference)): ?>
+                        <span class="inline-flex rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white">Resubmission</span>
+                    <?php endif; ?>
+                    <?php if (!empty($relatedResubmissions)): ?>
+                        <span class="inline-flex rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white">Submission history · <?= count($relatedResubmissions) ?></span>
+                    <?php endif; ?>
+                    <?php if (!empty($mfrLink)): ?>
+                        <span class="inline-flex rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white">Linked case</span>
+                    <?php endif; ?>
+                    <?php if (!empty($relatedMotions)): ?>
+                        <span class="inline-flex rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white">Linked motions · <?= count($relatedMotions) ?></span>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
-    </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
+    </section>
 
     <?php if (!empty($success ?? null)): ?>
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars((string) $success) ?></div>
@@ -67,38 +83,40 @@ ob_start();
         </div>
     <?php endif; ?>
 
+    <?php
+    $resubmissionTopMargin = 'mt-0';
+    require __DIR__ . '/../../partials/resubmission-relationship.php';
+    unset($resubmissionTopMargin);
+    $mfrRelationshipTopMargin = 'mt-0';
+    $mfrDetailRoute = 'plenary/comm-first-reading';
+    require __DIR__ . '/../../partials/mfr-relationship.php';
+    unset($mfrRelationshipTopMargin);
+    ?>
+
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
         <!-- Left: Document info -->
         <div class="lg:col-span-1 space-y-4">
-            <?php
-// MFR relationship links — Comm First Reading shows the original case link when this is an MFR
-$mfrDetailRoute = 'plenary/comm-first-reading';
-require __DIR__ . '/../../partials/resubmission-relationship.php';
-require __DIR__ . '/../../partials/mfr-relationship.php';
-?>
-
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Communication</h2>
+                <h2 class="text-base font-semibold text-gray-900">Document Information</h2>
                 <div>
-                    <p class="text-xs text-gray-400">Tracking Number</p>
-                    <p class="text-sm font-mono font-medium text-gray-900"><?= htmlspecialchars($trackingNumber) ?></p>
+                    <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Tracking Number</p>
+                    <p class="mt-1 text-sm font-mono font-semibold text-gray-900"><?= htmlspecialchars($trackingNumber) ?></p>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-400">Subject Matter</p>
-                    <p class="text-sm text-gray-800 leading-5"><?= htmlspecialchars($subjectMatter) ?></p>
+                    <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Subject Matter</p>
+                    <p class="mt-1 whitespace-pre-wrap text-sm leading-6 text-gray-900"><?= htmlspecialchars($subjectMatter) ?></p>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-400">Date Received</p>
-                    <p class="text-sm text-gray-800"><?= !empty($document['date_received']) ? htmlspecialchars(date('F j, Y', strtotime($document['date_received']))) : '—' ?></p>
-                </div>
-                <div>
-                    <p class="text-xs text-gray-400">Time Received</p>
-                    <p class="text-sm text-gray-800"><?= !empty($document['time_received']) ? htmlspecialchars(date('g:i A', strtotime($document['time_received']))) : '—' ?></p>
+                    <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Date &amp; Time Received</p>
+                    <p class="mt-1 text-sm text-gray-900">
+                        <?= !empty($document['date_received']) ? htmlspecialchars(date('F j, Y', strtotime($document['date_received']))) : '—' ?>
+                        · <?= !empty($document['time_received']) ? htmlspecialchars(date('g:i A', strtotime($document['time_received']))) : '—' ?>
+                    </p>
                 </div>
                 <?php if (!empty($document['document_type_name'])): ?>
                 <div>
-                    <p class="text-xs text-gray-400">Document Type</p>
+                    <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Document Type</p>
                     <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
                           style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
                                  color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
@@ -107,33 +125,29 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                 </div>
                 <?php endif; ?>
                 <div>
-                    <p class="text-xs text-gray-400">Source Type</p>
-                    <p class="text-sm text-gray-800"><?= htmlspecialchars($document['source_type_name'] ?: '—') ?></p>
-                </div>
-                <?php if (!empty($document['source_name'])): ?>
-                <div>
-                    <p class="text-xs text-gray-400">Source / Originating Office</p>
-                    <p class="text-sm text-gray-800 whitespace-pre-wrap"><?= htmlspecialchars($document['source_name']) ?></p>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($targetDate)): ?>
-                <div>
-                    <p class="text-xs text-gray-400">Target First Reading Date</p>
-                    <p class="text-sm text-gray-800"><?= htmlspecialchars(date('F j, Y', strtotime($targetDate))) ?></p>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($document['status'])): ?>
-                <div>
-                    <p class="text-xs text-gray-400">Status</p>
-                    <?php $bc = $document['status_badge_color'] ?? '#6B7280'; ?>
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                          style="background-color: <?= htmlspecialchars($bc) ?>1a; color: <?= htmlspecialchars($bc) ?>;">
-                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($bc) ?>;"></span>
-                        <?= htmlspecialchars($document['status'] ?? '') ?>
+                    <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Current Status</p>
+                    <?php $communicationStatusColor = $document['status_badge_color'] ?? '#6B7280'; ?>
+                    <span class="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                          style="background-color: <?= htmlspecialchars($communicationStatusColor) ?>1a; color: <?= htmlspecialchars($communicationStatusColor) ?>;">
+                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($communicationStatusColor) ?>;"></span>
+                        <?= htmlspecialchars($document['status'] ?? $document['status_name'] ?? 'Awaiting First Reading') ?>
                     </span>
                 </div>
+                <?php if (!empty($document['current_phase'])): ?>
+                    <div>
+                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Current Phase</p>
+                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $document['current_phase'])))) ?></p>
+                    </div>
+                <?php endif; ?>
+                <?php if (!empty($targetDate)): ?>
+                    <div>
+                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Target First Reading Date</p>
+                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars(date('F j, Y', strtotime($targetDate))) ?></p>
+                    </div>
                 <?php endif; ?>
             </div>
+
+            <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
             <!-- Uploaded documents -->
             <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
@@ -453,7 +467,7 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            Record First Reading Action
+                            Record Action
                         </button>
                         <a href="<?= BASE_URL ?>/plenary/first-reading"
                            class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium
