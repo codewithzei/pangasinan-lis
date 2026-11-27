@@ -389,6 +389,7 @@ ob_start();
             <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
                   style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>1a;
                          color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;">
+                <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;"></span>
                 <?= htmlspecialchars($document['status_name'] ?? 'Finalized') ?>
             </span>
         </div>

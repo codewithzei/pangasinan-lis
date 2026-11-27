@@ -145,6 +145,7 @@ ob_start();
 ?>
 
 <div class="detail-page flex min-w-0 flex-col space-y-5 sm:space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
     <!-- Back + Page header --------------------------------------------------->
     <div class="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
@@ -220,10 +221,10 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                 <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Status</dt>
                 <dd class="mt-1">
                     <?php $bc = $document['status_badge_color'] ?? '#6B7280'; ?>
-                    <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold"
-                          style="background-color: <?= htmlspecialchars($bc) ?>;
-                                 border-color: <?= htmlspecialchars($bc) ?>;
-                                 color: white;">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                          style="background-color: <?= htmlspecialchars($bc) ?>1a;
+                                 color: <?= htmlspecialchars($bc) ?>;">
+                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($bc) ?>;"></span>
                         <?= htmlspecialchars($document['status_name'] ?? 'Unknown') ?>
                     </span>
                 </dd>
@@ -407,29 +408,6 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                 </span>
                 <h2 class="text-base font-semibold text-indigo-900">Pre-Decision Status</h2>
             </div>
-
-            <?php if ($plenaryDetails): ?>
-                <!-- Current status summary (shared document status, synchronized with Plenary) -->
-                <div class="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 p-4">
-                    <div class="flex flex-wrap items-center gap-3">
-                        <span class="text-xs font-semibold uppercase tracking-wide text-indigo-500">Current Status:</span>
-                        <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold"
-                              style="background-color: <?= htmlspecialchars($displayStatusBadgeColor) ?>1a;
-                                     color: <?= htmlspecialchars($displayStatusBadgeColor) ?>;
-                                     border-color: <?= htmlspecialchars($displayStatusBadgeColor) ?>40;">
-                            <?= htmlspecialchars($displayStatusName) ?>
-                        </span>
-                        <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                            Already recorded
-                        </span>
-                        <?php if (!empty($plenaryDetails['remarks'])): ?>
-                            <span class="text-xs text-indigo-600 italic">
-                                "<?= htmlspecialchars(mb_strimwidth($plenaryDetails['remarks'], 0, 80, '…')) ?>"
-                            </span>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php endif; ?>
 
             <?php if ($hasRecordedPreDecision): ?>
                 <p class="text-sm text-gray-600">

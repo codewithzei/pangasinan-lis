@@ -22,21 +22,14 @@ ob_start();
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-7 sm:px-8">
             <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                <div class="flex items-start gap-4">
-                    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/5 text-blue-100">
-                        <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM19.4 15a1.7 1.7 0 00.34 1.88l.06.06-1.7 2.94-.08-.02a1.7 1.7 0 00-1.78.67l-.05.07h-3.4l-.05-.07a1.7 1.7 0 00-1.78-.67l-.08.02-1.7-2.94.06-.06A1.7 1.7 0 009.6 15l-.08-.04v-3.4l.08-.04a1.7 1.7 0 00-.34-1.88l-.06-.06 1.7-2.94.08.02a1.7 1.7 0 001.78-.67l.05-.07h3.4l.05.07a1.7 1.7 0 001.78.67l.08-.02 1.7 2.94-.06.06A1.7 1.7 0 0019.6 11l.08.04v3.4l-.28.56z"/>
-                        </svg>
-                    </div>
-                    <div class="max-w-3xl">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Master Control Panel</p>
-                        <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                            Welcome, <?= htmlspecialchars($userName) ?>
-                        </h1>
-                        <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
-                            Manage system access, monitor platform activity, review audit trails, and oversee legislative configuration.
-                        </p>
-                    </div>
+                <div class="max-w-3xl">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Master Control Panel</p>
+                    <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                        Welcome, <?= htmlspecialchars($userName) ?>
+                    </h1>
+                    <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
+                        Manage system access, monitor platform activity, review audit trails, and oversee legislative configuration.
+                    </p>
                 </div>
                 <div class="flex items-center gap-3 border-t border-white/15 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
                     <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-300 ring-4 ring-emerald-300/20"></span>

@@ -55,6 +55,10 @@ class AdminRoutedDocumentController
         $search         = trim($_GET['search']   ?? '');
         $filterStatus   = trim($_GET['status']   ?? '');
         $filterDivision = trim($_GET['division'] ?? '');
+        $filterTab      = trim($_GET['tab']      ?? 'ongoing');
+        if (!in_array($filterTab, ['ongoing', 'completed', 'withdrawn'], true)) {
+            $filterTab = 'ongoing';
+        }
 
         // -----------------------------------------------------------------------
         // Strategy: one row per LATEST valid outbound route event by this Admin.
@@ -84,6 +88,45 @@ class AdminRoutedDocumentController
         if ($filterDivision !== '') {
             $filterConditions[] = 'd.current_phase = ?';
             $filterParams[] = $filterDivision;
+        }
+
+        $completedCondition = "(
+            d.current_phase IN ('FINALIZED', 'FILED')
+            OR LOWER(COALESCE(ds.name, '')) LIKE '%finalized%'
+            OR LOWER(COALESCE(ds.name, '')) IN ('approved', 'second reading approved', 'filed')
+        )";
+        $withdrawnCondition = "LOWER(COALESCE(ds.name, '')) LIKE '%withdrawn%'";
+        $baseFilterConditions = $filterConditions;
+        $baseFilterParams = $filterParams;
+        $baseExtraWhere = count($baseFilterConditions)
+            ? 'AND ' . implode(' AND ', $baseFilterConditions)
+            : '';
+        $tabCountsStmt = $this->pdo->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN NOT ({$completedCondition}) AND NOT ({$withdrawnCondition}) THEN 1 ELSE 0 END), 0) AS ongoing,
+                COALESCE(SUM(CASE WHEN ({$completedCondition}) AND NOT ({$withdrawnCondition}) THEN 1 ELSE 0 END), 0) AS completed,
+                COALESCE(SUM(CASE WHEN {$withdrawnCondition} THEN 1 ELSE 0 END), 0) AS withdrawn
+            FROM (
+                SELECT dr.document_id
+                FROM document_routes dr
+                WHERE dr.routed_by  = ?
+                  AND dr.from_phase = 'ADMIN'
+                  AND dr.to_phase   IN ('SP_SECRETARY', 'PLENARY', 'COMMITTEE')
+                GROUP BY dr.document_id
+            ) sub
+            INNER JOIN documents d ON d.id = sub.document_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            WHERE 1=1 {$baseExtraWhere}
+        ");
+        $tabCountsStmt->execute([$authUserId, ...$baseFilterParams]);
+        $tabCounts = $tabCountsStmt->fetch();
+
+        if ($filterTab === 'completed') {
+            $filterConditions[] = "({$completedCondition}) AND NOT ({$withdrawnCondition})";
+        } elseif ($filterTab === 'withdrawn') {
+            $filterConditions[] = $withdrawnCondition;
+        } else {
+            $filterConditions[] = "NOT ({$completedCondition}) AND NOT ({$withdrawnCondition})";
         }
 
         $extraWhere = count($filterConditions)
@@ -353,6 +396,26 @@ class AdminRoutedDocumentController
         ");
         $routesStmt->execute([$documentId]);
         $routes = $routesStmt->fetchAll();
+
+        $assignmentsStmt = $this->pdo->prepare("
+            SELECT
+                da.*,
+                r.name AS role_name,
+                assigned.username AS assigned_to_username,
+                assigner.username AS assigned_by_username,
+                accepted.username AS accepted_by_username,
+                CONCAT(COALESCE(accepted_info.first_name, ''), ' ', COALESCE(accepted_info.last_name, '')) AS accepted_by_fullname
+            FROM document_assignments da
+            LEFT JOIN roles r ON r.id = da.assigned_to_role_id
+            LEFT JOIN user_accounts assigned ON assigned.id = da.assigned_to_user_id
+            LEFT JOIN user_accounts assigner ON assigner.id = da.assigned_by
+            LEFT JOIN user_accounts accepted ON accepted.id = da.accepted_by
+            LEFT JOIN user_info accepted_info ON accepted_info.user_account_id = accepted.id
+            WHERE da.document_id = ?
+            ORDER BY da.created_at ASC, da.id ASC
+        ");
+        $assignmentsStmt->execute([$documentId]);
+        $assignments = $assignmentsStmt->fetchAll();
 
         // Checklist items
         $checklistStmt = $this->pdo->prepare("

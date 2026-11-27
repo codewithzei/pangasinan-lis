@@ -162,9 +162,9 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
     <!-- Document List -->
     <section class="rounded-2xl border border-gray-200 bg-white">
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-                <h2 class="font-semibold text-gray-900">
-                    <?= $tab === 'returned' ? 'Returned by Committee' : 'With Committee' ?>
+            <div class="shrink-0">
+                <h2 class="whitespace-nowrap text-sm font-semibold text-gray-900">
+                    <?= $tab === 'returned' ? 'Returned by Committee' : 'In Committee' ?>
                 </h2>
                 <p class="mt-1 text-xs text-gray-500"><?= $total ?> record<?= $total !== 1 ? 's' : '' ?> found</p>
             </div>
@@ -197,14 +197,14 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full min-w-[1050px] table-fixed text-left text-sm">
+            <table class="w-full table-fixed text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="w-[16%] px-5 py-3 font-medium">Tracking Number</th>
-                        <th class="w-[34%] px-5 py-3 font-medium">Subject Matter</th>
-                        <th class="w-[20%] px-5 py-3 font-medium">Committee(s)</th>
-                        <th class="w-[12%] px-5 py-3 font-medium">Hearing Status</th>
-                        <th class="w-[18%] px-5 py-3 font-medium text-right">Action</th>
+                        <th class="w-[16%] px-4 py-3 font-medium">Tracking Number</th>
+                        <th class="w-[32%] px-4 py-3 font-medium">Subject Matter</th>
+                        <th class="w-[18%] px-4 py-3 font-medium">Committee(s)</th>
+                        <th class="w-[14%] px-4 py-3 font-medium">Hearing Status</th>
+                        <th class="w-[20%] px-4 py-3 font-medium text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -247,9 +247,9 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                 $detailUrl = rtcBuildDetailUrl((int) $row['document_id'], $tab, $page, $search, $documentTypeId);
                             ?>
                             <tr class="hover:bg-gray-50/50 transition">
-                                <td class="px-6 py-4">
-                                    <a href="<?= htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') ?>" class="font-medium text-gray-900 hover:text-primary hover:underline"><?= htmlspecialchars($row['tracking_number']) ?></a>
-                                    <div class="text-xs text-gray-500">
+                                <td class="px-4 py-4">
+                                    <a href="<?= htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') ?>" class="text-sm font-medium text-gray-900 hover:text-primary hover:underline"><?= htmlspecialchars($row['tracking_number']) ?></a>
+                                    <div class="mt-0.5 text-xs text-gray-500">
                                         <?php if (!empty($row['proposed_number'])): ?>
                                             <?= htmlspecialchars($row['proposed_number']) ?> ·
                                         <?php endif; ?>
@@ -259,9 +259,9 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                         <div class="mt-1 text-xs text-gray-400">Accepted by <?= htmlspecialchars($row['accepted_by_username']) ?></div>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-6 py-4">
+                                <td class="px-4 py-4">
                                     <div class="max-w-2xl">
-                                        <p class="whitespace-pre-wrap break-words text-base font-semibold leading-6 text-gray-900"><?= htmlspecialchars($row['subject_matter']) ?></p>
+                                        <p class="whitespace-pre-wrap break-words text-sm font-medium leading-5 text-gray-900"><?= htmlspecialchars($row['subject_matter']) ?></p>
                                         <?php if (!empty($row['document_type_name'])): ?>
                                             <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
                                                   style="background-color: <?= htmlspecialchars($typeColor) ?>1a; color: <?= htmlspecialchars($typeColor) ?>;">
@@ -274,9 +274,9 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                     $committeeNames = array_values(array_filter(array_map('trim', explode(',', (string) ($row['committee_names'] ?? '')))));
                                     $committeeCount = count($committeeNames);
                                 ?>
-                                <td class="px-6 py-4">
+                                <td class="px-4 py-4">
                                     <?php if ($committeeCount > 0): ?>
-                                        <div class="font-medium text-gray-800" title="<?= htmlspecialchars(implode(', ', $committeeNames), ENT_QUOTES, 'UTF-8') ?>">
+                                        <div class="text-sm font-medium text-gray-800" title="<?= htmlspecialchars(implode(', ', $committeeNames), ENT_QUOTES, 'UTF-8') ?>">
                                             <?= htmlspecialchars($committeeNames[0]) ?>
                                             <?php if ($committeeCount > 1): ?>
                                                 <span class="ml-1 text-xs font-medium text-gray-500">+<?= $committeeCount - 1 ?> others</span>
@@ -286,15 +286,16 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                         <span class="text-xs italic text-gray-400">—</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="px-6 py-4">
+                                <td class="px-4 py-4">
                                     <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
                                           style="background-color: <?= htmlspecialchars($committeeOutcomeColor) ?>1a; color: <?= htmlspecialchars($committeeOutcomeColor) ?>;">
                                         <?= htmlspecialchars($committeeOutcomeLabel) ?>
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-right">
+                                <td class="px-4 py-4">
+                                    <div class="flex flex-col items-end gap-2">
                                     <a href="<?= htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                       class="mb-2 ml-auto flex w-fit items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+                                       class="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
                                        aria-label="View legislative history for <?= htmlspecialchars($row['tracking_number'], ENT_QUOTES, 'UTF-8') ?>">
                                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -308,7 +309,7 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                             <!-- Cases/Petitions returned from Committee: Adopt Committee Report -->
                                             <button type="button"
                                                     onclick="openAdoptCasesModal(<?= (int) $row['document_id'] ?>, <?= htmlspecialchars(json_encode((string) $row['tracking_number'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"
-                                                    class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+                                                    class="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-2 py-1.5 text-center text-xs font-semibold text-white hover:bg-indigo-700 transition"
                                                     aria-label="Adopt Committee Report for <?= htmlspecialchars($row['tracking_number']) ?>">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -319,7 +320,7 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                             <!-- Communication returned from Committee: Adopt Committee Report -->
                                             <button type="button"
                                                     onclick="openAdoptModal(<?= (int) $row['document_id'] ?>, <?= htmlspecialchars(json_encode((string) $row['tracking_number'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= !empty($row['is_mfr']) ? 'true' : 'false' ?>)"
-                                                    class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition">
+                                                    class="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2 py-1.5 text-center text-xs font-semibold text-white hover:bg-emerald-700 transition">
                                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                                 </svg>
@@ -328,7 +329,7 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                         <?php else: ?>
                                             <!-- Adoption follows the latest Committee hearing outcome. -->
                                             <button type="button"
-                                                    class="open-report-adoption-confirmation inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition <?= $hearingApproved ? 'bg-violet-600 text-white hover:bg-violet-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50' ?>"
+                                                    class="open-report-adoption-confirmation inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition <?= $hearingApproved ? 'bg-violet-600 text-white hover:bg-violet-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50' ?>"
                                                     data-document-id="<?= (int) $row['document_id'] ?>"
                                                     data-decision="<?= $hearingApproved ? 'APPROVED' : 'DISAPPROVED' ?>"
                                                     data-tracking-number="<?= htmlspecialchars($row['tracking_number'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
@@ -343,13 +344,14 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                             </button>
                                         <?php endif; ?>
                                     <?php else: ?>
-                                        <span class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-400">
+                                        <span class="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-center text-xs font-medium text-gray-400">
                                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                             </svg>
                                             In Committee
                                         </span>
                                     <?php endif; ?>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -595,24 +597,23 @@ ob_start();
                      role="button"
                      tabindex="0"
                      aria-label="Drop final output files here or click to browse"
-                     class="relative flex flex-col items-center justify-center gap-2
+                     class="relative flex h-32 w-full flex-col items-center justify-center gap-2
                             rounded-xl border-2 border-dashed border-gray-300 bg-gray-50
-                            px-6 py-6 text-center transition
-                            hover:border-primary hover:bg-primary/5
+                            px-4 text-center transition hover:bg-gray-100
                             focus:outline-none focus:ring-2 focus:ring-primary/40
                             cursor-pointer">
 
-                    <svg class="h-7 w-7 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <svg class="h-8 w-8 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                     </svg>
 
-                    <p class="text-sm font-medium text-gray-700 pointer-events-none">
-                        Drag &amp; drop files here, or
+                    <p class="mb-1 text-sm text-gray-600 pointer-events-none">
+                        <span class="font-semibold">Click to upload</span> or drag and drop
                         <span class="text-primary underline-offset-2 hover:underline">browse</span>
                     </p>
-                    <p class="text-xs text-gray-400 pointer-events-none">
-                        Up to 10 files · max 25 MB each · PDF, DOC, DOCX, XLS, XLSX, JPG, PNG
+                    <p class="text-xs text-gray-500 pointer-events-none">
+                        PDF, Word, Excel, images (MAX. 25 MB each)
                     </p>
 
                     <div id="adopt-drag-overlay"
@@ -1095,24 +1096,23 @@ ob_start();
                      role="button"
                      tabindex="0"
                      aria-label="Drop committee report files here or click to browse"
-                     class="relative flex flex-col items-center justify-center gap-2
+                     class="relative flex h-32 w-full flex-col items-center justify-center gap-2
                             rounded-xl border-2 border-dashed border-gray-300 bg-gray-50
-                            px-6 py-6 text-center transition
-                            hover:border-primary hover:bg-primary/5
+                            px-4 text-center transition hover:bg-gray-100
                             focus:outline-none focus:ring-2 focus:ring-primary/40
                             cursor-pointer">
 
-                    <svg class="h-7 w-7 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <svg class="h-8 w-8 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                     </svg>
 
-                    <p class="text-sm font-medium text-gray-700 pointer-events-none">
-                        Drag &amp; drop files here, or
+                    <p class="mb-1 text-sm text-gray-600 pointer-events-none">
+                        <span class="font-semibold">Click to upload</span> or drag and drop
                         <span class="text-primary underline-offset-2 hover:underline">browse</span>
                     </p>
-                    <p class="text-xs text-gray-400 pointer-events-none">
-                        Up to 10 files · max 25 MB each · PDF, DOC, DOCX, XLS, XLSX, JPG, PNG
+                    <p class="text-xs text-gray-500 pointer-events-none">
+                        PDF, Word, Excel, images (MAX. 25 MB each)
                     </p>
 
                     <div id="adopt-cases-drag-overlay"

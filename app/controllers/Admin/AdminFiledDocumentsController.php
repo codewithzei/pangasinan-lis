@@ -20,6 +20,7 @@ require_once __DIR__ . '/../../services/DocumentService.php';
 class AdminFiledDocumentsController
 {
     protected PDO $pdo;
+    private ?array $activeSpMemberIds = null;
 
     public function __construct()
     {
@@ -119,6 +120,8 @@ class AdminFiledDocumentsController
                 dt.badge_color     AS document_type_badge_color,
                 da_appr.approved_number,
                 da_appr.date_approved,
+                pdd.authors_all,
+                pdd.co_authors_all,
                 df.id              AS filing_id,
                 df.description     AS filing_description,
                 df.tags            AS filing_tags_json,
@@ -128,6 +131,7 @@ class AdminFiledDocumentsController
             FROM documents d
             LEFT JOIN document_types     dt      ON dt.id      = d.document_type_id
             LEFT JOIN document_approvals da_appr ON da_appr.document_id = d.id
+            LEFT JOIN plenary_document_details pdd ON pdd.document_id = d.id
             INNER JOIN document_filings  df      ON df.document_id = d.id
             LEFT JOIN user_accounts      filer   ON filer.id = df.filed_by
             WHERE d.current_phase = 'FILED'
@@ -397,8 +401,13 @@ class AdminFiledDocumentsController
                 h.name             AS hospital_name,
                 m.name             AS municipality_name,
                 m.type             AS municipality_type,
+                district.name      AS district_name,
                 creator.username   AS created_by_username,
+                creator.email      AS created_by_email,
                 updater.username   AS updated_by_username,
+                updater.email      AS updated_by_email,
+                owner.username     AS current_owner_username,
+                owner.email        AS current_owner_email,
                 da_appr.approved_number,
                 da_appr.date_approved
             FROM documents d
@@ -408,8 +417,10 @@ class AdminFiledDocumentsController
             LEFT JOIN provincial_government_offices   eo      ON eo.id       = d.external_office_id
             LEFT JOIN hospitals          h       ON h.id        = d.hospital_id
             LEFT JOIN municities         m       ON m.id        = d.municipality_id
+            LEFT JOIN districts          district ON district.id = m.district_id
             LEFT JOIN user_accounts      creator ON creator.id  = d.created_by
             LEFT JOIN user_accounts      updater ON updater.id  = d.updated_by
+            LEFT JOIN user_accounts      owner   ON owner.id    = d.current_owner_user_id
             LEFT JOIN document_approvals da_appr ON da_appr.document_id = d.id
             WHERE d.id = ?
               AND d.current_phase = 'FINALIZED'
@@ -463,10 +474,77 @@ class AdminFiledDocumentsController
         $allAttachmentsStmt->execute([$documentId]);
         $allAttachments = $allAttachmentsStmt->fetchAll();
 
+        $routesStmt = $this->pdo->prepare("
+            SELECT
+                dr.id,
+                dr.from_phase,
+                dr.to_phase,
+                dr.remarks,
+                dr.created_at AS routed_at,
+                rb.username AS routed_by_username,
+                rr.name AS routed_to_role_name,
+                ro.name AS routing_option_name
+            FROM document_routes dr
+            LEFT JOIN user_accounts rb ON rb.id = dr.routed_by
+            LEFT JOIN roles rr ON rr.id = dr.routed_to_role_id
+            LEFT JOIN routing_options ro ON ro.id = dr.routing_option_id
+            WHERE dr.document_id = ?
+            ORDER BY dr.created_at ASC, dr.id ASC
+        ");
+        $routesStmt->execute([$documentId]);
+        $routes = $routesStmt->fetchAll();
+
+        $assignmentsStmt = $this->pdo->prepare("
+            SELECT
+                da.*,
+                r.name AS role_name,
+                assigned.username AS assigned_to_username,
+                assigner.username AS assigned_by_username,
+                accepted.username AS accepted_by_username,
+                CONCAT(COALESCE(accepted_info.first_name, ''), ' ', COALESCE(accepted_info.last_name, '')) AS accepted_by_fullname
+            FROM document_assignments da
+            LEFT JOIN roles r ON r.id = da.assigned_to_role_id
+            LEFT JOIN user_accounts assigned ON assigned.id = da.assigned_to_user_id
+            LEFT JOIN user_accounts assigner ON assigner.id = da.assigned_by
+            LEFT JOIN user_accounts accepted ON accepted.id = da.accepted_by
+            LEFT JOIN user_info accepted_info ON accepted_info.user_account_id = accepted.id
+            WHERE da.document_id = ?
+            ORDER BY da.created_at ASC, da.id ASC
+        ");
+        $assignmentsStmt->execute([$documentId]);
+        $assignments = $assignmentsStmt->fetchAll();
+
+        $checklistStmt = $this->pdo->prepare("
+            SELECT
+                dci.id,
+                dci.is_completed,
+                dci.completed_at,
+                c.name AS checklist_name,
+                c.description AS checklist_description,
+                cu.username AS completed_by_username
+            FROM document_checklist_items dci
+            INNER JOIN checklists c ON c.id = dci.checklist_id
+            LEFT JOIN user_accounts cu ON cu.id = dci.completed_by
+            WHERE dci.document_id = ?
+            ORDER BY c.name ASC
+        ");
+        $checklistStmt->execute([$documentId]);
+        $checklistItems = $checklistStmt->fetchAll();
+
         $docService = new DocumentService($this->pdo);
+        $documentEvents = $docService->getDocumentEvents($documentId);
         $resubmissionReference = $docService->getResubmissionReference($documentId);
         $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
         $resubmissionDetailRoute = 'admin/routed';
+        $mfrLink = null;
+        $relatedMotions = [];
+        $documentTypeName = $document['document_type_name'] ?? '';
+        if ($documentTypeName === DocumentService::mfrTypeName()) {
+            $mfrLink = $docService->getMotionLink($documentId);
+        } elseif (in_array($documentTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
+            $relatedMotions = $docService->getRelatedMotions($documentId);
+        }
+        $mfrDetailRoute = 'admin/routed';
 
         $pageTitle    = 'Finalized Document Details';
         $pageSubtitle = $document['tracking_number'];
@@ -619,8 +697,13 @@ class AdminFiledDocumentsController
                 h.name             AS hospital_name,
                 m.name             AS municipality_name,
                 m.type             AS municipality_type,
+                district.name      AS district_name,
                 creator.username   AS created_by_username,
+                creator.email      AS created_by_email,
                 updater.username   AS updated_by_username,
+                updater.email      AS updated_by_email,
+                owner.username     AS current_owner_username,
+                owner.email        AS current_owner_email,
                 da_appr.approved_number,
                 da_appr.date_approved,
                 df.id              AS filing_id,
@@ -636,8 +719,10 @@ class AdminFiledDocumentsController
             LEFT JOIN provincial_government_offices   eo      ON eo.id       = d.external_office_id
             LEFT JOIN hospitals          h       ON h.id        = d.hospital_id
             LEFT JOIN municities         m       ON m.id        = d.municipality_id
+            LEFT JOIN districts          district ON district.id = m.district_id
             LEFT JOIN user_accounts      creator ON creator.id  = d.created_by
             LEFT JOIN user_accounts      updater ON updater.id  = d.updated_by
+            LEFT JOIN user_accounts      owner   ON owner.id    = d.current_owner_user_id
             LEFT JOIN document_approvals da_appr ON da_appr.document_id = d.id
             LEFT JOIN document_filings   df      ON df.document_id      = d.id
             LEFT JOIN user_accounts      filer   ON filer.id    = df.filed_by
@@ -682,39 +767,28 @@ class AdminFiledDocumentsController
         $authorsStmt->execute([$documentId]);
         $authors = $this->markAllSelectedAuthorGroups($authorsStmt->fetchAll());
 
-        // Filing attachments (via join table for precision, fallback to phase/type)
-        $filingId = (int) ($document['filing_id'] ?? 0);
-
-        if ($filingId > 0) {
-            $attachStmt = $this->pdo->prepare("
-                SELECT
-                    da.id,
-                    da.file_name,
-                    da.stored_path,
-                    da.mime_type,
-                    da.file_size,
-                    da.phase,
-                    da.attachment_type,
-                    da.created_at
-                FROM document_filing_attachments dfa
-                INNER JOIN document_attachments da ON da.id = dfa.attachment_id
-                WHERE dfa.filing_id = ?
-                ORDER BY da.created_at ASC
-            ");
-            $attachStmt->execute([$filingId]);
-        } else {
-            // Fallback: attachments for this document in FILED phase
-            $attachStmt = $this->pdo->prepare("
-                SELECT id, file_name, stored_path, mime_type, file_size,
-                       phase, attachment_type, created_at
-                FROM document_attachments
-                WHERE document_id     = ?
-                  AND attachment_type = 'FILING_FILE'
-                ORDER BY created_at ASC
-            ");
-            $attachStmt->execute([$documentId]);
-        }
-        $filingAttachments = $attachStmt->fetchAll();
+        // Final scans are uploaded when Plenary approves the document at second reading.
+        $finalScannedAttachmentsStmt = $this->pdo->prepare("
+            SELECT
+                psraf.id,
+                psraf.original_filename AS file_name,
+                psraf.file_path AS stored_path,
+                psraf.mime_type,
+                psraf.file_size,
+                'PLENARY' AS phase,
+                'APPROVAL_FILE' AS attachment_type,
+                psraf.uploaded_at AS created_at
+            FROM plenary_second_reading_approval_files psraf
+            INNER JOIN plenary_readings pr
+                ON pr.id = psraf.reading_id
+               AND pr.document_id = psraf.document_id
+               AND pr.reading_number = 2
+               AND pr.action = 'APPROVED'
+            WHERE psraf.document_id = ?
+            ORDER BY psraf.uploaded_at ASC, psraf.id ASC
+        ");
+        $finalScannedAttachmentsStmt->execute([$documentId]);
+        $finalScannedAttachments = $finalScannedAttachmentsStmt->fetchAll();
 
         // All document attachments (full history)
         $allAttachmentsStmt = $this->pdo->prepare("
@@ -727,11 +801,39 @@ class AdminFiledDocumentsController
         $allAttachmentsStmt->execute([$documentId]);
         $allAttachments = $allAttachmentsStmt->fetchAll();
 
+        $assignmentsStmt = $this->pdo->prepare("
+            SELECT
+                da.*,
+                r.name AS role_name,
+                assigned.username AS assigned_to_username,
+                assigner.username AS assigned_by_username,
+                accepted.username AS accepted_by_username,
+                CONCAT(COALESCE(accepted_info.first_name, ''), ' ', COALESCE(accepted_info.last_name, '')) AS accepted_by_fullname
+            FROM document_assignments da
+            LEFT JOIN roles r ON r.id = da.assigned_to_role_id
+            LEFT JOIN user_accounts assigned ON assigned.id = da.assigned_to_user_id
+            LEFT JOIN user_accounts assigner ON assigner.id = da.assigned_by
+            LEFT JOIN user_accounts accepted ON accepted.id = da.accepted_by
+            LEFT JOIN user_info accepted_info ON accepted_info.user_account_id = accepted.id
+            WHERE da.document_id = ?
+            ORDER BY da.created_at ASC, da.id ASC
+        ");
+        $assignmentsStmt->execute([$documentId]);
+        $assignments = $assignmentsStmt->fetchAll();
+
         $docService = new DocumentService($this->pdo);
         $documentEvents = $docService->getDocumentEvents($documentId);
         $resubmissionReference = $docService->getResubmissionReference($documentId);
         $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
         $resubmissionDetailRoute = 'admin/routed';
+        $mfrLink = null;
+        $relatedMotions = [];
+        $documentTypeName = $document['document_type_name'] ?? '';
+        if ($documentTypeName === DocumentService::mfrTypeName()) {
+            $mfrLink = $docService->getMotionLink($documentId);
+        } elseif (in_array($documentTypeName, DocumentService::mfrEligibleReferenceTypeNames(), true)) {
+            $relatedMotions = $docService->getRelatedMotions($documentId);
+        }
 
         $pageTitle    = 'Filed Document Details';
         $pageSubtitle = $document['tracking_number'];
@@ -790,40 +892,67 @@ class AdminFiledDocumentsController
             }
         }
 
-        // Fetch filing attachments
+        // Final scans are the approval files uploaded by Plenary at second reading.
         $attachStmt = $this->pdo->prepare("
-            SELECT da.id, da.file_name, da.stored_path, da.mime_type, da.file_size
-            FROM document_filing_attachments dfa
-            INNER JOIN document_attachments da ON da.id = dfa.attachment_id
-            WHERE dfa.filing_id = ?
-            ORDER BY da.created_at ASC
+            SELECT
+                psraf.id,
+                psraf.original_filename AS file_name,
+                psraf.file_path AS stored_path,
+                psraf.mime_type,
+                psraf.file_size
+            FROM plenary_second_reading_approval_files psraf
+            INNER JOIN plenary_readings pr
+                ON pr.id = psraf.reading_id
+               AND pr.document_id = psraf.document_id
+               AND pr.reading_number = 2
+               AND pr.action = 'APPROVED'
+            WHERE psraf.document_id = ?
+            ORDER BY psraf.uploaded_at ASC, psraf.id ASC
         ");
-        $attachStmt->execute([(int)$filing['id']]);
+        $attachStmt->execute([$documentId]);
         $attachments = $attachStmt->fetchAll();
 
         if (empty($attachments)) {
-            flash_set('error', 'No attachments found for this filing.');
+            flash_set('error', 'No Plenary approval attachments found for this document.');
             redirect("admin/filed/show?id={$documentId}");
         }
 
         // Single file: stream directly
         if (count($attachments) === 1) {
             $att      = $attachments[0];
-            $filePath = PUBLIC_PATH . '/' . $att['stored_path'];
+            $relativePath = str_replace('\\', '/', (string) $att['stored_path']);
+            $relativePath = ltrim($relativePath, '/');
+            $relativePath = preg_replace('#^(?:public/)+#i', '', $relativePath);
+            $filePath = PUBLIC_PATH . DIRECTORY_SEPARATOR
+                . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
             $realPath = realpath($filePath);
-            $realPub  = realpath(PUBLIC_PATH);
+            $realPublic = realpath(PUBLIC_PATH);
 
-            if ($realPath === false || $realPub === false || strpos($realPath, $realPub) !== 0) {
+            if ($realPath === false || !is_file($realPath) || !is_readable($realPath)) {
+                system_log('ERROR', 'Plenary final approval attachment missing on disk', [
+                    'attachment_id' => $att['id'],
+                    'document_id' => $documentId,
+                    'stored_path' => $att['stored_path'],
+                ]);
+                flash_set('error', 'The Plenary final approval file is missing from the server. Please restore or re-upload it.');
+                redirect("admin/filed/show?id={$documentId}");
+            }
+
+            $publicPrefix = $realPublic !== false
+                ? rtrim($realPublic, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR
+                : '';
+            $pathIsInsidePublic = $realPublic !== false
+                && $publicPrefix !== ''
+                && (DIRECTORY_SEPARATOR === '\\'
+                    ? strncasecmp($realPath, $publicPrefix, strlen($publicPrefix)) === 0
+                    : strncmp($realPath, $publicPrefix, strlen($publicPrefix)) === 0);
+
+            if (!$pathIsInsidePublic) {
                 flash_set('error', 'File access denied.');
                 redirect("admin/filed/show?id={$documentId}");
             }
 
-            if (!file_exists($filePath)) {
-                flash_set('error', 'Attachment file not found on disk.');
-                redirect("admin/filed/show?id={$documentId}");
-            }
-
-            log_file_download($att['file_name'], 'FilingAttachment', (string)$att['id'], $att['stored_path']);
+            log_file_download($att['file_name'], 'PlenarySecondReadingApprovalFile', (string)$att['id'], $att['stored_path']);
 
             $safe = preg_replace('/[^a-zA-Z0-9._\-]/', '_', $att['file_name']);
             header('Content-Type: '        . $att['mime_type']);
@@ -831,7 +960,7 @@ class AdminFiledDocumentsController
             header('Content-Length: '      . $att['file_size']);
             header('X-Content-Type-Options: nosniff');
             header('X-Frame-Options: DENY');
-            readfile($filePath);
+            readfile($realPath);
             exit;
         }
 
@@ -962,9 +1091,31 @@ class AdminFiledDocumentsController
 
     private function markAllSelectedAuthorGroups(array $authors): array
     {
+        if ($this->activeSpMemberIds === null) {
+            $this->activeSpMemberIds = array_map(
+                'intval',
+                $this->pdo->query("
+                SELECT sp_member_id
+                FROM sp_members
+                WHERE is_active = 1 AND is_deleted = 0
+                ")->fetchAll(PDO::FETCH_COLUMN)
+            );
+        }
+
+        $selectedByRole = [];
+
+        foreach ($authors as $author) {
+            $selectedByRole[$author['author_role']][] = (int) $author['sp_member_id'];
+        }
+
         foreach ($authors as &$author) {
             $allFlag = $author['author_role'] === 'AUTHOR' ? 'authors_all' : 'co_authors_all';
-            $author['is_all_selected'] = !empty($author[$allFlag]);
+            $selectedMemberIds = $selectedByRole[$author['author_role']] ?? [];
+            $author['is_all_selected'] = !empty($author[$allFlag])
+                || (
+                    !empty($this->activeSpMemberIds)
+                    && array_diff($this->activeSpMemberIds, $selectedMemberIds) === []
+                );
         }
         unset($author);
 

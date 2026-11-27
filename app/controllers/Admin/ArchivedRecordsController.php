@@ -57,7 +57,18 @@ class ArchivedRecordsController
         // ── Filters ──────────────────────────────────────────────────────────
         $search      = trim($_GET['search']   ?? '');
         $filterType  = trim($_GET['type']     ?? '');
-        $filterYear  = trim($_GET['year']     ?? '');
+        $filterFrom  = trim($_GET['date_from'] ?? '');
+        $filterTo    = trim($_GET['date_to']   ?? '');
+        $isValidDate = static function (string $date): bool {
+            $parsedDate = DateTime::createFromFormat('!Y-m-d', $date);
+            return $parsedDate !== false && $parsedDate->format('Y-m-d') === $date;
+        };
+        if ($filterFrom !== '' && !$isValidDate($filterFrom)) {
+            $filterFrom = '';
+        }
+        if ($filterTo !== '' && !$isValidDate($filterTo)) {
+            $filterTo = '';
+        }
 
         // ── Pagination ───────────────────────────────────────────────────────
         $page    = max(1, (int) ($_GET['page'] ?? 1));
@@ -110,9 +121,14 @@ class ArchivedRecordsController
             }
         }
 
-        if ($filterYear !== '' && is_numeric($filterYear)) {
-            $where[]  = 'YEAR(ar.date_approved) = ?';
-            $params[] = (int) $filterYear;
+        if ($filterFrom !== '') {
+            $where[]  = 'ar.date_approved >= ?';
+            $params[] = $filterFrom;
+        }
+
+        if ($filterTo !== '') {
+            $where[]  = 'ar.date_approved <= ?';
+            $params[] = $filterTo;
         }
 
         $whereClause = implode(' AND ', $where);
@@ -153,7 +169,15 @@ class ArchivedRecordsController
                  LEFT JOIN sp_members sm ON ara.sp_member_id = sm.sp_member_id
                  WHERE ara.archived_record_id = ar.id
                    AND ara.author_role = 'AUTHOR'
-                )                                                AS authors_summary
+                )                                                AS authors_summary,
+                (SELECT GROUP_CONCAT(
+                    COALESCE(CONCAT_WS(' ', sm.first_name, sm.last_name), ara.custom_author_name)
+                    ORDER BY ara.sort_order SEPARATOR ', ')
+                 FROM archived_records_authors ara
+                 LEFT JOIN sp_members sm ON ara.sp_member_id = sm.sp_member_id
+                 WHERE ara.archived_record_id = ar.id
+                   AND ara.author_role = 'CO_AUTHOR'
+                )                                                AS coauthors_summary
             FROM archived_records ar
             LEFT JOIN document_types dt ON ar.document_type_id = dt.id
             WHERE {$whereClause}
@@ -168,15 +192,24 @@ class ArchivedRecordsController
             "SELECT COUNT(*) FROM archived_records WHERE is_deleted = 0"
         )->fetchColumn();
 
+        $archiveStats = $this->pdo->query(
+            "SELECT
+                SUM(CASE WHEN ar.is_public = 1 THEN 1 ELSE 0 END) AS published_count,
+                SUM(CASE WHEN EXISTS (
+                    SELECT 1
+                    FROM archived_records_attachments ara
+                    WHERE ara.archived_record_id = ar.id
+                ) THEN 1 ELSE 0 END) AS records_with_attachments
+             FROM archived_records ar
+             WHERE ar.is_deleted = 0"
+        )->fetch();
+        $publishedCount = (int) ($archiveStats['published_count'] ?? 0);
+        $recordsWithAttachments = (int) ($archiveStats['records_with_attachments'] ?? 0);
+
         // Document types for filter dropdown
         $documentTypes = $this->pdo->query(
-            "SELECT id, name, badge_color FROM document_types WHERE is_active = 1 AND is_deleted = 0 ORDER BY name ASC"
+            "SELECT id, name, badge_color FROM document_types WHERE is_active = 1 AND is_deleted = 0 ORDER BY sort_order ASC, name ASC"
         )->fetchAll();
-
-        // Available years for filter
-        $years = $this->pdo->query(
-            "SELECT DISTINCT YEAR(date_approved) AS y FROM archived_records WHERE is_deleted = 0 ORDER BY y DESC"
-        )->fetchAll(PDO::FETCH_COLUMN);
 
         // Current-term SP members and committees for the create modal
         $spMembers = $this->pdo->query(
@@ -290,7 +323,7 @@ class ArchivedRecordsController
             "SELECT id, name, badge_color FROM document_types
              WHERE (is_active = 1 AND is_deleted = 0)
                 OR id = (SELECT document_type_id FROM archived_records WHERE id = ?)
-             ORDER BY name ASC"
+             ORDER BY sort_order ASC, name ASC"
         );
         $documentTypesStmt->execute([$id]);
         $documentTypes = $documentTypesStmt->fetchAll();
@@ -368,8 +401,8 @@ class ArchivedRecordsController
             $stmt = $this->pdo->prepare("
                 INSERT INTO archived_records
                     (approved_no, date_approved, subject_matter, description, tags,
-                     document_type_id, custom_document_type_name, created_by, updated_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     document_type_id, custom_document_type_name, is_public, created_by, updated_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
                 $data['approved_no'],
@@ -379,6 +412,7 @@ class ArchivedRecordsController
                 $data['tags'] ?: null,
                 $data['document_type_id'],
                 $data['custom_document_type_name'],
+                $data['is_public'],
                 $userId,
                 $userId,
             ]);
@@ -397,6 +431,7 @@ class ArchivedRecordsController
 
             audit_log('CREATE', 'archived_records', (string) $recordId, null, [
                 'approved_no' => $data['approved_no'],
+                'is_public'   => $data['is_public'],
             ], null, $userId);
 
             flash_set('success', "Archived record {$data['approved_no']} has been created successfully.");

@@ -214,20 +214,19 @@ ob_start();
 
                         <!-- Drop zone -->
                         <div id="dropZone"
-                             class="relative flex flex-col items-center justify-center rounded-2xl border-2
-                                    border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center
-                                    transition hover:border-emerald-400 hover:bg-emerald-50/50 cursor-pointer">
-                            <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             class="relative flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2
+                                    border-dashed border-gray-300 bg-gray-50 px-4 text-center transition hover:bg-gray-100">
+                            <svg class="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                             </svg>
-                            <p class="mt-2 text-sm font-medium text-gray-700">
-                                Drag &amp; drop files here, or
+                            <p class="mb-1 text-sm text-gray-600">
+                                <span class="font-semibold">Click to upload</span> or drag and drop
                                 <button type="button" id="browseBtn"
-                                        class="text-emerald-600 underline hover:text-emerald-800">browse</button>
+                                        class="font-medium text-emerald-700 underline hover:text-emerald-900">Browse files</button>
                             </p>
-                            <p class="mt-1 text-xs text-gray-400">
-                                Allowed: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, WEBP · Max 25 MB per file · Up to 10 files
+                            <p class="text-xs text-gray-500">
+                                PDF, Word, Excel, images (MAX. 25 MB each)
                             </p>
                             <!-- Invisible real input -->
                             <input type="file" name="attachments[]" id="fileInput"

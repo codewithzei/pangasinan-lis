@@ -504,6 +504,12 @@ try {
             !empty($mfrLink['ref_document_type_name']) && str_contains($html, htmlspecialchars($mfrLink['ref_document_type_name'])));
         ok('7: navigation link URL contains mfrDetailRoute and ref_id',
             str_contains($html, $mfrDetailRoute . '/show?id=' . (int) $mfrLink['ref_id']));
+        ok('7: partial exposes linked case number support',
+            str_contains(file_get_contents($partial), 'Case Number')
+            && str_contains(file_get_contents($partial), 'ref_case_number')
+            && (!empty($mfrLink['ref_case_number'])
+                ? str_contains($html, htmlspecialchars((string) $mfrLink['ref_case_number']))
+                : true));
     }
 } catch (Throwable $e) {
     fail('Group 7 exception', $e->getMessage());

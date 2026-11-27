@@ -139,6 +139,11 @@ class SpsecInboxController
                 da.decision,
                 da.accepted_by,
                 da.assigned_to_user_id,
+                COALESCE(
+                    NULLIF(TRIM(CONCAT_WS(' ', sender_info.first_name, sender_info.last_name)), ''),
+                    sender_user.username,
+                    '—'
+                )                            AS sent_by_display,
                 d.id                         AS document_id,
                 d.tracking_number,
                 d.subject_matter,
@@ -166,6 +171,8 @@ class SpsecInboxController
             LEFT  JOIN provincial_government_offices  eo            ON d.external_office_id     = eo.id
             LEFT  JOIN hospitals          h            ON d.hospital_id            = h.id
             LEFT  JOIN municities         m            ON d.municipality_id        = m.id
+            LEFT  JOIN user_accounts      sender_user  ON da.assigned_by           = sender_user.id
+            LEFT  JOIN user_info          sender_info  ON sender_user.id           = sender_info.user_account_id
             LEFT  JOIN user_accounts     accepted_user ON da.accepted_by           = accepted_user.id
             LEFT  JOIN user_info         accepted_info ON accepted_user.id         = accepted_info.user_account_id
             WHERE {$whereClause}

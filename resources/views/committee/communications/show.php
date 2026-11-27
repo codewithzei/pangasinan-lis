@@ -49,6 +49,7 @@ ob_start();
 ?>
 
 <div class="detail-page space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
 
 
@@ -88,9 +89,10 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                 <div class="mb-5 flex items-center justify-between">
                     <h2 class="text-base font-semibold text-gray-900">Communication Information</h2>
                     <?php $sBadge = $comm['status_badge_color'] ?? '#0D9488'; ?>
-                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
                           style="background-color:<?= htmlspecialchars($sBadge) ?>1a;
                                  color:<?= htmlspecialchars($sBadge) ?>;">
+                        <span class="h-1.5 w-1.5 rounded-full" style="background-color:<?= htmlspecialchars($sBadge) ?>;"></span>
                         <?= htmlspecialchars($comm['status'] ?? '') ?>
                     </span>
                 </div>

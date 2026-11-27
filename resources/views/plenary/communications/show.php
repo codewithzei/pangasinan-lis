@@ -22,6 +22,7 @@ ob_start();
 ?>
 
 <div class="detail-page space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
 
 
@@ -70,83 +71,23 @@ ob_start();
                 <?php if (!empty($document['status'])): ?>
                 <div>
                     <p class="text-xs text-gray-400">Status</p>
-                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
-                          style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                          style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>1a;
+                                 color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;">
+                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;"></span>
                         <?= htmlspecialchars($document['status']) ?>
                     </span>
                 </div>
                 <?php endif; ?>
             </div>
 
-            <!-- First Reading summary -->
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-600">Plenary First Reading</h2>
-                <div>
-                    <p class="text-xs text-gray-400">Decision</p>
-                    <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                        Noted
-                    </span>
-                </div>
-                <?php if (!empty($firstReading['reading_date'])): ?>
-                <div>
-                    <p class="text-xs text-gray-400">Reading Date</p>
-                    <p class="text-sm text-gray-800"><?= htmlspecialchars(date('F j, Y', strtotime($firstReading['reading_date']))) ?></p>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($firstReading['communication_category_name'])): ?>
-                <div>
-                    <p class="text-xs text-gray-400">Communication Category</p>
-                    <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($firstReading['communication_category_name']) ?></p>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($firstReading['performed_by_username'])): ?>
-                <div>
-                    <p class="text-xs text-gray-400">Noted By</p>
-                    <p class="text-sm text-gray-800"><?= htmlspecialchars($firstReading['performed_by_username']) ?></p>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($firstReading['remarks'])): ?>
-                <div>
-                    <p class="text-xs text-gray-400">Remarks</p>
-                    <p class="text-sm text-gray-800 leading-5"><?= htmlspecialchars($firstReading['remarks']) ?></p>
-                </div>
-                <?php endif; ?>
-            </div>
         </div>
 
-        <!-- Right: Route history -->
+        <!-- Right: Document actions -->
         <div class="lg:col-span-2 space-y-4">
-            <?php if (!empty($routes)): ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
-                <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-600">Routing History</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="bg-gray-50 text-xs uppercase text-gray-500">
-                            <tr>
-                                <th class="px-4 py-2 font-medium">From</th>
-                                <th class="px-4 py-2 font-medium">To</th>
-                                <th class="px-4 py-2 font-medium">Route</th>
-                                <th class="px-4 py-2 font-medium">By</th>
-                                <th class="px-4 py-2 font-medium">Date</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <?php foreach ($routes as $route): ?>
-                            <tr class="text-xs text-gray-700">
-                                <td class="px-4 py-2"><?= htmlspecialchars($route['from_phase'] ?? '—') ?></td>
-                                <td class="px-4 py-2"><?= htmlspecialchars($route['to_phase'] ?? '—') ?></td>
-                                <td class="px-4 py-2"><?= htmlspecialchars($route['routing_option_name'] ?? '—') ?></td>
-                                <td class="px-4 py-2"><?= htmlspecialchars($route['routed_by_username'] ?? '—') ?></td>
-                                <td class="px-4 py-2"><?= htmlspecialchars(date('M j, Y g:i A', strtotime($route['created_at'] ?? 'now'))) ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <?php endif; ?>
-
             <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+
+            <?php require __DIR__ . '/../../partials/assignment-history.php'; ?>
 
             <!-- Back link -->
             <div class="flex items-center gap-3">

@@ -30,19 +30,12 @@ ob_start();
         <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
         <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         <div class="relative z-10 flex flex-col gap-6 px-6 py-7 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
-            <div class="flex items-start gap-4">
-                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/5 text-blue-100">
-                    <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M4 19.5A2.5 2.5 0 016.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2zM8 7h8m-8 4h8"/>
-                    </svg>
-                </div>
-                <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Receiving Section</p>
-                    <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">Receiving Dashboard</h1>
-                    <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
-                        Welcome back, <?= htmlspecialchars($userName) ?>. Log incoming legislative documents, keep track of your submissions, and follow items returned for correction.
-                    </p>
-                </div>
+            <div class="max-w-3xl">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Receiving Section</p>
+                <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">Receiving Dashboard</h1>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
+                    Welcome back, <?= htmlspecialchars($userName) ?>. Log incoming legislative documents, keep track of your submissions, and follow items returned for correction.
+                </p>
             </div>
             <div class="flex items-center gap-3 border-t border-white/15 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
                 <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-300 ring-4 ring-emerald-300/20"></span>

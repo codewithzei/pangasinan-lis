@@ -41,7 +41,7 @@
  * --------
  * - Wrap all DB work in a transaction and ROLLBACK at the end (zero side-effects).
  * - Re-issue the exact SQL predicates the controller uses (kept in sync by the
- *   ACCEPTED_STILL_PROCESSING / OUTCOME_STATUS_IDS_SQL constants below) and
+ *   ACCEPTED_STILL_PROCESSING constant below) and
  *   assert the resulting membership.
  * - No HTTP / session bootstrapping required.
  *
@@ -52,16 +52,9 @@ declare(strict_types=1);
 
 // ── Controller predicate mirrors (must match PlenaryInboxController) ────────
 const ACCEPTED_STILL_PROCESSING = "
-    d.current_status_id NOT IN (
+    d.current_status_id IN (
         SELECT id FROM document_statuses
-        WHERE name IN (
-            'Awaiting First Reading',
-            'Returned to Plenary',
-            'Approved',
-            'Plenary Comm: Finalized',
-            'Plenary Cases: Finalized',
-            'Plenary: Committee Report Adopted'
-        )
+        WHERE name IN ('Pending', 'For Encoding')
           AND is_active  = 1
           AND is_deleted = 0
     )
@@ -80,13 +73,6 @@ const ACCEPTED_STILL_PROCESSING = "
             LIMIT 1
         )
     )
-";
-
-const OUTCOME_STATUS_IDS_SQL = "
-    SELECT id FROM document_statuses
-    WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','Withdrawn')
-      AND is_active  = 1
-      AND is_deleted = 0
 ";
 
 const OUTCOME_TABS = [
@@ -179,6 +165,12 @@ function setPreDecision(PDO $pdo, int $docId, ?int $statusId, ?string $remarks, 
             VALUES (?, ?, ?, ?, ?)
         ")->execute([$docId, $statusId, $remarks, $userId, $userId]);
     }
+
+    $pdo->prepare("
+        UPDATE documents
+        SET current_status_id = ?, updated_by = ?
+        WHERE id = ?
+    ")->execute([$statusId, $userId, $docId]);
 }
 
 /** Mirror of the outcome-tab list query in PlenaryInboxController::index(). */
@@ -211,7 +203,7 @@ function outcomeTabList(PDO $pdo, int $roleId, int $userId, string $statusName, 
     return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
-/** Mirror of the Accepted list query (outcome statuses excluded). */
+/** Mirror of the Accepted list query (only Pending / For Encoding processing). */
 function acceptedList(PDO $pdo, int $roleId, int $userId, string $search = ''): array
 {
     $where  = [
@@ -221,7 +213,6 @@ function acceptedList(PDO $pdo, int $roleId, int $userId, string $search = ''): 
         'da.completed_at IS NULL',
         '(da.accepted_by = ? OR da.assigned_to_user_id = ?)',
         '(' . ACCEPTED_STILL_PROCESSING . ')',
-        '(pdd.status_id IS NULL OR pdd.status_id NOT IN (' . OUTCOME_STATUS_IDS_SQL . '))',
     ];
     $params = [$roleId, $userId, $userId];
 
@@ -309,6 +300,9 @@ function submitCompliance(PDO $pdo, int $docId, int $toOnProcessStatusId, string
     $pdo->prepare("
         UPDATE plenary_document_details SET status_id = ?, remarks = ?, updated_by = ? WHERE document_id = ?
     ")->execute([$toOnProcessStatusId, $combined, $userId, $docId]);
+    $pdo->prepare("
+        UPDATE documents SET current_status_id = ?, updated_by = ? WHERE id = ?
+    ")->execute([$toOnProcessStatusId, $userId, $docId]);
 
     if ($emitEvent) {
         $pdo->prepare("
@@ -339,15 +333,14 @@ try {
         $sourceTypeId = (int) $stRow['id'];
     }
 
-    // A neutral document status that is NOT "Awaiting First Reading" so the
-    // documents count as "accepted still processing".
+    // Newly routed documents enter Plenary with the Pending status.
     $neutralRow = $pdo->query("
         SELECT id FROM document_statuses
-        WHERE name <> 'Awaiting First Reading' AND is_active=1 AND is_deleted=0
-        ORDER BY id ASC LIMIT 1
+        WHERE name = 'Pending' AND is_active=1 AND is_deleted=0
+        LIMIT 1
     ")->fetch();
     if (!$neutralRow) {
-        $pdo->exec("INSERT INTO document_statuses (name, badge_color, sort_order) VALUES ('_TestStatus','#6c757d',0)");
+        $pdo->exec("INSERT INTO document_statuses (name, badge_color, sort_order) VALUES ('Pending','#6c757d',0)");
         $neutralStatusId = (int) $pdo->lastInsertId();
     } else {
         $neutralStatusId = (int) $neutralRow['id'];

@@ -136,28 +136,27 @@ ob_start();
 
 
     <!-- Back + Page header --------------------------------------------------->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-7 sm:px-8">
-            <div class="relative z-10 flex items-center gap-3">
-                <a href="<?= htmlspecialchars($detailBackUrl) ?>"
-                   class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
-                   aria-label="<?= $fromNotedDocuments ? 'Back to Noted Documents' : 'Back to Admin Inbox' ?>">
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                    </svg>
-                </a>
-                <div class="min-w-0">
-                    <p class="text-sm font-medium text-blue-100">
-                        <?= $fromNotedDocuments ? 'NOTED DOCUMENT' : 'DOCUMENT DETAILS' ?>
-                    </p>
-                    <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                        <?= htmlspecialchars($trackingNumber) ?>
-                    </h1>
-                </div>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-center sm:px-8 sm:py-7">
+            <a href="<?= htmlspecialchars($detailBackUrl) ?>"
+               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white
+                      transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+               aria-label="<?= $fromNotedDocuments ? 'Back to Noted Documents' : 'Back to Admin Inbox' ?>">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">
+                    <?= $fromNotedDocuments ? 'NOTED DOCUMENT' : 'DOCUMENT DETAILS' ?>
+                </p>
+                <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                    <?= htmlspecialchars($trackingNumber) ?>
+                </h1>
             </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <!-- Main 2-column layout ------------------------------------------------->
@@ -168,89 +167,13 @@ ob_start();
             ? 'order-1 space-y-6 xl:col-span-1'
             : 'order-2 space-y-6 xl:order-none xl:col-span-2' ?>">
 
-            <!-- Document summary -------------------------------------------->
+            <!-- Document relationships ------------------------------------->
             <?php
 // MFR relationship links (Referenced Original Case / Related Motions)
 $mfrDetailRoute = 'admin/inbox';
 require __DIR__ . '/../../partials/resubmission-relationship.php';
 require __DIR__ . '/../../partials/mfr-relationship.php';
 ?>
-
-            <div class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="mb-4 text-base font-semibold text-gray-900">Document Details</h2>
-
-                <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Tracking Number</dt>
-                        <dd class="mt-1 font-mono text-sm font-bold text-primary"><?= htmlspecialchars($trackingNumber) ?></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Current Status</dt>
-                        <dd class="mt-1">
-                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                                  style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#2563EB') ?>1a;
-                                         color: <?= htmlspecialchars($document['status_badge_color'] ?? '#2563EB') ?>;">
-                                <?= htmlspecialchars($document['status'] ?? '') ?>
-                            </span>
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Current Phase</dt>
-                        <dd class="mt-1 text-sm text-gray-800"><?= htmlspecialchars(showPhase($document['current_phase'] ?? 'ADMIN')) ?></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Date / Time Received</dt>
-                        <dd class="mt-1 text-sm text-gray-800">
-                            <?= htmlspecialchars(date('F j, Y', strtotime($document['date_received']))) ?>
-                            at <?= htmlspecialchars(date('g:i A', strtotime($document['time_received']))) ?>
-                        </dd>
-                    </div>
-                    <div class="sm:col-span-2">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Subject Matter</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($document['subject_matter'] ?? '') ?></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Document Type</dt>
-                        <dd class="mt-1">
-                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                                  style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
-                                         color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
-                                <?= htmlspecialchars($document['document_type_name'] ?? '') ?>
-                            </span>
-                        </dd>
-                    </div>
-                    <?php if (!empty($document['communication_category_name'])): ?>
-                        <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Communication Category</dt>
-                            <dd class="mt-1 text-sm text-gray-800"><?= htmlspecialchars($document['communication_category_name']) ?></dd>
-                        </div>
-                    <?php endif; ?>
-                    <?php if (!empty($document['remarks'])): ?>
-                        <div class="sm:col-span-2">
-                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Remarks</dt>
-                            <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($document['remarks']) ?></dd>
-                        </div>
-                    <?php endif; ?>
-                </dl>
-                <?php if ($resubmissionReference !== null): ?>
-                    <div class="mt-5 rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-                        <p class="text-sm font-semibold text-indigo-900">Resubmission needed</p>
-                        <p class="mt-1 text-sm text-indigo-800">
-                            Linked to
-                            <a href="<?= BASE_URL ?>/admin/inbox/show?id=<?= (int) ($resubmissionReference['ref_id'] ?? 0) ?>"
-                               class="font-semibold text-primary hover:underline">
-                                <?= htmlspecialchars($resubmissionReference['ref_tracking_number'] ?? '—') ?>
-                            </a>
-                            <?php if (!empty($resubmissionReference['ref_proposed_number'])): ?>
-                                (<?= htmlspecialchars($resubmissionReference['ref_proposed_number']) ?>)
-                            <?php endif; ?>
-                            — <?= htmlspecialchars($resubmissionReference['ref_status'] ?? 'Prior document') ?>.
-                        </p>
-                        <p class="mt-1 text-xs text-indigo-700"><?= escape_trimmed_text($resubmissionReference['ref_subject_matter'] ?? '') ?></p>
-                        <p class="mt-2 text-xs font-medium text-indigo-700">Choose the destination when routing this document.</p>
-                    </div>
-                <?php endif; ?>
-            </div>
 
             <!-- Source information ------------------------------------------>
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
@@ -385,17 +308,17 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                               enctype="multipart/form-data" id="uploadForm">
                             <input type="hidden" name="document_id" value="<?= $documentId ?>">
                             <div class="flex items-center justify-center w-full">
-                                <label for="extra_attachments"
-                                       class="flex flex-col items-center justify-center w-full h-28 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100">
-                                    <div class="flex flex-col items-center justify-center py-4">
-                                        <svg class="w-7 h-7 mb-1.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <label for="extra_attachments" data-attachment-dropzone
+                                       class="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition hover:bg-gray-100">
+                                    <div class="flex flex-col items-center justify-center px-4 py-5 text-center">
+                                        <svg class="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                                         </svg>
-                                        <p class="text-xs text-gray-500 text-center px-4">
-                                            <span class="font-semibold text-gray-700">Click to upload</span> or drag and drop<br>
-                                            PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (max 25 MB each, up to 10 files)
+                                        <p class="mb-1 text-sm text-gray-600">
+                                            <span class="font-semibold">Click to upload</span> or drag and drop
                                         </p>
+                                        <p class="text-xs text-gray-500">PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (MAX. 25 MB each)</p>
                                     </div>
                                     <input id="extra_attachments" name="attachments[]" type="file"
                                            multiple class="hidden"

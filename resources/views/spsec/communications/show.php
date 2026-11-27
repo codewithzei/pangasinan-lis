@@ -130,11 +130,10 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                         </div>
                         <div>
                             <p class="text-xs font-medium text-gray-500">Current Status</p>
-                            <span class="mt-1 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5
-                                         text-xs font-semibold shadow-sm"
-                                  style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                         border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                         color: white;">
+                            <span class="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                  style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>1a;
+                                         color: <?= htmlspecialchars($statusBadgeColor) ?>;">
+                                <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;"></span>
                                 <?= htmlspecialchars($document['status'] ?? '—') ?>
                             </span>
                         </div>
@@ -434,65 +433,6 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
         <!-- ── Right / sidebar column ─────────────────────────────────────────── -->
         <div class="order-1 space-y-6 lg:order-2">
 
-            <!-- Quick Summary card ────────────────────────────────────────────── -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-gray-900">Summary</h2>
-
-                <div class="mt-4 space-y-3 text-sm">
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Tracking #</span>
-                        <span class="font-semibold text-gray-900 text-right break-all">
-                            <?= htmlspecialchars($document['tracking_number'] ?? '—') ?>
-                        </span>
-                    </div>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Type</span>
-                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                              style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
-                                     color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
-                            <?= htmlspecialchars($document['document_type_name'] ?? '—') ?>
-                        </span>
-                    </div>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Status</span>
-                        <span class="inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold"
-                              style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                     border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                     color: white;">
-                            <?= htmlspecialchars($document['status'] ?? '—') ?>
-                        </span>
-                    </div>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Phase</span>
-                        <span class="text-xs font-medium text-gray-700">
-                            <?= htmlspecialchars(spsec_formatPhaseName($document['current_phase'] ?? '')) ?>
-                        </span>
-                    </div>
-                    <?php if (!empty($document['committee_name'])): ?>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Committee</span>
-                        <span class="text-xs font-medium text-amber-700 text-right">
-                            <?= htmlspecialchars($document['committee_name']) ?>
-                        </span>
-                    </div>
-                    <?php endif; ?>
-                    <?php if (!empty($document['communication_category_name'])): ?>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Comm. Category</span>
-                        <span class="text-xs font-medium text-emerald-700 text-right">
-                            <?= htmlspecialchars($document['communication_category_name']) ?>
-                        </span>
-                    </div>
-                    <?php endif; ?>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Received</span>
-                        <span class="text-xs text-gray-700 text-right">
-                            <?= htmlspecialchars(date('M j, Y', strtotime($document['date_received']))) ?>
-                        </span>
-                    </div>
-                </div>
-
-            </section>
 
             <!-- Metadata ─────────────────────────────────────────────────────── -->
             <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">

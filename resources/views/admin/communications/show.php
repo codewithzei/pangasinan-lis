@@ -59,37 +59,28 @@ $statusBadgeColor = !empty($document['status_badge_color'])
 
 
     <!-- ── Header ────────────────────────────────────────────────────────────── -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary
-                    to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="flex items-center gap-3">
-                        <a href="<?= BASE_URL ?>/admin/communications"
-                           class="flex h-10 w-10 items-center justify-center rounded-xl
-                                  bg-white/10 text-white hover:bg-white/20 transition">
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M15 19l-7-7 7-7"/>
-                            </svg>
-                        </a>
-                        <div>
-                            <p class="text-sm font-medium text-blue-100">DOCUMENT DETAILS</p>
-                            <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                                <?= htmlspecialchars($document['tracking_number'] ?? '') ?>
-                            </h1>
-                            <p class="mt-1 text-sm text-blue-100">
-                                <?= htmlspecialchars($pageSubtitle) ?>
-                            </p>
-                        </div>
-                    </div>
-                </div>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-center sm:px-8 sm:py-7">
+            <a href="<?= BASE_URL ?>/admin/communications"
+               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white
+                      transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">DOCUMENT DETAILS</p>
+                <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                    <?= htmlspecialchars($document['tracking_number'] ?? '') ?>
+                </h1>
+                <p class="mt-1 break-words text-sm text-blue-100">
+                    <?= htmlspecialchars($pageSubtitle) ?>
+                </p>
             </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64
-                        rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72
-                        rounded-full bg-white/5"></div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <!-- ── Main layout: 2-col on lg ──────────────────────────────────────────── -->
@@ -138,11 +129,10 @@ $statusBadgeColor = !empty($document['status_badge_color'])
                         </div>
                         <div>
                             <p class="text-xs font-medium text-gray-500">Current Status</p>
-                            <span class="mt-1 inline-flex items-center gap-1.5 rounded-full border
-                                         px-2.5 py-0.5 text-xs font-semibold shadow-sm"
-                                  style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                         border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                         color: white;">
+                            <span class="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                  style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>1a;
+                                         color: <?= htmlspecialchars($statusBadgeColor) ?>;">
+                                <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;"></span>
                                 <?= htmlspecialchars($document['status'] ?? '—') ?>
                             </span>
                         </div>
@@ -470,57 +460,6 @@ $statusBadgeColor = !empty($document['status_badge_color'])
         <!-- ── Right / sidebar ───────────────────────────────────────────────── -->
         <div class="order-1 space-y-6 lg:order-2">
 
-            <!-- Quick Summary ─────────────────────────────────────────────────── -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-gray-900">Summary</h2>
-
-                <div class="mt-4 space-y-3 text-sm">
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Tracking #</span>
-                        <span class="font-semibold text-gray-900 text-right break-all">
-                            <?= htmlspecialchars($document['tracking_number'] ?? '—') ?>
-                        </span>
-                    </div>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Type</span>
-                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                              style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
-                                     color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
-                            <?= htmlspecialchars($document['document_type_name'] ?? '—') ?>
-                        </span>
-                    </div>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Status</span>
-                        <span class="inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold"
-                              style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                     border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                     color: white;">
-                            <?= htmlspecialchars($document['status'] ?? '—') ?>
-                        </span>
-                    </div>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Phase</span>
-                        <span class="text-xs font-medium text-gray-700">
-                            <?= htmlspecialchars(admin_comm_formatPhaseName($document['current_phase'] ?? '')) ?>
-                        </span>
-                    </div>
-                    <?php if (!empty($document['communication_category_name'])): ?>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Comm. Category</span>
-                        <span class="text-xs font-medium text-emerald-700 text-right">
-                            <?= htmlspecialchars($document['communication_category_name']) ?>
-                        </span>
-                    </div>
-                    <?php endif; ?>
-                    <div class="flex items-start justify-between gap-2">
-                        <span class="text-xs text-gray-500 shrink-0 pt-0.5">Received</span>
-                        <span class="text-xs text-gray-700 text-right">
-                            <?= htmlspecialchars(date('M j, Y', strtotime($document['date_received']))) ?>
-                        </span>
-                    </div>
-                </div>
-
-            </section>
 
             <!-- Metadata ─────────────────────────────────────────────────────── -->
             <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">

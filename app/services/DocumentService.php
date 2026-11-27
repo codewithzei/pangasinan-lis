@@ -2369,6 +2369,7 @@ class DocumentService
                 ds.badge_color     AS ref_status_badge_color,
                 cc.id              AS ref_case_id,
                 cc.docket_number   AS ref_docket_number,
+                cc.docket_number   AS ref_case_number,
                 cc.nature_of_case  AS ref_nature_of_case,
                 cc.complainant_details AS ref_complainant_details,
                 cc.respondents     AS ref_respondents,

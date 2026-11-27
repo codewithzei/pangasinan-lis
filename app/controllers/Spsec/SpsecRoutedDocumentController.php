@@ -42,6 +42,10 @@ class SpsecRoutedDocumentController
         $filterStatus   = trim($_GET['status']         ?? '');
         $filterPhase    = strtoupper(trim($_GET['current_phase'] ?? ''));
         $filterType     = trim($_GET['document_type']   ?? '');
+        $filterTab      = trim($_GET['tab'] ?? 'ongoing');
+        if (!in_array($filterTab, ['ongoing', 'completed', 'withdrawn'], true)) {
+            $filterTab = 'ongoing';
+        }
 
         $documentPhases = [
             'RECEIVING' => 'Receiving',
@@ -80,6 +84,44 @@ class SpsecRoutedDocumentController
             $filterParams[]     = (int) $filterType;
         } else {
             $filterType = '';
+        }
+
+        $completedCondition = "(
+            d.current_phase IN ('FINALIZED', 'FILED')
+            OR LOWER(COALESCE(ds.name, '')) LIKE '%finalized%'
+            OR LOWER(COALESCE(ds.name, '')) IN ('approved', 'second reading approved', 'filed')
+        )";
+        $withdrawnCondition = "LOWER(COALESCE(ds.name, '')) LIKE '%withdrawn%'";
+        $baseFilterConditions = $filterConditions;
+        $baseFilterParams = $filterParams;
+        $baseExtraWhere = count($baseFilterConditions) > 0
+            ? 'AND ' . implode(' AND ', $baseFilterConditions)
+            : '';
+        $tabCountsStmt = $this->pdo->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN NOT ({$completedCondition}) AND NOT ({$withdrawnCondition}) THEN 1 ELSE 0 END), 0) AS ongoing,
+                COALESCE(SUM(CASE WHEN ({$completedCondition}) AND NOT ({$withdrawnCondition}) THEN 1 ELSE 0 END), 0) AS completed,
+                COALESCE(SUM(CASE WHEN {$withdrawnCondition} THEN 1 ELSE 0 END), 0) AS withdrawn
+            FROM (
+                SELECT dr.document_id, MAX(dr.id) AS latest_route_id
+                FROM document_routes dr
+                WHERE dr.from_phase = 'SP_SECRETARY'
+                  AND dr.to_phase IN ('PLENARY', 'COMMITTEE')
+                GROUP BY dr.document_id
+            ) sub
+            INNER JOIN documents d ON d.id = sub.document_id
+            LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+            WHERE 1=1 {$baseExtraWhere}
+        ");
+        $tabCountsStmt->execute($baseFilterParams);
+        $tabCounts = $tabCountsStmt->fetch();
+
+        if ($filterTab === 'completed') {
+            $filterConditions[] = "({$completedCondition}) AND NOT ({$withdrawnCondition})";
+        } elseif ($filterTab === 'withdrawn') {
+            $filterConditions[] = $withdrawnCondition;
+        } else {
+            $filterConditions[] = "NOT ({$completedCondition}) AND NOT ({$withdrawnCondition})";
         }
 
         $extraWhere = count($filterConditions) > 0
@@ -254,6 +296,7 @@ class SpsecRoutedDocumentController
                 cc.name            AS communication_category_name,
                 creator.username   AS created_by_username,
                 updater.username   AS updated_by_username,
+                owner.username     AS current_owner_username,
                 comm.name          AS committee_name
             FROM documents d
             LEFT JOIN document_types          dt      ON d.document_type_id          = dt.id
@@ -265,6 +308,7 @@ class SpsecRoutedDocumentController
             LEFT JOIN communication_categories cc     ON d.communication_category_id = cc.id
             LEFT JOIN user_accounts           creator ON d.created_by                = creator.id
             LEFT JOIN user_accounts           updater ON d.updated_by                = updater.id
+            LEFT JOIN user_accounts           owner   ON d.current_owner_user_id      = owner.id
             LEFT JOIN document_committees     dc      ON dc.document_id              = d.id
             LEFT JOIN committees              comm    ON comm.id                     = dc.committee_id
             WHERE d.id = ?
@@ -328,6 +372,24 @@ class SpsecRoutedDocumentController
         ");
         $attStmt->execute([$documentId]);
         $attachments = $attStmt->fetchAll();
+
+        // Checklist items
+        $checklistStmt = $this->pdo->prepare("
+            SELECT
+                dci.id,
+                dci.is_completed,
+                dci.completed_at,
+                c.name AS checklist_name,
+                c.description AS checklist_description,
+                completed_by.username AS completed_by_username
+            FROM document_checklist_items dci
+            INNER JOIN checklists c ON c.id = dci.checklist_id
+            LEFT JOIN user_accounts completed_by ON completed_by.id = dci.completed_by
+            WHERE dci.document_id = ?
+            ORDER BY c.name ASC
+        ");
+        $checklistStmt->execute([$documentId]);
+        $checklistItems = $checklistStmt->fetchAll();
 
         $pageTitle    = 'Routed Document Details — ' . htmlspecialchars($document['tracking_number']);
         $pageSubtitle = 'Detailed document information';

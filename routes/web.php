@@ -112,9 +112,23 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'receiving/logs' => [
+        'method' => 'GET',
+        'controller' => 'UserHistoryController',
+        'action' => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'admin/dashboard' => [
         'method' => 'GET',
         'controller' => 'Admin/AdminDashboardController',
+        'action' => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'admin/logs' => [
+        'method' => 'GET',
+        'controller' => 'UserHistoryController',
         'action' => 'index',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
@@ -125,8 +139,22 @@ return [
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 
+    'spsec/logs' => [
+        'method' => 'GET',
+        'controller' => 'UserHistoryController',
+        'action' => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
     'plenary/dashboard' => [
         'controller' => 'Plenary/PlenaryDashboardController',
+        'action' => 'index',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'plenary/logs' => [
+        'method' => 'GET',
+        'controller' => 'UserHistoryController',
         'action' => 'index',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
@@ -134,6 +162,13 @@ return [
     'committee/dashboard' => [
         'view' => 'committee/dashboard',
         'title' => 'Committee Dashboard',
+        'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
+    ],
+
+    'committee/logs' => [
+        'method' => 'GET',
+        'controller' => 'UserHistoryController',
+        'action' => 'index',
         'middleware' => ['AuthMiddleware', 'RoleMiddleware'],
     ],
 

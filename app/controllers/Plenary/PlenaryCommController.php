@@ -46,6 +46,7 @@ class PlenaryCommController
 
         $this->requirePlenaryAccess();
 
+        $perPage = self::PER_PAGE;
         $tab    = trim($_GET['tab']    ?? 'noted');
         $validTabs = ['noted'];
         if (!in_array($tab, $validTabs, true)) { $tab = 'noted'; }
@@ -54,7 +55,6 @@ class PlenaryCommController
         $filterCat = trim($_GET['category'] ?? '');
 
         $page   = max(1, (int) ($_GET['page'] ?? 1));
-        $offset = ($page - 1) * self::PER_PAGE;
 
         // ── Base: Comm documents that have a Plenary Comm First Reading with
         //    NOTED decision (not finalized ones — those go to Finalized Docs).
@@ -89,8 +89,9 @@ class PlenaryCommController
         $cntStmt = $this->pdo->prepare($countSql);
         $cntStmt->execute($params);
         $total      = (int) $cntStmt->fetchColumn();
-        $totalPages = max(1, (int) ceil($total / self::PER_PAGE));
+        $totalPages = max(1, (int) ceil($total / $perPage));
         $page       = min($page, $totalPages);
+        $offset     = ($page - 1) * $perPage;
 
         $listSql = "
             SELECT
@@ -120,11 +121,20 @@ class PlenaryCommController
             LIMIT ? OFFSET ?
         ";
         $listStmt = $this->pdo->prepare($listSql);
-        $listStmt->execute([...$params, self::PER_PAGE, $offset]);
+        $listStmt->execute([...$params, $perPage, $offset]);
         $communications = $listStmt->fetchAll();
 
-        // Tab counts (noted only for now)
-        $tabCounts = ['noted' => $total];
+        $notedCountStmt = $this->pdo->prepare("
+            SELECT COUNT(DISTINCT d.id)
+            FROM documents d
+            INNER JOIN document_types dt ON dt.id = d.document_type_id
+                AND dt.name LIKE '%Communication%' AND dt.is_deleted = 0
+            INNER JOIN plenary_comm_first_reading pcfr
+                ON pcfr.document_id = d.id AND pcfr.decision = 'NOTED'
+            WHERE d.current_status_id = ?
+        ");
+        $notedCountStmt->execute([$notedStatusId]);
+        $tabCounts = ['noted' => (int) $notedCountStmt->fetchColumn()];
 
         // Filter options
         $categories = $this->pdo->query("
@@ -199,6 +209,26 @@ class PlenaryCommController
         ");
         $routeStmt->execute([$documentId]);
         $routes = $routeStmt->fetchAll();
+
+        $assignmentsStmt = $this->pdo->prepare("
+            SELECT
+                da.*,
+                r.name AS role_name,
+                assigned.username AS assigned_to_username,
+                assigner.username AS assigned_by_username,
+                accepted.username AS accepted_by_username,
+                CONCAT(COALESCE(accepted_info.first_name, ''), ' ', COALESCE(accepted_info.last_name, '')) AS accepted_by_fullname
+            FROM document_assignments da
+            LEFT JOIN roles r ON r.id = da.assigned_to_role_id
+            LEFT JOIN user_accounts assigned ON assigned.id = da.assigned_to_user_id
+            LEFT JOIN user_accounts assigner ON assigner.id = da.assigned_by
+            LEFT JOIN user_accounts accepted ON accepted.id = da.accepted_by
+            LEFT JOIN user_info accepted_info ON accepted_info.user_account_id = accepted.id
+            WHERE da.document_id = ?
+            ORDER BY da.created_at ASC, da.id ASC
+        ");
+        $assignmentsStmt->execute([$documentId]);
+        $assignments = $assignmentsStmt->fetchAll();
 
         $docService = new DocumentService($this->pdo);
         $documentEvents = $docService->getDocumentEvents($documentId);

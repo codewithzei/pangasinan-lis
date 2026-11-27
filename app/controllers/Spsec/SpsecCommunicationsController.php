@@ -129,6 +129,8 @@ class SpsecCommunicationsController
         $countStmt->execute($filterParams);
         $totalRows  = (int) ($countStmt->fetch()['total'] ?? 0);
         $totalPages = max(1, (int) ceil($totalRows / $perPage));
+        $page       = min($page, $totalPages);
+        $offset     = ($page - 1) * $perPage;
 
         // Main list query — uses the derived-table join + the full nr row.
         // No GROUP BY needed: the derived table guarantees one nr row per document.

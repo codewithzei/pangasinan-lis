@@ -132,13 +132,11 @@ class PlenaryInboxController
     private const TERMINAL_STATUSES = ['noted', 'remanded', 'withdrawn'];
 
     /**
-     * Scalar-friendly SQL fragment listing the outcome status ids.
-     * Used to keep outcome documents out of the generic Accepted list so the
-     * inbox partitions cleanly by pre-decision status.
+     * Only newly routed Pending documents may be claimed from the Plenary inbox.
      */
-    private const OUTCOME_STATUS_IDS_SQL = "
+    private const PENDING_INBOX_STATUS_IDS_SQL = "
         SELECT id FROM document_statuses
-        WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','Withdrawn')
+        WHERE name = 'Pending'
           AND is_active  = 1
           AND is_deleted = 0
     ";
@@ -172,15 +170,17 @@ class PlenaryInboxController
      * check ensures this.
      * The Accepted tab only contains documents with no recorded pre-decision
      * yet or with the active "For Encoding" pre-decision status.
+     * The shared status must also be Pending or For Encoding so stale or
+     * unsynchronized terminal statuses cannot leak into this tab.
      *
      * Requires the query to join `documents d` and `document_assignments da`.
      * Used verbatim by both the Accepted list query and the accepted count so
      * the badge and the list can never drift apart.
      */
     private const ACCEPTED_STILL_PROCESSING = "
-        d.current_status_id NOT IN (
+        d.current_status_id IN (
             SELECT id FROM document_statuses
-                        WHERE name IN ('Awaiting First Reading', 'Returned to Plenary')
+            WHERE name IN ('Pending', 'For Encoding')
               AND is_active  = 1
               AND is_deleted = 0
         )
@@ -189,16 +189,15 @@ class PlenaryInboxController
         )
         AND d.current_phase = 'PLENARY'
         AND d.finalized_at IS NULL
-        AND d.current_status_id NOT IN (
-            SELECT id FROM document_statuses
-            WHERE name IN (
-                'Approved',
-                'Plenary Comm: Finalized',
-                'Plenary Cases: Finalized',
-                'Plenary: Committee Report Adopted'
+        AND (
+            pdd.status_id IS NULL
+            OR pdd.status_id = (
+                SELECT id FROM document_statuses
+                WHERE name = 'For Encoding'
+                  AND is_active = 1
+                  AND is_deleted = 0
+                LIMIT 1
             )
-              AND is_active = 1
-              AND is_deleted = 0
         )
     ";
 
@@ -269,12 +268,7 @@ class PlenaryInboxController
                   AND newer_da.id > da.id
             )';
             $where[] = 'd.finalized_at IS NULL';
-            $where[] = "d.current_status_id NOT IN (
-                SELECT id FROM document_statuses
-                WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
-                  AND is_active = 1
-                  AND is_deleted = 0
-            )";
+            $where[] = 'd.current_status_id IN (' . self::PENDING_INBOX_STATUS_IDS_SQL . ')';
             $params[] = $userId;
         } elseif ($isOutcomeView) {
             // Outcome tabs list the documents this user accepted whose current
@@ -303,9 +297,6 @@ class PlenaryInboxController
             // no longer "being processed" in this inbox — hide them here while
             // leaving the ACCEPTED assignment open for ownership checks.
             $where[] = '(' . self::ACCEPTED_STILL_PROCESSING . ')';
-            // Outcome documents live in their own tabs; keep them out of the
-            // generic Accepted list so every document is listed exactly once.
-            $where[] = '(pdd.status_id IS NULL OR pdd.status_id NOT IN (' . self::OUTCOME_STATUS_IDS_SQL . '))';
         }
 
         if ($search !== '') {
@@ -357,6 +348,18 @@ class PlenaryInboxController
             ? "LEFT JOIN user_accounts ab  ON ab.id  = da.accepted_by
                LEFT JOIN user_info     aui ON aui.user_account_id = da.accepted_by"
             : '';
+        $senderSelect = $view === 'inbox'
+            ? ",
+                COALESCE(
+                    NULLIF(TRIM(CONCAT_WS(' ', sender_info.first_name, sender_info.last_name)), ''),
+                    sender_user.username,
+                    '—'
+                ) AS sent_by_display"
+            : '';
+        $senderJoin = $view === 'inbox'
+            ? "LEFT JOIN user_accounts sender_user ON da.assigned_by = sender_user.id
+               LEFT JOIN user_info sender_info ON sender_user.id = sender_info.user_account_id"
+            : '';
 
         $sql = "
             SELECT
@@ -374,11 +377,13 @@ class PlenaryInboxController
                 dt.name            AS document_type_name,
                 dt.badge_color     AS document_type_badge_color
                 {$acceptedSelect}
+                {$senderSelect}
             FROM document_assignments da
             INNER JOIN documents        d   ON d.id  = da.document_id
             LEFT  JOIN plenary_document_details pdd ON pdd.document_id = d.id
             LEFT  JOIN document_statuses ds  ON ds.id = d.current_status_id
             LEFT  JOIN document_types    dt  ON dt.id = d.document_type_id
+            {$senderJoin}
             {$acceptedJoin}
             WHERE {$whereClause}
             ORDER BY da.id DESC
@@ -1789,7 +1794,7 @@ class PlenaryInboxController
      * Return the badge count for every tab, keyed by view slug.
      *
      * Each count mirrors the corresponding list filter exactly (same ownership
-     * scoping, same ACCEPTED_STILL_PROCESSING / outcome partitioning) so a tab
+     * scoping, same accepted / outcome status predicates) so a tab
      * badge and its list can never drift apart.
      *
      * @return array<string,int> e.g. ['inbox' => 3, 'accepted' => 1, 'deferred' => 2, …]
@@ -1814,12 +1819,7 @@ class PlenaryInboxController
                       AND newer_da.id > da.id
               )
               AND d.finalized_at IS NULL
-              AND d.current_status_id NOT IN (
-                    SELECT id FROM document_statuses
-                    WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
-                      AND is_active = 1
-                      AND is_deleted = 0
-              )
+              AND d.current_status_id IN (" . self::PENDING_INBOX_STATUS_IDS_SQL . ")
         ");
         $pendingRow->execute([$plenaryRoleId, $userId]);
 
@@ -1834,7 +1834,6 @@ class PlenaryInboxController
               AND da.completed_at        IS NULL
               AND (da.accepted_by = ? OR da.assigned_to_user_id = ?)
               AND (" . self::ACCEPTED_STILL_PROCESSING . ")
-              AND (pdd.status_id IS NULL OR pdd.status_id NOT IN (" . self::OUTCOME_STATUS_IDS_SQL . "))
         ");
         $acceptedRow->execute([$plenaryRoleId, $userId, $userId]);
 

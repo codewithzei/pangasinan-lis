@@ -27,6 +27,10 @@ class RoutedDocumentController
         $filterStatus = trim($_GET['status'] ?? '');
         $filterType = trim($_GET['type'] ?? '');
         $filterDivision = trim($_GET['division'] ?? '');
+        $filterTab = trim($_GET['tab'] ?? 'ongoing');
+        if (!in_array($filterTab, ['ongoing', 'completed', 'withdrawn'], true)) {
+            $filterTab = 'ongoing';
+        }
 
         // Base query
         $whereConditions = ['1=1'];
@@ -49,6 +53,33 @@ class RoutedDocumentController
         if ($filterDivision !== '') {
             $whereConditions[] = 'd.current_phase = ?';
             $params[] = $filterDivision;
+        }
+
+        $completedCondition = "(
+            d.current_phase IN ('FINALIZED', 'FILED')
+            OR LOWER(COALESCE(ds.name, '')) LIKE '%finalized%'
+            OR LOWER(COALESCE(ds.name, '')) IN ('approved', 'second reading approved', 'filed')
+        )";
+        $withdrawnCondition = "LOWER(COALESCE(ds.name, '')) LIKE '%withdrawn%'";
+        $baseWhereClause = implode(' AND ', $whereConditions);
+        $tabCountsStmt = $this->pdo->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN NOT ({$completedCondition}) AND NOT ({$withdrawnCondition}) THEN 1 ELSE 0 END), 0) AS ongoing,
+                COALESCE(SUM(CASE WHEN ({$completedCondition}) AND NOT ({$withdrawnCondition}) THEN 1 ELSE 0 END), 0) AS completed,
+                COALESCE(SUM(CASE WHEN {$withdrawnCondition} THEN 1 ELSE 0 END), 0) AS withdrawn
+            FROM documents d
+            LEFT JOIN document_statuses ds ON d.current_status_id = ds.id
+            WHERE {$baseWhereClause}
+        ");
+        $tabCountsStmt->execute($params);
+        $tabCounts = $tabCountsStmt->fetch();
+
+        if ($filterTab === 'completed') {
+            $whereConditions[] = "({$completedCondition}) AND NOT ({$withdrawnCondition})";
+        } elseif ($filterTab === 'withdrawn') {
+            $whereConditions[] = $withdrawnCondition;
+        } else {
+            $whereConditions[] = "NOT ({$completedCondition}) AND NOT ({$withdrawnCondition})";
         }
 
         $whereClause = implode(' AND ', $whereConditions);
@@ -233,6 +264,26 @@ class RoutedDocumentController
         $routesStmt = $this->pdo->prepare($routesSql);
         $routesStmt->execute([$documentId]);
         $routes = $routesStmt->fetchAll();
+
+        $assignmentsStmt = $this->pdo->prepare("
+            SELECT
+                da.*,
+                r.name AS role_name,
+                assigned.username AS assigned_to_username,
+                assigner.username AS assigned_by_username,
+                accepted.username AS accepted_by_username,
+                CONCAT(COALESCE(accepted_info.first_name, ''), ' ', COALESCE(accepted_info.last_name, '')) AS accepted_by_fullname
+            FROM document_assignments da
+            LEFT JOIN roles r ON r.id = da.assigned_to_role_id
+            LEFT JOIN user_accounts assigned ON assigned.id = da.assigned_to_user_id
+            LEFT JOIN user_accounts assigner ON assigner.id = da.assigned_by
+            LEFT JOIN user_accounts accepted ON accepted.id = da.accepted_by
+            LEFT JOIN user_info accepted_info ON accepted_info.user_account_id = accepted.id
+            WHERE da.document_id = ?
+            ORDER BY da.created_at ASC, da.id ASC
+        ");
+        $assignmentsStmt->execute([$documentId]);
+        $assignments = $assignmentsStmt->fetchAll();
 
         // Fetch checklist items
         $checklistSql = "

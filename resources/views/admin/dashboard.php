@@ -46,19 +46,12 @@ ob_start();
         <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
         <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         <div class="relative z-10 flex flex-col gap-6 px-6 py-7 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
-            <div class="flex items-start gap-4">
-                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/5 text-blue-100">
-                    <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4" d="M3 21h18M4 18h16M5 18V9l7-5 7 5v9M9 10v5m6-5v5M2 9h20"/>
-                    </svg>
-                </div>
-                <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Pangasinan Provincial Legislature</p>
-                    <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">Legislative Dashboard</h1>
-                    <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                        Good day, <?= htmlspecialchars($userName) ?>. A consolidated view of legislative measures, workflow, and your administration desk.
-                    </p>
-                </div>
+            <div class="max-w-3xl">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Pangasinan Provincial Legislature</p>
+                <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">Legislative Dashboard</h1>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                    Good day, <?= htmlspecialchars($userName) ?>. A consolidated view of legislative measures, workflow, and your administration desk.
+                </p>
             </div>
             <div class="flex items-center gap-3 border-t border-white/10 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
                 <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/15"></span>

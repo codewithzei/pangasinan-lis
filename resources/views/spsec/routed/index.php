@@ -11,6 +11,8 @@ $search           = $search           ?? '';
 $filterStatus     = $filterStatus     ?? '';
 $filterPhase      = $filterPhase      ?? '';
 $filterType       = $filterType       ?? '';
+$filterTab        = $filterTab        ?? 'ongoing';
+$tabCounts        = $tabCounts        ?? [];
 $documents        = $documents        ?? [];
 $documentStatuses = $documentStatuses ?? [];
 $documentPhases   = $documentPhases   ?? [];
@@ -63,31 +65,20 @@ function formatCurrentLocation(array $doc): string
 <div class="space-y-6">
 
     <!-- ── Header Banner ────────────────────────────────────────────────────── -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div class="max-w-3xl">
-                    <p class="text-sm font-medium text-blue-100">DOCUMENT TRACKING</p>
-                    <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 px-6 py-7 sm:px-8">
+            <div class="max-w-3xl">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">DOCUMENT TRACKING</p>
+                    <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                         <?= htmlspecialchars($pageTitle) ?>
                     </h1>
-                    <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">
+                    <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
                         <?= htmlspecialchars($pageSubtitle) ?>
                     </p>
-                </div>
-                <div>
-                    <a href="<?= BASE_URL ?>/spsec/inbox?view=accepted"
-                       class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary hover:bg-blue-50 transition shadow-sm">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
-                        </svg>
-                        Back to Inbox
-                    </a>
-                </div>
             </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <!-- ── Statistics Cards ────────────────────────────────────────────────── -->
@@ -95,67 +86,95 @@ function formatCurrentLocation(array $doc): string
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
 
             <!-- Total Routed -->
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div class="flex items-start justify-between">
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-primary"></span>
+                <div class="flex items-start justify-between gap-3">
                     <div>
-                        <p class="text-sm text-gray-500">Total Routed</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalRouted) ?></p>
+                        <p class="text-xs font-medium text-gray-500">Total Routed</p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($totalRouted) ?></p>
+                        <p class="mt-1 text-[11px] text-gray-400">SP Secretary outbound</p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                         </svg>
-                    </div>
+                    </span>
                 </div>
-                <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-blue-50 px-2 py-1 font-medium text-primary">SP Secretary Outbound</span>
-                </div>
-            </div>
+            </article>
 
             <!-- Plenary Destinations -->
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div class="flex items-start justify-between">
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-violet-500"></span>
+                <div class="flex items-start justify-between gap-3">
                     <div>
-                        <p class="text-sm text-gray-500">Routed to Plenary</p>
-                        <p class="mt-2 text-3xl font-bold text-violet-700"><?= number_format($plenaryCount) ?></p>
+                        <p class="text-xs font-medium text-gray-500">Routed to Plenary</p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($plenaryCount) ?></p>
+                        <p class="mt-1 text-[11px] text-gray-400">For Session Floor</p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
                         </svg>
-                    </div>
+                    </span>
                 </div>
-                <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-violet-50 px-2 py-1 font-medium text-violet-700">For Session Floor</span>
-                </div>
-            </div>
+            </article>
 
             <!-- Committee Destinations -->
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div class="flex items-start justify-between">
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-amber-500"></span>
+                <div class="flex items-start justify-between gap-3">
                     <div>
-                        <p class="text-sm text-gray-500">Routed to Committee</p>
-                        <p class="mt-2 text-3xl font-bold text-amber-700"><?= number_format($committeeCount) ?></p>
+                        <p class="text-xs font-medium text-gray-500">Routed to Committee</p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($committeeCount) ?></p>
+                        <p class="mt-1 text-[11px] text-gray-400">In review</p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 100-8 4 4 0 000 8z"/>
                         </svg>
-                    </div>
+                    </span>
                 </div>
-                <div class="mt-4 flex items-center gap-2 text-xs">
-                    <span class="rounded-full bg-amber-50 px-2 py-1 font-medium text-amber-700">In Review</span>
-                </div>
-            </div>
+            </article>
 
         </div>
     </section>
 
+    <nav aria-label="Routed document status" class="flex gap-2 overflow-x-auto border-b border-gray-200">
+        <?php
+        $routedTabs = ['ongoing' => 'On Going', 'completed' => 'Completed', 'withdrawn' => 'Withdrawn'];
+        foreach ($routedTabs as $tabKey => $tabLabel):
+            $tabQuery = ['tab' => $tabKey];
+            if ($search !== '') $tabQuery['search'] = $search;
+            if ($filterStatus !== '') $tabQuery['status'] = $filterStatus;
+            if ($filterPhase !== '') $tabQuery['current_phase'] = $filterPhase;
+            if ($filterType !== '') $tabQuery['document_type'] = $filterType;
+        ?>
+            <a href="<?= BASE_URL ?>/spsec/routed?<?= htmlspecialchars(http_build_query($tabQuery), ENT_QUOTES, 'UTF-8') ?>"
+               aria-current="<?= $filterTab === $tabKey ? 'page' : 'false' ?>"
+               class="shrink-0 border-b-2 px-4 py-3 text-sm font-semibold transition <?= $filterTab === $tabKey
+                   ? 'border-primary text-primary'
+                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>">
+                <?= htmlspecialchars($tabLabel) ?>
+                <span class="ml-1 rounded-full px-2 py-0.5 text-xs <?= $filterTab === $tabKey ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-600' ?>">
+                    <?= number_format((int) ($tabCounts[$tabKey] ?? 0)) ?>
+                </span>
+            </a>
+        <?php endforeach; ?>
+    </nav>
+
     <!-- ── Documents Table Section ─────────────────────────────────────────── -->
-    <section class="rounded-2xl border border-gray-200 bg-white shadow-sm">
+    <section id="spsec-routed-list" class="rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <?php
+        $responsiveInboxId = 'spsec-routed-list';
+        $responsiveInboxLabels = [
+            'Tracking Number', 'Subject Matter', 'Routed To', 'Current Phase',
+            'Date Routed', 'Current Status', 'Routed By', 'Action',
+        ];
+        require __DIR__ . '/../../partials/responsive-inbox-table.php';
+        ?>
 
         <!-- Table Filters -->
-        <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 xl:flex-row xl:items-center xl:justify-between">
+        <div class="flex min-w-0 flex-col gap-4 border-b border-gray-100 px-5 py-5 md:px-6 xl:flex-row xl:items-center xl:justify-between">
             <div class="shrink-0">
                 <h2 class="whitespace-nowrap font-semibold text-gray-900">Routed Documents</h2>
                 <p class="mt-1 text-xs text-gray-500">
@@ -164,10 +183,11 @@ function formatCurrentLocation(array $doc): string
             </div>
 
             <form method="GET" action="<?= BASE_URL ?>/spsec/routed"
-                  class="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:flex xl:flex-1 xl:flex-wrap xl:items-center xl:justify-end xl:gap-2">
+                  class="hidden w-full min-w-0 flex-wrap items-center justify-end gap-2 xl:flex xl:flex-1">
+                <input type="hidden" name="tab" value="<?= htmlspecialchars($filterTab, ENT_QUOTES, 'UTF-8') ?>">
 
                 <!-- Search -->
-                <div class="relative min-w-0 xl:w-[360px] xl:flex-none">
+                <div class="relative w-full min-w-0 xl:w-[360px] xl:flex-none">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
                          fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -226,33 +246,93 @@ function formatCurrentLocation(array $doc): string
                 </button>
 
                 <?php if ($search !== '' || $filterStatus !== '' || $filterPhase !== '' || $filterType !== ''): ?>
-                    <a href="<?= BASE_URL ?>/spsec/routed"
+                    <a href="<?= BASE_URL ?>/spsec/routed?tab=<?= urlencode($filterTab) ?>"
                        class="inline-flex w-auto shrink-0 justify-self-end items-center justify-center whitespace-nowrap rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium
                               text-gray-700 hover:bg-gray-50 transition text-center">
                         Clear
                     </a>
                 <?php endif; ?>
             </form>
+
+            <div class="flex min-w-0 items-center gap-2 xl:hidden">
+                <form method="GET" action="<?= BASE_URL ?>/spsec/routed" class="relative min-w-0 flex-1">
+                    <input type="hidden" name="tab" value="<?= htmlspecialchars($filterTab, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="status" value="<?= htmlspecialchars((string) $filterStatus, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="current_phase" value="<?= htmlspecialchars($filterPhase, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="document_type" value="<?= htmlspecialchars((string) $filterType, ENT_QUOTES, 'UTF-8') ?>">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="search" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search tracking # or subject..."
+                           class="block w-full min-w-0 rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                </form>
+                <button type="button" data-inbox-filter-target="#spsec-routed-filter-sheet" aria-label="Open filters" aria-haspopup="dialog"
+                        class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 12h12m-9 8h6"/></svg>
+                    <?php if ($filterStatus !== '' || $filterPhase !== '' || $filterType !== ''): ?><span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"></span><?php endif; ?>
+                </button>
+            </div>
         </div>
 
+        <div id="spsec-routed-filter-sheet" class="fixed inset-0 z-50 hidden xl:hidden">
+            <button type="button" class="inbox-filter-backdrop absolute inset-0 bg-gray-950/40" aria-label="Close filters"></button>
+            <form method="GET" action="<?= BASE_URL ?>/spsec/routed" role="dialog" aria-modal="true" aria-labelledby="spsec-routed-filter-title"
+                  class="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl">
+                <input type="hidden" name="tab" value="<?= htmlspecialchars($filterTab, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="search" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
+                <div class="mb-5 flex items-center justify-between">
+                    <h3 id="spsec-routed-filter-title" class="font-semibold text-gray-900">Filters</h3>
+                    <button type="button" class="inbox-filter-close rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-100">Close</button>
+                </div>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700" for="spsec-routed-mobile-status">Document Status</label>
+                <select id="spsec-routed-mobile-status" name="status" class="mb-4 block w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-800">
+                    <option value="">All Document Statuses</option>
+                    <?php foreach ($documentStatuses as $st): ?>
+                        <option value="<?= (int) $st['id'] ?>" <?= $filterStatus == $st['id'] ? 'selected' : '' ?>><?= htmlspecialchars($st['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700" for="spsec-routed-mobile-phase">Current Phase</label>
+                <select id="spsec-routed-mobile-phase" name="current_phase" class="mb-4 block w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-800">
+                    <option value="">All Current Phases</option>
+                    <?php foreach ($documentPhases as $phaseValue => $phaseLabel): ?>
+                        <option value="<?= htmlspecialchars($phaseValue, ENT_QUOTES, 'UTF-8') ?>" <?= $filterPhase === $phaseValue ? 'selected' : '' ?>><?= htmlspecialchars($phaseLabel) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700" for="spsec-routed-mobile-type">Document Type</label>
+                <select id="spsec-routed-mobile-type" name="document_type" class="mb-5 block w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-800">
+                    <option value="">All Document Types</option>
+                    <?php foreach ($documentTypes as $type): ?>
+                        <option value="<?= (int) $type['id'] ?>" <?= $filterType == $type['id'] ? 'selected' : '' ?>><?= htmlspecialchars($type['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="grid <?= $search !== '' || $filterStatus !== '' || $filterPhase !== '' || $filterType !== '' ? 'grid-cols-2' : 'grid-cols-1' ?> gap-3">
+                    <button type="submit" class="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:opacity-90">Apply Filters</button>
+                    <?php if ($search !== '' || $filterStatus !== '' || $filterPhase !== '' || $filterType !== ''): ?>
+                        <a href="<?= BASE_URL ?>/spsec/routed?tab=<?= urlencode($filterTab) ?>" class="flex w-full items-center justify-center rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">Clear</a>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+
+        <?php require __DIR__ . '/../../partials/inbox-mobile-filter-script.php'; ?>
         <!-- Table -->
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
-                <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+            <table class="inbox-responsive-table w-full text-left text-sm">
+                <thead class="border-b border-gray-100 bg-gray-50/70 text-[11px] uppercase tracking-wide text-gray-500">
                     <tr>
-                        <th class="px-6 py-3 font-medium">Tracking Number</th>
-                        <th class="px-6 py-3 font-medium">Subject Matter</th>
-                        <th class="px-6 py-3 font-medium">Routed To</th>
-                        <th class="px-6 py-3 font-medium">Current Phase</th>
-                        <th class="px-6 py-3 font-medium">Date Routed</th>
-                        <th class="px-6 py-3 font-medium">Current Status</th>
-                        <th class="px-6 py-3 font-medium">Routed By</th>
-                        <th class="px-6 py-3 font-medium text-right">Action</th>
+                        <th class="px-6 py-3 font-bold">Tracking Number</th>
+                        <th class="px-6 py-3 font-bold">Subject Matter</th>
+                        <th class="px-6 py-3 font-bold">Routed To</th>
+                        <th class="px-6 py-3 font-bold">Current Phase</th>
+                        <th class="px-6 py-3 font-bold">Date Routed</th>
+                        <th class="px-6 py-3 font-bold">Current Status</th>
+                        <th class="px-6 py-3 font-bold">Routed By</th>
+                        <th class="px-6 py-3 text-right font-bold">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php if (empty($documents)): ?>
-                        <tr>
+                        <tr class="inbox-empty-row">
                             <td colspan="8" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -307,14 +387,14 @@ function formatCurrentLocation(array $doc): string
                                 <!-- Routed to: Plenary or Committee -->
                                 <td class="px-6 py-4">
                                     <?php if ($doc['to_phase'] === 'PLENARY'): ?>
-                                        <span class="inline-flex items-center gap-1 rounded-lg bg-violet-50 border border-violet-200 px-2.5 py-1 text-xs font-medium text-violet-700">
+                                        <span class="inline-flex max-w-full items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700">
                                             <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
                                             </svg>
                                             Plenary
                                         </span>
                                     <?php elseif ($doc['to_phase'] === 'COMMITTEE'): ?>
-                                        <span class="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700">
+                                        <span class="inline-flex max-w-full items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
                                             <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 100-8 4 4 0 000 8z"/>
                                             </svg>
@@ -346,10 +426,10 @@ function formatCurrentLocation(array $doc): string
 
                                 <!-- Current status -->
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold shadow-sm"
-                                          style="background-color: <?= htmlspecialchars($statusColor) ?>;
-                                                 border-color: <?= htmlspecialchars($statusColor) ?>;
-                                                 color: white;">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                                          style="background-color: <?= htmlspecialchars($statusColor) ?>1a;
+                                                 color: <?= htmlspecialchars($statusColor) ?>;">
+                                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($statusColor) ?>;"></span>
                                         <?= htmlspecialchars($doc['status'] ?? '—') ?>
                                     </span>
                                 </td>
@@ -369,18 +449,15 @@ function formatCurrentLocation(array $doc): string
                                 <!-- Action: Details link -->
                                 <td class="px-6 py-4 text-right whitespace-nowrap">
                                     <a href="<?= BASE_URL ?>/spsec/routed/show?id=<?= (int)$doc['id'] ?>"
-                                       class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200
-                                              px-3 py-1.5 text-xs font-medium text-gray-700
-                                              hover:border-primary hover:bg-blue-50 hover:text-primary transition"
-                                       title="View Details">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                       class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:border-primary hover:bg-primary hover:text-white"
+                                       title="View Details" aria-label="View routed document details">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7
                                                      -1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
-                                        View Details
                                     </a>
                                 </td>
 
@@ -405,6 +482,7 @@ function formatCurrentLocation(array $doc): string
                 if ($filterStatus !== '') $qArgs['status']         = $filterStatus;
                 if ($filterPhase !== '')  $qArgs['current_phase']  = $filterPhase;
                 if ($filterType !== '')   $qArgs['document_type']  = $filterType;
+                $qArgs['tab'] = $filterTab;
                 $qs = !empty($qArgs) ? '&' . http_build_query($qArgs) : '';
                 ?>
                 <?php if ($page > 1): ?>

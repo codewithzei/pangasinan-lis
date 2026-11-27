@@ -404,6 +404,10 @@ $renderLegislativeEditors = static function (string $title, array $tables) use (
         <p><span class="font-semibold">Correction only:</span> Document status, routing, assignments, and finalized or filed workflow state are protected here. Every saved correction is recorded in the document timeline and audit history.</p>
     </div>
 
+    <?php
+    require __DIR__ . '/../../partials/mfr-relationship.php';
+    ?>
+
     <form method="POST" action="<?= BASE_URL ?>/master/documents/update" class="space-y-6">
         <input type="hidden" name="id" value="<?= (int)$document['id'] ?>">
         <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">

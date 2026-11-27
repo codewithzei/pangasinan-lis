@@ -172,8 +172,10 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
             <div>
                 <p class="text-xs font-medium text-gray-500">Current Status</p>
                 <?php if (!empty($document['status_badge_color'])): ?>
-                    <span class="mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
-                          style="background-color: <?= htmlspecialchars($document['status_badge_color']) ?>;">
+                    <span class="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                          style="background-color: <?= htmlspecialchars($document['status_badge_color']) ?>1a;
+                                 color: <?= htmlspecialchars($document['status_badge_color']) ?>;">
+                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($document['status_badge_color']) ?>;"></span>
                         <?= htmlspecialchars($document['status'] ?? '') ?>
                     </span>
                 <?php else: ?>
@@ -205,55 +207,6 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
          Editing and routing are blocked until the document is accepted.
     ═══════════════════════════════════════════════════════════════════ -->
 
-    <!-- Read-only document summary -->
-    <section class="rounded-2xl border border-gray-200 bg-white p-6">
-        <h2 class="text-lg font-semibold text-gray-900">Document Details</h2>
-        <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-            <div>
-                <dt class="text-xs font-medium text-gray-500">Subject Matter</dt>
-                <dd class="mt-1 text-sm text-gray-900"><?= nl2br(escape_trimmed_text($document['subject_matter'] ?? '—')) ?></dd>
-            </div>
-            <div>
-                <dt class="text-xs font-medium text-gray-500">Document Type</dt>
-                <dd class="mt-1">
-                    <?php if (!empty($document['document_type_badge_color'])): ?>
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
-                              style="background-color: <?= htmlspecialchars($document['document_type_badge_color']) ?>;">
-                            <?= htmlspecialchars($document['document_type_name'] ?? '') ?>
-                        </span>
-                    <?php else: ?>
-                        <span class="text-sm text-gray-900"><?= htmlspecialchars($document['document_type_name'] ?? '—') ?></span>
-                    <?php endif; ?>
-                </dd>
-            </div>
-            <div>
-                <dt class="text-xs font-medium text-gray-500">Source Type</dt>
-                <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_type'] ?? '—') ?></dd>
-            </div>
-            <?php if (!empty($document['external_office_name'])): ?>
-            <div>
-                <dt class="text-xs font-medium text-gray-500">Provincial Government Offices</dt>
-                <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['external_office_name']) ?></dd>
-            </div>
-            <?php elseif (!empty($document['hospital_name'])): ?>
-            <div>
-                <dt class="text-xs font-medium text-gray-500">Hospital</dt>
-                <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['hospital_name']) ?></dd>
-            </div>
-            <?php elseif (!empty($document['source_name'])): ?>
-            <div>
-                <dt class="text-xs font-medium text-gray-500">Source Name</dt>
-                <dd class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_name']) ?></dd>
-            </div>
-            <?php endif; ?>
-            <?php if (!empty($document['remarks'])): ?>
-            <div class="sm:col-span-2">
-                <dt class="text-xs font-medium text-gray-500">Remarks</dt>
-                <dd class="mt-1 text-sm text-gray-900"><?= nl2br(escape_trimmed_text($document['remarks'])) ?></dd>
-            </div>
-            <?php endif; ?>
-        </dl>
-    </section>
 
     <?php if (!empty($attachments)): ?>
     <section class="rounded-2xl border border-gray-200 bg-white p-6">
@@ -703,14 +656,14 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
 
             <div class="mt-4">
                 <div class="flex items-center justify-center w-full">
-                    <label for="attachmentFileInput"
-                           class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    <label for="attachmentFileInput" data-attachment-dropzone
+                           class="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition hover:bg-gray-100">
                         <div class="flex flex-col items-center justify-center pt-5 pb-6">
                             <svg class="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                             </svg>
                             <p class="mb-1 text-sm text-gray-600"><span class="font-semibold">Click to upload</span> or drag and drop</p>
-                            <p class="text-xs text-gray-500">PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (MAX. 25MB each)</p>
+                            <p class="text-xs text-gray-500">PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (MAX. 25 MB each)</p>
                         </div>
                         <!-- form= links this input to editDocumentForm so it submits with Save & Route to Admin -->
                         <input id="attachmentFileInput" name="attachments[]" type="file" multiple

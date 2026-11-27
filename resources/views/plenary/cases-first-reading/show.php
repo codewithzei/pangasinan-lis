@@ -33,6 +33,7 @@ ob_start();
 ?>
 
 <div class="detail-page space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
 
 
@@ -128,8 +129,9 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                 <div>
                     <p class="text-xs text-gray-400">Status</p>
                     <?php $bc = $document['status_badge_color'] ?? '#6B7280'; ?>
-                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
-                          style="background-color:<?= htmlspecialchars($bc) ?>;">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                          style="background-color:<?= htmlspecialchars($bc) ?>1a; color:<?= htmlspecialchars($bc) ?>;">
+                        <span class="h-1.5 w-1.5 rounded-full" style="background-color:<?= htmlspecialchars($bc) ?>;"></span>
                         <?= htmlspecialchars($document['status'] ?? '') ?>
                     </span>
                 </div>

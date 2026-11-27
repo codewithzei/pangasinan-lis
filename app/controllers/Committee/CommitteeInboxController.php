@@ -280,6 +280,11 @@ class CommitteeInboxController
                 da.decision,
                 da.accepted_by,
                 da.assigned_to_user_id,
+                COALESCE(
+                    NULLIF(TRIM(CONCAT_WS(' ', sender_info.first_name, sender_info.last_name)), ''),
+                    sender_user.username,
+                    '—'
+                )                            AS sent_by_display,
                 d.id                         AS document_id,
                 d.tracking_number,
                 d.subject_matter,
@@ -293,7 +298,6 @@ class CommitteeInboxController
                 ds.badge_color               AS status_badge_color,
                 st.name                      AS source_type,
                 COALESCE(eo.name, h.name, m.name, d.source_name, '—') AS source_display,
-                GROUP_CONCAT(c.name ORDER BY c.name SEPARATOR ', ') AS committee_names,
                 accepted_user.username       AS accepted_by_username,
                 CONCAT(
                     COALESCE(accepted_info.first_name, ''),
@@ -308,14 +312,15 @@ class CommitteeInboxController
             LEFT  JOIN provincial_government_offices  eo            ON d.external_office_id     = eo.id
             LEFT  JOIN hospitals          h            ON d.hospital_id            = h.id
             LEFT  JOIN municities         m            ON d.municipality_id        = m.id
-            LEFT  JOIN document_committees dc          ON d.id                     = dc.document_id
-            LEFT  JOIN committees         c            ON dc.committee_id          = c.id
-            LEFT  JOIN user_accounts     accepted_user ON da.accepted_by           = accepted_user.id
+            LEFT  JOIN user_accounts      sender_user  ON da.assigned_by            = sender_user.id
+            LEFT  JOIN user_info          sender_info  ON sender_user.id            = sender_info.user_account_id
+            LEFT  JOIN user_accounts     accepted_user ON da.accepted_by            = accepted_user.id
             LEFT  JOIN user_info         accepted_info ON accepted_user.id         = accepted_info.user_account_id
             WHERE {$whereClause}
             GROUP BY
                 da.id, da.received_at, da.accepted_at, da.decision,
                 da.accepted_by, da.assigned_to_user_id,
+                sender_user.username, sender_info.first_name, sender_info.last_name,
                 d.id, d.tracking_number, d.subject_matter, d.document_type_id,
                 dt.name, dt.badge_color, d.current_phase, d.date_received, d.time_received,
                 ds.name, ds.badge_color, st.name, eo.name, h.name, m.name, d.source_name,

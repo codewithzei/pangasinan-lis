@@ -37,6 +37,7 @@ ob_start();
 ?>
 
 <div class="detail-page space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
 
 
@@ -125,8 +126,9 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                 <div>
                     <p class="text-xs text-gray-400">Status</p>
                     <?php $bc = $document['status_badge_color'] ?? '#6B7280'; ?>
-                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
-                          style="background-color: <?= htmlspecialchars($bc) ?>;">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                          style="background-color: <?= htmlspecialchars($bc) ?>1a; color: <?= htmlspecialchars($bc) ?>;">
+                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($bc) ?>;"></span>
                         <?= htmlspecialchars($document['status'] ?? '') ?>
                     </span>
                 </div>
@@ -355,10 +357,9 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                                  role="button"
                                  tabindex="0"
                                  aria-label="Drop final output files here or click to browse"
-                                 class="relative flex flex-col items-center justify-center gap-2
+                                 class="relative flex h-32 w-full flex-col items-center justify-center gap-2
                                         rounded-xl border-2 border-dashed border-gray-300 bg-gray-50
-                                        px-6 py-8 text-center transition
-                                        hover:border-primary hover:bg-primary/5
+                                        px-4 text-center transition hover:bg-gray-100
                                         focus:outline-none focus:ring-2 focus:ring-primary/40
                                         cursor-pointer">
 
@@ -368,12 +369,12 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                                           d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                                 </svg>
 
-                                <p class="text-sm font-medium text-gray-700 pointer-events-none">
-                                    Drag &amp; drop files here, or
+                                <p class="mb-1 text-sm text-gray-600 pointer-events-none">
+                                    <span class="font-semibold">Click to upload</span> or drag and drop
                                     <span class="text-primary underline-offset-2 hover:underline">browse</span>
                                 </p>
-                                <p class="text-xs text-gray-400 pointer-events-none">
-                                    Up to 10 files · max 25 MB each · PDF, DOC, DOCX, XLS, XLSX, JPG, PNG
+                                <p class="text-xs text-gray-500 pointer-events-none">
+                                    PDF, Word, Excel, images (MAX. 25 MB each)
                                 </p>
 
                                 <!-- Active-drag overlay -->

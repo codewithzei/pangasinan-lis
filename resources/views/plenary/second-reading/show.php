@@ -52,6 +52,7 @@ ob_start();
 ?>
 
 <div class="detail-page space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
 
 
@@ -126,8 +127,10 @@ ob_start();
                 <?php if (!empty($document['status_name'])): ?>
                 <div>
                     <p class="text-xs text-gray-400">Current Status</p>
-                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold text-white"
-                          style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                          style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>1a;
+                                 color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;">
+                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;"></span>
                         <?= htmlspecialchars($document['status_name']) ?>
                     </span>
                 </div>

@@ -61,9 +61,9 @@ class PlenaryDashboardController
                      AND (da.assigned_to_user_id IS NULL OR da.assigned_to_user_id = ?)
                      AND d.current_phase = 'PLENARY'
                      AND d.finalized_at IS NULL
-                     AND d.current_status_id NOT IN (
+                     AND d.current_status_id IN (
                          SELECT id FROM document_statuses
-                         WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
+                         WHERE name IN ('Pending', 'Returned to Plenary')
                            AND is_active = 1
                            AND is_deleted = 0
                      )
@@ -81,16 +81,9 @@ class PlenaryDashboardController
                      AND (da.accepted_by = ? OR da.assigned_to_user_id = ?)
                      AND d.current_phase = 'PLENARY'
                      AND d.finalized_at IS NULL
-                     AND d.current_status_id NOT IN (
+                     AND d.current_status_id IN (
                          SELECT id FROM document_statuses
-                         WHERE name IN (
-                             'Awaiting First Reading',
-                             'Returned to Plenary',
-                             'Approved',
-                             'Plenary Comm: Finalized',
-                             'Plenary Cases: Finalized',
-                             'Plenary: Committee Report Adopted'
-                         )
+                         WHERE name IN ('Pending', 'For Encoding')
                            AND is_active = 1
                            AND is_deleted = 0
                      )

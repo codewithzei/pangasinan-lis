@@ -23,6 +23,7 @@ ob_start();
 ?>
 
 <div class="space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
         <div class="relative px-6 py-7 sm:px-8">
             <div class="relative z-10">

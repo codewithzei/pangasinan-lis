@@ -411,24 +411,23 @@ ob_start();
                             </p>
                             <div id="opinionDropzone"
                                  role="button" aria-label="Choose or drop opinion documents" tabindex="0"
-                                 class="flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl
-                                        border-2 border-dashed border-gray-300 bg-gray-50 px-4 text-center
-                                        transition hover:border-primary hover:bg-blue-50">
+                                 class="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl
+                                        border-2 border-dashed border-gray-300 bg-gray-50 px-4 text-center transition hover:bg-gray-100">
                                 <input type="file" id="opinionFiles" name="opinion_files[]" multiple
                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" class="hidden">
                                 <div class="flex flex-col items-center justify-center py-3">
-                                    <svg class="mb-1 h-6 w-6 text-gray-400" fill="none" stroke="currentColor"
+                                    <svg class="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor"
                                          viewBox="0 0 24 24" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9
                                                  M15 13l-3-3m0 0l-3 3m3-3v12"/>
                                     </svg>
-                                    <p class="text-xs text-gray-500">
+                                    <p class="mb-1 text-sm text-gray-600">
                                         <span class="font-semibold text-gray-700">Click to upload</span>
                                         or drag and drop
                                     </p>
-                                    <p class="mt-1 text-[10px] text-gray-400">
-                                        PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, WEBP · Max 25 MB each · Up to 10 files
+                                    <p class="text-xs text-gray-500">
+                                        PDF, Word, Excel, images (MAX. 25 MB each)
                                     </p>
                                 </div>
                             </div>
@@ -457,24 +456,23 @@ ob_start();
                             </p>
                             <div id="complianceDropzone"
                                  role="button" aria-label="Choose or drop compliance documents" tabindex="0"
-                                 class="flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl
-                                        border-2 border-dashed border-gray-300 bg-gray-50 px-4 text-center
-                                        transition hover:border-primary hover:bg-blue-50">
+                                 class="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl
+                                        border-2 border-dashed border-gray-300 bg-gray-50 px-4 text-center transition hover:bg-gray-100">
                                 <input type="file" id="complianceFiles" name="compliance_files[]" multiple
                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" class="hidden">
                                 <div class="flex flex-col items-center justify-center py-3">
-                                    <svg class="mb-1 h-6 w-6 text-gray-400" fill="none" stroke="currentColor"
+                                    <svg class="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor"
                                          viewBox="0 0 24 24" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9
                                                  M15 13l-3-3m0 0l-3 3m3-3v12"/>
                                     </svg>
-                                    <p class="text-xs text-gray-500">
+                                    <p class="mb-1 text-sm text-gray-600">
                                         <span class="font-semibold text-gray-700">Click to upload</span>
                                         or drag and drop
                                     </p>
-                                    <p class="mt-1 text-[10px] text-gray-400">
-                                        PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, WEBP · Max 25 MB each · Up to 10 files
+                                    <p class="text-xs text-gray-500">
+                                        PDF, Word, Excel, images (MAX. 25 MB each)
                                     </p>
                                 </div>
                             </div>

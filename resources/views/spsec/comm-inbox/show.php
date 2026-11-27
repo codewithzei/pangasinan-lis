@@ -28,6 +28,7 @@ ob_start();
 ?>
 
 <div class="detail-page space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
 
 
@@ -75,8 +76,9 @@ ob_start();
                 <?php if (!empty($document['status'])): ?>
                 <div>
                     <p class="text-xs text-gray-400">Status</p>
-                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
                           style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>1a; color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;">
+                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;"></span>
                         <?= htmlspecialchars($document['status']) ?>
                     </span>
                 </div>
@@ -191,30 +193,9 @@ ob_start();
             </div>
             <?php endif; ?>
 
-            <!-- Route history -->
-            <?php if (!empty($routes)): ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-600">Route History</h2>
-                <div class="space-y-2">
-                    <?php foreach ($routes as $r): ?>
-                        <div class="flex items-start gap-3 border-b border-gray-50 pb-2 last:border-0 last:pb-0">
-                            <div class="h-2 w-2 mt-1.5 rounded-full bg-gray-300 shrink-0"></div>
-                            <div>
-                                <p class="text-xs text-gray-500">
-                                    <?= htmlspecialchars($r['from_phase'] ?? '') ?> → <?= htmlspecialchars($r['to_phase'] ?? '') ?>
-                                    <?php if (!empty($r['routing_option_name'])): ?>
-                                        <span class="text-gray-400">(<?= htmlspecialchars($r['routing_option_name']) ?>)</span>
-                                    <?php endif; ?>
-                                </p>
-                                <p class="text-xs text-gray-400"><?= htmlspecialchars(date('M j, Y', strtotime($r['created_at']))) ?></p>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php endif; ?>
-
             <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+
+            <?php require __DIR__ . '/../../partials/assignment-history.php'; ?>
 
         </div>
     </div>

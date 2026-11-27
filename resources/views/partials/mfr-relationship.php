@@ -49,6 +49,7 @@
 $mfrLink        = $mfrLink        ?? null;
 $relatedMotions = $relatedMotions ?? [];
 $mfrDetailRoute = rtrim($mfrDetailRoute ?? 'admin/inbox', '/');
+$mfrDetailAction = $mfrDetailAction ?? 'show';
 
 // ── Nothing to show? Exit immediately ─────────────────────────────────────────
 if (empty($mfrLink) && empty($relatedMotions)) {
@@ -66,38 +67,39 @@ if (empty($mfrLink) && empty($relatedMotions)) {
         This Motion for Reconsideration challenges the following finalized case.
     </p>
 
-    <?php if (!empty($mfrLink['outcome']) && $mfrLink['outcome'] !== 'PENDING'): ?>
     <?php
-        $mfrGranted = $mfrLink['outcome'] === 'GRANTED';
-        $mfrOutcomeClass = $mfrGranted
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-            : 'border-red-200 bg-red-50 text-red-900';
+        $mfrOutcome = strtoupper(trim((string) ($mfrLink['outcome'] ?? 'PENDING')));
+        $mfrOutcome = in_array($mfrOutcome, ['GRANTED', 'DENIED'], true) ? $mfrOutcome : 'PENDING';
+        $mfrOutcomeConfig = match ($mfrOutcome) {
+            'GRANTED' => ['accent' => 'border-l-emerald-500', 'badge' => 'border-emerald-200 bg-emerald-50 text-emerald-700'],
+            'DENIED' => ['accent' => 'border-l-red-500', 'badge' => 'border-red-200 bg-red-50 text-red-700'],
+            default => ['accent' => 'border-l-gray-400', 'badge' => 'border-gray-200 bg-gray-50 text-gray-600'],
+        };
     ?>
-    <div class="mt-4 rounded-2xl border <?= $mfrOutcomeClass ?> p-4">
-        <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full <?= $mfrGranted ? 'bg-emerald-600' : 'bg-red-600' ?> text-white">
-                <?php if ($mfrGranted): ?>
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                <?php else: ?>
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                <?php endif; ?>
+    <div class="mt-4">
+        <div class="flex flex-wrap items-center gap-2.5">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Plenary Outcome</p>
+            <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-bold <?= $mfrOutcomeConfig['badge'] ?>">
+                <?= htmlspecialchars(ucwords(strtolower($mfrOutcome))) ?>
             </span>
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wide opacity-75">Plenary Outcome</p>
-                <p class="mt-0.5 text-lg font-bold"><?= htmlspecialchars($mfrLink['outcome']) ?></p>
-                <?php if (!empty($mfrLink['outcome_remarks'])): ?>
-                <p class="mt-1 text-sm opacity-90"><?= htmlspecialchars($mfrLink['outcome_remarks']) ?></p>
-                <?php endif; ?>
-            </div>
+            <?php if (!empty($mfrLink['outcome_at'])): ?>
+            <span class="text-xs text-gray-500">
+                <?= htmlspecialchars(date('M j, Y · g:i A', strtotime($mfrLink['outcome_at']))) ?>
+            </span>
+            <?php endif; ?>
         </div>
+        <?php if (!empty($mfrLink['outcome_remarks'])): ?>
+        <blockquote class="mt-2 border-l-2 border-gray-300 pl-3 text-sm italic leading-relaxed text-gray-600">
+            &ldquo;<?= htmlspecialchars(trim((string) $mfrLink['outcome_remarks'])) ?>&rdquo;
+        </blockquote>
+        <?php endif; ?>
     </div>
-    <?php endif; ?>
 
     <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
 
         <div>
             <p class="text-xs font-medium text-gray-500">Tracking Number</p>
-            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/show?id=<?= (int) ($mfrLink['ref_id'] ?? $mfrLink['referenced_document_id'] ?? 0) ?>"
+            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($mfrLink['ref_id'] ?? $mfrLink['referenced_document_id'] ?? 0) ?>"
                class="mt-1 text-sm font-semibold text-primary hover:underline">
                 <?= htmlspecialchars($mfrLink['ref_tracking_number'] ?? '—') ?>
             </a>
@@ -118,11 +120,12 @@ if (empty($mfrLink) && empty($relatedMotions)) {
             </p>
         </div>
 
-        <?php if (!empty($mfrLink['ref_docket_number'])): ?>
+        <?php $refCaseNumber = trim((string) ($mfrLink['ref_case_number'] ?? $mfrLink['ref_docket_number'] ?? '')); ?>
+        <?php if ($refCaseNumber !== ''): ?>
         <div>
-            <p class="text-xs font-medium text-gray-500">Docket Number</p>
-            <p class="mt-1 text-sm font-mono text-gray-900">
-                <?= htmlspecialchars($mfrLink['ref_docket_number']) ?>
+            <p class="text-xs font-medium text-gray-500">Case Number</p>
+            <p class="mt-1 text-sm font-mono font-semibold text-gray-900">
+                <?= htmlspecialchars($refCaseNumber) ?>
             </p>
         </div>
         <?php endif; ?>
@@ -167,7 +170,7 @@ if (empty($mfrLink) && empty($relatedMotions)) {
     </div><!-- /grid -->
 
     <div class="mt-4">
-        <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/show?id=<?= (int) ($mfrLink['ref_id'] ?? $mfrLink['referenced_document_id'] ?? 0) ?>"
+        <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($mfrLink['ref_id'] ?? $mfrLink['referenced_document_id'] ?? 0) ?>"
            class="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-50 transition">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -204,7 +207,7 @@ if (empty($mfrLink) && empty($relatedMotions)) {
         <div class="rounded-xl border border-purple-200 bg-white p-4">
             <div class="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                    <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/show?id=<?= (int) ($motion['mfr_document_id'] ?? 0) ?>"
+                    <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($motion['mfr_document_id'] ?? 0) ?>"
                        class="text-sm font-semibold text-primary hover:underline">
                         <?= htmlspecialchars($motion['mfr_tracking_number'] ?? '—') ?>
                     </a>
@@ -243,7 +246,7 @@ if (empty($mfrLink) && empty($relatedMotions)) {
                 <?php endif; ?>
             </div>
 
-            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/show?id=<?= (int) ($motion['mfr_document_id'] ?? 0) ?>"
+            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($motion['mfr_document_id'] ?? 0) ?>"
                class="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium">
                 View Motion
                 <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

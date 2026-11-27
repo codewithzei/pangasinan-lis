@@ -30,6 +30,7 @@ $disapprovedCount = count(array_filter($adoptions, static fn(array $item): bool 
 ob_start();
 ?>
 <div class="detail-page space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
     <a href="<?= BASE_URL ?>/plenary/reports"
        class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary">
         <span aria-hidden="true">←</span> Back to Plenary Reports

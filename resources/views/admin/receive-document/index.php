@@ -513,8 +513,8 @@ ob_start();
 
                 <div class="mt-4">
                     <div class="flex items-center justify-center w-full">
-                        <label for="attachments"
-                               class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100">
+                        <label for="attachments" data-attachment-dropzone
+                               class="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition hover:bg-gray-100">
                             <div class="flex flex-col items-center justify-center pt-5 pb-6">
                                 <svg class="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

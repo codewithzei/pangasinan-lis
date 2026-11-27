@@ -448,22 +448,21 @@ ob_start();
                             <span class="font-normal text-gray-400">(optional)</span>
                         </label>
                         <div id="sharedReportDropZone"
-                             class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2
-                                    border-dashed border-gray-300 bg-gray-50 px-5 py-7 text-center transition
-                                    hover:border-emerald-400 hover:bg-emerald-50/50"
+                             class="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2
+                                    border-dashed border-gray-300 bg-gray-50 px-4 text-center transition hover:bg-gray-100"
                              role="button" tabindex="0" aria-label="Choose or drop report attachments">
-                            <svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <svg class="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                             </svg>
-                            <p class="mt-2 text-sm font-medium text-gray-700">
-                                Drop files here or
+                            <p class="mb-1 text-sm text-gray-600">
+                                <span class="font-semibold">Click to upload</span> or drag and drop
                                 <button type="button" id="sharedReportBrowseBtn" class="text-emerald-700 underline hover:text-emerald-900">
-                                    browse
+                                    Browse files
                                 </button>
                             </p>
-                            <p class="mt-1 text-xs text-gray-400">
-                                PDF, Word, Excel, or images · Up to 10 files · 25 MB each
+                            <p class="text-xs text-gray-500">
+                                PDF, Word, Excel, images (MAX. 25 MB each)
                             </p>
                             <input type="file" name="attachments[]" id="sharedReportFileInput" multiple
                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" class="sr-only">

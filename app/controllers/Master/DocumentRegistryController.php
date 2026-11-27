@@ -796,6 +796,14 @@ class DocumentRegistryController
         old_clear();
         $success = null;
         $error = null;
+
+        require_once __DIR__ . '/../../services/DocumentService.php';
+        $mfrService = new DocumentService($this->pdo);
+        $mfrLink = $mfrService->getMotionLink($id);
+        $relatedMotions = $mfrService->getRelatedMotions($id);
+        $mfrDetailRoute = 'master/documents';
+        $mfrDetailAction = 'edit';
+
         $pageTitle = 'Correct Document Details';
         $pageSubtitle = 'Review the document record and save corrections. Changes are recorded in the audit history.';
 

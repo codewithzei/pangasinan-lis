@@ -211,6 +211,26 @@ class SpsecCommInboxController
 
         // Route history (for context)
         $routes = $this->fetchRoutes($documentId);
+        $assignmentsStmt = $this->pdo->prepare("
+            SELECT
+                da.*,
+                r.name AS role_name,
+                assigned.username AS assigned_to_username,
+                assigner.username AS assigned_by_username,
+                accepted.username AS accepted_by_username,
+                CONCAT(COALESCE(accepted_info.first_name, ''), ' ', COALESCE(accepted_info.last_name, '')) AS accepted_by_fullname
+            FROM document_assignments da
+            LEFT JOIN roles r ON r.id = da.assigned_to_role_id
+            LEFT JOIN user_accounts assigned ON assigned.id = da.assigned_to_user_id
+            LEFT JOIN user_accounts assigner ON assigner.id = da.assigned_by
+            LEFT JOIN user_accounts accepted ON accepted.id = da.accepted_by
+            LEFT JOIN user_info accepted_info ON accepted_info.user_account_id = accepted.id
+            WHERE da.document_id = ?
+            ORDER BY da.created_at ASC, da.id ASC
+        ");
+        $assignmentsStmt->execute([$documentId]);
+        $assignments = $assignmentsStmt->fetchAll();
+
         $documentEvents = $this->docService->getDocumentEvents($documentId);
         $resubmissionReference = $this->docService->getResubmissionReference($documentId);
         $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);

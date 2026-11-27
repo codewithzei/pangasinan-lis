@@ -74,16 +74,9 @@ function check(string $label, bool $cond, string $detail = ''): void {
 
 // ── Controller predicate mirrors (must match PlenaryInboxController) ────────
 const ACCEPTED_STILL_PROCESSING = "
-    d.current_status_id NOT IN (
+    d.current_status_id IN (
         SELECT id FROM document_statuses
-        WHERE name IN (
-            'Awaiting First Reading',
-            'Returned to Plenary',
-            'Approved',
-            'Plenary Comm: Finalized',
-            'Plenary Cases: Finalized',
-            'Plenary: Committee Report Adopted'
-        )
+        WHERE name IN ('Pending', 'For Encoding')
           AND is_active  = 1
           AND is_deleted = 0
     )
@@ -104,9 +97,9 @@ const ACCEPTED_STILL_PROCESSING = "
     )
 ";
 
-const OUTCOME_STATUS_IDS_SQL = "
+const PENDING_INBOX_STATUS_IDS_SQL = "
     SELECT id FROM document_statuses
-    WHERE name IN ('Deferred','Lay on the Table','Noted','Remanded','Withdrawn')
+    WHERE name = 'Pending'
       AND is_active  = 1
       AND is_deleted = 0
 ";
@@ -158,8 +151,15 @@ check('S2: list SELECT query joins plenary_document_details pdd', $hasListJoin,
 // have silently dropped the outcome/accepted filtering).
 check('S3: outcome-tab filter still uses pdd.status_id',
     str_contains($indexBody, 'pdd.status_id = ('));
-check('S4: accepted-tab partition still excludes outcome statuses via pdd.status_id',
-    str_contains($indexBody, 'pdd.status_id IS NULL OR pdd.status_id NOT IN'));
+check('S4: accepted-tab uses the explicit processing-status predicate',
+    str_contains($indexBody, 'self::ACCEPTED_STILL_PROCESSING'));
+check('S4b: accepted predicate only permits Pending / For Encoding shared statuses',
+    str_contains($source, "name IN ('Pending', 'For Encoding')"));
+check('S4c: accepted predicate excludes non-processing Plenary statuses',
+    str_contains($source, "pdd.status_id IS NULL"));
+check('S4d: inbox list and badge use the same incoming-status allowlist',
+    substr_count($source, 'self::PENDING_INBOX_STATUS_IDS_SQL') >= 2
+    && str_contains($source, "WHERE name = 'Pending'"));
 
 // fetchTabCounts already joined pdd before the fix — make sure it still does,
 // so badge counts and list counts cannot drift.
@@ -177,6 +177,12 @@ $pendingCountSql = ($pendingCountStart !== false && $pendingCountEnd !== false)
     : '';
 check('S6: pending inbox count does not reference pdd without joining it',
     $pendingCountSql !== '' && !str_contains($pendingCountSql, 'pdd.status_id'));
+check('S6b: pending inbox count uses the allowed Plenary incoming statuses',
+str_contains($pendingCountSql, 'self::PENDING_INBOX_STATUS_IDS_SQL'));
+$dashboardSource = file_get_contents(__DIR__ . '/../app/controllers/Plenary/PlenaryDashboardController.php');
+check('S7: dashboard counts use the same explicit incoming and processing statuses',
+str_contains($dashboardSource, "name IN ('Pending', 'Returned to Plenary')")
+&& str_contains($dashboardSource, "name IN ('Pending', 'For Encoding')"));
 
 // =====================================================================
 // GROUP F — Functional: the exact controller SQL runs against the live
@@ -208,12 +214,7 @@ function countForView(PDO $pdo, int $roleId, int $userId, string $view, string $
               AND newer_da.id > da.id
         )';
         $where[] = 'd.finalized_at IS NULL';
-        $where[] = "d.current_status_id NOT IN (
-            SELECT id FROM document_statuses
-            WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
-              AND is_active = 1
-              AND is_deleted = 0
-        )";
+        $where[] = 'd.current_status_id IN (' . PENDING_INBOX_STATUS_IDS_SQL . ')';
         $params[] = $userId;
     } elseif ($isOutcomeView) {
         $where[] = "da.decision = 'ACCEPTED'";
@@ -234,7 +235,6 @@ function countForView(PDO $pdo, int $roleId, int $userId, string $view, string $
         $params[] = $userId;
         $params[] = $userId;
         $where[] = '(' . ACCEPTED_STILL_PROCESSING . ')';
-        $where[] = '(pdd.status_id IS NULL OR pdd.status_id NOT IN (' . OUTCOME_STATUS_IDS_SQL . '))';
     }
 
     if ($search !== '') {
@@ -278,12 +278,7 @@ function listForView(PDO $pdo, int $roleId, int $userId, string $view, string $s
               AND newer_da.id > da.id
         )';
         $where[] = 'd.finalized_at IS NULL';
-        $where[] = "d.current_status_id NOT IN (
-            SELECT id FROM document_statuses
-            WHERE name IN ('Approved', 'Plenary Comm: Finalized', 'Plenary Cases: Finalized')
-              AND is_active = 1
-              AND is_deleted = 0
-        )";
+        $where[] = 'd.current_status_id IN (' . PENDING_INBOX_STATUS_IDS_SQL . ')';
         $params[] = $userId;
     } elseif ($isOutcomeView) {
         $where[] = "da.decision = 'ACCEPTED'";
@@ -304,7 +299,6 @@ function listForView(PDO $pdo, int $roleId, int $userId, string $view, string $s
         $params[] = $userId;
         $params[] = $userId;
         $where[] = '(' . ACCEPTED_STILL_PROCESSING . ')';
-        $where[] = '(pdd.status_id IS NULL OR pdd.status_id NOT IN (' . OUTCOME_STATUS_IDS_SQL . '))';
     }
 
     if ($search !== '') {
@@ -348,9 +342,13 @@ try {
 
     $neutralRow = $pdo->query("
         SELECT id FROM document_statuses
-        WHERE name <> 'Awaiting First Reading' AND is_active=1 AND is_deleted=0
-        ORDER BY id ASC LIMIT 1
+        WHERE name = 'Pending' AND is_active=1 AND is_deleted=0
+        LIMIT 1
     ")->fetch();
+    if (!$neutralRow) {
+        $pdo->exec("INSERT INTO document_statuses (name, badge_color, sort_order) VALUES ('Pending','#6c757d',0)");
+        $neutralRow = ['id' => $pdo->lastInsertId()];
+    }
     $neutralStatusId = (int) $neutralRow['id'];
 
     $plenaryRoleRow = $pdo->query("SELECT id FROM roles WHERE name='Plenary' AND is_active=1 AND is_deleted=0 LIMIT 1")->fetch();
@@ -377,7 +375,8 @@ try {
         SELECT id, name FROM document_statuses
         WHERE name IN (
             'Deferred','Lay on the Table','Noted','Remanded','For Encoding','Withdrawn',
-            'Plenary: Committee Report Adopted'
+            'Plenary: Committee Report Adopted', 'Returned to Plenary', 'Approved',
+            'Plenary Comm: Finalized'
         )
           AND is_active=1 AND is_deleted=0
     ")->fetchAll(PDO::FETCH_ASSOC);
@@ -394,6 +393,9 @@ try {
             'For Encoding',
             'Withdrawn',
             'Plenary: Committee Report Adopted',
+            'Returned to Plenary',
+            'Approved',
+            'Plenary Comm: Finalized',
         ],
         array_keys($status)
     );
@@ -437,6 +439,25 @@ try {
         return $docId;
     };
 
+    $createPending = function (int $statusId) use ($pdo, &$seq, $docTypeId, $sourceTypeId, $plenaryRoleId, $userA): int {
+        $seq++;
+        $tn = 'PLC-PENDING-' . str_pad((string) ($seq - 930000), 5, '0', STR_PAD_LEFT);
+        $pdo->prepare("
+            INSERT INTO documents
+                (tracking_number, tracking_year, tracking_sequence, subject_matter,
+                 document_type_id, source_type_id, current_status_id,
+                 date_received, time_received, current_phase)
+            VALUES (?, YEAR(CURDATE()), ?, 'pending regression doc', ?, ?, ?, CURDATE(), CURTIME(), 'PLENARY')
+        ")->execute([$tn, $seq, $docTypeId, $sourceTypeId, $statusId]);
+        $docId = (int) $pdo->lastInsertId();
+        $pdo->prepare("
+            INSERT INTO document_assignments
+                (document_id, assigned_to_role_id, phase, assigned_by, decision, received_at)
+            VALUES (?, ?, 'PLENARY', ?, 'PENDING', NOW())
+        ")->execute([$docId, $plenaryRoleId, $userA]);
+        return $docId;
+    };
+
     // Documents in every outcome status + one For Encoding + one with no pdd row.
     $docDeferred   = $createAccepted($userA, $status['Deferred']);
     $docLayTable   = $createAccepted($userA, $status['Lay on the Table']);
@@ -445,6 +466,9 @@ try {
     $docWithdrawn  = $createAccepted($userA, $status['Withdrawn']);
     $docOnProcess  = $createAccepted($userA, $status['For Encoding']);
     $docAdoptedOnly = $createAccepted($userA, $status['Plenary: Committee Report Adopted']);
+    $docNotedWithoutDetails = $createAccepted($userA, $status['Noted']);
+    $pdo->prepare("DELETE FROM plenary_document_details WHERE document_id = ?")
+        ->execute([$docNotedWithoutDetails]);
 
     // Document with no plenary_document_details row (no pre-decision yet):
     $seq++;
@@ -508,6 +532,11 @@ try {
         VALUES (?, ?, 'COMMITTEE', ?, 'PENDING', NOW())
     ")->execute([$docStalePlenary, (int) $committeeRoleRow['id'], $userA]);
 
+    $docReturnedToPlenary = $createPending($status['Returned to Plenary']);
+    $docNotedPending = $createPending($status['Noted']);
+    $docApprovedPending = $createPending($status['Approved']);
+    $docFinalizedPending = $createPending($status['Plenary Comm: Finalized']);
+
     // ── F1: every view query runs without "Unknown column 'pdd.status_id'" ──
     $views = array_merge(['inbox', 'accepted'], array_keys(OUTCOME_TABS));
     foreach ($views as $v) {
@@ -527,6 +556,14 @@ try {
         in_array($docCurrentPlenary, $inboxList, true));
     check('F1b: stale Plenary PENDING assignment is hidden after newer Committee routing',
         !in_array($docStalePlenary, $inboxList, true));
+    check('F1c: Returned to Plenary is excluded from Inbox',
+        !in_array($docReturnedToPlenary, $inboxList, true));
+    check('F1d: Noted status is excluded from Inbox',
+        !in_array($docNotedPending, $inboxList, true));
+    check('F1e: Approved status is excluded from Inbox',
+        !in_array($docApprovedPending, $inboxList, true));
+    check('F1f: Finalized status is excluded from Inbox',
+        !in_array($docFinalizedPending, $inboxList, true));
 
     // ── F2: Deferred doc is in the deferred tab, NOT in accepted, NOT in others
     $deferredList = listForView($pdo, $plenaryRoleId, $userA, 'deferred');
@@ -569,6 +606,8 @@ try {
     check('F4b: For Encoding doc stays in accepted', in_array($docOnProcess, $acc2, true));
     check('F4c: adopted Committee Report document is excluded from accepted',
         !in_array($docAdoptedOnly, $acc2, true));
+    check('F4d: legacy Noted document without Plenary details is excluded from accepted',
+        !in_array($docNotedWithoutDetails, $acc2, true));
 
     // ── F5: doc with no pdd row stays in accepted (pdd.status_id IS NULL branch)
     check('F5: doc with no plenary_document_details stays in accepted', in_array($docNoPdd, $acc2, true));

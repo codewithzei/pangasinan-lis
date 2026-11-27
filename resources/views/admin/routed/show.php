@@ -42,28 +42,24 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
 
     <!-- ── Page header ─────────────────────────────────────────────────────── -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10">
-                <div class="flex items-center gap-3">
-                    <a href="<?= BASE_URL ?>/admin/routed"
-                       class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white
-                              hover:bg-white/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                    </a>
-                    <div>
-                        <p class="text-sm font-medium text-blue-100">DOCUMENT DETAILS</p>
-                        <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                            <?= htmlspecialchars($pageSubtitle) ?>
-                        </h1>
-                    </div>
-                </div>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-center sm:px-8 sm:py-7">
+            <a href="<?= BASE_URL ?>/admin/routed"
+               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white
+                      transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">DOCUMENT DETAILS</p>
+                <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                    <?= htmlspecialchars($pageSubtitle) ?>
+                </h1>
             </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <!-- ── Two-column layout ───────────────────────────────────────────────── -->
@@ -76,7 +72,9 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
             <?php
 // MFR relationship links (Referenced Original Case / Related Motions)
 $mfrDetailRoute = 'admin/routed';
+$resubmissionTopMargin = 'mt-0';
 require __DIR__ . '/../../partials/resubmission-relationship.php';
+unset($resubmissionTopMargin);
 require __DIR__ . '/../../partials/mfr-relationship.php';
 ?>
 
@@ -117,11 +115,10 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
 
                     <div>
                         <p class="text-xs font-medium text-gray-500">Current Status</p>
-                        <span class="mt-1 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5
-                                     text-xs font-semibold shadow-sm"
-                              style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                     border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                     color: white;">
+                        <span class="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                              style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>1a;
+                                     color: <?= htmlspecialchars($statusBadgeColor) ?>;">
+                            <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;"></span>
                             <?= htmlspecialchars($document['status']) ?>
                         </span>
                     </div>
@@ -270,86 +267,7 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
 
             <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
 
-            <!-- Routing History -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="text-lg font-semibold text-gray-900">Routing History</h2>
-
-                <?php if (empty($routes)): ?>
-                    <div class="mt-4 py-8 text-center">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        <p class="mt-2 text-sm text-gray-500">No routing history available</p>
-                    </div>
-                <?php else: ?>
-                    <div class="mt-4 flow-root">
-                        <ul role="list" class="-mb-8">
-                            <?php foreach ($routes as $index => $route): ?>
-                                <li>
-                                    <div class="relative pb-8">
-                                        <?php if ($index < count($routes) - 1): ?>
-                                            <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200"
-                                                  aria-hidden="true"></span>
-                                        <?php endif; ?>
-                                        <div class="relative flex space-x-3">
-                                            <div>
-                                                <span class="flex h-8 w-8 items-center justify-center rounded-full
-                                                             bg-blue-100 ring-8 ring-white">
-                                                    <svg class="h-4 w-4 text-primary" fill="none"
-                                                         stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                              stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                                                    </svg>
-                                                </span>
-                                            </div>
-                                            <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
-                                                <div>
-                                                    <p class="text-sm text-gray-900">
-                                                        Routed from
-                                                        <span class="font-semibold">
-                                                            <?= htmlspecialchars(formatPhaseName($route['from_phase'])) ?>
-                                                        </span>
-                                                        to
-                                                        <span class="font-semibold">
-                                                            <?= htmlspecialchars(formatPhaseName($route['to_phase'])) ?>
-                                                        </span>
-                                                        <?php if (!empty($route['routed_to_role_name'])): ?>
-                                                            <span class="text-gray-500">
-                                                                (<?= htmlspecialchars($route['routed_to_role_name']) ?>)
-                                                            </span>
-                                                        <?php endif; ?>
-                                                    </p>
-                                                    <?php if (!empty($route['routed_by_username'])): ?>
-                                                        <p class="mt-0.5 text-xs text-gray-500">
-                                                            By: <?= htmlspecialchars($route['routed_by_username']) ?>
-                                                        </p>
-                                                    <?php endif; ?>
-                                                    <?php if (!empty($route['routing_option_name'])): ?>
-                                                        <p class="mt-0.5 text-xs text-gray-500">
-                                                            Option: <?= htmlspecialchars($route['routing_option_name']) ?>
-                                                        </p>
-                                                    <?php endif; ?>
-                                                    <?php if (!empty($route['remarks'])): ?>
-                                                        <p class="mt-1 text-xs text-gray-600">
-                                                            <?= htmlspecialchars($route['remarks']) ?>
-                                                        </p>
-                                                    <?php endif; ?>
-                                                </div>
-                                                <div class="whitespace-nowrap text-right text-xs text-gray-500">
-                                                    <?= htmlspecialchars(date('M j, Y', strtotime($route['routed_at']))) ?>
-                                                    <br>
-                                                    <?= htmlspecialchars(date('g:i A', strtotime($route['routed_at']))) ?>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endif; ?>
-            </section>
+            <?php require __DIR__ . '/../../partials/assignment-history.php'; ?>
 
         </div>
 

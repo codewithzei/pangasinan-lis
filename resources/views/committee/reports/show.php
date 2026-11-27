@@ -51,6 +51,7 @@ ob_start();
 ?>
 
 <div class="detail-page space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
     <!-- ── Page header ─────────────────────────────────────────────────────── -->
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
@@ -208,9 +209,10 @@ ob_start();
                                         </span>
                                     <?php endif; ?>
                                     <?php if (!empty($doc['status'])): ?>
-                                        <span class="inline-flex items-center rounded-full px-2 py-0.5
-                                                     text-xs font-medium text-white"
-                                              style="background-color:<?= htmlspecialchars($doc['status_badge_color'] ?? '#6B7280') ?>">
+                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                              style="background-color:<?= htmlspecialchars($doc['status_badge_color'] ?? '#6B7280') ?>1a;
+                                                     color:<?= htmlspecialchars($doc['status_badge_color'] ?? '#6B7280') ?>;">
+                                            <span class="h-1.5 w-1.5 rounded-full" style="background-color:<?= htmlspecialchars($doc['status_badge_color'] ?? '#6B7280') ?>;"></span>
                                             <?= htmlspecialchars($doc['status']) ?>
                                         </span>
                                     <?php endif; ?>
@@ -388,19 +390,21 @@ ob_start();
                         Add latest signed or supporting files
                     </label>
                     <div id="reportAttachmentDropZone"
-                         class="mt-2 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2
-                                border-dashed border-gray-300 bg-gray-50 px-5 py-6 text-center transition
-                                hover:border-emerald-400 hover:bg-emerald-50/50"
+                         data-attachment-dropzone data-drop-managed="true"
+                         class="attachment-dropzone mt-2 flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl
+                                border-2 border-dashed border-gray-300 bg-gray-50 px-4 text-center transition hover:bg-gray-100"
                          role="button" tabindex="0" aria-label="Choose or drop Committee Report attachments">
                         <svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                         </svg>
-                        <p class="mt-2 text-sm font-medium text-gray-700">
-                            Drop files here or
-                            <button type="button" id="reportAttachmentBrowse" class="text-emerald-800 underline hover:text-emerald-900">browse</button>
+                        <p class="mb-1 text-sm text-gray-600">
+                            <span class="font-semibold">Click to upload</span> or drag and drop
                         </p>
-                        <p class="mt-1 text-xs text-gray-400">PDF, Word, Excel, or images · Up to 10 files · 25 MB each</p>
+                        <p class="text-xs text-gray-500">
+                            <button type="button" id="reportAttachmentBrowse" class="font-medium text-emerald-800 underline hover:text-emerald-900">Browse files</button>
+                            · PDF, Word, Excel, images (MAX. 25 MB each)
+                        </p>
                         <input type="file" name="attachments[]" id="reportAttachmentInput" multiple
                                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp" class="sr-only">
                     </div>

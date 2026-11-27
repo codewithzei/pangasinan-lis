@@ -35,81 +35,96 @@ $prevIsPublic    = !empty($_POST['is_public']);
 <div class="space-y-6">
 
     <!-- ── Page header ───────────────────────────────────────────────────── -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <p class="text-sm font-medium text-blue-100">DOCUMENT ARCHIVE</p>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex flex-col gap-6 px-6 py-7 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
+                <div class="max-w-3xl">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Document Archive</p>
                     <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                         <?= htmlspecialchars($pageTitle) ?>
                     </h1>
-                    <p class="mt-2 text-sm leading-6 text-blue-100">
+                    <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
                         <?= htmlspecialchars($pageSubtitle) ?>
                     </p>
                 </div>
-            </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
+                <div class="flex items-center gap-3 border-t border-white/15 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                    <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-300 ring-4 ring-emerald-300/20"></span>
+                    <div>
+                        <p class="text-xs font-medium text-white">Filing archive</p>
+                        <p class="mt-0.5 text-xs text-blue-100/80"><?= htmlspecialchars(date('l, F j, Y')) ?></p>
+                    </div>
+                </div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <!-- ── Statistics ────────────────────────────────────────────────────── -->
     <section>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+        <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">At a glance</p>
+                <h2 class="mt-1 text-xl font-semibold text-gray-900">Filing activity</h2>
+            </div>
+            <p class="text-xs text-gray-500">Documents filed and awaiting filing</p>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-amber-500"></span>
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-sm text-gray-500">To Be Filed</p>
-                        <p class="mt-2 text-3xl font-bold text-amber-600"><?= number_format($toBeFiledCount) ?></p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($toBeFiledCount) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     </div>
                 </div>
                 <p class="mt-3 text-xs text-gray-400">Finalized, awaiting filing</p>
-            </div>
+            </article>
 
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-primary"></span>
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-sm text-gray-500">Total Filed</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($totalFiledCount) ?></p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($totalFiledCount) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/>
                         </svg>
                     </div>
                 </div>
                 <p class="mt-3 text-xs text-gray-400">Documents in the archive</p>
-            </div>
+            </article>
 
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-emerald-500"></span>
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-sm text-gray-500">Public Records</p>
-                        <p class="mt-2 text-3xl font-bold text-emerald-600"><?= number_format($publicCount) ?></p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($publicCount) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-500">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/>
                         </svg>
                     </div>
                 </div>
                 <p class="mt-3 text-xs text-gray-400">Visible on public portal</p>
-            </div>
+            </article>
         </div>
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- ── SECTION 1: To Be Filed ──────────────────────────────────────── -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <section class="rounded-2xl border border-amber-200 bg-white">
-        <div class="flex items-center justify-between border-b border-amber-100 px-6 py-4">
+    <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 md:px-6">
             <div class="flex items-center gap-3">
-                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -129,8 +144,7 @@ $prevIsPublic    = !empty($_POST['is_public']);
             <?php endif; ?>
         </div>
 
-        <!-- Scrollable grid – constrained height -->
-        <div class="max-h-[480px] overflow-y-auto px-6 py-5">
+        <div class="max-h-[480px] overflow-y-auto bg-gray-50/50 px-5 py-5 md:px-6">
             <?php if (empty($toBeFiledDocs)): ?>
                 <div class="flex flex-col items-center justify-center py-12 text-center">
                     <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-400">
@@ -151,8 +165,8 @@ $prevIsPublic    = !empty($_POST['is_public']);
                             : (!empty($doc['finalized_at']) ? date('M j, Y', strtotime($doc['finalized_at'])) : '—');
                         $isThisDocFailing = $autoOpenModal && $filingDocId === (int)$doc['id'];
                         ?>
-                        <div class="flex flex-col justify-between rounded-xl border border-gray-200 bg-gray-50 p-4
-                                    transition hover:border-amber-300 hover:shadow-sm
+                        <div class="flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-4 shadow-sm
+                                    transition hover:border-primary/40 hover:shadow-md
                                     <?= $isThisDocFailing ? 'ring-2 ring-red-300' : '' ?>">
 
                             <!-- Header -->
@@ -165,7 +179,7 @@ $prevIsPublic    = !empty($_POST['is_public']);
                                         <?= htmlspecialchars($doc['subject_matter']) ?>
                                     </p>
                                 </div>
-                                <span class="ml-2 shrink-0 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
+                                <span class="ml-2 shrink-0 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
                                       style="background-color:<?= htmlspecialchars($typeColor) ?>1a; color:<?= htmlspecialchars($typeColor) ?>;">
                                     <?= htmlspecialchars($doc['document_type_name'] ?? '—') ?>
                                 </span>
@@ -198,8 +212,8 @@ $prevIsPublic    = !empty($_POST['is_public']);
                                             <?= htmlspecialchars(json_encode($doc['document_type_name'] ?? '—'), ENT_QUOTES) ?>,
                                             <?= htmlspecialchars(json_encode($displayDate), ENT_QUOTES) ?>
                                         )"
-                                        class="flex-1 rounded-lg bg-amber-500 py-1.5 text-center text-xs
-                                               font-semibold text-white hover:bg-amber-600 transition">
+                                        class="flex-1 rounded-lg bg-primary py-2 text-center text-xs
+                                               font-semibold text-white transition hover:bg-blue-700">
                                     File
                                 </button>
                             </div>
@@ -213,11 +227,11 @@ $prevIsPublic    = !empty($_POST['is_public']);
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- ── SECTION 2: Filed Documents Table ───────────────────────────── -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <section class="rounded-2xl border border-gray-200 bg-white">
+    <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
 
         <!-- Table header / filters -->
-        <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
+        <div class="flex min-w-0 flex-col gap-4 border-b border-gray-100 px-5 py-5 md:px-6 xl:flex-row xl:items-center xl:justify-between">
+            <div class="shrink-0">
                 <h2 class="font-semibold text-gray-900">Filed Documents</h2>
                 <p class="mt-1 text-xs text-gray-500">
                     <?= number_format($totalRows) ?> record<?= $totalRows !== 1 ? 's' : '' ?> found
@@ -225,26 +239,22 @@ $prevIsPublic    = !empty($_POST['is_public']);
             </div>
 
             <form method="GET" action="<?= BASE_URL ?>/admin/filed"
-                  class="flex min-w-0 flex-wrap items-center gap-3 lg:flex-1 lg:justify-end">
+                  class="hidden w-full min-w-0 items-center justify-end gap-2 xl:flex xl:flex-1">
 
-                <div class="relative w-full min-w-0 lg:w-60 lg:flex-none">
+                <div class="relative w-full min-w-0 flex-none" style="max-width: 320px;">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>"
-                           placeholder="Tracking #, subject, approved no…"
-                           class="w-full min-w-0 rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm
-                                  text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none
-                                  focus:ring-2 focus:ring-primary/20">
+                    <input type="search" name="search" value="<?= htmlspecialchars($search) ?>"
+                           placeholder="Search tracking #, subject, approved no..."
+                           class="block w-full min-w-0 rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                 </div>
 
-                <select name="type"
-                        class="w-full min-w-0 max-w-full truncate rounded-xl border border-gray-200 bg-white px-3 py-2
-                               text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2
-                               focus:ring-primary/20 lg:w-48 lg:flex-none">
-                    <option value="">All Types</option>
+                <select name="type" aria-label="Filter by document type"
+                        class="w-48 min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    <option value="">All types</option>
                     <?php foreach ($documentTypes as $dt): ?>
                         <option value="<?= (int)$dt['id'] ?>" <?= $filterType == $dt['id'] ? 'selected' : '' ?>>
                             <?= htmlspecialchars($dt['name']) ?>
@@ -252,11 +262,9 @@ $prevIsPublic    = !empty($_POST['is_public']);
                     <?php endforeach; ?>
                 </select>
 
-                <select name="year"
-                        class="w-full min-w-0 max-w-full rounded-xl border border-gray-200 bg-white px-3 py-2
-                               text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2
-                               focus:ring-primary/20 lg:w-36 lg:flex-none">
-                    <option value="">All Years</option>
+                <select name="year" aria-label="Filter by approval year"
+                        class="w-36 min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    <option value="">All years</option>
                     <?php foreach ($approvalYears as $yr): ?>
                         <option value="<?= (int)$yr ?>" <?= $filterYear == $yr ? 'selected' : '' ?>>
                             <?= (int)$yr ?>
@@ -264,33 +272,91 @@ $prevIsPublic    = !empty($_POST['is_public']);
                     <?php endforeach; ?>
                 </select>
 
-                <button type="submit"
-                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium
-                               text-gray-700 transition hover:bg-gray-50">
+                <button type="submit" class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
                     Filter
                 </button>
 
                 <?php if ($search !== '' || $filterType !== '' || $filterYear !== ''): ?>
                     <a href="<?= BASE_URL ?>/admin/filed"
-                       class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium
-                              text-gray-700 transition hover:bg-gray-50">
+                       class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">
                         Clear
                     </a>
                 <?php endif; ?>
             </form>
+
+            <div class="flex min-w-0 items-center gap-2 xl:hidden">
+                <form method="GET" action="<?= BASE_URL ?>/admin/filed" class="relative min-w-0 flex-1">
+                    <input type="hidden" name="type" value="<?= htmlspecialchars($filterType) ?>">
+                    <input type="hidden" name="year" value="<?= htmlspecialchars($filterYear) ?>">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <input type="search" name="search" value="<?= htmlspecialchars($search) ?>"
+                           placeholder="Search filed documents..."
+                           class="block w-full min-w-0 rounded-lg border border-gray-200 py-2.5 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                </form>
+                <button type="button" data-inbox-filter-target="#admin-filed-filter-sheet"
+                        aria-label="Open filters" aria-haspopup="dialog"
+                        class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 12h12m-9 8h6"/>
+                    </svg>
+                    <?php if ($filterType !== '' || $filterYear !== ''): ?>
+                        <span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"></span>
+                    <?php endif; ?>
+                </button>
+            </div>
         </div>
 
+        <div id="admin-filed-filter-sheet" class="fixed inset-0 z-50 hidden xl:hidden">
+            <button type="button" class="inbox-filter-backdrop absolute inset-0 bg-gray-950/40" aria-label="Close filters"></button>
+            <form method="GET" action="<?= BASE_URL ?>/admin/filed"
+                  class="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-5 shadow-2xl">
+                <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                <div class="mb-4 flex items-center justify-between">
+                    <h3 class="font-semibold text-gray-900">Filters</h3>
+                    <button type="button" class="inbox-filter-close text-sm text-gray-500">Close</button>
+                </div>
+                <label for="filed-type-filter" class="mb-1 block text-xs font-medium text-gray-600">Document type</label>
+                <select id="filed-type-filter" name="type" class="mb-3 w-full rounded-lg border border-gray-200 px-3 py-3 text-sm">
+                    <option value="">All types</option>
+                    <?php foreach ($documentTypes as $dt): ?>
+                        <option value="<?= (int)$dt['id'] ?>" <?= $filterType == $dt['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($dt['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <label for="filed-year-filter" class="mb-1 block text-xs font-medium text-gray-600">Approval year</label>
+                <select id="filed-year-filter" name="year" class="mb-4 w-full rounded-lg border border-gray-200 px-3 py-3 text-sm">
+                    <option value="">All years</option>
+                    <?php foreach ($approvalYears as $yr): ?>
+                        <option value="<?= (int)$yr ?>" <?= $filterYear == $yr ? 'selected' : '' ?>><?= (int)$yr ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white">Apply filters</button>
+                    <?php if ($search !== '' || $filterType !== '' || $filterYear !== ''): ?>
+                        <a href="<?= BASE_URL ?>/admin/filed"
+                           class="rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700">Clear</a>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+        <?php require __DIR__ . '/../../partials/inbox-mobile-filter-script.php'; ?>
+
         <!-- Table -->
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+        <div class="hidden overflow-x-auto xl:block">
+            <table class="w-full min-w-[1200px] text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                        <th class="px-5 py-3 font-medium">Approved No.</th>
-                        <th class="px-5 py-3 font-medium">Subject &amp; Type</th>
-                        <th class="px-5 py-3 font-medium">Authors / Sponsors</th>
-                        <th class="px-5 py-3 font-medium">Tags</th>
-                        <th class="px-5 py-3 font-medium whitespace-nowrap">Date Approved</th>
-                        <th class="px-5 py-3 font-medium text-right">Actions</th>
+                        <th class="px-5 py-3 font-bold">Approved No.</th>
+                        <th class="px-5 py-3 font-bold">Subject &amp; Type</th>
+                        <th class="px-5 py-3 font-bold">Authors / Sponsors</th>
+                        <th class="px-5 py-3 font-bold">Tags</th>
+                        <th class="whitespace-nowrap px-5 py-3 font-bold">Date Approved</th>
+                        <th class="px-5 py-3 text-right font-bold">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -348,36 +414,47 @@ $prevIsPublic    = !empty($_POST['is_public']);
                                     <p class="text-sm text-gray-800 line-clamp-2">
                                         <?= htmlspecialchars($fd['subject_matter']) ?>
                                     </p>
-                                    <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                                          style="background-color:<?= htmlspecialchars($typeColor) ?>1a; color:<?= htmlspecialchars($typeColor) ?>;">
+                                    <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
+                                      style="background-color:<?= htmlspecialchars($typeColor) ?>14; color:<?= htmlspecialchars($typeColor) ?>;">
                                         <?= htmlspecialchars($fd['document_type_name'] ?? '—') ?>
                                     </span>
                                 </td>
 
                                 <!-- Authors/Sponsors -->
-                                <td class="px-5 py-4 max-w-[180px]">
-                                    <?php if (!empty($fd['authors'])): ?>
-                                        <div class="space-y-1">
+                                <td class="max-w-[220px] px-5 py-4">
+                                    <?php if (!empty($fd['authors']) || !empty($fd['authors_all']) || !empty($fd['co_authors_all'])): ?>
+                                        <div class="space-y-2">
                                             <?php foreach (['AUTHOR', 'CO_AUTHOR'] as $role): ?>
                                                 <?php
                                                 $roleAuthors = array_values(array_filter(
                                                     $fd['authors'],
                                                     static fn(array $author): bool => $author['author_role'] === $role
                                                 ));
+                                                $allSelected = !empty($fd[$role === 'AUTHOR' ? 'authors_all' : 'co_authors_all'])
+                                                    || (!empty($roleAuthors) && !empty($roleAuthors[0]['is_all_selected']));
                                                 ?>
-                                                <?php if (!empty($roleAuthors)): ?>
-                                                    <?php if (!empty($roleAuthors[0]['is_all_selected'])): ?>
-                                                        <div class="text-xs text-gray-700">
-                                                            <span class="text-[10px] font-medium uppercase text-gray-400 mr-1"><?= $role === 'CO_AUTHOR' ? 'Co' : 'Au' ?>:</span>
-                                                            ALL
+                                                <?php if ($allSelected || !empty($roleAuthors)): ?>
+                                                    <?php if ($allSelected): ?>
+                                                        <div class="flex flex-wrap items-center gap-1.5">
+                                                            <span class="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                                                                <?= $role === 'CO_AUTHOR' ? 'Co-author' : 'Author' ?>
+                                                            </span>
+                                                            <span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-blue-700">
+                                                                All
+                                                            </span>
                                                         </div>
                                                     <?php else: ?>
-                                                        <?php foreach ($roleAuthors as $a): ?>
-                                                            <div class="text-xs text-gray-700">
-                                                                <span class="text-[10px] font-medium uppercase text-gray-400 mr-1"><?= $role === 'CO_AUTHOR' ? 'Co' : 'Au' ?>:</span>
-                                                                <?= htmlspecialchars($a['full_name']) ?>
-                                                            </div>
-                                                        <?php endforeach; ?>
+                                                        <div>
+                                                            <p class="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                                                                <?= $role === 'CO_AUTHOR' ? 'Co-author' : 'Author' ?>
+                                                            </p>
+                                                            <p class="mt-0.5 break-words text-xs leading-5 text-gray-700">
+                                                                <?= implode(', ', array_map(
+                                                                    static fn(array $author): string => htmlspecialchars($author['full_name']),
+                                                                    $roleAuthors
+                                                                )) ?>
+                                                            </p>
+                                                        </div>
                                                     <?php endif; ?>
                                                 <?php endif; ?>
                                             <?php endforeach; ?>
@@ -392,7 +469,7 @@ $prevIsPublic    = !empty($_POST['is_public']);
                                     <?php if (!empty($fd['tags'])): ?>
                                         <div class="flex flex-wrap gap-1">
                                             <?php foreach (array_slice($fd['tags'], 0, 3) as $tag): ?>
-                                                <span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                                                <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
                                                     <?= htmlspecialchars($tag) ?>
                                                 </span>
                                             <?php endforeach; ?>
@@ -422,23 +499,19 @@ $prevIsPublic    = !empty($_POST['is_public']);
                                 <td class="px-5 py-4 text-right">
                                     <div class="flex items-center justify-end gap-2">
                                         <a href="<?= BASE_URL ?>/admin/filed/show?id=<?= (int)$fd['id'] ?>"
-                                           class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200
-                                                  px-3 py-1.5 text-xs font-medium text-gray-700
-                                                  hover:border-primary hover:bg-blue-50 hover:text-primary transition">
-                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                           class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:border-primary hover:bg-primary hover:text-white"
+                                           title="View filed document" aria-label="View filed document">
+                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                             </svg>
-                                            View
                                         </a>
                                         <a href="<?= BASE_URL ?>/admin/filed/download-all?id=<?= (int)$fd['id'] ?>"
-                                           class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200
-                                                  px-3 py-1.5 text-xs font-medium text-gray-700
-                                                  hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 transition">
-                                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                           class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:border-primary hover:bg-primary hover:text-white"
+                                           title="Download all attachments" aria-label="Download all attachments">
+                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                                             </svg>
-                                            Download
                                         </a>
                                     </div>
                                 </td>
@@ -450,44 +523,175 @@ $prevIsPublic    = !empty($_POST['is_public']);
             </table>
         </div>
 
+        <div class="divide-y divide-gray-100 xl:hidden">
+            <?php if (empty($filedDocuments)): ?>
+                <div class="px-5 py-12 text-center">
+                    <p class="text-sm font-medium text-gray-700">No filed documents found.</p>
+                    <p class="mt-1 text-xs text-gray-500">
+                        <?= ($search !== '' || $filterType !== '' || $filterYear !== '')
+                            ? 'Try adjusting your filters.'
+                            : 'Filed documents will appear here once documents are filed.' ?>
+                    </p>
+                </div>
+            <?php else: ?>
+                <?php foreach ($filedDocuments as $fd): ?>
+                    <?php $typeColor = $fd['document_type_badge_color'] ?? '#2563EB'; ?>
+                    <article class="px-5 py-5">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="break-words font-semibold text-gray-900">
+                                    <?= htmlspecialchars($fd['approved_number'] ?? $fd['tracking_number']) ?>
+                                </p>
+                                <?php if (!empty($fd['approved_number'])): ?>
+                                    <p class="mt-1 break-words text-xs text-gray-400">
+                                        Tracking No. <?= htmlspecialchars($fd['tracking_number']) ?>
+                                    </p>
+                                <?php endif; ?>
+                            </div>
+                            <?php if (!empty($fd['filing_is_public'])): ?>
+                                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>Public
+                                </span>
+                            <?php else: ?>
+                                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>Private
+                                </span>
+                            <?php endif; ?>
+                        </div>
+
+                        <p class="mt-3 break-words text-sm font-medium text-gray-900">
+                            <?= htmlspecialchars($fd['subject_matter']) ?>
+                        </p>
+                        <span class="mt-1.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium"
+                              style="background-color:<?= htmlspecialchars($typeColor) ?>14; color:<?= htmlspecialchars($typeColor) ?>;">
+                            <?= htmlspecialchars($fd['document_type_name'] ?? '—') ?>
+                        </span>
+
+                        <div class="mt-4 grid grid-cols-1 gap-3 border-t border-gray-100 pt-3 sm:grid-cols-2">
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-medium uppercase tracking-wide text-gray-400">Authors / Sponsors</p>
+                                <?php if (!empty($fd['authors']) || !empty($fd['authors_all']) || !empty($fd['co_authors_all'])): ?>
+                                    <div class="mt-1 space-y-1">
+                                        <?php foreach (['AUTHOR', 'CO_AUTHOR'] as $role): ?>
+                                            <?php
+                                            $roleAuthors = array_values(array_filter(
+                                                $fd['authors'],
+                                                static fn(array $author): bool => $author['author_role'] === $role
+                                            ));
+                                            $allSelected = !empty($fd[$role === 'AUTHOR' ? 'authors_all' : 'co_authors_all'])
+                                                || (!empty($roleAuthors) && !empty($roleAuthors[0]['is_all_selected']));
+                                            ?>
+                                            <?php if ($allSelected || !empty($roleAuthors)): ?>
+                                                <?php if ($allSelected): ?>
+                                                    <p class="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                                                        <span class="text-xs font-medium text-gray-500"><?= $role === 'CO_AUTHOR' ? 'Co-author' : 'Author' ?></span>
+                                                        <span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-blue-700">All</span>
+                                                    </p>
+                                                <?php else: ?>
+                                                    <p class="break-words text-sm leading-5 text-gray-600">
+                                                        <span class="text-xs font-medium text-gray-500"><?= $role === 'CO_AUTHOR' ? 'Co-author' : 'Author' ?>:</span>
+                                                        <?= implode(', ', array_map(
+                                                            static fn(array $author): string => htmlspecialchars($author['full_name']),
+                                                            $roleAuthors
+                                                        )) ?>
+                                                    </p>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php else: ?>
+                                    <p class="mt-1 text-sm text-gray-400">—</p>
+                                <?php endif; ?>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-medium uppercase tracking-wide text-gray-400">Tags</p>
+                                <?php if (!empty($fd['tags'])): ?>
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        <?php foreach (array_slice($fd['tags'], 0, 3) as $tag): ?>
+                                            <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                                                <?= htmlspecialchars($tag) ?>
+                                            </span>
+                                        <?php endforeach; ?>
+                                        <?php if (count($fd['tags']) > 3): ?>
+                                            <span class="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">
+                                                +<?= count($fd['tags']) - 3 ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php else: ?>
+                                    <p class="mt-1 text-sm text-gray-400">—</p>
+                                <?php endif; ?>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-medium uppercase tracking-wide text-gray-400">Date Approved</p>
+                                <p class="mt-1 text-sm text-gray-600">
+                                    <?= !empty($fd['date_approved'])
+                                        ? htmlspecialchars(date('M j, Y', strtotime($fd['date_approved'])))
+                                        : '—' ?>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 flex items-center justify-end gap-2 border-t border-gray-100 pt-3">
+                            <a href="<?= BASE_URL ?>/admin/filed/show?id=<?= (int)$fd['id'] ?>"
+                               class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:border-primary hover:bg-primary hover:text-white"
+                               title="View filed document" aria-label="View filed document">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </a>
+                            <a href="<?= BASE_URL ?>/admin/filed/download-all?id=<?= (int)$fd['id'] ?>"
+                               class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:border-primary hover:bg-primary hover:text-white"
+                               title="Download all attachments" aria-label="Download all attachments">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
         <!-- Pagination -->
-        <?php if ($totalPages > 1): ?>
-        <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
+        <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-5 py-4 sm:flex-row md:px-6">
             <p class="text-xs text-gray-500">
-                Page <span class="font-medium text-gray-700"><?= $page ?></span>
-                of <span class="font-medium text-gray-700"><?= $totalPages ?></span>
-                (<?= number_format($totalRows) ?> total)
+                Showing page <span class="font-medium text-gray-700"><?= $page ?></span> of
+                <span class="font-medium text-gray-700"><?= $totalPages ?></span>
+                (<?= number_format($totalRows) ?> total records)
             </p>
-            <div class="flex items-center gap-1">
+            <div class="flex flex-wrap items-center justify-center gap-1">
                 <?php
                 $qArgs = [];
                 if ($search !== '')     $qArgs['search'] = $search;
                 if ($filterType !== '') $qArgs['type']   = $filterType;
                 if ($filterYear !== '') $qArgs['year']   = $filterYear;
                 $qs = !empty($qArgs) ? '&' . http_build_query($qArgs) : '';
+                $startPage = max(1, $page - 2);
+                $endPage = min($totalPages, $page + 2);
                 ?>
                 <?php if ($page > 1): ?>
-                    <a href="?page=<?= $page - 1 ?><?= $qs ?>"
+                    <a href="<?= BASE_URL ?>/admin/filed?page=<?= $page - 1 ?><?= $qs ?>"
                        class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
                         Prev
                     </a>
                 <?php endif; ?>
-                <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
-                    <a href="?page=<?= $i ?><?= $qs ?>"
+                <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+                    <a href="<?= BASE_URL ?>/admin/filed?page=<?= $i ?><?= $qs ?>"
                        class="rounded-lg border px-3 py-1.5 text-sm font-medium transition
                               <?= $i === $page ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>">
                         <?= $i ?>
                     </a>
                 <?php endfor; ?>
                 <?php if ($page < $totalPages): ?>
-                    <a href="?page=<?= $page + 1 ?><?= $qs ?>"
+                    <a href="<?= BASE_URL ?>/admin/filed?page=<?= $page + 1 ?><?= $qs ?>"
                        class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
                         Next
                     </a>
                 <?php endif; ?>
             </div>
         </div>
-        <?php endif; ?>
 
     </section>
 

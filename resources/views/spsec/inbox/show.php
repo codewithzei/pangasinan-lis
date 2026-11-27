@@ -165,71 +165,13 @@ ob_start();
             ? 'order-1 space-y-6 xl:col-span-1'
             : 'order-2 space-y-6 xl:order-none xl:col-span-2' ?>">
 
-            <!-- Document summary -------------------------------------------->
+            <!-- Document relationships ------------------------------------->
             <?php
 // MFR relationship links (Referenced Original Case / Related Motions)
 $mfrDetailRoute = 'spsec/inbox';
 require __DIR__ . '/../../partials/resubmission-relationship.php';
 require __DIR__ . '/../../partials/mfr-relationship.php';
 ?>
-
-            <div class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="mb-4 text-base font-semibold text-gray-900">Document Details</h2>
-
-                <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Tracking Number</dt>
-                        <dd class="mt-1 font-mono text-sm font-bold text-primary"><?= htmlspecialchars($trackingNumber) ?></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Current Status</dt>
-                        <dd class="mt-1">
-                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                                  style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#2563EB') ?>1a;
-                                         color: <?= htmlspecialchars($document['status_badge_color'] ?? '#2563EB') ?>;">
-                                <?= htmlspecialchars($document['status'] ?? '') ?>
-                            </span>
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Current Phase</dt>
-                        <dd class="mt-1 text-sm text-gray-800"><?= htmlspecialchars(spsecShowPhase($document['current_phase'] ?? 'SP_SECRETARY')) ?></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Date / Time Received</dt>
-                        <dd class="mt-1 text-sm text-gray-800">
-                            <?= htmlspecialchars(date('F j, Y', strtotime($document['date_received']))) ?>
-                            at <?= htmlspecialchars(date('g:i A', strtotime($document['time_received']))) ?>
-                        </dd>
-                    </div>
-                    <div class="sm:col-span-2">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Subject Matter</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($document['subject_matter'] ?? '') ?></dd>
-                    </div>
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Document Type</dt>
-                        <dd class="mt-1">
-                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                                  style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
-                                         color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
-                                <?= htmlspecialchars($document['document_type_name'] ?? '') ?>
-                            </span>
-                        </dd>
-                    </div>
-                    <?php if (!empty($document['communication_category_name'])): ?>
-                        <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Communication Category</dt>
-                            <dd class="mt-1 text-sm text-gray-800"><?= htmlspecialchars($document['communication_category_name']) ?></dd>
-                        </div>
-                    <?php endif; ?>
-                    <?php if (!empty($document['remarks'])): ?>
-                        <div class="sm:col-span-2">
-                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Remarks</dt>
-                            <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($document['remarks']) ?></dd>
-                        </div>
-                    <?php endif; ?>
-                </dl>
-            </div>
 
             <!-- Source information ------------------------------------------>
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
@@ -364,17 +306,17 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                               enctype="multipart/form-data" id="uploadForm">
                             <input type="hidden" name="document_id" value="<?= $documentId ?>">
                             <div class="flex items-center justify-center w-full">
-                                <label for="extra_attachments"
-                                       class="flex flex-col items-center justify-center w-full h-28 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100">
-                                    <div class="flex flex-col items-center justify-center py-4">
-                                        <svg class="w-7 h-7 mb-1.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <label for="extra_attachments" data-attachment-dropzone
+                                       class="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 transition hover:bg-gray-100">
+                                    <div class="flex flex-col items-center justify-center px-4 py-5 text-center">
+                                        <svg class="mb-2 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                                         </svg>
-                                        <p class="text-xs text-gray-500 text-center px-4">
-                                            <span class="font-semibold text-gray-700">Click to upload</span> or drag and drop<br>
-                                            PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (max 25 MB each, up to 10 files)
+                                        <p class="mb-1 text-sm text-gray-600">
+                                            <span class="font-semibold">Click to upload</span> or drag and drop
                                         </p>
+                                        <p class="text-xs text-gray-500">PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (MAX. 25 MB each)</p>
                                     </div>
                                     <input id="extra_attachments" name="attachments[]" type="file"
                                            multiple class="hidden"
@@ -520,45 +462,6 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
             </div>
 
             <?php if (!$fromNotedDocuments): ?>
-            <!-- Route history ------------------------------------------------>
-            <div class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="mb-4 text-base font-semibold text-gray-900">Routing History</h2>
-                <?php if (empty($routes)): ?>
-                    <p class="text-sm text-gray-400">No routes recorded.</p>
-                <?php else: ?>
-                    <ol class="relative border-l border-gray-200 ml-3 space-y-5">
-                        <?php foreach ($routes as $rt): ?>
-                            <li class="ml-6">
-                                <span class="absolute -left-3 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white ring-4 ring-white">
-                                    <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-                                    </svg>
-                                </span>
-                                <p class="text-sm font-semibold text-gray-800">
-                                    <?= htmlspecialchars(spsecShowPhase($rt['from_phase'] ?? '')) ?>
-                                    &rarr;
-                                    <?= htmlspecialchars(spsecShowPhase($rt['to_phase'])) ?>
-                                </p>
-                                <p class="text-xs text-gray-400">
-                                    <?php if (!empty($rt['routed_to_role_name'])): ?>
-                                        To: <?= htmlspecialchars($rt['routed_to_role_name']) ?> &middot;
-                                    <?php endif; ?>
-                                    <?php if (!empty($rt['routed_by_username'])): ?>
-                                        By: <?= htmlspecialchars($rt['routed_by_username']) ?> &middot;
-                                    <?php endif; ?>
-                                    <?= htmlspecialchars(date('M j, Y g:i A', strtotime($rt['created_at']))) ?>
-                                </p>
-                                <?php if (!empty($rt['remarks'])): ?>
-                                    <p class="mt-1 text-xs text-gray-500 italic"><?= htmlspecialchars($rt['remarks']) ?></p>
-                                <?php endif; ?>
-                            </li>
-                        <?php endforeach; ?>
-                    </ol>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
-
             <!-- Action history ----------------------------------------------->
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="mb-4 text-base font-semibold text-gray-900">Action History</h2>
@@ -718,6 +621,8 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                         </div>
                     </dl>
                 </div>
+            <?php endif; ?>
+
             <?php endif; ?>
 
         </div><!-- /left column -->

@@ -93,6 +93,7 @@ ob_start();
 ?>
 
 <div class="detail-page space-y-6">
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
 
 
@@ -214,128 +215,6 @@ ob_start();
                 </section>
             <?php endif; ?>
 
-            <!-- Case summary card -------------------------------------------->
-            <div class="rounded-2xl border border-gray-200 bg-white p-6">
-                <div class="mb-5 flex items-center justify-between">
-                    <h2 class="text-base font-semibold text-gray-900">Case Information</h2>
-                    <span class="font-mono text-sm font-bold text-purple-700">
-                        <?= htmlspecialchars($docketNumber) ?>
-                    </span>
-                </div>
-                <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <!-- Tracking Number -->
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Tracking Number</dt>
-                        <dd class="mt-1 font-mono text-sm font-bold text-primary">
-                            <a href="<?= BASE_URL ?>/committee/inbox/show?id=<?= $documentId ?>"
-                               class="hover:underline">
-                                <?= htmlspecialchars($case['tracking_number'] ?? '') ?>
-                            </a>
-                        </dd>
-                    </div>
-                    <!-- Document Type -->
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Document Type</dt>
-                        <dd class="mt-1">
-                            <?php
-                            $dtBadge = $case['document_type_badge_color'] ?? '#2563EB';
-                            ?>
-                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                                  style="background-color:<?= htmlspecialchars($dtBadge) ?>1a;
-                                         color:<?= htmlspecialchars($dtBadge) ?>;">
-                                <?= htmlspecialchars($case['document_type_name'] ?? '') ?>
-                            </span>
-                        </dd>
-                    </div>
-                    <!-- Date Assigned -->
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Date Assigned</dt>
-                        <dd class="mt-1 text-sm text-gray-800">
-                            <?= htmlspecialchars(
-                                !empty($case['date_assigned'])
-                                    ? date('F j, Y', strtotime($case['date_assigned']))
-                                    : '—'
-                            ) ?>
-                        </dd>
-                    </div>
-                    <!-- Current Status -->
-                    <div>
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Current Status</dt>
-                        <dd class="mt-1">
-                            <?php $sBadge = $case['status_badge_color'] ?? '#2563EB'; ?>
-                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                                  style="background-color:<?= htmlspecialchars($sBadge) ?>1a;
-                                         color:<?= htmlspecialchars($sBadge) ?>;">
-                                <?= htmlspecialchars($case['status'] ?? '') ?>
-                            </span>
-                        </dd>
-                    </div>
-                    <!-- Subject Matter -->
-                    <div class="sm:col-span-2">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Subject Matter</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($case['subject_matter'] ?? '') ?></dd>
-                    </div>
-                    <!-- Nature of Case -->
-                    <div class="sm:col-span-2">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Nature of Case</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($case['nature_of_case'] ?? '') ?></dd>
-                    </div>
-                    <!-- Complainant Details -->
-                    <div class="sm:col-span-2">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Complainant Details</dt>
-                        <dd class="mt-1 text-sm text-gray-800 whitespace-pre-wrap"><?= escape_trimmed_text($case['complainant_details'] ?? '') ?></dd>
-                    </div>
-                    <!-- Complainant Municipality -->
-                    <?php if (!empty($case['complainant_municipality'])): ?>
-                        <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">
-                                Complainant Municipality / City
-                            </dt>
-                            <dd class="mt-1 text-sm text-gray-800">
-                                <?= htmlspecialchars($case['complainant_municipality']) ?>
-                            </dd>
-                        </div>
-                    <?php endif; ?>
-                    <!-- Respondents -->
-                    <div class="sm:col-span-2">
-                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Respondents</dt>
-                        <dd class="mt-2">
-                            <?php if (!empty($respondentsList)): ?>
-                                <div class="flex flex-wrap gap-2">
-                                    <?php foreach ($respondentsList as $r): ?>
-                                        <span class="inline-flex items-center gap-1.5 rounded-xl border
-                                                     border-gray-200 bg-gray-50 px-3 py-1 text-xs
-                                                     font-medium text-gray-700">
-                                            <svg class="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                            </svg>
-                                            <?= htmlspecialchars($r) ?>
-                                        </span>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php else: ?>
-                                <span class="text-sm text-gray-400">—</span>
-                            <?php endif; ?>
-                        </dd>
-                    </div>
-                    <!-- Created by -->
-                    <?php if (!empty($case['created_by_username'])): ?>
-                        <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Docketed By</dt>
-                            <dd class="mt-1 text-sm text-gray-800">
-                                <?php
-                                $creatorName = trim($case['created_by_name'] ?? '');
-                                echo htmlspecialchars($creatorName !== '' ? $creatorName : $case['created_by_username']);
-                                ?>
-                                <span class="block text-xs text-gray-400">
-                                    <?= htmlspecialchars(date('F j, Y', strtotime($case['created_at']))) ?>
-                                </span>
-                            </dd>
-                        </div>
-                    <?php endif; ?>
-                </dl>
-            </div>
 
             <!-- Case Timeline ------------------------------------------------>
             <div class="rounded-2xl border border-gray-200 bg-white p-6" id="timelineSection">
@@ -1012,21 +891,20 @@ ob_start();
                     </label>
                     <div class="flex items-center justify-center w-full">
                         <label for="modal_attachment"
-                               class="flex flex-col items-center justify-center w-full h-24 border-2
-                                      border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50
-                                      hover:bg-gray-100 transition"
+                               class="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2
+                                      border-dashed border-gray-300 bg-gray-50 transition hover:bg-gray-100"
                                id="attachDropZone">
-                            <div class="flex flex-col items-center justify-center py-3" id="attachDropContent">
-                                <svg class="w-6 h-6 mb-1 text-gray-400" fill="none" stroke="currentColor"
+                            <div class="flex flex-col items-center justify-center" id="attachDropContent">
+                                <svg class="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor"
                                      viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                           d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9
                                              M15 13l-3-3m0 0l-3 3m3-3v12"/>
                                 </svg>
-                                <p class="text-xs text-gray-500 text-center px-3" id="attachDropText">
+                                <p class="mb-1 text-sm text-gray-600 text-center px-3" id="attachDropText">
                                     <span class="font-semibold text-gray-700">Click to upload</span>
-                                    or drag and drop<br>
-                                    PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, WEBP &mdash; max 25 MB each, up to 10 files
+                                    or drag and drop
+                                    <span class="block text-xs text-gray-500">PDF, Word, Excel, images (MAX. 25 MB each)</span>
                                 </p>
                             </div>
                             <input id="modal_attachment" name="attachments[]" type="file"
@@ -1147,8 +1025,8 @@ document.addEventListener('keydown', function (e) {
     function updateDropText() {
         if (selectedFiles.length === 0) {
             dropText.innerHTML =
-                '<span class="font-semibold text-gray-700">Click to upload</span> or drag and drop<br>' +
-                'PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, GIF, WEBP &mdash; max 25 MB each, up to 10 files';
+                '<span class="font-semibold text-gray-700">Click to upload</span> or drag and drop' +
+                '<span class="block text-xs text-gray-500">PDF, Word, Excel, images (MAX. 25 MB each)</span>';
         } else {
             dropText.innerHTML =
                 '<span class="font-semibold text-gray-700">' + selectedFiles.length +

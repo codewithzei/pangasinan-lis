@@ -18,6 +18,9 @@
 $document       = $document       ?? [];
 $authors        = $authors        ?? [];
 $allAttachments = $allAttachments ?? [];
+$routes         = $routes         ?? [];
+$checklistItems = $checklistItems ?? [];
+$documentEvents = $documentEvents ?? [];
 $pageTitle      = $pageTitle      ?? 'Finalized Document Details';
 $pageSubtitle   = $pageSubtitle   ?? '';
 
@@ -63,48 +66,39 @@ function _ss_typeLabel(string $type): string
 
 <div class="detail-page space-y-6">
 
-
-
     <!-- ── Page header ──────────────────────────────────────────────────── -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10">
-                <div class="flex items-center gap-3">
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-center sm:px-8 sm:py-7">
                     <a href="<?= BASE_URL ?>/admin/filed"
-                       class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white
-                              hover:bg-white/20 transition"
+                       class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white
+                              transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
                        aria-label="Back to Filed Documents">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                         </svg>
                     </a>
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <p class="text-sm font-medium text-blue-100">FINALIZED — AWAITING FILING</p>
-                        </div>
-
-                        <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">Finalized · Awaiting filing</p>
+                        <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl">
                             <?= htmlspecialchars($pageSubtitle) ?>
                         </h1>
                     </div>
-                </div>
-            </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <!-- ── Not filed yet notice ─────────────────────────────────────────── -->
-    <div class="flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4">
-        <svg class="mt-0.5 h-5 w-5 shrink-0 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+        <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
         <div class="flex-1">
-            <p class="text-sm font-medium text-blue-900">This document has not been filed yet.</p>
-            <p class="mt-0.5 text-xs text-blue-700">
+            <p class="text-sm font-medium text-amber-900">This document has not been filed yet.</p>
+            <p class="mt-0.5 text-xs text-amber-800">
                 It is finalized and waiting to be filed. Go back to the
-                <a href="<?= BASE_URL ?>/admin/filed" class="font-semibold underline underline-offset-2 hover:text-blue-900">
+                <a href="<?= BASE_URL ?>/admin/filed" class="font-semibold underline underline-offset-2 hover:text-amber-950">
                     Filed Documents
                 </a>
                 page and use the <strong>File</strong> button to file it.
@@ -119,10 +113,16 @@ function _ss_typeLabel(string $type): string
         <div class="lg:col-span-2 space-y-6">
 
             <!-- Document Information -->
-            <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
+            <?php
+            $resubmissionTopMargin = 'mt-0';
+            require __DIR__ . '/../../partials/resubmission-relationship.php';
+            unset($resubmissionTopMargin);
+            $mfrDetailRoute = 'admin/routed';
+            require __DIR__ . '/../../partials/mfr-relationship.php';
+            ?>
 
-            <section class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="text-base font-semibold text-gray-900">Document Information</h2>
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Document Information</h2>
                 <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
 
                     <div>
@@ -146,25 +146,36 @@ function _ss_typeLabel(string $type): string
 
                     <div>
                         <p class="text-xs font-medium text-gray-500">Document Type</p>
-                        <span class="mt-1 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                              style="background-color:<?= htmlspecialchars($typeColor) ?>1a; color:<?= htmlspecialchars($typeColor) ?>;">
+                        <span class="mt-1 inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium"
+                              style="background-color:<?= htmlspecialchars($typeColor) ?>14; color:<?= htmlspecialchars($typeColor) ?>;">
                             <?= htmlspecialchars($document['document_type_name'] ?? '—') ?>
                         </span>
                     </div>
 
                     <div>
                         <p class="text-xs font-medium text-gray-500">Current Status</p>
-                        <span class="mt-1 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold"
-                              style="background-color:<?= htmlspecialchars($statusBadgeColor) ?>; border-color:<?= htmlspecialchars($statusBadgeColor) ?>; color:white;">
+                        <span class="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                              style="background-color:<?= htmlspecialchars($statusBadgeColor) ?>14; color:<?= htmlspecialchars($statusBadgeColor) ?>;">
+                            <span class="h-1.5 w-1.5 rounded-full" style="background-color:<?= htmlspecialchars($statusBadgeColor) ?>;"></span>
                             <?= htmlspecialchars($document['status'] ?? '—') ?>
                         </span>
                     </div>
 
                     <div>
-                        <p class="text-xs font-medium text-gray-500">Date Received</p>
+                        <p class="text-xs font-medium text-gray-500">Date &amp; Time Received</p>
                         <p class="mt-1 text-sm text-gray-900">
                             <?= htmlspecialchars(date('F j, Y', strtotime($document['date_received']))) ?>
+                            <?php if (!empty($document['time_received'])): ?>
+                                at <?= htmlspecialchars(date('g:i A', strtotime($document['time_received']))) ?>
+                            <?php endif; ?>
                         </p>
+                    </div>
+
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Current Division / Phase</p>
+                        <span class="mt-1 inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">
+                            <?= htmlspecialchars(_ss_phaseLabel($document['current_phase'] ?? '')) ?>
+                        </span>
                     </div>
 
                     <?php if (!empty($document['date_approved'])): ?>
@@ -196,7 +207,7 @@ function _ss_typeLabel(string $type): string
 
             <!-- Authors / Sponsors -->
             <?php if (!empty($authors)): ?>
-            <section class="rounded-2xl border border-gray-200 bg-white p-6">
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
                 <h2 class="text-base font-semibold text-gray-900">Authors &amp; Sponsors</h2>
                 <div class="mt-4 divide-y divide-gray-100">
                     <?php foreach (['AUTHOR', 'CO_AUTHOR'] as $role): ?>
@@ -209,7 +220,7 @@ function _ss_typeLabel(string $type): string
                         <?php if (!empty($roleAuthors)): ?>
                             <?php if (!empty($roleAuthors[0]['is_all_selected'])): ?>
                                 <div class="flex items-center justify-between py-2.5">
-                                    <p class="text-sm text-gray-900">ALL</p>
+                                    <p class="text-sm text-gray-900">All</p>
                                     <span class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold <?= $role === 'CO_AUTHOR' ? 'bg-purple-50 text-purple-700' : 'bg-blue-50 text-blue-700' ?>">
                                         <?= $role === 'CO_AUTHOR' ? 'Co-Author' : 'Author' ?>
                                     </span>
@@ -233,61 +244,65 @@ function _ss_typeLabel(string $type): string
             <?php endif; ?>
 
             <!-- Attachments -->
-            <?php if (!empty($allAttachments)): ?>
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="text-base font-semibold text-gray-900">Document Attachments</h2>
-                <p class="mt-1 text-xs text-gray-500">All files uploaded across every workflow phase.</p>
-                <ul class="mt-4 divide-y divide-gray-100">
-                    <?php foreach ($allAttachments as $att): ?>
-                        <li class="flex items-center justify-between gap-4 py-3">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-400">
-                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
-                                    </svg>
-                                </div>
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm text-gray-800">
-                                        <?= htmlspecialchars($att['file_name']) ?>
-                                    </p>
-                                    <div class="flex items-center gap-2 mt-0.5">
-                                        <span class="text-[11px] text-gray-400">
+                <h2 class="text-lg font-semibold text-gray-900">Attachments</h2>
+
+                <?php if (empty($allAttachments)): ?>
+                    <div class="mt-4 py-8 text-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293
+                                     l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <p class="mt-2 text-sm text-gray-500">No attachments found</p>
+                    </div>
+                <?php else: ?>
+                    <div class="mt-4 space-y-2">
+                        <?php foreach ($allAttachments as $att): ?>
+                            <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                <div class="flex min-w-0 flex-1 items-center gap-3">
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-primary">
+                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586
+                                                     a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-sm font-medium text-gray-900">
+                                            <?= htmlspecialchars($att['file_name']) ?>
+                                        </p>
+                                        <p class="text-xs text-gray-500">
                                             <?= htmlspecialchars(_ss_phaseLabel($att['phase'])) ?>
-                                        </span>
-                                        <span class="text-gray-300">·</span>
-                                        <span class="text-[11px] text-gray-400">
+                                            &bull;
                                             <?= htmlspecialchars(_ss_typeLabel($att['attachment_type'])) ?>
-                                        </span>
-                                        <span class="text-gray-300">·</span>
-                                        <span class="text-[11px] text-gray-400">
-                                            <?= htmlspecialchars(_ss_formatBytes((int)$att['file_size'])) ?>
-                                        </span>
+                                            &bull;
+                                            <?= htmlspecialchars(_ss_formatBytes((int) $att['file_size'])) ?>
+                                            &bull;
+                                            <?= htmlspecialchars(date('M j, Y', strtotime($att['created_at']))) ?>
+                                        </p>
                                     </div>
                                 </div>
+                                <a href="<?= BASE_URL ?>/admin/filed/source-attachment?attachment_id=<?= (int) $att['id'] ?>&amp;document_id=<?= (int) $document['id'] ?>"
+                                   data-attachment-preview
+                                   data-preview-url="<?= BASE_URL ?>/admin/filed/source-attachment?attachment_id=<?= (int) $att['id'] ?>&amp;document_id=<?= (int) $document['id'] ?>&amp;mode=raw"
+                                   data-download-url="<?= BASE_URL ?>/admin/filed/source-attachment?attachment_id=<?= (int) $att['id'] ?>&amp;document_id=<?= (int) $document['id'] ?>&amp;mode=download"
+                                   data-preview-name="<?= htmlspecialchars($att['file_name']) ?>"
+                                   target="_blank" rel="noopener"
+                                   class="ml-3 shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-1.5
+                                          text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                                   title="View attachment" aria-label="View attachment">
+                                    View
+                                </a>
                             </div>
-                            <a href="<?= BASE_URL ?>/admin/filed/source-attachment?attachment_id=<?= (int) $att['id'] ?>&amp;document_id=<?= (int) $document['id'] ?>"
-                               data-attachment-preview
-                               data-preview-url="<?= BASE_URL ?>/admin/filed/source-attachment?attachment_id=<?= (int) $att['id'] ?>&amp;document_id=<?= (int) $document['id'] ?>&amp;mode=raw"
-                               data-download-url="<?= BASE_URL ?>/admin/filed/source-attachment?attachment_id=<?= (int) $att['id'] ?>&amp;document_id=<?= (int) $document['id'] ?>&amp;mode=download"
-                               data-preview-name="<?= htmlspecialchars($att['file_name']) ?>"
-                               target="_blank" rel="noopener"
-                               class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-blue-200
-                                      bg-blue-50 px-3 py-1.5 text-xs font-medium text-primary
-                                      hover:bg-blue-100 transition"
-                               title="View attachment">
-                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M2.25 12s3.5-6.75 9.75-6.75S21.75 12 21.75 12s-3.5 6.75-9.75 6.75S2.25 12 2.25 12z"/>
-                                    <circle cx="12" cy="12" r="3" stroke-width="2"/>
-                                </svg>
-                                View
-                            </a>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </section>
-            <?php endif; ?>
+
+            <?php require __DIR__ . '/../../partials/document-action-timeline.php'; ?>
+
+            <?php require __DIR__ . '/../../partials/assignment-history.php'; ?>
 
         </div><!-- /main col -->
 
@@ -296,9 +311,8 @@ function _ss_typeLabel(string $type): string
 
             <!-- Source Information -->
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="text-base font-semibold text-gray-900">Source Information</h2>
-                <div class="mt-4 space-y-3">
-
+                <h2 class="text-lg font-semibold text-gray-900">Source Information</h2>
+                <div class="mt-4 space-y-4">
                     <div>
                         <p class="text-xs font-medium text-gray-500">Source Type</p>
                         <p class="mt-1 text-sm text-gray-900">
@@ -306,11 +320,11 @@ function _ss_typeLabel(string $type): string
                         </p>
                     </div>
 
-                    <?php if (!empty($document['external_office_name'])): ?>
+                    <?php if (($document['source_type'] ?? '') === 'Provincial Government Offices'): ?>
                     <div>
                         <p class="text-xs font-medium text-gray-500">Provincial Government Offices</p>
                         <p class="mt-1 text-sm text-gray-900">
-                            <?= htmlspecialchars($document['external_office_name']) ?>
+                            <?= htmlspecialchars($document['external_office_name'] ?? '—') ?>
                             <?php if (!empty($document['external_office_abbr'])): ?>
                                 (<?= htmlspecialchars($document['external_office_abbr']) ?>)
                             <?php endif; ?>
@@ -318,59 +332,127 @@ function _ss_typeLabel(string $type): string
                     </div>
                     <?php endif; ?>
 
-                    <?php if (!empty($document['hospital_name'])): ?>
+                    <?php if (($document['source_type'] ?? '') === 'Hospital'): ?>
                     <div>
                         <p class="text-xs font-medium text-gray-500">Hospital</p>
-                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['hospital_name']) ?></p>
+                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['hospital_name'] ?? '—') ?></p>
                     </div>
                     <?php endif; ?>
 
-                    <?php if (!empty($document['municipality_name'])): ?>
+                    <?php if (($document['source_type'] ?? '') === 'Client'): ?>
                     <div>
                         <p class="text-xs font-medium text-gray-500">Municipality / City</p>
                         <p class="mt-1 text-sm text-gray-900">
-                            <?= htmlspecialchars($document['municipality_name']) ?>
+                            <?= htmlspecialchars($document['municipality_name'] ?? '—') ?>
+                            <?php if (!empty($document['municipality_type'])): ?>
+                                (<?= htmlspecialchars($document['municipality_type']) ?>)
+                            <?php endif; ?>
                         </p>
                     </div>
-                    <?php endif; ?>
-
-                    <?php if (!empty($document['source_name'])): ?>
+                    <?php if (!empty($document['district_name'])): ?>
                     <div>
-                        <p class="text-xs font-medium text-gray-500">Source Name</p>
-                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_name']) ?></p>
+                        <p class="text-xs font-medium text-gray-500">District</p>
+                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['district_name']) ?></p>
                     </div>
                     <?php endif; ?>
+                    <?php endif; ?>
+
+                    <?php if (in_array($document['source_type'] ?? '', ['SP Member', 'Agency', 'Client'], true)): ?>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">
+                            <?= ($document['source_type'] ?? '') === 'Agency'
+                                ? 'Agency Name'
+                                : ((($document['source_type'] ?? '') === 'Client') ? 'Client Name' : 'SP Member') ?>
+                        </p>
+                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_name'] ?? '—') ?></p>
+                    </div>
+                    <?php endif; ?>
+
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Contact Number</p>
+                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_contact_number'] ?: '—') ?></p>
+                    </div>
+
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Address</p>
+                        <p class="mt-1 whitespace-pre-wrap text-sm text-gray-900"><?= htmlspecialchars($document['source_address'] ?: '—') ?></p>
+                    </div>
+
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Liaison / Contact Person</p>
+                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['source_liaison_name'] ?: '—') ?></p>
+                    </div>
                 </div>
             </section>
 
-            <!-- Phase / Workflow -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="text-base font-semibold text-gray-900">Workflow Phase</h2>
-                <div class="mt-3">
-                    <span class="inline-flex items-center rounded-lg bg-gray-50 border border-gray-200
-                                 px-3 py-1.5 text-sm font-medium text-gray-700">
-                        <?= htmlspecialchars(_ss_phaseLabel($document['current_phase'])) ?>
-                    </span>
-                </div>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Checklist</h2>
+                <?php if (empty($checklistItems)): ?>
+                    <div class="mt-4 py-6 text-center">
+                        <p class="text-xs text-gray-500">No checklist items</p>
+                    </div>
+                <?php else: ?>
+                    <div class="mt-4 space-y-2">
+                        <?php foreach ($checklistItems as $item): ?>
+                            <div class="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                <div class="flex h-5 items-center">
+                                    <?php if ($item['is_completed']): ?>
+                                        <svg class="h-5 w-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                        </svg>
+                                    <?php else: ?>
+                                        <svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clip-rule="evenodd"/>
+                                        </svg>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($item['checklist_name']) ?></p>
+                                    <?php if (!empty($item['checklist_description'])): ?>
+                                        <p class="mt-0.5 text-xs text-gray-500"><?= htmlspecialchars($item['checklist_description']) ?></p>
+                                    <?php endif; ?>
+                                    <?php if ($item['is_completed'] && !empty($item['completed_at'])): ?>
+                                        <p class="mt-1 text-xs text-emerald-600">
+                                            Completed <?= htmlspecialchars(date('M j, Y', strtotime($item['completed_at']))) ?>
+                                            <?php if (!empty($item['completed_by_username'])): ?>by <?= htmlspecialchars($item['completed_by_username']) ?><?php endif; ?>
+                                        </p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </section>
 
-            <!-- Audit -->
-            <section class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="text-base font-semibold text-gray-900">Audit</h2>
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Metadata</h2>
                 <div class="mt-4 space-y-3">
-                    <?php if (!empty($document['created_by_username'])): ?>
-                    <div>
-                        <p class="text-xs font-medium text-gray-500">Created By</p>
-                        <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($document['created_by_username']) ?></p>
-                    </div>
+                    <?php foreach ([
+                        'Created' => ['date' => $document['created_at'] ?? null, 'user' => $document['created_by_username'] ?? null],
+                        'Last Updated' => ['date' => $document['updated_at'] ?? null, 'user' => $document['updated_by_username'] ?? null],
+                    ] as $label => $metadata): ?>
+                        <?php if (!empty($metadata['date'])): ?>
+                            <div>
+                                <p class="text-xs font-medium text-gray-500"><?= htmlspecialchars($label) ?></p>
+                                <p class="mt-1 text-xs text-gray-900">
+                                    <?= htmlspecialchars(date('F j, Y g:i A', strtotime($metadata['date']))) ?>
+                                    <?php if (!empty($metadata['user'])): ?><br>by <?= htmlspecialchars($metadata['user']) ?><?php endif; ?>
+                                </p>
+                            </div>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                    <?php if (!empty($document['current_owner_username'])): ?>
+                        <div>
+                            <p class="text-xs font-medium text-gray-500">Current Owner</p>
+                            <p class="mt-1 text-xs text-gray-900"><?= htmlspecialchars($document['current_owner_username']) ?></p>
+                        </div>
                     <?php endif; ?>
-                    <?php if (!empty($document['created_at'])): ?>
-                    <div>
-                        <p class="text-xs font-medium text-gray-500">Created At</p>
-                        <p class="mt-1 text-sm text-gray-900">
-                            <?= htmlspecialchars(date('M j, Y g:i A', strtotime($document['created_at']))) ?>
-                        </p>
-                    </div>
+                    <?php if (!empty($document['finalized_at'])): ?>
+                        <div>
+                            <p class="text-xs font-medium text-gray-500">Finalized</p>
+                            <p class="mt-1 text-xs text-gray-900"><?= htmlspecialchars(date('F j, Y g:i A', strtotime($document['finalized_at']))) ?></p>
+                        </div>
                     <?php endif; ?>
                 </div>
             </section>

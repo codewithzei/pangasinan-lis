@@ -61,14 +61,23 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
         <div class="relative px-6 py-8 sm:px-8">
             <div class="relative z-10">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-blue-100">DOCUMENT DETAILS</p>
-                        <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                            <?= htmlspecialchars($document['tracking_number'] ?? '') ?>
-                        </h1>
-                        <p class="mt-1 text-sm text-blue-100">
-                            <?= htmlspecialchars($pageSubtitle) ?>
-                        </p>
+                    <div class="flex min-w-0 items-center gap-3">
+                        <a href="<?= BASE_URL ?>/spsec/routed"
+                           aria-label="Back to Routed Documents"
+                           class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                            </svg>
+                        </a>
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-blue-100">DOCUMENT DETAILS</p>
+                            <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                                <?= htmlspecialchars($document['tracking_number'] ?? '') ?>
+                            </h1>
+                            <p class="mt-1 text-sm text-blue-100">
+                                <?= htmlspecialchars($pageSubtitle) ?>
+                            </p>
+                        </div>
                     </div>
                     <div class="flex items-center gap-3 shrink-0">
                         <!-- Current phase badge -->
@@ -86,67 +95,11 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
     <?php
     // MFR relationship links (Referenced Original Case / Related Motions)
     $mfrDetailRoute = 'spsec/inbox';
+    $resubmissionTopMargin = 'mt-0';
     require __DIR__ . '/../../partials/resubmission-relationship.php';
+    unset($resubmissionTopMargin);
     require __DIR__ . '/../../partials/mfr-relationship.php';
     ?>
-
-    <section class="rounded-2xl border border-gray-200 bg-white p-6">
-        <h2 class="text-lg font-semibold text-gray-900">Summary</h2>
-
-        <div class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-            <div class="flex items-start justify-between gap-2">
-                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Tracking #</span>
-                <span class="break-all text-right font-semibold text-gray-900">
-                    <?= htmlspecialchars($document['tracking_number'] ?? '—') ?>
-                </span>
-            </div>
-            <div class="flex items-start justify-between gap-2">
-                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Type</span>
-                <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                      style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
-                             color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
-                    <?= htmlspecialchars($document['document_type_name'] ?? '—') ?>
-                </span>
-            </div>
-            <div class="flex items-start justify-between gap-2">
-                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Status</span>
-                <span class="inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold"
-                      style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                             border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                             color: white;">
-                    <?= htmlspecialchars($document['status'] ?? '—') ?>
-                </span>
-            </div>
-            <div class="flex items-start justify-between gap-2">
-                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Phase</span>
-                <span class="text-right text-xs font-medium text-gray-700">
-                    <?= htmlspecialchars(spsec_formatPhaseName($document['current_phase'] ?? '')) ?>
-                </span>
-            </div>
-            <?php if (!empty($document['committee_name'])): ?>
-            <div class="flex items-start justify-between gap-2">
-                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Committee</span>
-                <span class="text-right text-xs font-medium text-amber-700">
-                    <?= htmlspecialchars($document['committee_name']) ?>
-                </span>
-            </div>
-            <?php endif; ?>
-            <?php if (!empty($document['communication_category_name'])): ?>
-            <div class="flex items-start justify-between gap-2">
-                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Comm. Category</span>
-                <span class="text-right text-xs font-medium text-emerald-700">
-                    <?= htmlspecialchars($document['communication_category_name']) ?>
-                </span>
-            </div>
-            <?php endif; ?>
-            <div class="flex items-start justify-between gap-2">
-                <span class="shrink-0 pt-0.5 text-xs text-gray-500">Received</span>
-                <span class="text-right text-xs text-gray-700">
-                    <?= htmlspecialchars(date('M j, Y', strtotime($document['date_received']))) ?>
-                </span>
-            </div>
-        </div>
-    </section>
 
     <!-- ── Main layout: 2-col on lg ──────────────────────────────────────────── -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -192,11 +145,10 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
                     <div>
                         <p class="text-xs font-medium text-gray-500">Current Status</p>
-                        <span class="mt-1 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5
-                                     text-xs font-semibold shadow-sm"
-                              style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                     border-color: <?= htmlspecialchars($statusBadgeColor) ?>;
-                                     color: white;">
+                        <span class="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                              style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>1a;
+                                     color: <?= htmlspecialchars($statusBadgeColor) ?>;">
+                            <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;"></span>
                             <?= htmlspecialchars($document['status'] ?? '—') ?>
                         </span>
                     </div>
@@ -372,14 +324,14 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
                     <div class="mt-4 hidden overflow-x-auto sm:block">
                         <table class="w-full text-left text-sm">
-                            <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+                            <thead class="border-b border-gray-100 bg-gray-50/70 text-[11px] uppercase tracking-wide text-gray-500">
                                 <tr>
-                                    <th class="px-4 py-3 font-medium">Role</th>
-                                    <th class="px-4 py-3 font-medium">Phase</th>
-                                    <th class="px-4 py-3 font-medium">Decision</th>
-                                    <th class="px-4 py-3 font-medium">Accepted By</th>
-                                    <th class="px-4 py-3 font-medium">Received</th>
-                                    <th class="px-4 py-3 font-medium">Completed</th>
+                                    <th class="px-4 py-3 font-bold">Role</th>
+                                    <th class="px-4 py-3 font-bold">Phase</th>
+                                    <th class="px-4 py-3 font-bold">Decision</th>
+                                    <th class="px-4 py-3 font-bold">Accepted By</th>
+                                    <th class="px-4 py-3 font-bold">Received</th>
+                                    <th class="px-4 py-3 font-bold">Completed</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
@@ -489,6 +441,63 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
         <!-- ── Right / sidebar column ─────────────────────────────────────────── -->
         <div class="space-y-6">
 
+            <!-- Checklist -->
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Checklist</h2>
+
+                <?php if (empty($checklistItems)): ?>
+                    <div class="mt-4 py-6 text-center">
+                        <svg class="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
+                                     M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                        </svg>
+                        <p class="mt-2 text-xs text-gray-500">No checklist items</p>
+                    </div>
+                <?php else: ?>
+                    <div class="mt-4 space-y-2">
+                        <?php foreach ($checklistItems as $item): ?>
+                            <div class="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                <div class="flex h-5 items-center">
+                                    <?php if ($item['is_completed']): ?>
+                                        <svg class="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd"
+                                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414
+                                                     L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                                  clip-rule="evenodd"/>
+                                        </svg>
+                                    <?php else: ?>
+                                        <svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd"
+                                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z"
+                                                  clip-rule="evenodd"/>
+                                        </svg>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-medium text-gray-900">
+                                        <?= htmlspecialchars($item['checklist_name']) ?>
+                                    </p>
+                                    <?php if (!empty($item['checklist_description'])): ?>
+                                        <p class="mt-0.5 text-xs text-gray-500">
+                                            <?= htmlspecialchars($item['checklist_description']) ?>
+                                        </p>
+                                    <?php endif; ?>
+                                    <?php if ($item['is_completed'] && !empty($item['completed_at'])): ?>
+                                        <p class="mt-1 text-xs text-green-600">
+                                            Completed on <?= htmlspecialchars(date('M j, Y', strtotime($item['completed_at']))) ?>
+                                            <?php if (!empty($item['completed_by_username'])): ?>
+                                                by <?= htmlspecialchars($item['completed_by_username']) ?>
+                                            <?php endif; ?>
+                                        </p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </section>
+
             <!-- Metadata ─────────────────────────────────────────────────────── -->
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="text-lg font-semibold text-gray-900">Metadata</h2>
@@ -531,6 +540,13 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                         </p>
                     </div>
                     <?php endif; ?>
+
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Public Access</p>
+                        <p class="mt-1 text-xs text-gray-900">
+                            <?= !empty($document['is_public']) ? 'Yes' : 'No' ?>
+                        </p>
+                    </div>
 
                     <div>
                         <p class="text-xs font-medium text-gray-500">Route Count</p>

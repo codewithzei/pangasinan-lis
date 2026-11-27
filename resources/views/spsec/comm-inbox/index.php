@@ -98,10 +98,17 @@ ob_start();
     </section>
 
     <!-- Table -->
-    <section class="rounded-2xl border border-gray-200 bg-white">
+    <section id="spsec-comm-inbox-list" class="rounded-2xl border border-gray-200 bg-white shadow-sm">
 
         <!-- Tabs + Search -->
-        <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <?php
+        $responsiveInboxId = 'spsec-comm-inbox-list';
+        $responsiveInboxLabels = $tab === 'sent'
+            ? ['Communication Date', 'Subject Matter', 'Status', 'Sent to FR', 'Action']
+            : ['Communication Date', 'Subject Matter', 'Status', 'Action'];
+        require __DIR__ . '/../../partials/responsive-inbox-table.php';
+        ?>
+        <div class="flex min-w-0 flex-col gap-4 border-b border-gray-100 px-5 py-5 md:px-6 xl:flex-row xl:items-center xl:justify-between">
             <div class="flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
                 <a href="?tab=pending<?= $search !== '' ? '&search=' . urlencode($search) : '' ?><?= $typeFilterQuery ?>"
                    class="rounded-lg px-4 py-1.5 text-sm font-medium transition <?= $tab === 'pending' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' ?>">
@@ -119,18 +126,18 @@ ob_start();
                 </a>
             </div>
 
-            <form method="GET" action="<?= BASE_URL ?>/spsec/comm-inbox" class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <form method="GET" action="<?= BASE_URL ?>/spsec/comm-inbox" class="hidden w-full min-w-0 items-center justify-end gap-2 xl:flex xl:flex-1">
                 <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
-                <div class="relative">
+                <div class="relative w-full min-w-0 flex-none" style="max-width: 320px;">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
                     <input type="text" name="search" value="<?= htmlspecialchars($search) ?>"
                            placeholder="Search tracking # or subject…"
-                           class="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 lg:w-64">
+                           class="block w-full min-w-0 rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                 </div>
                 <select name="document_type_id" aria-label="Filter by document type"
-                        class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 sm:w-52">
+                        class="w-44 min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                     <option value="">All document types</option>
                     <?php foreach ($documentTypes as $documentType): ?>
                         <option value="<?= (int) $documentType['id'] ?>" <?= (int) $documentTypeId === (int) $documentType['id'] ? 'selected' : '' ?>>
@@ -138,15 +145,41 @@ ob_start();
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <button type="submit" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Filter</button>
+                <button type="submit" class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Filter</button>
                 <?php if ($search !== '' || $documentTypeId > 0): ?>
-                    <a href="?tab=<?= htmlspecialchars($tab) ?>" class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Clear</a>
+                    <a href="?tab=<?= htmlspecialchars($tab) ?>" class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Clear</a>
                 <?php endif; ?>
+            </form>
+
+            <div class="flex min-w-0 items-center gap-2 xl:hidden">
+                <form method="GET" action="<?= BASE_URL ?>/spsec/comm-inbox" class="relative min-w-0 flex-1">
+                    <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
+                    <input type="hidden" name="document_type_id" value="<?= (int) $documentTypeId ?>">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input type="search" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search tracking # or subject…" class="block w-full min-w-0 rounded-lg border border-gray-200 py-2.5 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                </form>
+                <button type="button" data-inbox-filter-target="#spsec-comm-inbox-filter-sheet" aria-label="Open filters" class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 12h12m-9 8h6"/></svg>
+                    <?php if ($documentTypeId > 0): ?><span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"></span><?php endif; ?>
+                </button>
+            </div>
+        </div>
+
+        <div id="spsec-comm-inbox-filter-sheet" class="fixed inset-0 z-50 hidden xl:hidden">
+            <button type="button" class="inbox-filter-backdrop absolute inset-0 bg-gray-950/40" aria-label="Close filters"></button>
+            <form method="GET" action="<?= BASE_URL ?>/spsec/comm-inbox" class="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-5 shadow-2xl">
+                <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
+                <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                <div class="mb-4 flex items-center justify-between"><h3 class="font-semibold text-gray-900">Filters</h3><button type="button" class="inbox-filter-close text-sm text-gray-500">Close</button></div>
+                <select name="document_type_id" aria-label="Filter by document type" class="mb-3 w-full rounded-lg border border-gray-200 px-3 py-3 text-sm"><option value="">All document types</option><?php foreach ($documentTypes as $documentType): ?><option value="<?= (int) $documentType['id'] ?>" <?= (int) $documentTypeId === (int) $documentType['id'] ? 'selected' : '' ?>><?= htmlspecialchars($documentType['name']) ?></option><?php endforeach; ?></select>
+                <button type="submit" class="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white">Apply Filter</button>
+                <?php if ($search !== '' || $documentTypeId > 0): ?><a href="?tab=<?= urlencode($tab) ?>" class="mt-2 block w-full rounded-lg border border-gray-200 px-4 py-3 text-center text-sm font-medium text-gray-700">Clear filters</a><?php endif; ?>
             </form>
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+            <?php require __DIR__ . '/../../partials/inbox-mobile-filter-script.php'; ?>
+            <table class="inbox-responsive-table w-full text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
                         <th class="px-6 py-3 font-medium">Communication Date</th>
@@ -160,7 +193,7 @@ ob_start();
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     <?php if (empty($documents)): ?>
-                        <tr>
+                        <tr class="inbox-empty-row">
                             <td colspan="<?= $tab === 'sent' ? 5 : 4 ?>" class="px-6 py-16 text-center">
                                 <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
                                     <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -187,8 +220,10 @@ ob_start();
                                 </td>
                                 <td class="px-6 py-4">
                                     <?php if (!empty($row['status'])): ?>
-                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                                              style="background-color: <?= htmlspecialchars($row['status_badge_color'] ?? '#6B7280') ?>1a; color: <?= htmlspecialchars($row['status_badge_color'] ?? '#6B7280') ?>;">
+                                        <?php $statusBadgeColor = $row['status_badge_color'] ?? '#6B7280'; ?>
+                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                                              style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>1a; color: <?= htmlspecialchars($statusBadgeColor) ?>;">
+                                            <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;"></span>
                                             <?= htmlspecialchars($row['status']) ?>
                                         </span>
                                     <?php else: ?>
@@ -203,16 +238,18 @@ ob_start();
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-2">
                                         <a href="<?= BASE_URL ?>/spsec/comm-inbox/show?id=<?= (int) $row['id'] ?>"
-                                           class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition">
-                                            View
+                                           class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 hover:border-primary hover:bg-primary hover:text-white transition"
+                                           title="View communication" aria-label="View communication">
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                         </a>
                                         <?php if ($tab === 'pending' && empty($row['sent_to_fr_at'])): ?>
                                             <form method="POST" action="<?= BASE_URL ?>/spsec/comm-inbox/send-to-fr"
                                                   onsubmit="return confirm('Send this communication to the First Reading queue?')">
                                                 <input type="hidden" name="document_id" value="<?= (int) $row['id'] ?>">
                                                 <button type="submit"
-                                                        class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 transition">
-                                                    Send to First Reading
+                                                        title="Send to First Reading" aria-label="Send to First Reading"
+                                                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-primary bg-primary text-white hover:bg-primary/90 transition">
+                                                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.5 19.5l15-7.5-15-7.5 3 7.5-3 7.5z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7.5 12h12"/></svg>
                                                 </button>
                                             </form>
                                         <?php endif; ?>

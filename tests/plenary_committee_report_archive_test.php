@@ -64,7 +64,7 @@ $checks = [
         'Hearing Status',
         'name="doc_type"',
         'All document types',
-        'text-base font-semibold leading-6',
+        'text-sm font-medium leading-5',
         "rtcBuildPageUrl(\$tab, \$page + 1, \$search, \$documentTypeId)",
         '$row[\'committee_hearing_outcome\']',
         "'Pending'",

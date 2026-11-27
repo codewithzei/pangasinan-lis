@@ -22,7 +22,7 @@ $pageTitle = $pageTitle ?? APP_SHORT_NAME;
 
     <link
         rel="stylesheet"
-        href="<?= BASE_URL ?>/public/assets/css/output.css"
+        href="<?= BASE_URL ?>/public/assets/css/output.css?v=<?= filemtime(__DIR__ . '/../../../public/assets/css/output.css') ?>"
     >
 
 </head>
