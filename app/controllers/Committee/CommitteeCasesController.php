@@ -1007,7 +1007,7 @@ class CommitteeCasesController
         }
 
         // ── Validate outcome value ────────────────────────────────────────────
-        $validOutcomes = ['APPROVED', 'DEFERRED', 'WITHDRAWN', 'NOTED'];
+        $validOutcomes = ['APPROVED', 'DEFERRED', 'REMANDED', 'WITHDRAWN', 'NOTED'];
         if (!in_array($outcome, $validOutcomes, true)) {
             flash_set('error', 'Please select a valid final outcome.');
             redirect('committee/cases/show?id=' . $caseId);
@@ -1077,12 +1077,14 @@ class CommitteeCasesController
         $statusMap = [
             'APPROVED'  => 'Hearing Completed',
             'DEFERRED'  => 'Deferred',
+            'REMANDED'  => 'Remanded',
             'WITHDRAWN' => 'Withdrawn',
             'NOTED'     => 'Noted',
         ];
         $eventMap = [
             'APPROVED'  => 'COMMITTEE_CASE_APPROVED',
             'DEFERRED'  => 'HEARING_DEFERRED',
+            'REMANDED'  => 'HEARING_REMANDED',
             'WITHDRAWN' => 'HEARING_WITHDRAWN',
             'NOTED'     => 'COMMITTEE_CASE_NOTED',
         ];

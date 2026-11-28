@@ -402,6 +402,7 @@ ob_start();
             $outcomeBadges = [
                 'APPROVED'  => ['label' => 'Approved',  'bg' => 'bg-green-100',  'text' => 'text-green-700',  'border' => 'border-green-200',  'icon_color' => 'text-green-500'],
                 'DEFERRED'  => ['label' => 'Deferred',  'bg' => 'bg-gray-100',   'text' => 'text-gray-700',   'border' => 'border-gray-200',   'icon_color' => 'text-gray-400'],
+                'REMANDED'  => ['label' => 'Remanded',  'bg' => 'bg-red-100',    'text' => 'text-red-700',    'border' => 'border-red-200',    'icon_color' => 'text-red-500'],
                 'WITHDRAWN' => ['label' => 'Withdrawn', 'bg' => 'bg-amber-100',  'text' => 'text-amber-700',  'border' => 'border-amber-200',  'icon_color' => 'text-amber-500'],
                 'NOTED'     => ['label' => 'Noted',     'bg' => 'bg-cyan-100',   'text' => 'text-cyan-700',   'border' => 'border-cyan-200',   'icon_color' => 'text-cyan-500'],
             ];
@@ -526,12 +527,13 @@ ob_start();
                             </a>
                         </div>
 
-                    <?php elseif (in_array($finalOutcome, ['DEFERRED', 'WITHDRAWN', 'NOTED'])): ?>
+                    <?php elseif (in_array($finalOutcome, ['DEFERRED', 'REMANDED', 'WITHDRAWN', 'NOTED'])): ?>
                         <!-- ── Non-approved outcome links ──────────────────── -->
                         <div class="mt-5 border-t border-gray-100 pt-4">
                             <?php
                             $outcomeLinkMap = [
                                 'DEFERRED'  => ['url' => 'committee/hearing?tab=deferred',  'label' => '← Back to Deferred Hearings'],
+                                'REMANDED'  => ['url' => 'committee/hearing?tab=remanded', 'label' => '← Back to Remanded Hearings'],
                                 'WITHDRAWN' => ['url' => 'committee/hearing?tab=withdrawn', 'label' => '← Back to Withdrawn Hearings'],
                                 'NOTED'     => ['url' => 'committee/hearing?tab=noted',     'label' => '← Back to Noted Hearings'],
                             ];
@@ -596,6 +598,7 @@ ob_start();
                                     <option value="">— Choose an outcome —</option>
                                     <option value="APPROVED">Approved — Hearing Completed → For Report</option>
                                     <option value="DEFERRED">Defer — Case sent to Deferred</option>
+                                    <option value="REMANDED">Remand — Case sent to Remanded</option>
                                     <option value="WITHDRAWN">Withdraw — Case sent to Withdrawn</option>
                                     <option value="NOTED">Noted — Case sent to Noted</option>
                                 </select>
@@ -1251,6 +1254,7 @@ openActionModal();
     const outcomeLabels = {
         'APPROVED':  'Approved — document status will be set to Hearing Completed.',
         'DEFERRED':  'Deferred — document status will be set to Deferred.',
+        'REMANDED':  'Remanded — document status will be set to Remanded.',
         'WITHDRAWN': 'Withdrawn — document status will be set to Withdrawn.',
         'NOTED':     'Noted — document status will be set to Noted.',
     };
