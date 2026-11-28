@@ -480,6 +480,7 @@ class CommitteeCommunicationsController
         $this->requireCommOwnership($comm, $userId);
 
         $documentId = (int) $comm['document_id'];
+        $this->ensureMfrAutoApprovedHearing($comm, $userId);
 
         // Attachments for the source document
         $attStmt = $this->pdo->prepare("
@@ -1673,6 +1674,100 @@ class CommitteeCommunicationsController
             );
             redirect('committee/hearing?tab=approved');
         }
+    }
+
+    /** Backfill the synthetic approved-hearing record for an older MFR communication. */
+    private function ensureMfrAutoApprovedHearing(array &$comm, int $userId): void
+    {
+        if (($comm['document_type_name'] ?? null) !== DocumentService::mfrTypeName()) {
+            return;
+        }
+
+        $documentId = (int) ($comm['document_id'] ?? 0);
+        if ($documentId <= 0) return;
+
+        $hearingStmt = $this->pdo->prepare("
+            SELECT id
+            FROM committee_hearings
+            WHERE document_id = ?
+              AND agenda_id IS NULL
+              AND outcome = 'APPROVED'
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $hearingStmt->execute([$documentId]);
+        $hearingId = (int) ($hearingStmt->fetchColumn() ?: 0);
+
+        if ($hearingId <= 0) {
+            try {
+                $this->pdo->beginTransaction();
+
+                $hearingStmt = $this->pdo->prepare("
+                    INSERT INTO committee_hearings
+                        (document_id, agenda_id, outcome, remarks, performed_by, performed_at, created_at)
+                    VALUES (?, NULL, 'APPROVED', ?, ?, NOW(), NOW())
+                ");
+                $hearingStmt->execute([
+                    $documentId,
+                    'Automatically approved for Motion for Reconsideration; no agenda or hearing required.',
+                    $userId,
+                ]);
+                $hearingId = (int) $this->pdo->lastInsertId();
+
+                $commStatus = $this->requireDocumentStatus('Hearing Completed');
+                $currentStatusId = (int) ($comm['current_status_id'] ?? 0);
+
+                $this->pdo->prepare(
+                    "UPDATE committee_communications SET hearing_id = ?, updated_at = NOW() WHERE id = ?"
+                )->execute([$hearingId, (int) $comm['id']]);
+
+                $this->pdo->prepare(
+                    "UPDATE documents SET current_status_id = ?, updated_by = ? WHERE id = ?"
+                )->execute([$commStatus['id'], $userId, $documentId]);
+
+                $eventStmt = $this->pdo->prepare("
+                    SELECT 1 FROM document_events
+                    WHERE document_id = ?
+                      AND event_type = 'HEARING_COMPLETED'
+                      AND remarks = 'Motion for Reconsideration automatically approved; no agenda or hearing required.'
+                    LIMIT 1
+                ");
+                $eventStmt->execute([$documentId]);
+                if (!$eventStmt->fetchColumn()) {
+                    $this->pdo->prepare("
+                        INSERT INTO document_events (
+                            document_id, event_type, phase, performed_by,
+                            from_status_id, to_status_id, remarks, metadata
+                        ) VALUES (?, 'HEARING_COMPLETED', 'COMMITTEE', ?, ?, ?, ?, ?)
+                    ")->execute([
+                        $documentId,
+                        $userId,
+                        $currentStatusId ?: null,
+                        $commStatus['id'],
+                        'Motion for Reconsideration automatically approved; no agenda or hearing required.',
+                        json_encode([
+                            'hearing_id' => $hearingId,
+                            'outcome' => 'APPROVED',
+                            'auto_approved' => true,
+                            'reason' => 'MOTION_FOR_RECONSIDERATION',
+                            'performed_by' => $userId,
+                            'backfilled' => true,
+                        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    ]);
+                }
+
+                $this->pdo->commit();
+            } catch (Throwable $e) {
+                if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+                throw $e;
+            }
+        } elseif (empty($comm['hearing_id'])) {
+            $this->pdo->prepare(
+                "UPDATE committee_communications SET hearing_id = ?, updated_at = NOW() WHERE id = ?"
+            )->execute([$hearingId, (int) $comm['id']]);
+        }
+
+        $comm['hearing_id'] = $hearingId;
     }
 
     /** Load a communication record with all document and status joins. */
