@@ -25,7 +25,14 @@ $checks = [
         "WHERE document_id = ? AND event_type = 'RETURNED_TO_PLENARY'",
         "private function recordAdoptedCommitteeReport(",
         'public function referredToCommitteeShow(): void',
+        "['in_committee', 'returned', 'remanded', 'withdrawn', 'noted']",
+        "\$outcomeStatusIds['remanded']",
+        "\$outcomeStatusIds['withdrawn']",
+        "\$outcomeStatusIds['noted']",
+        "da2.phase = d.current_phase",
+        "da3.phase = d.current_phase",
         "\$_GET['doc_type']",
+        '$offset     = ($page - 1) * $perPage;',
         "AND d.document_type_id = ?",
         'SELECT id, name',
         'FROM document_events de',
@@ -58,10 +65,27 @@ $checks = [
         'id="reportAdoptionConfirmationDecision"',
         'Confirm Committee Report Adoption',
         'Approve &amp; Proceed to 2nd Reading',
-        'Adopt Report Only (Disapproved)',
+        'Adopt Report Only',
+        'max-w-56 flex-col items-end gap-2',
+        '<span>View details</span>',
+        '<span>Adopt Committee Report</span>',
+        '<span>Adopt Report Only</span>',
+        'aria-label="<?= $hearingApproved ? \'Approve and proceed to Second Reading\' : \'Adopt report only\' ?> for',
         "function rtcBuildDetailUrl(",
+        "'remanded' => 'Remanded'",
+        "'withdrawn' => 'Withdrawn'",
+        "'noted' => 'Noted'",
+        "\$outcomeCounts['remanded']",
         "return BASE_URL . '/plenary/referred-to-committee/show?' . http_build_query(\$params);",
         'Hearing Status',
+        'hidden overflow-x-auto xl:block',
+        'space-y-4 border-t border-gray-100 px-4 py-4 sm:px-6 xl:hidden',
+        'id="rtc-mobile-search"',
+        'id="rtcMobileFilterSheet"',
+        "require __DIR__ . '/row-actions.php';",
+        'inline-flex max-w-full items-center justify-center gap-1.5 whitespace-normal rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-center text-xs font-medium text-gray-700',
+        'aria-label="View details for <?= htmlspecialchars($row[\'tracking_number\'], ENT_QUOTES, \'UTF-8\') ?>"',
+        'Showing 0 records',
         'name="doc_type"',
         'All document types',
         'text-sm font-medium leading-5',
@@ -76,6 +100,16 @@ $checks = [
         "var dt = typeof DataTransfer === 'function' ? new DataTransfer() : null;",
         "var casesDt = typeof DataTransfer === 'function' ? new DataTransfer() : null;",
         'Use the file picker to attach files in this browser.',
+    ],
+    'resources/views/plenary/first-reading/index.php' => [
+        'inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5',
+        'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5',
+        '<span>Process</span>',
+    ],
+    'resources/views/plenary/inbox/index.php' => [
+        'inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5',
+        'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5',
+        '<span><?= $currentView === \'inbox\' ? \'Process\' : \'View\' ?></span>',
     ],
     'resources/views/plenary/reports/index.php' => [
         'Adopted Committee Reports',
@@ -109,6 +143,24 @@ $checks = [
     'resources/views/layouts/sidebar.php' => [
         '<?= BASE_URL ?>/plenary/reports',
         'Plenary Reports',
+        "in_array(\$currentRoute, ['plenary/cases-first-reading/show', 'plenary/comm-first-reading/show'], true)",
+        "\$currentRoute = 'plenary/first-reading';",
+    ],
+    'resources/views/plenary/cases-first-reading/show.php' => [
+        'name="reading_date"',
+        'focus:ring-primary/20"',
+    ],
+    'resources/views/plenary/comm-first-reading/show.php' => [
+        'name="reading_date"',
+        'focus:ring-primary/20">',
+        'Action History',
+        'Assignment History',
+        'data-attachment-preview',
+        'space-y-3 sm:hidden',
+        'hidden overflow-x-auto sm:block',
+        'flex items-center justify-end gap-3 border-t border-gray-100 pt-4',
+        "\$mfrDetailRoute = 'plenary/inbox';",
+        "\$resubmissionDetailRoute = 'plenary/inbox';",
     ],
 ];
 
@@ -140,7 +192,43 @@ foreach ($checks as $relativePath => $needles) {
     }
 }
 
+$datePickerViews = [
+    'resources/views/plenary/cases-first-reading/show.php',
+    'resources/views/plenary/comm-first-reading/show.php',
+];
+foreach ($datePickerViews as $relativePath) {
+    $contents = file_get_contents($root . '/' . $relativePath);
+    $hasFullWidthDatePicker = $contents !== false
+        && preg_match('/<input type="date" id="reading_date"[\s\S]*?class="([^"]*)"/', $contents, $dateInput) === 1
+        && str_contains($dateInput[1], 'w-full')
+        && !str_contains($dateInput[1], 'sm:w-52');
+    if (!$hasFullWidthDatePicker) {
+        fwrite(STDERR, "[FAIL] {$relativePath} reading date picker must remain full width at all breakpoints." . PHP_EOL);
+        $failed++;
+    }
+}
+
+$commFirstReadingView = file_get_contents($root . '/resources/views/plenary/comm-first-reading/show.php');
+if ($commFirstReadingView === false
+    || str_contains($commFirstReadingView, 'communication_category_id')
+    || str_contains($commFirstReadingView, 'Communication Category')) {
+    fwrite(STDERR, '[FAIL] Communication First Reading Noted decision must not request a Communication Category.' . PHP_EOL);
+    $failed++;
+}
+
 $controller = file_get_contents($root . '/app/controllers/Plenary/PlenaryReadingController.php');
+$commNotedStart = strpos((string) $controller, 'private function doCommFrNoted(');
+$commNotedEnd = strpos((string) $controller, 'private function doCommFrReferToCommittee(', $commNotedStart ?: 0);
+$commNotedHandler = $commNotedStart !== false && $commNotedEnd !== false
+    ? substr((string) $controller, $commNotedStart, $commNotedEnd - $commNotedStart)
+    : '';
+if ($commNotedHandler === ''
+    || str_contains($commNotedHandler, 'communication_category_id')
+    || !str_contains($commNotedHandler, "VALUES (?, 'NOTED', ?, ?, ?, NOW(), ?)")) {
+    fwrite(STDERR, '[FAIL] Communication First Reading Noted handler must store without a category.' . PHP_EOL);
+    $failed++;
+}
+
 $sharedRecorderCalls = substr_count((string) $controller, '$this->recordAdoptedCommitteeReport(');
 if ($sharedRecorderCalls < 2) {
     fwrite(STDERR, '[FAIL] Communication and cases adoption paths must also archive the Committee Report.' . PHP_EOL);

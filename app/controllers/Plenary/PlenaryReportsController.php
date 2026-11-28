@@ -20,9 +20,18 @@ class PlenaryReportsController
         $this->requirePlenaryAccess();
 
         $search = trim($_GET['search'] ?? '');
+        $reportType = trim($_GET['report_type'] ?? '');
+        $validReportTypes = ['', 'COMMITTEE_REPORT', 'JOINT_COMMITTEE_REPORT'];
+        if (!in_array($reportType, $validReportTypes, true)) {
+            $reportType = '';
+        }
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $offset = ($page - 1) * self::PER_PAGE;
         [$where, $params] = $this->buildSearchClause($search);
+        if ($reportType !== '') {
+            $where .= ' AND cr.report_type = ?';
+            $params[] = $reportType;
+        }
 
         $countStmt = $this->pdo->prepare("
             SELECT COUNT(DISTINCT pcra.committee_report_id)
@@ -62,6 +71,7 @@ class PlenaryReportsController
         $reports = $listStmt->fetchAll();
 
         $pageTitle = 'Plenary Reports';
+        $perPage = self::PER_PAGE;
         require __DIR__ . '/../../../resources/views/plenary/reports/index.php';
     }
 

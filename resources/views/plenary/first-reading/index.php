@@ -10,7 +10,6 @@
  *   $search             string
  *   $tab                string  active document-type tab ('petitions' is a legacy URL alias for 'cases')
  *   $tabCounts          array   totals for each document-type tab
- *   $referredCommCount  int
  *   $success            string|null
  *   $error              string|null
  *   $errors             array
@@ -21,6 +20,7 @@ $page              = $page              ?? 1;
 $totalPages        = $totalPages        ?? 1;
 $total             = $total             ?? 0;
 $search            = $search            ?? '';
+$sessionType       = $sessionType       ?? '';
 $tab               = $tab               ?? 'all';
 $tabCounts         = $tabCounts         ?? [
     'all' => 0,
@@ -32,20 +32,21 @@ $tabCounts         = $tabCounts         ?? [
     'others' => 0,
     'communication' => 0,
 ];
-$referredCommCount = $referredCommCount ?? 0;
 $errors            = $errors            ?? [];
 
 ob_start();
 
-function frTabUrl(string $targetTab, string $search = ''): string {
+function frTabUrl(string $targetTab, string $search = '', string $sessionType = ''): string {
     $qs = 'tab=' . $targetTab;
     if ($search !== '') { $qs .= '&search=' . urlencode($search); }
+    if ($sessionType !== '') { $qs .= '&session_type=' . urlencode($sessionType); }
     return BASE_URL . '/plenary/first-reading?' . $qs;
 }
 
-function frPageUrl(string $tab, int $pageNum, string $search): string {
+function frPageUrl(string $tab, int $pageNum, string $search, string $sessionType = ''): string {
     $qs = 'tab=' . $tab . '&page=' . $pageNum;
     if ($search !== '') { $qs .= '&search=' . urlencode($search); }
+    if ($sessionType !== '') { $qs .= '&session_type=' . urlencode($sessionType); }
     return BASE_URL . '/plenary/first-reading?' . $qs;
 }
 
@@ -113,7 +114,13 @@ function frSessionLabel(string $type): string {
             </div>
             <p class="text-xs text-gray-500">Awaiting documents and related referrals</p>
         </div>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <?php
+        $legislativeQueueCount = $tabCounts['ordinance']
+            + $tabCounts['resolution']
+            + $tabCounts['municipal_ordinances']
+            + $tabCounts['municipal_resolutions'];
+        ?>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                 <span class="absolute inset-x-0 top-0 h-1 bg-amber-500"></span>
                 <div class="flex items-start justify-between">
@@ -144,14 +151,28 @@ function frSessionLabel(string $type): string {
             </div>
             <div class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                 <span class="absolute inset-x-0 top-0 h-1 bg-violet-500"></span>
-                <div class="flex items-start justify-between">
+                <div class="flex items-start justify-between gap-3">
                     <div>
-                        <p class="text-sm text-gray-500">Comm Referred (awaiting return)</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($referredCommCount) ?></p>
+                        <p class="text-sm text-gray-500">Petitions in Queue</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($tabCounts['cases']) ?></p>
                     </div>
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/>
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h8M8 11h8m-8 4h5m-8 5h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+            <div class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-emerald-500"></span>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm text-gray-500">Ordinances &amp; Resolutions</p>
+                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($legislativeQueueCount) ?></p>
+                    </div>
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v13H5V3h2zm6 1v5h5M8 13h8m-8 4h8"/>
                         </svg>
                     </div>
                 </div>
@@ -177,7 +198,7 @@ function frSessionLabel(string $type): string {
                 foreach ($tabs as $tabKey => $tabInfo):
                     $isActive = ($tab === $tabKey);
                 ?>
-                <a href="<?= frTabUrl($tabKey, $search) ?>"
+                <a href="<?= frTabUrl($tabKey, $search, $sessionType) ?>"
                    class="<?= $isActive ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>
                           shrink-0 whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition">
                     <?= htmlspecialchars($tabInfo['label']) ?>
@@ -210,8 +231,17 @@ function frSessionLabel(string $type): string {
                     <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search tracking # or subject..."
                            class="block w-full min-w-0 rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                 </div>
+                <select name="session_type" aria-label="Filter by session type"
+                        class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    <option value="">All Session Types</option>
+                    <?php foreach (['REGULAR', 'REGULAR_ONLINE', 'SPECIAL', 'SPECIAL_ONLINE'] as $sessionTypeOption): ?>
+                        <option value="<?= htmlspecialchars($sessionTypeOption) ?>" <?= $sessionType === $sessionTypeOption ? 'selected' : '' ?>>
+                            <?= htmlspecialchars(frSessionLabel($sessionTypeOption)) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
                 <button type="submit" class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Filter</button>
-                <?php if ($search !== ''): ?>
+                <?php if ($search !== '' || $sessionType !== ''): ?>
                     <a href="<?= frTabUrl($tab) ?>" class="shrink-0 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition text-center">Clear</a>
                 <?php endif; ?>
             </form>
@@ -219,6 +249,7 @@ function frSessionLabel(string $type): string {
             <div class="flex min-w-0 items-center gap-2 xl:hidden">
                 <form method="GET" action="<?= BASE_URL ?>/plenary/first-reading" class="relative min-w-0 flex-1">
                     <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
+                    <input type="hidden" name="session_type" value="<?= htmlspecialchars($sessionType) ?>">
                     <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     <input type="search" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search tracking # or subject..."
                            class="block w-full min-w-0 rounded-lg border border-gray-200 py-2.5 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
@@ -226,7 +257,7 @@ function frSessionLabel(string $type): string {
                 <button type="button" data-inbox-filter-target="#first-reading-filter-sheet" aria-label="Open document filters"
                         class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 12h12m-9 8h6"/></svg>
-                    <?php if ($tab !== 'all'): ?><span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"></span><?php endif; ?>
+                    <?php if ($tab !== 'all' || $sessionType !== ''): ?><span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"></span><?php endif; ?>
                 </button>
             </div>
         </div>
@@ -237,12 +268,22 @@ function frSessionLabel(string $type): string {
                 <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
                 <div class="mb-4 flex items-center justify-between"><h3 class="font-semibold text-gray-900">Document Filter</h3><button type="button" class="inbox-filter-close text-sm text-gray-500">Close</button></div>
                 <select name="tab" aria-label="Filter by document category" class="mb-3 w-full rounded-lg border border-gray-200 px-3 py-3 text-sm">
+                    <option value="all" <?= $tab === 'all' ? 'selected' : '' ?>>All</option>
                     <?php foreach ($tabs as $tabKey => $tabInfo): ?>
+                        <?php if ($tabKey === 'all') { continue; } ?>
                         <option value="<?= htmlspecialchars($tabKey) ?>" <?= $tab === $tabKey ? 'selected' : '' ?>><?= htmlspecialchars($tabInfo['label']) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <select name="session_type" aria-label="Filter by session type" class="mb-3 w-full rounded-lg border border-gray-200 px-3 py-3 text-sm">
+                    <option value="">All Session Types</option>
+                    <?php foreach (['REGULAR', 'REGULAR_ONLINE', 'SPECIAL', 'SPECIAL_ONLINE'] as $sessionTypeOption): ?>
+                        <option value="<?= htmlspecialchars($sessionTypeOption) ?>" <?= $sessionType === $sessionTypeOption ? 'selected' : '' ?>>
+                            <?= htmlspecialchars(frSessionLabel($sessionTypeOption)) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
                 <button type="submit" class="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white">Apply Filter</button>
-                <?php if ($search !== '' || $tab !== 'all'): ?><a href="<?= BASE_URL ?>/plenary/first-reading" class="mt-2 block w-full rounded-lg border border-gray-200 px-4 py-3 text-center text-sm font-medium text-gray-700">Clear filters</a><?php endif; ?>
+                <?php if ($search !== '' || $tab !== 'all' || $sessionType !== ''): ?><a href="<?= BASE_URL ?>/plenary/first-reading" class="mt-2 block w-full rounded-lg border border-gray-200 px-4 py-3 text-center text-sm font-medium text-gray-700">Clear filters</a><?php endif; ?>
             </form>
         </div>
 
@@ -258,7 +299,7 @@ function frSessionLabel(string $type): string {
                         <th class="px-6 py-3 font-bold">Session Type</th>
                         <?php endif; ?>
                         <th class="px-6 py-3 font-bold">Target Date</th>
-                        <th class="px-6 py-3 text-right font-bold">Action</th>
+                        <th class="w-36 px-3 py-3 text-right font-bold">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -325,15 +366,18 @@ function frSessionLabel(string $type): string {
                                         ? htmlspecialchars(date('M j, Y', strtotime($row['target_first_reading_date'])))
                                         : '<span class="text-xs italic text-gray-400">Not set</span>' ?>
                                 </td>
-                                <td class="px-6 py-4 text-right">
+                                <td class="w-36 px-3 py-4 text-right">
+                                    <div class="flex w-full justify-end">
                                     <a href="<?= BASE_URL ?>/<?= $processRoute ?>" aria-label="Process <?= htmlspecialchars($row['tracking_number']) ?>"
-                                       class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500
-                                              transition hover:bg-primary hover:text-white">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                       title="Process document"
+                                       class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary hover:bg-blue-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
+                                        <span>Process</span>
                                     </a>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -371,10 +415,6 @@ function frSessionLabel(string $type): string {
                                 <p class="font-bold text-gray-900"><?= htmlspecialchars($row['tracking_number']) ?></p>
                                 <p class="mt-1 text-xs text-gray-500"><?= htmlspecialchars(date('M j, Y', strtotime($row['date_received']))) ?></p>
                             </div>
-                            <a href="<?= BASE_URL ?>/<?= $processRoute ?>" aria-label="Process <?= htmlspecialchars($row['tracking_number']) ?>"
-                               class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-500 transition hover:bg-primary hover:text-white">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                            </a>
                         </div>
                         <div class="mt-4">
                             <p class="text-sm font-medium leading-6 text-gray-900"><?= htmlspecialchars($row['subject_matter']) ?></p>
@@ -411,37 +451,48 @@ function frSessionLabel(string $type): string {
                                 <dd class="mt-1 text-sm text-gray-700"><?= !empty($row['target_first_reading_date']) ? htmlspecialchars(date('M j, Y', strtotime($row['target_first_reading_date']))) : '<span class="text-gray-400">Not set</span>' ?></dd>
                             </div>
                         </dl>
+                        <div class="mt-4 flex justify-end border-t border-gray-100 pt-3">
+                            <a href="<?= BASE_URL ?>/<?= $processRoute ?>" aria-label="Process <?= htmlspecialchars($row['tracking_number']) ?>"
+                               title="Process document"
+                               class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary hover:bg-blue-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                <span>Process</span>
+                            </a>
+                        </div>
                     </article>
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
 
-        <?php if ($totalPages > 1): ?>
-            <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
+            <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-5 py-4 sm:flex-row md:px-6">
                 <p class="text-xs text-gray-500">
-                    Showing page <span class="font-medium"><?= $page ?></span>
-                    of <span class="font-medium"><?= $totalPages ?></span>
-                    (<?= $total ?> total)
+                    Showing page <span class="font-medium text-gray-700"><?= $page ?></span> of
+                    <span class="font-medium text-gray-700"><?= $totalPages ?></span>
+                    (<?= number_format($total) ?> total records)
                 </p>
-                <div class="flex items-center gap-1">
+                <nav class="flex flex-wrap items-center justify-center gap-1" aria-label="First Reading pagination">
                     <?php if ($page > 1): ?>
-                        <a href="<?= frPageUrl($tab, $page - 1, $search) ?>"
+                        <a href="<?= frPageUrl($tab, $page - 1, $search, $sessionType) ?>"
                            class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Prev</a>
                     <?php endif; ?>
-                    <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
-                        <a href="<?= frPageUrl($tab, $i, $search) ?>"
+                    <?php
+                    $startPage = max(1, $page - 2);
+                    $endPage = min($totalPages, $page + 2);
+                    for ($i = $startPage; $i <= $endPage; $i++):
+                    ?>
+                        <a href="<?= frPageUrl($tab, $i, $search, $sessionType) ?>"
+                           <?= $i === $page ? 'aria-current="page"' : '' ?>
                            class="rounded-lg border px-3 py-1.5 text-sm font-medium transition
                                   <?= $i === $page ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>">
                             <?= $i ?>
                         </a>
                     <?php endfor; ?>
                     <?php if ($page < $totalPages): ?>
-                        <a href="<?= frPageUrl($tab, $page + 1, $search) ?>"
+                        <a href="<?= frPageUrl($tab, $page + 1, $search, $sessionType) ?>"
                            class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Next</a>
                     <?php endif; ?>
-                </div>
+                </nav>
             </div>
-        <?php endif; ?>
     </section>
 </div>
 

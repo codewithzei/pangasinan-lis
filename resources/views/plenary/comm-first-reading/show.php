@@ -6,8 +6,9 @@
  *   $document        array
  *   $plenaryDetails  array|null
  *   $committees      array   all active committees for select
- *   $categories      array   communication_categories for NOTED decision
- *   $events          array
+ *   $events         array
+ *   $assignments    array
+ *   $documentAttachments array
  *   $existingReading array|null  (should be null; gate enforced by controller)
  *   $canAct          bool
  *   $success         string|null
@@ -19,13 +20,13 @@
 $document       = $document       ?? [];
 $plenaryDetails = $plenaryDetails ?? null;
 $committees     = $committees     ?? [];
-$categories     = $categories     ?? [];
 $events         = $events         ?? [];
 $success        = $success        ?? null;
 $error          = $error          ?? null;
 $errors         = $errors         ?? [];
 $old            = $old            ?? [];
 $canAct         = $canAct         ?? false;
+$assignments    = $assignments    ?? [];
 $documentAttachments = $documentAttachments ?? [];
 
 $documentId     = (int) ($document['id']               ?? 0);
@@ -85,20 +86,22 @@ ob_start();
 
     <?php
     $resubmissionTopMargin = 'mt-0';
+    $resubmissionDetailRoute = 'plenary/inbox';
+    $mfrDetailRoute = 'plenary/inbox';
     require __DIR__ . '/../../partials/resubmission-relationship.php';
     unset($resubmissionTopMargin);
     $mfrRelationshipTopMargin = 'mt-0';
-    $mfrDetailRoute = 'plenary/comm-first-reading';
     require __DIR__ . '/../../partials/mfr-relationship.php';
     unset($mfrRelationshipTopMargin);
     ?>
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div class="flex flex-col gap-6">
 
-        <!-- Left: Document info -->
-        <div class="lg:col-span-1 space-y-4">
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <h2 class="text-base font-semibold text-gray-900">Document Information</h2>
+        <!-- Document information -->
+        <div class="order-2 space-y-4">
+            <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Document Information</h2>
+                <div class="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                     <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Tracking Number</p>
                     <p class="mt-1 text-sm font-mono font-semibold text-gray-900"><?= htmlspecialchars($trackingNumber) ?></p>
@@ -145,69 +148,199 @@ ob_start();
                         <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars(date('F j, Y', strtotime($targetDate))) ?></p>
                     </div>
                 <?php endif; ?>
-            </div>
+                </div>
+            </section>
 
             <?php require __DIR__ . '/../../partials/source-information.php'; ?>
 
-            <!-- Uploaded documents -->
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <div class="flex items-center justify-between gap-3">
-                    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Attachments</h2>
-                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600"><?= count($documentAttachments) ?></span>
-                </div>
-                <?php if ($documentAttachments === []): ?>
-                    <p class="text-sm text-gray-500">No uploaded documents.</p>
-                <?php else: ?>
-                    <ul class="divide-y divide-gray-100">
-                        <?php foreach ($documentAttachments as $attachment): ?>
-                            <li class="py-3 first:pt-0 last:pb-0">
-                                <p class="break-all text-sm font-medium text-gray-800"><?= htmlspecialchars($attachment['file_name']) ?></p>
-                                <?php if (!empty($attachment['file_size'])): ?>
-                                    <p class="mt-1 text-xs text-gray-500"><?= number_format((int) $attachment['file_size'] / 1024, 1) ?> KB</p>
-                                <?php endif; ?>
-                                <?php if (!empty($attachment['stored_path'])):
-                                    $attachmentUrl = BASE_URL . '/public/' . ltrim($attachment['stored_path'], '/');
-                                    $attachmentName = (string) ($attachment['file_name'] ?? 'Attachment');
-                                ?>
-                                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                                        <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                           target="_blank"
-                                           data-attachment-preview
-                                           data-preview-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                           data-preview-name="<?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?>"
-                                           data-download-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                           class="inline-flex rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition">Preview</a>
-                                        <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" download
-                                           class="inline-flex rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition">Download</a>
-                                    </div>
-                                <?php endif; ?>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-            </div>
-
-            <!-- Event timeline -->
-            <?php if (!empty($events)): ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">History</h2>
-                <ol class="space-y-3">
-                    <?php foreach ($events as $ev): ?>
-                    <li class="flex gap-3 text-xs">
-                        <div class="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-gray-300"></div>
-                        <div>
-                            <p class="font-medium text-gray-700"><?= htmlspecialchars($ev['event_type'] ?? '') ?></p>
-                            <p class="text-gray-400"><?= htmlspecialchars(date('M j, Y g:i A', strtotime($ev['created_at'] ?? 'now'))) ?></p>
+            <div class="space-y-6">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                        <h2 class="text-base font-semibold text-gray-900">Attachments</h2>
+                        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                            <?= count($documentAttachments) ?> file<?= count($documentAttachments) === 1 ? '' : 's' ?>
+                        </span>
+                    </div>
+                    <?php if ($documentAttachments === []): ?>
+                        <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
+                            <div class="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-white text-gray-400 shadow-sm">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <p class="mt-3 text-sm font-medium text-gray-700">No attachments</p>
+                            <p class="mt-1 text-xs text-gray-500">Uploaded documents will appear here.</p>
                         </div>
-                    </li>
-                    <?php endforeach; ?>
-                </ol>
+                    <?php else: ?>
+                        <ul class="space-y-2">
+                            <?php foreach ($documentAttachments as $attachment): ?>
+                                <?php
+                                $attachmentName = (string) ($attachment['file_name'] ?? 'Attachment');
+                                $attachmentUrl = BASE_URL . '/public/' . ltrim((string) ($attachment['stored_path'] ?? ''), '/\\');
+                                ?>
+                                <li class="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="flex min-w-0 items-start gap-3 sm:items-center">
+                                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary">
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <p class="break-words text-sm font-medium text-gray-800 sm:truncate"><?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?></p>
+                                            <p class="mt-0.5 break-words text-xs leading-relaxed text-gray-500">
+                                                <?= number_format((int) ($attachment['file_size'] ?? 0) / 1024, 1) ?> KB
+                                                <?php if (!empty($attachment['phase'])): ?>
+                                                    &middot; <?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', (string) $attachment['phase']))), ENT_QUOTES, 'UTF-8') ?>
+                                                <?php endif; ?>
+                                                <?php if (!empty($attachment['created_at'])): ?>
+                                                    &middot; <?= htmlspecialchars(date('M j, Y g:i A', strtotime($attachment['created_at'])), ENT_QUOTES, 'UTF-8') ?>
+                                                <?php endif; ?>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <?php if (!empty($attachment['stored_path'])): ?>
+                                        <div class="grid grid-cols-2 gap-2 sm:ml-4 sm:flex sm:shrink-0 sm:items-center">
+                                            <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                               target="_blank" rel="noopener"
+                                               data-attachment-preview
+                                               data-preview-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                               data-preview-name="<?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?>"
+                                               data-download-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                               class="inline-flex justify-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-hover sm:py-1.5">Preview</a>
+                                            <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" download
+                                               class="inline-flex justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 sm:py-1.5">Download</a>
+                                        </div>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+                </section>
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                    <h2 class="mb-4 text-base font-semibold text-gray-900">Action History</h2>
+                    <?php if (empty($events)): ?>
+                        <p class="text-sm text-gray-400">No action history recorded.</p>
+                    <?php else: ?>
+                        <ol class="relative ml-3 space-y-5 border-l border-gray-200">
+                            <?php foreach ($events as $ev): ?>
+                                <?php
+                                $eventType = (string) ($ev['event_type'] ?? 'OTHER');
+                                $eventLabel = ucwords(strtolower(str_replace('_', ' ', $eventType)));
+                                ?>
+                                <li class="relative ml-6">
+                                    <span class="absolute -left-[31px] flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white ring-4 ring-white" aria-hidden="true">
+                                        <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                    </span>
+                                    <p class="text-sm font-semibold text-gray-800"><?= htmlspecialchars($eventLabel, ENT_QUOTES, 'UTF-8') ?></p>
+                                    <p class="text-xs text-gray-500">
+                                        <?= htmlspecialchars($ev['phase'] ?? 'Plenary', ENT_QUOTES, 'UTF-8') ?>
+                                        <?php if (!empty($ev['performed_by_username'])): ?>
+                                            &middot; by <?= htmlspecialchars($ev['performed_by_username'], ENT_QUOTES, 'UTF-8') ?>
+                                        <?php endif; ?>
+                                        &middot; <?= !empty($ev['created_at']) ? htmlspecialchars(date('M j, Y g:i A', strtotime($ev['created_at'])), ENT_QUOTES, 'UTF-8') : 'Date unavailable' ?>
+                                    </p>
+                                    <?php if (!empty($ev['to_status_name'])): ?>
+                                        <p class="mt-1 text-xs text-gray-500">Status: <?= htmlspecialchars($ev['to_status_name'], ENT_QUOTES, 'UTF-8') ?></p>
+                                    <?php endif; ?>
+                                    <?php if (!empty($ev['remarks'])): ?>
+                                        <p class="mt-1 whitespace-pre-line text-xs italic text-gray-500"><?= htmlspecialchars($ev['remarks'], ENT_QUOTES, 'UTF-8') ?></p>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        </ol>
+                    <?php endif; ?>
+                </section>
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                    <h2 class="mb-4 text-base font-semibold text-gray-900">Assignment History</h2>
+                    <?php if (empty($assignments)): ?>
+                        <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
+                            <p class="text-sm font-medium text-gray-700">No assignments yet</p>
+                            <p class="mt-1 text-xs text-gray-500">Assignment records will appear here.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="space-y-3 sm:hidden">
+                            <?php foreach ($assignments as $assignment): ?>
+                                <?php
+                                $decision = (string) ($assignment['decision'] ?? '');
+                                $decisionClass = match ($decision) {
+                                    'COMPLETED', 'NOTED' => 'bg-green-50 text-green-700',
+                                    'ACCEPTED' => 'bg-blue-50 text-blue-700',
+                                    'DECLINED', 'REJECTED' => 'bg-red-50 text-red-700',
+                                    default => 'bg-amber-50 text-amber-700',
+                                };
+                                $phase = ucwords(strtolower(str_replace('_', ' ', (string) ($assignment['phase'] ?? ''))));
+                                ?>
+                                <article class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= htmlspecialchars($phase ?: 'Unspecified phase', ENT_QUOTES, 'UTF-8') ?></p>
+                                            <p class="mt-1 break-words text-sm font-semibold text-gray-900"><?= htmlspecialchars($assignment['role_name'] ?? $assignment['assigned_to_username'] ?? '—', ENT_QUOTES, 'UTF-8') ?></p>
+                                        </div>
+                                        <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold <?= $decisionClass ?>"><?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $decision ?: 'Pending'))), ENT_QUOTES, 'UTF-8') ?></span>
+                                    </div>
+                                    <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-gray-200 pt-3 text-xs">
+                                        <div>
+                                            <dt class="text-gray-400">Assigned At</dt>
+                                            <dd class="mt-1 break-words font-medium text-gray-700"><?= !empty($assignment['created_at']) ? htmlspecialchars(date('M j, Y g:i A', strtotime($assignment['created_at'])), ENT_QUOTES, 'UTF-8') : '—' ?></dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-gray-400">Accepted By</dt>
+                                            <dd class="mt-1 break-words font-medium text-gray-700"><?= htmlspecialchars($assignment['accepted_by_username'] ?? '—', ENT_QUOTES, 'UTF-8') ?></dd>
+                                        </div>
+                                        <div class="col-span-2">
+                                            <dt class="text-gray-400">Accepted At</dt>
+                                            <dd class="mt-1 break-words font-medium text-gray-700"><?= !empty($assignment['accepted_at']) ? htmlspecialchars(date('M j, Y g:i A', strtotime($assignment['accepted_at'])), ENT_QUOTES, 'UTF-8') : '—' ?></dd>
+                                        </div>
+                                    </dl>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="hidden overflow-x-auto sm:block">
+                            <table class="w-full min-w-[640px] divide-y divide-gray-100 text-left text-sm">
+                                <thead>
+                                    <tr class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                        <th class="pb-3 pr-4">Phase</th>
+                                        <th class="pb-3 pr-4">Assigned To</th>
+                                        <th class="pb-3 pr-4">Decision</th>
+                                        <th class="pb-3 pr-4">Assigned At</th>
+                                        <th class="pb-3 pr-4">Accepted By</th>
+                                        <th class="pb-3">Accepted At</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-50">
+                                    <?php foreach ($assignments as $assignment): ?>
+                                        <?php
+                                        $decision = (string) ($assignment['decision'] ?? '');
+                                        $decisionClass = match ($decision) {
+                                            'COMPLETED', 'NOTED' => 'bg-green-50 text-green-700',
+                                            'ACCEPTED' => 'bg-blue-50 text-blue-700',
+                                            'DECLINED', 'REJECTED' => 'bg-red-50 text-red-700',
+                                            default => 'bg-amber-50 text-amber-700',
+                                        };
+                                        ?>
+                                        <tr class="text-gray-700">
+                                            <td class="py-3 pr-4"><?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', (string) ($assignment['phase'] ?? '')))) ?: '—', ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="py-3 pr-4 font-medium"><?= htmlspecialchars($assignment['role_name'] ?? $assignment['assigned_to_username'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="py-3 pr-4"><span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold <?= $decisionClass ?>"><?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $decision ?: 'Pending'))), ENT_QUOTES, 'UTF-8') ?></span></td>
+                                            <td class="whitespace-nowrap py-3 pr-4"><?= !empty($assignment['created_at']) ? htmlspecialchars(date('M j, Y g:i A', strtotime($assignment['created_at'])), ENT_QUOTES, 'UTF-8') : '—' ?></td>
+                                            <td class="py-3 pr-4"><?= htmlspecialchars($assignment['accepted_by_username'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>
+                                            <td class="whitespace-nowrap py-3"><?= !empty($assignment['accepted_at']) ? htmlspecialchars(date('M j, Y g:i A', strtotime($assignment['accepted_at'])), ENT_QUOTES, 'UTF-8') : '—' ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </section>
             </div>
-            <?php endif; ?>
         </div>
 
-        <!-- Right: Decision form -->
-        <div class="lg:col-span-2">
+        <!-- Communication First Reading action -->
+        <div class="order-1">
             <?php if ($canAct): ?>
             <div class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="mb-4 text-base font-semibold text-gray-900">First Reading Decision</h2>
@@ -228,7 +361,7 @@ ob_start();
                                value="<?= htmlspecialchars($old['reading_date'] ?? date('Y-m-d')) ?>"
                                class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
                                       text-gray-800 focus:border-primary focus:outline-none focus:ring-2
-                                      focus:ring-primary/20 sm:w-52">
+                                      focus:ring-primary/20">
                     </div>
 
                     <!-- Decision selector -->
@@ -269,28 +402,6 @@ ob_start();
                                 </div>
                             </label>
                             <?php endforeach; ?>
-                        </div>
-                    </div>
-
-                    <!-- NOTED: Communication Category -->
-                    <div id="section-noted" class="hidden space-y-4">
-                        <div>
-                            <label for="communication_category_id" class="block text-sm font-medium text-gray-700 mb-1">
-                                Communication Category <span class="text-red-500">*</span>
-                            </label>
-                            <select id="communication_category_id" name="communication_category_id"
-                                    class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm
-                                           text-gray-800 focus:border-primary focus:outline-none focus:ring-2
-                                           focus:ring-primary/20 sm:w-72">
-                                <option value="">— Select a category —</option>
-                                <?php foreach ($categories as $cat): ?>
-                                    <option value="<?= (int) $cat['id'] ?>"
-                                        <?= ((int) ($old['communication_category_id'] ?? 0) === (int) $cat['id']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($cat['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <p class="mt-1 text-xs text-gray-400">Category for this Noted Communication.</p>
                         </div>
                     </div>
 
@@ -458,7 +569,7 @@ ob_start();
                                   placeholder="Optional remarks or notes…"><?= htmlspecialchars($old['remarks'] ?? '') ?></textarea>
                     </div>
 
-                    <div class="flex items-center gap-3 border-t border-gray-100 pt-4">
+                    <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
                         <button type="submit"
                                 class="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5
                                        text-sm font-semibold text-white hover:bg-primary/90 transition
@@ -495,7 +606,6 @@ ob_start();
     // ── Decision card toggling ────────────────────────────────────────────────
 
     var sections = {
-        'NOTED':              document.getElementById('section-noted'),
         'APPROVED':           document.getElementById('section-approved'),
         'REFER_TO_COMMITTEE': document.getElementById('section-refer'),
     };

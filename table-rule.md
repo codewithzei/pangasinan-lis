@@ -46,6 +46,7 @@ Use `resources/views/receiving/inbox/index.php` as the project's visual referenc
 - Keep the list title/count separate from the controls. On desktop, place search and filters together on the right; on small screens, keep search full-width with a filter icon that opens a bottom sheet.
 - Show a readable desktop table only at wide breakpoints. On smaller screens, render dedicated stacked cards that show every field represented by the table; do not rely on horizontal scrolling or squeeze a wide table into cards.
 - Use the current page's real fields and actions. Adapt the Receiving Inbox visual pattern to the page's data instead of inventing columns such as Division or removing page-specific information.
-- Keep subtle row separators, generous row/card spacing, soft status pills with a small dot, understated secondary metadata, and a compact accessible icon action.
+- Keep subtle row separators, generous row/card spacing, soft status pills with a small dot, and understated secondary metadata.
+- Keep action labels visible at every viewport size; do not collapse labeled buttons into icons. Let short actions size to their labels instead of assigning oversized fixed widths; use a shared maximum width only where longer labels need to wrap. On mobile cards, keep buttons readable and prevent them from shrinking beside record details.
 - Keep table column headers consistent across inbox and communications pages: use the same `font-bold` weight and `py-3` vertical padding as the Receiving Inbox header; vary horizontal padding only when column fit requires it.
 - Preserve existing filtering, pagination, links, empty states, and query behavior while changing presentation. Include active filters in pagination URLs.

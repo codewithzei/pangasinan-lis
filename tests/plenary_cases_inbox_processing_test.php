@@ -702,6 +702,10 @@ if (!file_exists($showPath)) {
     check('8.5 Cases panel has indigo styling (distinct from violet full form)', strpos($html, 'border-indigo-200') !== false);
     // Ensure the full processing details section is inside an else branch for $isCases
     check('8.6 Full processing form is inside else branch of isCases', strpos($html, '<?php else: ?>') !== false && strpos($html, 'Plenary Processing Details') !== false);
+    check('8.7 Petitions fast-path has a full-screen confirmation modal', strpos($html, 'id="confirmSendPetitionsDialog"') !== false);
+    check('8.8 Confirmation modal has a full-screen blurred backdrop', strpos($html, 'id="confirmSendPetitionsBackdrop"') !== false && strpos($html, 'bg-gray-900/60 backdrop-blur-sm') !== false);
+    check('8.9 Confirmation submits the Petitions fast-path form', strpos($html, 'form.requestSubmit()') !== false);
+    check('8.10 Confirmation modal is centered and viewport-constrained', strpos($html, 'fixed inset-0 z-[9999] hidden items-center justify-center p-4') !== false && strpos($html, 'max-h-[calc(100vh-2rem)]') !== false);
 }
 
 // ==========================================================================

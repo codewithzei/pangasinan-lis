@@ -13,6 +13,8 @@
  *   $firstReading          array|null
  *   $secondReading         array|null
  *   $secondReadingDetails  array|null
+ *   $assignments           array
+ *   $documentAttachments  array
  *   $canAct                bool
  *   $inEligibleStatus      bool
  *   $isDeferred            bool
@@ -37,11 +39,13 @@ $old                  = $old                  ?? [];
 $canAct               = $canAct               ?? false;
 $inEligibleStatus     = $inEligibleStatus     ?? false;
 $isDeferred           = $isDeferred           ?? false;
+$documentAttachments  = $documentAttachments  ?? [];
 
 $documentId     = (int) ($document['id']              ?? 0);
 $trackingNumber = $document['tracking_number']         ?? '';
 $subjectMatter  = $document['subject_matter']          ?? '';
 $proposedNumber = $plenaryDetails['proposed_number']   ?? '';
+$sessionType    = $plenaryDetails['session_type']      ?? '';
 
 $existingCommitteeIds = array_map('intval', array_column($docCommittees, 'committee_id'));
 
@@ -52,22 +56,31 @@ ob_start();
 ?>
 
 <div class="detail-page space-y-6">
-    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
-
-
-
-    <div class="flex items-center gap-4">
-        <a href="<?= BASE_URL ?>/plenary/second-reading"
-           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-        </a>
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Plenary / Second Reading</p>
-            <h1 class="text-xl font-bold text-gray-900"><?= htmlspecialchars($trackingNumber) ?></h1>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex items-center gap-3 px-5 py-6 sm:px-8 sm:py-7">
+            <a href="<?= BASE_URL ?>/plenary/second-reading"
+               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+               aria-label="Back to Second Reading">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">DOCUMENT DETAILS</p>
+                <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl"><?= htmlspecialchars($trackingNumber) ?></h1>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <?php if (!empty($resubmissionReference)): ?>
+                        <span class="inline-flex rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white">Resubmission</span>
+                    <?php endif; ?>
+                    <?php if (!empty($relatedResubmissions)): ?>
+                        <span class="inline-flex rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white">Submission history · <?= count($relatedResubmissions) ?></span>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
-    </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
+    </section>
 
     <?php if (!empty($success ?? null)): ?>
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><?= htmlspecialchars($success) ?></div>
@@ -102,89 +115,229 @@ ob_start();
     </div>
     <?php endif; ?>
 
+    <?php
+    $resubmissionTopMargin = 'mt-0';
+    require __DIR__ . '/../../partials/resubmission-relationship.php';
+    unset($resubmissionTopMargin);
+    $mfrDetailRoute = 'plenary/inbox';
+    require __DIR__ . '/../../partials/mfr-relationship.php';
+    ?>
+
+    <?php
+    $isReturnedFromCommittee = ($document['status_name'] ?? '') === 'Returned to Plenary' && $firstReading;
+    ?>
+    <?php if ($isReturnedFromCommittee && $canAct): ?>
+    <div class="rounded-2xl border border-violet-200 bg-violet-50 p-5">
+        <p class="mb-3 text-sm font-semibold text-violet-800">This document has been returned from Committee. Advance it to the Second Reading queue to begin processing.</p>
+        <form method="POST" action="<?= BASE_URL ?>/plenary/second-reading/advance-from-committee">
+            <input type="hidden" name="document_id" value="<?= $documentId ?>">
+            <button type="submit" class="rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-violet-700">
+                Advance to Second Reading Queue
+            </button>
+        </form>
+    </div>
+    <?php endif; ?>
+
+    <?php require __DIR__ . '/second-reading-action.php'; ?>
+
+    <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <h2 class="text-lg font-semibold text-gray-900">Document Information</h2>
+        <div class="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+                <p class="text-xs font-medium text-gray-500">Tracking Number</p>
+                <p class="mt-1 text-sm font-semibold text-gray-900"><?= htmlspecialchars($trackingNumber) ?></p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500">Date &amp; Time Received</p>
+                <p class="mt-1 text-sm text-gray-900">
+                    <?= !empty($document['date_received']) ? htmlspecialchars(date('F j, Y', strtotime($document['date_received']))) : '—' ?>
+                    at <?= !empty($document['time_received']) ? htmlspecialchars(date('g:i A', strtotime($document['time_received']))) : '—' ?>
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500">Document Type</p>
+                <?php if (!empty($document['document_type_name'])): ?>
+                    <span class="mt-1 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                          style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a; color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
+                        <?= htmlspecialchars($document['document_type_name']) ?>
+                    </span>
+                <?php else: ?>
+                    <p class="mt-1 text-sm text-gray-900">—</p>
+                <?php endif; ?>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-gray-500">Current Status</p>
+                <?php $secondReadingStatusColor = $document['status_badge_color'] ?? '#6B7280'; ?>
+                <span class="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                      style="background-color: <?= htmlspecialchars($secondReadingStatusColor) ?>1a; color: <?= htmlspecialchars($secondReadingStatusColor) ?>;">
+                    <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($secondReadingStatusColor) ?>;"></span>
+                    <?= htmlspecialchars($document['status'] ?? $document['status_name'] ?? 'Awaiting Second Reading') ?>
+                </span>
+            </div>
+            <?php if (!empty($document['current_phase'])): ?>
+                <div>
+                    <p class="text-xs font-medium text-gray-500">Current Division / Phase</p>
+                    <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $document['current_phase'])))) ?></p>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($proposedNumber)): ?>
+                <div>
+                    <p class="text-xs font-medium text-gray-500">Proposed Number</p>
+                    <p class="mt-1 text-sm font-medium text-primary"><?= htmlspecialchars($proposedNumber) ?></p>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($sessionType)): ?>
+                <div>
+                    <p class="text-xs font-medium text-gray-500">Session Type</p>
+                    <p class="mt-1 text-sm text-gray-900"><?= htmlspecialchars($sessionType) ?></p>
+                </div>
+            <?php endif; ?>
+            <div class="sm:col-span-2 lg:col-span-3">
+                <p class="text-xs font-medium text-gray-500">Subject Matter</p>
+                <p class="mt-1 whitespace-pre-wrap text-sm leading-6 text-gray-900"><?= htmlspecialchars($subjectMatter) ?></p>
+            </div>
+        </div>
+    </section>
+
+    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
+
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
         <!-- Left column: Info panels -->
         <div class="lg:col-span-1 space-y-4">
-            <?php require __DIR__ . '/../../partials/resubmission-relationship.php'; ?>
-
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Document Details</h2>
-                <div><p class="text-xs text-gray-400">Tracking Number</p><p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($trackingNumber) ?></p></div>
-                <div><p class="text-xs text-gray-400">Subject Matter</p><p class="text-sm text-gray-800"><?= htmlspecialchars($subjectMatter) ?></p></div>
-                <?php if (!empty($document['document_type_name'])): ?>
-                <div>
-                    <p class="text-xs text-gray-400">Document Type</p>
-                    <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                          style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a; color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
-                        <?= htmlspecialchars($document['document_type_name']) ?>
-                    </span>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($proposedNumber)): ?>
-                <div><p class="text-xs text-gray-400">Proposed No.</p><p class="text-sm font-medium text-primary"><?= htmlspecialchars($proposedNumber) ?></p></div>
-                <?php endif; ?>
-                <?php if (!empty($document['status_name'])): ?>
-                <div>
-                    <p class="text-xs text-gray-400">Current Status</p>
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                          style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>1a;
-                                 color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;">
-                        <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($document['status_badge_color'] ?? '#6B7280') ?>;"></span>
-                        <?= htmlspecialchars($document['status_name']) ?>
-                    </span>
-                </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Authors -->
-            <?php if (!empty($authors) || !empty($coAuthors)): ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-3">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Authorship</h2>
-                <?php if (!empty($authors)): ?>
-                <div><p class="text-xs text-gray-400 mb-1">Authors</p>
-                    <?php if (!empty($authors[0]['is_all_selected'])): ?>
-                        <p class="text-sm text-gray-800">ALL</p>
-                    <?php else: ?>
-                        <ol class="list-decimal space-y-1 pl-5"><?php foreach ($authors as $a): ?><li class="text-sm text-gray-800"><?= htmlspecialchars($a['full_name']) ?></li><?php endforeach; ?></ol>
-                    <?php endif; ?>
-                </div><?php endif; ?>
-                <?php if (!empty($coAuthors)): ?>
-                <div><p class="text-xs text-gray-400 mb-1">Co-Authors</p>
-                    <?php if (!empty($coAuthors[0]['is_all_selected'])): ?>
-                        <p class="text-sm text-gray-800">ALL</p>
-                    <?php else: ?>
-                        <ol class="list-decimal space-y-1 pl-5"><?php foreach ($coAuthors as $a): ?><li class="text-sm text-gray-800"><?= htmlspecialchars($a['full_name']) ?></li><?php endforeach; ?></ol>
-                    <?php endif; ?>
-                </div><?php endif; ?>
-            </div>
-            <?php endif; ?>
-
             <!-- First Reading history -->
             <?php if ($firstReading): ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-2">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">First Reading</h2>
-                <div><p class="text-xs text-gray-400">Date</p><p class="text-sm text-gray-800"><?= htmlspecialchars(date('F j, Y', strtotime($firstReading['reading_date']))) ?></p></div>
-                <div><p class="text-xs text-gray-400">Action</p>
-                    <span class="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                        <?= htmlspecialchars(str_replace('_', ' ', $firstReading['action'])) ?>
-                    </span>
+            <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                <h2 class="text-base font-semibold text-gray-900">First Reading</h2>
+                <div class="mt-4 space-y-3">
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Date</p>
+                        <p class="mt-1 text-sm text-gray-800"><?= htmlspecialchars(date('F j, Y', strtotime($firstReading['reading_date']))) ?></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Action</p>
+                        <span class="mt-1 inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                            <?= htmlspecialchars(str_replace('_', ' ', $firstReading['action'])) ?>
+                        </span>
+                    </div>
+                    <?php if (!empty($firstReading['remarks'])): ?>
+                        <div>
+                            <p class="text-xs font-medium text-gray-500">Remarks</p>
+                            <p class="mt-1 whitespace-pre-line text-sm text-gray-700"><?= htmlspecialchars($firstReading['remarks']) ?></p>
+                        </div>
+                    <?php endif; ?>
                 </div>
-                <?php if (!empty($firstReading['remarks'])): ?>
-                <div><p class="text-xs text-gray-400">Remarks</p><p class="text-sm text-gray-700"><?= htmlspecialchars($firstReading['remarks']) ?></p></div>
-                <?php endif; ?>
-            </div>
+            </section>
             <?php endif; ?>
 
-            <!-- Committees -->
-            <?php if (!empty($docCommittees)): ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5 space-y-2">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Committee Referral</h2>
-                <ul class="space-y-1"><?php foreach ($docCommittees as $dc): ?>
-                    <li><span class="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"><?= htmlspecialchars($dc['committee_name']) ?></span></li>
-                <?php endforeach; ?></ul>
-            </div>
-            <?php endif; ?>
+            <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <h2 class="text-base font-semibold text-gray-900">Attachments</h2>
+                    <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                        <?= count($documentAttachments) ?> file<?= count($documentAttachments) === 1 ? '' : 's' ?>
+                    </span>
+                </div>
+                <?php if ($documentAttachments === []): ?>
+                    <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
+                        <p class="text-sm font-medium text-gray-700">No attachments</p>
+                        <p class="mt-1 text-xs text-gray-500">Uploaded documents will appear here.</p>
+                    </div>
+                <?php else: ?>
+                    <ul class="space-y-2">
+                        <?php foreach ($documentAttachments as $attachment): ?>
+                            <?php
+                            $attachmentName = (string) ($attachment['file_name'] ?? 'Attachment');
+                            $attachmentUrl = BASE_URL . '/public/' . ltrim((string) ($attachment['stored_path'] ?? ''), '/\\');
+                            ?>
+                            <li class="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="min-w-0">
+                                    <p class="break-words text-sm font-medium text-gray-800"><?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?></p>
+                                    <p class="mt-0.5 break-words text-xs text-gray-500">
+                                        <?= number_format((int) ($attachment['file_size'] ?? 0) / 1024, 1) ?> KB
+                                        <?php if (!empty($attachment['phase'])): ?>
+                                            &middot; <?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', (string) $attachment['phase']))), ENT_QUOTES, 'UTF-8') ?>
+                                        <?php endif; ?>
+                                        <?php if (!empty($attachment['created_at'])): ?>
+                                            &middot; <?= htmlspecialchars(date('M j, Y g:i A', strtotime($attachment['created_at'])), ENT_QUOTES, 'UTF-8') ?>
+                                        <?php endif; ?>
+                                    </p>
+                                </div>
+                                <?php if (!empty($attachment['stored_path'])): ?>
+                                    <div class="grid grid-cols-2 gap-2 sm:ml-4 sm:flex sm:shrink-0 sm:items-center">
+                                        <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           target="_blank" rel="noopener"
+                                           data-attachment-preview
+                                           data-preview-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           data-preview-name="<?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?>"
+                                           data-download-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           class="inline-flex justify-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-hover sm:py-1.5">Preview</a>
+                                        <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" download
+                                           class="inline-flex justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 sm:py-1.5">Download</a>
+                                    </div>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </section>
+
+            <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Authors &amp; Sponsors</h2>
+                <?php if (!empty($authors) || !empty($coAuthors)): ?>
+                    <div class="mt-5 space-y-5">
+                        <?php foreach ([
+                            [$authors, 'Authors / Sponsors'],
+                            [$coAuthors, 'Co-authors / Co-sponsors'],
+                        ] as [$authorGroup, $groupLabel]): ?>
+                            <?php if (!empty($authorGroup)): ?>
+                                <div>
+                                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400"><?= $groupLabel ?></p>
+                                    <div class="space-y-2">
+                                        <?php if (!empty($authorGroup[0]['is_all_selected'])): ?>
+                                            <div class="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                                                <span class="shrink-0 pt-0.5 text-xs font-semibold text-gray-500">1.</span>
+                                                <p class="text-sm font-semibold text-gray-900">ALL</p>
+                                            </div>
+                                        <?php else: ?>
+                                            <?php foreach (array_values($authorGroup) as $rank => $author): ?>
+                                                <div class="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                                                    <span class="shrink-0 pt-0.5 text-xs font-semibold text-gray-500"><?= $rank + 1 ?>.</span>
+                                                    <p class="min-w-0 break-words text-sm font-semibold text-gray-900">
+                                                        <?= htmlspecialchars($author['full_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+                                                    </p>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 p-4">
+                        <p class="text-sm italic text-gray-400">No authors have been assigned to this document.</p>
+                    </div>
+                <?php endif; ?>
+            </section>
+
+            <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Committee Referral</h2>
+                <?php if (!empty($docCommittees)): ?>
+                    <ul class="mt-3 divide-y divide-gray-100">
+                        <?php foreach ($docCommittees as $dc): ?>
+                            <li class="py-3 first:pt-0 last:pb-0">
+                                <p class="break-words text-sm font-medium text-gray-900"><?= htmlspecialchars($dc['committee_name'] ?? 'Committee', ENT_QUOTES, 'UTF-8') ?></p>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <div class="mt-3 border-t border-gray-100 pt-3">
+                        <p class="text-sm text-gray-500">No committees have been assigned to this document.</p>
+                    </div>
+                <?php endif; ?>
+            </section>
+
+
 
             <!-- Existing 2nd reading result (finalized/withdrawn) -->
             <?php if ($hasFinalSecondReading && $secondReadingDetails): ?>
@@ -265,197 +418,139 @@ ob_start();
             <?php endif; ?>
         </div>
 
-        <!-- Right column: Processing form -->
+        <!-- Right column: Action history -->
         <div class="lg:col-span-2 space-y-4">
-            <?php if ($canAct && $inEligibleStatus && !$hasFinalSecondReading): ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-6">
-                <h2 class="text-base font-semibold text-gray-900 mb-5">Second Reading Action</h2>
-
-                <form method="POST" action="<?= BASE_URL ?>/plenary/second-reading/store" enctype="multipart/form-data" id="srForm">
-                    <input type="hidden" name="document_id" value="<?= $documentId ?>">
-
-                    <div class="space-y-5">
-                        <!-- Reading Date -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1" for="sr_reading_date">Reading Date <span class="text-red-500">*</span></label>
-                            <input type="date" id="sr_reading_date" name="reading_date"
-                                   value="<?= htmlspecialchars($old['reading_date'] ?? date('Y-m-d')) ?>"
-                                   class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                   required>
-                        </div>
-
-                        <!-- Action -->
-                        <div>
-                            <p class="block text-sm font-medium text-gray-700 mb-2">Second Reading Decision <span class="text-red-500">*</span></p>
-                            <div class="space-y-3">
-                                <?php
-                                $srActions = [
-                                    ['value' => 'APPROVED',                       'label' => 'Approved on Second Reading',                     'desc'  => 'Approve the document; enter the Resolution/Ordinance No. and Date Approved.'],
-                                    ['value' => 'REFERRED_TO_COMMITTEE_SECOND',   'label' => 'Referred back to Committee',                       'desc'  => 'Return the document to Committee; it will come back here after the Committee workflow completes.'],
-                                    ['value' => 'DEFERRED',                       'label' => 'Defer',                                           'desc'  => 'Defer the document; status becomes "Second Reading Deferred".'],
-                                    ['value' => 'WITHDRAWN',                      'label' => 'Withdraw',                                        'desc'  => 'Withdraw the document from the Second Reading workflow.'],
-                                ];
-                                foreach ($srActions as $srA): ?>
-                                <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-4 hover:bg-gray-50 has-[:checked]:border-primary has-[:checked]:bg-blue-50 transition">
-                                    <input type="radio" name="second_reading_action" value="<?= $srA['value'] ?>"
-                                           <?= ($old['second_reading_action'] ?? '') === $srA['value'] ? 'checked' : '' ?>
-                                           class="mt-0.5 h-4 w-4 accent-primary">
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-900"><?= htmlspecialchars($srA['label']) ?></p>
-                                        <p class="text-xs text-gray-500 mt-0.5"><?= htmlspecialchars($srA['desc']) ?></p>
-                                    </div>
-                                </label>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-
-                        <!-- APPROVED fields -->
-                        <div id="srApprovedSection" class="hidden space-y-4 rounded-xl bg-gray-50 border border-gray-200 p-4">
-                            <h3 class="text-sm font-semibold text-gray-700">Approval Details</h3>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1" for="approved_no">Resolution/Ordinance No. <span class="text-red-500">*</span></label>
-                                <input type="text" id="approved_no" name="approved_no"
-                                       value="<?= htmlspecialchars($old['approved_no'] ?? '') ?>"
-                                       placeholder="e.g. SP Res. No. 001-2026 or SP Ordinance No. 001-2026"
-                                       class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1" for="date_finalized">Date Approved <span class="text-red-500">*</span></label>
-                                <input type="date" id="date_finalized" name="date_finalized"
-                                       value="<?= htmlspecialchars($old['date_finalized'] ?? '') ?>"
-                                       class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1" for="approved_subject_matter">Subject Matter (Approved)</label>
-                                <textarea id="approved_subject_matter" name="approved_subject_matter" rows="3"
-                                          placeholder="Enter the approved subject matter…"
-                                          class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"><?= htmlspecialchars($old['approved_subject_matter'] ?? $document['subject_matter'] ?? '') ?></textarea>
-                            </div>
-                            <div data-approval-file-upload data-required-when-radio="second_reading_action:APPROVED">
-                                <label class="mb-1 block text-xs font-medium text-gray-600">
-                                    Approval Attachments <span class="text-red-500">*</span>
-                                </label>
-                                <input type="file" name="approval_files[]" multiple
-                                       data-approval-file-input
-                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
-                                       class="sr-only">
-                                <div data-approval-file-zone role="button" tabindex="0"
-                                     class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-white px-5 py-5 text-center hover:border-primary hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary/40">
-                                    <p class="text-sm font-medium text-gray-700">Drag &amp; drop files here, or browse</p>
-                                    <p class="mt-1 text-xs text-gray-400">Required · up to 10 files · max 25 MB each</p>
-                                </div>
-                                <ul data-approval-file-list class="mt-2 hidden space-y-2" aria-live="polite"></ul>
-                                <p data-approval-file-error class="mt-1 hidden text-xs text-red-600" role="alert"></p>
-                            </div>
-                        </div>
-
-                        <!-- REFERRED TO COMMITTEE fields -->
-                        <div id="srReferSection" class="hidden space-y-4 rounded-xl bg-gray-50 border border-gray-200 p-4">
-                            <h3 class="text-sm font-semibold text-gray-700">Committee Selection <span class="text-red-500">*</span></h3>
-                            <div class="max-h-52 overflow-y-auto space-y-1 rounded-xl border border-gray-200 bg-white p-3">
-                                <?php foreach ($committees as $c): ?>
-                                    <label class="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-50 cursor-pointer">
-                                        <input type="checkbox" name="committee_ids[]" value="<?= (int) $c['id'] ?>"
-                                               <?= in_array((int) $c['id'], array_map('intval', $old['committee_ids'] ?? $existingCommitteeIds), true) ? 'checked' : '' ?>
-                                               class="h-4 w-4 accent-primary rounded">
-                                        <span class="text-sm text-gray-800"><?= htmlspecialchars($c['name']) ?></span>
-                                    </label>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-
-                        <!-- DEFERRED fields -->
-                        <div id="srDeferredSection" class="hidden space-y-4 rounded-xl bg-gray-50 border border-gray-200 p-4">
-                            <h3 class="text-sm font-semibold text-gray-700">Deferral Details</h3>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1" for="date_deferred">Date Deferred <span class="text-red-500">*</span></label>
-                                <input type="date" id="date_deferred" name="date_deferred"
-                                       value="<?= htmlspecialchars($old['date_deferred'] ?? '') ?>"
-                                       class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1" for="compliance_file_new">Compliance Document (optional)</label>
-                                <input type="file" id="compliance_file_new" name="compliance_file"
-                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                                       class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-1 file:text-xs file:font-medium file:text-white hover:file:bg-blue-700">
-                            </div>
-                        </div>
-
-                        <!-- WITHDRAWN fields -->
-                        <div id="srWithdrawnSection" class="hidden space-y-4 rounded-xl bg-gray-50 border border-gray-200 p-4">
-                            <h3 class="text-sm font-semibold text-gray-700">Withdrawal Details</h3>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-600 mb-1" for="date_withdrawn">Date Withdrawn <span class="text-red-500">*</span></label>
-                                <input type="date" id="date_withdrawn" name="date_withdrawn"
-                                       value="<?= htmlspecialchars($old['date_withdrawn'] ?? '') ?>"
-                                       class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                            </div>
-                        </div>
-
-                        <!-- Common remarks -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1" for="sr_remarks">Remarks</label>
-                            <textarea id="sr_remarks" name="remarks" rows="3"
-                                      placeholder="Enter remarks…"
-                                      class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"><?= htmlspecialchars($old['remarks'] ?? '') ?></textarea>
-                        </div>
-
-                        <div class="flex items-center justify-end gap-3 pt-2">
-                            <a href="<?= BASE_URL ?>/plenary/second-reading"
-                               class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Cancel</a>
-                            <button type="submit"
-                                    class="rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition">
-                                Record Second Reading
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <?php elseif (!$canAct): ?>
-            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                <p class="text-sm font-medium text-amber-800">You are not the owner of this document. Only the Plenary user who accepted it may process the Second Reading.</p>
-            </div>
-            <?php endif; ?>
-
-            <!-- Committee-returned documents waiting for advance -->
-            <?php
-            $isReturnedFromCommittee = ($document['status_name'] ?? '') === 'Returned to Plenary' && $firstReading;
-            ?>
-            <?php if ($isReturnedFromCommittee && $canAct): ?>
-            <div class="rounded-2xl border border-violet-200 bg-violet-50 p-5">
-                <p class="text-sm font-semibold text-violet-800 mb-3">This document has been returned from Committee. Advance it to the Second Reading queue to begin processing.</p>
-                <form method="POST" action="<?= BASE_URL ?>/plenary/second-reading/advance-from-committee">
-                    <input type="hidden" name="document_id" value="<?= $documentId ?>">
-                    <button type="submit" class="rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition">
-                        Advance to Second Reading Queue
-                    </button>
-                </form>
-            </div>
-            <?php endif; ?>
-
             <!-- Event Timeline -->
-            <?php if (!empty($events)): ?>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
-                <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">Event History</h2>
-                <ol class="relative border-l border-gray-200 ml-3 space-y-5">
+            <section class="rounded-2xl border border-gray-200 bg-white p-6">
+                <h2 class="mb-4 text-base font-semibold text-gray-900">Action History</h2>
+                <?php if (empty($events)): ?>
+                    <p class="text-sm text-gray-400">No action history recorded.</p>
+                <?php else: ?>
+                <ol class="relative ml-3 space-y-5 border-l border-gray-200">
                     <?php foreach ($events as $ev): ?>
-                        <li class="ml-4">
-                            <div class="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border border-white bg-primary"></div>
-                            <div class="flex flex-col">
-                                <span class="text-xs font-semibold text-gray-700"><?= htmlspecialchars(str_replace('_', ' ', $ev['event_type'])) ?></span>
-                                <?php if (!empty($ev['remarks'])): ?>
-                                    <span class="text-xs text-gray-500 mt-0.5"><?= htmlspecialchars($ev['remarks']) ?></span>
+                        <?php
+                        $eventType = (string) ($ev['event_type'] ?? 'OTHER');
+                        $eventLabel = ucwords(strtolower(str_replace('_', ' ', $eventType)));
+                        ?>
+                        <li class="relative ml-6">
+                            <span class="absolute -left-[31px] flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-white ring-4 ring-white" aria-hidden="true">
+                                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </span>
+                            <p class="text-sm font-semibold text-gray-800"><?= htmlspecialchars($eventLabel) ?></p>
+                            <p class="text-xs text-gray-500">
+                                <?= htmlspecialchars($ev['phase'] ?? 'Plenary') ?>
+                                <?php if (!empty($ev['performed_by_username'])): ?>
+                                    &middot; by <?= htmlspecialchars($ev['performed_by_username']) ?>
                                 <?php endif; ?>
-                                <span class="text-xs text-gray-400 mt-1">
-                                    <?= htmlspecialchars(date('M j, Y g:i A', strtotime($ev['created_at']))) ?>
-                                    <?php if (!empty($ev['performed_by_username'])): ?>by <?= htmlspecialchars($ev['performed_by_username']) ?><?php endif; ?>
-                                </span>
-                            </div>
+                                &middot; <?= !empty($ev['created_at']) ? htmlspecialchars(date('M j, Y g:i A', strtotime($ev['created_at']))) : 'Date unavailable' ?>
+                            </p>
+                            <?php if (!empty($ev['to_status_name'])): ?>
+                                <p class="mt-1 text-xs text-gray-500">Status: <?= htmlspecialchars($ev['to_status_name']) ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($ev['remarks'])): ?>
+                                <p class="mt-1 whitespace-pre-line text-xs italic text-gray-500"><?= htmlspecialchars($ev['remarks']) ?></p>
+                            <?php endif; ?>
                         </li>
                     <?php endforeach; ?>
                 </ol>
-            </div>
-            <?php endif; ?>
+                <?php endif; ?>
+            </section>            <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+                <h2 class="mb-4 text-base font-semibold text-gray-900">Assignment History</h2>
+                <?php if (empty($assignments)): ?>
+                    <p class="text-sm text-gray-400">No assignments yet.</p>
+                <?php else: ?>
+                    <div class="space-y-3 sm:hidden">
+                        <?php foreach ($assignments as $assignment): ?>
+                            <?php
+                            $decision = (string) ($assignment['decision'] ?? '');
+                            $decisionClass = match ($decision) {
+                                'COMPLETED', 'NOTED' => 'bg-green-50 text-green-700',
+                                'ACCEPTED' => 'bg-blue-50 text-blue-700',
+                                'DECLINED', 'REJECTED' => 'bg-red-50 text-red-700',
+                                default => 'bg-amber-50 text-amber-700',
+                            };
+                            $phase = ucwords(strtolower(str_replace('_', ' ', (string) ($assignment['phase'] ?? ''))));
+                            ?>
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400"><?= htmlspecialchars($phase, ENT_QUOTES, 'UTF-8') ?></p>
+                                        <p class="mt-1 break-words text-sm font-semibold text-gray-800">
+                                            <?= htmlspecialchars($assignment['role_name'] ?? $assignment['assigned_to_username'] ?? '—', ENT_QUOTES, 'UTF-8') ?>
+                                        </p>
+                                    </div>
+                                    <span class="shrink-0 rounded-full px-2 py-1 text-xs font-semibold <?= $decisionClass ?>">
+                                        <?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $decision ?: 'Pending'))), ENT_QUOTES, 'UTF-8') ?>
+                                    </span>
+                                </div>
+                                <dl class="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                    <div>
+                                        <dt class="text-gray-400">Accepted By</dt>
+                                        <dd class="mt-0.5 break-words font-medium text-blue-700">
+                                            <?= htmlspecialchars($assignment['accepted_by_username'] ?? '—', ENT_QUOTES, 'UTF-8') ?>
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt class="text-gray-400">Assigned At</dt>
+                                        <dd class="mt-0.5 break-words text-gray-600">
+                                            <?= !empty($assignment['created_at']) ? htmlspecialchars(date('M j, Y', strtotime($assignment['created_at'])), ENT_QUOTES, 'UTF-8') : '—' ?>
+                                        </dd>
+                                    </div>
+                                    <?php if (!empty($assignment['accepted_at'])): ?>
+                                        <div class="col-span-2">
+                                            <dt class="text-gray-400">Accepted At</dt>
+                                            <dd class="mt-0.5 break-words text-gray-600">
+                                                <?= htmlspecialchars(date('M j, Y g:i A', strtotime($assignment['accepted_at'])), ENT_QUOTES, 'UTF-8') ?>
+                                            </dd>
+                                        </div>
+                                    <?php endif; ?>
+                                </dl>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="hidden overflow-x-auto sm:block">
+                        <table class="w-full divide-y divide-gray-100 text-left text-sm">
+                            <thead>
+                                <tr class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                    <th class="pb-2 pr-3">Phase</th>
+                                    <th class="pb-2 pr-3">Role</th>
+                                    <th class="pb-2 pr-3">Decision</th>
+                                    <th class="pb-2 pr-3">Accepted By</th>
+                                    <th class="pb-2">Accepted At</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50">
+                                <?php foreach ($assignments as $assignment): ?>
+                                    <?php
+                                    $decision = (string) ($assignment['decision'] ?? '');
+                                    $decisionClass = match ($decision) {
+                                        'COMPLETED', 'NOTED' => 'bg-green-50 text-green-700',
+                                        'ACCEPTED' => 'bg-blue-50 text-blue-700',
+                                        'DECLINED', 'REJECTED' => 'bg-red-50 text-red-700',
+                                        default => 'bg-amber-50 text-amber-700',
+                                    };
+                                    ?>
+                                    <tr class="text-gray-700">
+                                        <td class="py-2 pr-3"><?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', (string) ($assignment['phase'] ?? '')))), ENT_QUOTES, 'UTF-8') ?></td>
+                                        <td class="py-2 pr-3"><?= htmlspecialchars($assignment['role_name'] ?? $assignment['assigned_to_username'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>
+                                        <td class="py-2 pr-3">
+                                            <span class="rounded-full px-2 py-1 text-xs font-semibold <?= $decisionClass ?>">
+                                                <?= htmlspecialchars(ucwords(strtolower(str_replace('_', ' ', $decision ?: 'Pending'))), ENT_QUOTES, 'UTF-8') ?>
+                                            </span>
+                                        </td>
+                                        <td class="py-2 pr-3"><?= htmlspecialchars($assignment['accepted_by_username'] ?? '—', ENT_QUOTES, 'UTF-8') ?></td>
+                                        <td class="py-2">
+                                            <?= !empty($assignment['accepted_at']) ? htmlspecialchars(date('M j, Y g:i A', strtotime($assignment['accepted_at'])), ENT_QUOTES, 'UTF-8') : '—' ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </section>
         </div>
     </div>
 </div>

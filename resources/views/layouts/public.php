@@ -67,7 +67,7 @@ $pageTitle = $pageTitle ?? 'Public Portal';
     </style>
 </head>
 
-<body class="font-poppins bg-gray-50 text-gray-800">
+<body class="font-inter bg-gray-50 text-gray-800">
     <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-3 focus:text-gray-900 focus:shadow-lg">
         Skip to main content
     </a>

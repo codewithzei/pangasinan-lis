@@ -97,16 +97,32 @@ function fetchReferredList(PDO $pdo, string $tab, int $returnedId, int $awaiting
             SELECT 1 FROM plenary_committee_report_adoptions pcra
             WHERE pcra.document_id = d.id
         ) ";
+    $outcomeStatusIds = [
+        'remanded' => statusId($pdo, 'Remanded'),
+        'withdrawn' => statusId($pdo, 'Withdrawn'),
+        'noted' => statusId($pdo, 'Noted'),
+    ];
     if ($tab === 'returned') {
         $sql = "SELECT d.id, ds.name AS status FROM documents d
                 LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
                 WHERE {$base} AND d.current_status_id = ?";
         $params = [$returnedId];
+    } elseif (isset($outcomeStatusIds[$tab])) {
+        $sql = "SELECT d.id, ds.name AS status FROM documents d
+                LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
+                WHERE {$base} AND d.current_status_id = ?";
+        $params = [$outcomeStatusIds[$tab]];
     } else {
         $sql = "SELECT d.id, ds.name AS status FROM documents d
                 LEFT JOIN document_statuses ds ON ds.id = d.current_status_id
-                WHERE {$base} AND d.current_status_id <> ? AND d.current_status_id <> ?";
-        $params = [$returnedId, $awaitingSecondId];
+                WHERE {$base} AND d.current_status_id NOT IN (?, ?, ?, ?, ?)";
+        $params = [
+            $returnedId,
+            $awaitingSecondId,
+            $outcomeStatusIds['remanded'],
+            $outcomeStatusIds['withdrawn'],
+            $outcomeStatusIds['noted'],
+        ];
     }
     $s = $pdo->prepare($sql);
     $s->execute($params);
@@ -298,6 +314,9 @@ $referredId      = statusId($pdo, 'Referred');
 $opinionId       = statusId($pdo, 'Opinion Requested');
 $returnedId      = statusId($pdo, 'Returned to Plenary');
 $awaitingSecondId = statusId($pdo, 'Awaiting Second Reading');
+$remandedId      = statusId($pdo, 'Remanded');
+$withdrawnId     = statusId($pdo, 'Withdrawn');
+$notedId         = statusId($pdo, 'Noted');
 
 $pdo->beginTransaction();
 
@@ -328,6 +347,19 @@ try {
     $sharedName2 = $pdo->prepare("SELECT ds.name FROM documents d JOIN document_statuses ds ON ds.id=d.current_status_id WHERE d.id=?");
     $sharedName2->execute([$docId]);
     check("Shared status reflects live committee sub-status ('Opinion Requested')", $sharedName2->fetchColumn() === 'Opinion Requested');
+
+    foreach ([
+        'remanded' => $remandedId,
+        'withdrawn' => $withdrawnId,
+        'noted' => $notedId,
+    ] as $outcomeTab => $outcomeStatusId) {
+        setCommitteeSubStatus($pdo, $docId, $fakeUserId, $outcomeStatusId);
+        $outcomeDocuments = fetchReferredList($pdo, $outcomeTab, $returnedId, $awaitingSecondId);
+        $inCommitteeAfterOutcome = fetchReferredList($pdo, 'in_committee', $returnedId, $awaitingSecondId);
+        check("Document appears on " . ucfirst($outcomeTab) . " tab", in_array($docId, array_column($outcomeDocuments, 'id'), true));
+        check("Document leaves In Committee tab after " . $outcomeTab, !in_array($docId, array_column($inCommitteeAfterOutcome, 'id'), true));
+    }
+    setCommitteeSubStatus($pdo, $docId, $fakeUserId, $opinionId);
     echo PHP_EOL;
 
     // ── Test 3: committee return enables adoption decision ─────────────────

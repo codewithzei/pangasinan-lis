@@ -135,26 +135,27 @@ ob_start();
 
 
     <!-- Back + Page header --------------------------------------------------->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-7 sm:px-8">
-            <div class="relative z-10 flex items-center gap-3">
-                <a href="<?= htmlspecialchars($detailBackUrl) ?>"
-                   class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
-                   aria-label="<?= $fromNotedDocuments ? 'Back to Noted Documents' : 'Back to SP Secretary Inbox' ?>">
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                    </svg>
-                </a>
-                <div class="min-w-0">
-                    <p class="text-sm font-medium text-blue-100">
-                        <?= $fromNotedDocuments ? 'NOTED DOCUMENT' : 'DOCUMENT DETAILS' ?>
-                    </p>
-                    <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl"><?= htmlspecialchars($trackingNumber) ?></h1>
-                </div>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-center sm:px-8 sm:py-7">
+            <a href="<?= htmlspecialchars($detailBackUrl) ?>"
+               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white
+                      transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+               aria-label="<?= $fromNotedDocuments ? 'Back to Noted Documents' : 'Back to SP Secretary Inbox' ?>">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">
+                    <?= $fromNotedDocuments ? 'NOTED DOCUMENT' : 'DOCUMENT DETAILS' ?>
+                </p>
+                <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                    <?= htmlspecialchars($trackingNumber) ?>
+                </h1>
             </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <!-- Main 2-column layout ------------------------------------------------->

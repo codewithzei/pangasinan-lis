@@ -17,9 +17,10 @@
  *   $search             string
  *   $documentTypeId     int
  *   $documentTypes      array
- *   $tab                string  ('in_committee' | 'returned')
+ *   $tab                string  ('in_committee' | 'returned' | 'remanded' | 'withdrawn' | 'noted')
  *   $inCommitteeCount   int
  *   $returnedCount      int
+ *   $outcomeCounts      array
  *   $success            string|null
  *   $error              string|null
  *   $errors             array
@@ -35,7 +36,23 @@ $documentTypes    = $documentTypes    ?? [];
 $tab              = $tab              ?? 'in_committee';
 $inCommitteeCount = $inCommitteeCount ?? 0;
 $returnedCount    = $returnedCount    ?? 0;
+$outcomeCounts    = $outcomeCounts    ?? ['remanded' => 0, 'withdrawn' => 0, 'noted' => 0];
+$withdrawnNotedCount = (int) ($outcomeCounts['withdrawn'] ?? 0) + (int) ($outcomeCounts['noted'] ?? 0);
 $errors           = $errors           ?? [];
+$tabLabels = [
+    'in_committee' => 'In Committee',
+    'returned' => 'Returned — Awaiting 2nd Reading',
+    'remanded' => 'Remanded',
+    'withdrawn' => 'Withdrawn',
+    'noted' => 'Noted',
+];
+$tabCounts = [
+    'in_committee' => $inCommitteeCount,
+    'returned' => $returnedCount,
+    'remanded' => $outcomeCounts['remanded'] ?? 0,
+    'withdrawn' => $outcomeCounts['withdrawn'] ?? 0,
+    'noted' => $outcomeCounts['noted'] ?? 0,
+];
 
 ob_start();
 
@@ -98,25 +115,41 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
     <?php endif; ?>
 
     <!-- Header -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10 max-w-3xl">
-                <p class="text-sm font-medium text-blue-100">PLENARY / LEGISLATIVE READINGS</p>
-                <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">Referred to Committee</h1>
-                <p class="mt-2 max-w-xl text-sm leading-6 text-blue-100">Track documents referred to a Committee. Adopt returned Committee Reports as approved to proceed to Second Reading, or disapproved to save the report copy only.</p>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex flex-col gap-6 px-6 py-7 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
+            <div class="max-w-3xl">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-100">Plenary · Legislative Readings</p>
+                <h1 class="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">Referred to Committee</h1>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-blue-100">Track documents referred to a Committee. Adopt returned Committee Reports as approved to proceed to Second Reading, or disapproved to save the report copy only.</p>
             </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+            <div class="flex items-center gap-3 border-t border-white/15 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                <span class="flex h-2.5 w-2.5 rounded-full <?= $tab === 'returned' ? 'bg-violet-300 ring-4 ring-violet-300/20' : ($tab === 'in_committee' ? 'bg-amber-300 ring-4 ring-amber-300/20' : 'bg-blue-300 ring-4 ring-blue-300/20') ?>"></span>
+                <div>
+                    <p class="text-xs font-medium text-white"><?= htmlspecialchars($tabLabels[$tab] ?? 'Committee queue') ?></p>
+                    <p class="mt-0.5 text-xs text-blue-100/80"><?= htmlspecialchars(date('l, F j, Y')) ?></p>
+                </div>
+            </div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <!-- Stats -->
     <section>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+        <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">At a glance</p>
+                <h2 class="mt-1 text-xl font-semibold text-gray-900">Where documents stand</h2>
+            </div>
+            <p class="text-xs text-gray-500">A quick summary of referred documents</p>
+        </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-amber-500"></span>
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">In Committee</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($inCommitteeCount) ?></p>
+                        <p class="text-sm font-medium text-gray-700">With the Committee</p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($inCommitteeCount) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -124,13 +157,14 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                         </svg>
                     </div>
                 </div>
-                <div class="mt-4"><span class="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-600">Committee work in progress</span></div>
-            </div>
-            <div class="rounded-2xl border border-gray-200 bg-white p-5">
+                <p class="mt-3 text-xs leading-5 text-gray-500">Waiting for committee review or a report.</p>
+            </article>
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-violet-500"></span>
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="text-sm text-gray-500">Returned — awaiting 2nd Reading</p>
-                        <p class="mt-2 text-3xl font-bold text-gray-900"><?= number_format($returnedCount) ?></p>
+                        <p class="text-sm font-medium text-gray-700">Returned to Plenary</p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($returnedCount) ?></p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,24 +172,51 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                         </svg>
                     </div>
                 </div>
-                <div class="mt-4"><span class="rounded-full bg-violet-50 px-2 py-1 text-xs font-medium text-violet-600">Ready to proceed</span></div>
-            </div>
+                <p class="mt-3 text-xs leading-5 text-gray-500">Back from committee and ready for plenary review.</p>
+            </article>
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-blue-500"></span>
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Sent Back to Committee</p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format((int) ($outcomeCounts['remanded'] ?? 0)) ?></p>
+                    </div>
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 14l-4-4 4-4M5 10h9a5 5 0 010 10h-2"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="mt-3 text-xs leading-5 text-gray-500">Remanded for more committee work.</p>
+            </article>
+            <article class="relative overflow-hidden rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <span class="absolute inset-x-0 top-0 h-1 bg-gray-400"></span>
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Withdrawn or Noted</p>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-900"><?= number_format($withdrawnNotedCount) ?></p>
+                    </div>
+                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 7h12M8 12h8m-8 5h5M4 7h.01M4 12h.01M4 17h.01"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="mt-3 text-xs leading-5 text-gray-500">Documents withdrawn or marked as noted.</p>
+            </article>
         </div>
     </section>
 
     <!-- Tabs -->
     <div class="border-b border-gray-200">
-        <nav class="-mb-px flex gap-1" aria-label="Referred to Committee tabs">
-            <a href="<?= htmlspecialchars(rtcBuildTabUrl('in_committee', $search, $documentTypeId)) ?>"
-               class="inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition <?= $tab === 'in_committee' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>">
-                In Committee
-                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 <?= $tab === 'in_committee' ? 'bg-primary/10 text-primary' : '' ?>"><?= number_format($inCommitteeCount) ?></span>
-            </a>
-            <a href="<?= htmlspecialchars(rtcBuildTabUrl('returned', $search, $documentTypeId)) ?>"
-               class="inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition <?= $tab === 'returned' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>">
-                Returned — Awaiting 2nd Reading
-                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 <?= $tab === 'returned' ? 'bg-primary/10 text-primary' : '' ?>"><?= number_format($returnedCount) ?></span>
-            </a>
+        <nav class="-mb-px flex gap-1 overflow-x-auto" aria-label="Referred to Committee tabs">
+            <?php foreach ($tabLabels as $tabKey => $tabLabel): ?>
+                <a href="<?= htmlspecialchars(rtcBuildTabUrl($tabKey, $search, $documentTypeId)) ?>"
+                   class="inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition <?= $tab === $tabKey ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700' ?>">
+                    <?= htmlspecialchars($tabLabel) ?>
+                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 <?= $tab === $tabKey ? 'bg-primary/10 text-primary' : '' ?>"><?= number_format((int) $tabCounts[$tabKey]) ?></span>
+                </a>
+            <?php endforeach; ?>
         </nav>
     </div>
 
@@ -164,11 +225,11 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div class="shrink-0">
                 <h2 class="whitespace-nowrap text-sm font-semibold text-gray-900">
-                    <?= $tab === 'returned' ? 'Returned by Committee' : 'In Committee' ?>
+                    <?= htmlspecialchars($tabLabels[$tab] ?? 'In Committee') ?>
                 </h2>
                 <p class="mt-1 text-xs text-gray-500"><?= $total ?> record<?= $total !== 1 ? 's' : '' ?> found</p>
             </div>
-            <form method="GET" action="<?= BASE_URL ?>/plenary/referred-to-committee" class="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <form method="GET" action="<?= BASE_URL ?>/plenary/referred-to-committee" class="hidden flex-col gap-3 xl:flex xl:flex-row xl:items-center">
                 <input type="hidden" name="tab" value="<?= htmlspecialchars($tab) ?>">
                 <input type="hidden" name="page" value="1">
                 <div class="relative">
@@ -196,7 +257,57 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
             </form>
         </div>
 
-        <div class="overflow-x-auto">
+        <div class="flex min-w-0 items-center gap-2 border-b border-gray-100 px-4 py-4 xl:hidden">
+            <form method="GET" action="<?= BASE_URL ?>/plenary/referred-to-committee" class="relative min-w-0 flex-1">
+                <input type="hidden" name="tab" value="<?= htmlspecialchars($tab, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="page" value="1">
+                <input type="hidden" name="doc_type" value="<?= (int) $documentTypeId ?>">
+                <label for="rtc-mobile-search" class="sr-only">Search by tracking number or subject</label>
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input id="rtc-mobile-search" type="search" name="search" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>" placeholder="Search tracking # or subject..."
+                       class="block w-full min-w-0 rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-sm text-gray-800 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+            </form>
+            <button type="button" data-inbox-filter-target="#rtc-mobile-filter-sheet" aria-label="Open filters" aria-haspopup="dialog"
+                    class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 12h12m-9 8h6"/>
+                </svg>
+                <?php if ($documentTypeId > 0): ?><span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"></span><?php endif; ?>
+            </button>
+        </div>
+        <div id="rtc-mobile-filter-sheet" class="fixed inset-0 z-50 hidden xl:hidden">
+            <button type="button" class="inbox-filter-backdrop absolute inset-0 bg-gray-950/40" aria-label="Close filters"></button>
+            <form method="GET" action="<?= BASE_URL ?>/plenary/referred-to-committee" role="dialog" aria-modal="true" aria-labelledby="rtc-mobile-filter-title"
+                  class="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl">
+                <input type="hidden" name="tab" value="<?= htmlspecialchars($tab, ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="page" value="1">
+                <input type="hidden" name="search" value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>">
+                <div class="mb-5 flex items-center justify-between">
+                    <h3 id="rtc-mobile-filter-title" class="font-semibold text-gray-900">Filters</h3>
+                    <button type="button" class="inbox-filter-close rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-100">Close</button>
+                </div>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700" for="rtc-mobile-doc-type">Document type</label>
+                <select id="rtc-mobile-doc-type" name="doc_type" class="mb-5 block w-full min-w-0 rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-800">
+                    <option value="0">All document types</option>
+                    <?php foreach ($documentTypes as $documentType): ?>
+                        <option value="<?= (int) $documentType['id'] ?>" <?= $documentTypeId === (int) $documentType['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($documentType['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="grid <?= $search !== '' || $documentTypeId > 0 ? 'grid-cols-2' : 'grid-cols-1' ?> gap-3">
+                    <button type="submit" class="w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white hover:opacity-90">Apply Filters</button>
+                    <?php if ($search !== '' || $documentTypeId > 0): ?>
+                        <a href="<?= htmlspecialchars(rtcBuildTabUrl($tab, '', 0), ENT_QUOTES, 'UTF-8') ?>" class="flex w-full items-center justify-center rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">Clear</a>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+        <?php require __DIR__ . '/../../partials/inbox-mobile-filter-script.php'; ?>
+
+        <div class="hidden overflow-x-auto xl:block">
             <table class="w-full table-fixed text-left text-sm">
                 <thead class="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
@@ -217,11 +328,7 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                     </svg>
                                 </div>
                                 <p class="mt-4 text-sm font-medium text-gray-700">
-                                    <?php if ($tab === 'returned'): ?>
-                                        No documents returned from Committee awaiting Second Reading.
-                                    <?php else: ?>
-                                        No documents currently referred to Committee.
-                                    <?php endif; ?>
+                                    No documents in the <?= htmlspecialchars($tabLabels[$tab] ?? 'In Committee') ?> queue.
                                 </p>
                                 <p class="mt-1 text-xs text-gray-500">Documents referred during First Reading remain here until the returned Committee Report is adopted.</p>
                             </td>
@@ -293,15 +400,16 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                     </span>
                                 </td>
                                 <td class="px-4 py-4">
-                                    <div class="flex flex-col items-end gap-2">
+                                    <div class="ml-auto flex w-full max-w-56 flex-col items-end gap-2">
                                     <a href="<?= htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                       class="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
-                                       aria-label="View legislative history for <?= htmlspecialchars($row['tracking_number'], ENT_QUOTES, 'UTF-8') ?>">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                       class="inline-flex max-w-full items-center justify-center gap-1.5 whitespace-normal rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-center text-xs font-medium text-gray-700 transition hover:border-primary hover:bg-blue-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                                       aria-label="View details for <?= htmlspecialchars($row['tracking_number'], ENT_QUOTES, 'UTF-8') ?>"
+                                       title="View details">
+                                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.065 7-9.542 7s-8.268-2.943-9.542-7z"/>
                                         </svg>
-                                        View details
+                                        <span>View details</span>
                                     </a>
                                     <?php if ($canAdvance): ?>
                                         <?php $hearingApproved = ($row['committee_hearing_outcome'] ?? '') === 'APPROVED'; ?>
@@ -309,47 +417,48 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
                                             <!-- Cases/Petitions returned from Committee: Adopt Committee Report -->
                                             <button type="button"
                                                     onclick="openAdoptCasesModal(<?= (int) $row['document_id'] ?>, <?= htmlspecialchars(json_encode((string) $row['tracking_number'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>)"
-                                                    class="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-2 py-1.5 text-center text-xs font-semibold text-white hover:bg-indigo-700 transition"
-                                                    aria-label="Adopt Committee Report for <?= htmlspecialchars($row['tracking_number']) ?>">
-                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    class="inline-flex max-w-full items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-primary px-3 py-1.5 text-center text-xs font-medium text-white transition hover:bg-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                                                    aria-label="Adopt Committee Report for <?= htmlspecialchars($row['tracking_number'], ENT_QUOTES, 'UTF-8') ?>"
+                                                    title="Adopt Committee Report">
+                                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                                 </svg>
-                                                Adopted Committee Report
+                                                <span>Adopt Committee Report</span>
                                             </button>
                                         <?php elseif ($hearingApproved && !empty($row['is_plenary_comm_referred'])): ?>
                                             <!-- Communication returned from Committee: Adopt Committee Report -->
                                             <button type="button"
                                                     onclick="openAdoptModal(<?= (int) $row['document_id'] ?>, <?= htmlspecialchars(json_encode((string) $row['tracking_number'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string) ($row['subject_matter'] ?? ''), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8') ?>, <?= !empty($row['is_mfr']) ? 'true' : 'false' ?>)"
-                                                    class="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-2 py-1.5 text-center text-xs font-semibold text-white hover:bg-emerald-700 transition">
-                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    class="inline-flex max-w-full items-center justify-center gap-1.5 whitespace-normal rounded-lg bg-primary px-3 py-1.5 text-center text-xs font-medium text-white transition hover:bg-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                                                    aria-label="Adopt Committee Report for <?= htmlspecialchars($row['tracking_number'], ENT_QUOTES, 'UTF-8') ?>"
+                                                    title="Adopt Committee Report">
+                                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                                 </svg>
-                                                Adopted Committee Report
+                                                <span>Adopt Committee Report</span>
                                             </button>
                                         <?php else: ?>
                                             <!-- Adoption follows the latest Committee hearing outcome. -->
                                             <button type="button"
-                                                    class="open-report-adoption-confirmation inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-center text-xs font-semibold transition <?= $hearingApproved ? 'bg-violet-600 text-white hover:bg-violet-700' : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50' ?>"
+                                                    class="open-report-adoption-confirmation inline-flex max-w-full items-center justify-center gap-1.5 whitespace-normal rounded-lg px-3 py-1.5 text-center text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 <?= $hearingApproved ? 'bg-violet-600 text-white hover:bg-violet-700' : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50' ?>"
                                                     data-document-id="<?= (int) $row['document_id'] ?>"
                                                     data-decision="<?= $hearingApproved ? 'APPROVED' : 'DISAPPROVED' ?>"
-                                                    data-tracking-number="<?= htmlspecialchars($row['tracking_number'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                                                    data-tracking-number="<?= htmlspecialchars($row['tracking_number'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                                    aria-label="<?= $hearingApproved ? 'Approve and proceed to Second Reading' : 'Adopt report only' ?> for <?= htmlspecialchars($row['tracking_number'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                                    title="<?= $hearingApproved ? 'Approve and proceed to 2nd Reading' : 'Adopt Report Only' ?>">
                                                 <?php if ($hearingApproved): ?>
-                                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                                                        </svg>
-                                                        Approve &amp; Proceed to 2nd Reading
+                                                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                                                    </svg>
+                                                    <span>Approve &amp; Proceed to 2nd Reading</span>
                                                 <?php else: ?>
-                                                    Adopt Report Only (Disapproved)
+                                                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                    </svg>
+                                                    <span>Adopt Report Only</span>
                                                 <?php endif; ?>
                                             </button>
                                         <?php endif; ?>
-                                    <?php else: ?>
-                                        <span class="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-center text-xs font-medium text-gray-400">
-                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                            </svg>
-                                            In Committee
-                                        </span>
                                     <?php endif; ?>
                                     </div>
                                 </td>
@@ -360,18 +469,73 @@ function rtcBuildDetailUrl(int $documentId, string $tab, int $pageNum, string $s
             </table>
         </div>
 
-        <?php if ($totalPages > 1): ?>
-            <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 sm:flex-row">
-                <p class="text-xs text-gray-500">Showing page <span class="font-medium"><?= $page ?></span> of <span class="font-medium"><?= $totalPages ?></span> (<?= $total ?> total)</p>
-                <div class="flex items-center gap-1">
-                    <?php if ($page > 1): ?><a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $page - 1, $search, $documentTypeId)) ?>" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Prev</a><?php endif; ?>
-                    <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
-                        <a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $i, $search, $documentTypeId)) ?>" class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>"><?= $i ?></a>
-                    <?php endfor; ?>
-                    <?php if ($page < $totalPages): ?><a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $page + 1, $search, $documentTypeId)) ?>" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">Next</a><?php endif; ?>
+        <div class="space-y-4 border-t border-gray-100 px-4 py-4 sm:px-6 xl:hidden">
+            <?php if (empty($documents)): ?>
+                <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center">
+                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-white text-gray-400 shadow-sm">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                    </div>
+                    <p class="mt-3 text-sm font-medium text-gray-700">No matching committee records</p>
+                    <p class="mt-1 text-xs text-gray-500">Try changing your search or document type filter.</p>
                 </div>
-            </div>
-        <?php endif; ?>
+            <?php else: ?>
+                <?php foreach ($documents as $row): ?>
+                    <?php
+                        $cardOutcome = strtoupper(trim((string) ($row['committee_hearing_outcome'] ?? '')));
+                        $cardOutcomeLabel = $cardOutcome !== '' ? ucwords(strtolower(str_replace('_', ' ', $cardOutcome))) : 'Pending';
+                        $cardOutcomeColors = ['APPROVED' => '#16A34A', 'DEFERRED' => '#D97706', 'REMANDED' => '#2563EB', 'WITHDRAWN' => '#6B7280', 'NOTED' => '#7C3AED', 'TERMINATED' => '#DC2626'];
+                        $cardOutcomeColor = $cardOutcomeColors[$cardOutcome] ?? '#6B7280';
+                        $cardCommittees = array_values(array_filter(array_map('trim', explode(',', (string) ($row['committee_names'] ?? '')))));
+                        $detailUrl = rtcBuildDetailUrl((int) $row['document_id'], $tab, $page, $search, $documentTypeId);
+                        $isMobile = true;
+                    ?>
+                    <article class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                        <div class="border-b border-gray-100 p-4">
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                                <a href="<?= htmlspecialchars($detailUrl, ENT_QUOTES, 'UTF-8') ?>" class="break-all text-sm font-semibold text-primary hover:underline"><?= htmlspecialchars($row['tracking_number']) ?></a>
+                                <span class="inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold" style="background-color: <?= htmlspecialchars($cardOutcomeColor) ?>1a; color: <?= htmlspecialchars($cardOutcomeColor) ?>;"><?= htmlspecialchars($cardOutcomeLabel) ?></span>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500"><?= htmlspecialchars(date('M j, Y', strtotime($row['date_received']))) ?>
+                                <?php if (!empty($row['proposed_number'])): ?> · <?= htmlspecialchars($row['proposed_number']) ?><?php endif; ?>
+                            </p>
+                            <?php if (!empty($row['accepted_by_username'])): ?><p class="mt-1 text-xs text-gray-400">Accepted by <?= htmlspecialchars($row['accepted_by_username']) ?></p><?php endif; ?>
+                        </div>
+                        <div class="space-y-4 p-4">
+                            <div>
+                                <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Subject matter</p>
+                                <p class="mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-gray-800"><?= htmlspecialchars($row['subject_matter']) ?></p>
+                            </div>
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Document type</p>
+                                    <p class="mt-1 text-sm text-gray-700"><?= htmlspecialchars($row['document_type_name'] ?? '—') ?></p>
+                                </div>
+                                <div class="min-w-0 text-right">
+                                    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Committee(s)</p>
+                                    <p class="mt-1 break-words text-sm text-gray-700"><?= !empty($cardCommittees) ? htmlspecialchars(implode(', ', $cardCommittees)) : '—' ?></p>
+                                </div>
+                            </div>
+                            <div class="border-t border-gray-100 pt-3">
+                                <?php require __DIR__ . '/row-actions.php'; ?>
+                            </div>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
+        <div class="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-4 py-4 sm:flex-row sm:px-6">
+                <p class="text-xs text-gray-500"><?= $total > 0 ? 'Showing ' . min((($page - 1) * 20) + 1, $total) . '–' . min($page * 20, $total) . ' of ' . number_format($total) . ' records' : 'Showing 0 records' ?></p>
+                <div class="flex items-center gap-1">
+                    <?php if ($page > 1): ?><a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $page - 1, $search, $documentTypeId)) ?>" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition" aria-label="Previous page">Prev</a><?php endif; ?>
+                    <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                        <a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $i, $search, $documentTypeId)) ?>" class="rounded-lg border px-3 py-1.5 text-sm font-medium transition <?= $i === $page ? 'border-primary bg-primary text-white' : 'border-gray-200 text-gray-700 hover:bg-gray-50' ?>" <?= $i === $page ? 'aria-current="page"' : '' ?>><?= $i ?></a>
+                    <?php endfor; ?>
+                    <?php if ($page < $totalPages): ?><a href="<?= htmlspecialchars(rtcBuildPageUrl($tab, $page + 1, $search, $documentTypeId)) ?>" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition" aria-label="Next page">Next</a><?php endif; ?>
+                </div>
+        </div>
     </section>
 </div>
 

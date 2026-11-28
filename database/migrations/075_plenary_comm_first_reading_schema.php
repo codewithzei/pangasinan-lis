@@ -105,7 +105,7 @@ class PlenaryCommFirstReadingSchema
 
                 -- NOTED path
                 communication_category_id INT UNSIGNED    NULL
-                    COMMENT 'FK to communication_categories; required for NOTED decision',
+                    COMMENT 'Optional FK to communication_categories',
 
                 -- APPROVED path
                 proposed_number           VARCHAR(100)    NULL

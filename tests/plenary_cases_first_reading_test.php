@@ -653,6 +653,25 @@ if (!file_exists($showViewPath)) {
     check('8.12 NOTED: no additional inputs required (no required category field)', strpos($viewHtml, 'name="communication_category_id"') === false);
     check('8.13 Back link goes to petitions tab', strpos($viewHtml, 'tab=petitions') !== false);
     check('8.14 Layout included', strpos($viewHtml, 'layouts/app.php') !== false);
+    check('8.15 Document details use full-width stacked layout', strpos($viewHtml, '<div class="flex flex-col gap-6">') !== false);
+    check('8.16 Resubmission relationship panel included', strpos($viewHtml, 'partials/resubmission-relationship.php') !== false);
+    check('8.17 MFR relationship panel included', strpos($viewHtml, 'partials/mfr-relationship.php') !== false);
+    $controllerPath = __DIR__ . '/../app/controllers/Plenary/PlenaryReadingController.php';
+    $controllerHtml = file_get_contents($controllerPath);
+    check('8.18 Linked record detail routes use Plenary Inbox', strpos($controllerHtml, "\$mfrDetailRoute = 'plenary/inbox';") !== false && strpos($controllerHtml, "\$resubmissionDetailRoute = 'plenary/inbox';") !== false);
+    check('8.19 Attachment card includes preview and download actions', strpos($viewHtml, 'data-attachment-preview') !== false && strpos($viewHtml, 'download') !== false);
+    check('8.20 Action History section present', strpos($viewHtml, '>Action History</h2>') !== false);
+    check('8.21 Assignment History section present', strpos($viewHtml, '>Assignment History</h2>') !== false);
+    check('8.22 Controller loads assignment history', strpos($controllerHtml, '$assignments     = $this->fetchAllAssignments($documentId);') !== false);
+    check('8.23 Petitions action and document containers have intentional visual order', strpos($viewHtml, '<div class="order-1">') !== false && strpos($viewHtml, '<div class="order-2 space-y-4">') !== false);
+    check('8.24 Attachments and each history card occupy separate rows', strpos($viewHtml, '<div class="space-y-6">') !== false && strpos($viewHtml, 'lg:col-span-2') === false);
+    check('8.25 Assignment history has responsive card and table layouts', strpos($viewHtml, 'space-y-3 sm:hidden') !== false && strpos($viewHtml, 'hidden overflow-x-auto sm:block') !== false);
+    check('8.26 Assignment history displays assignment and acceptance timestamps', strpos($viewHtml, '>Assigned At</th>') !== false && strpos($viewHtml, '>Accepted At</th>') !== false);
+    check('8.27 Petition action buttons are right-aligned', strpos($viewHtml, 'flex items-center justify-end gap-3 border-t border-gray-100 pt-4') !== false);
+    $commShowView = file_get_contents(__DIR__ . '/../resources/views/plenary/comm-first-reading/show.php');
+    check('8.28 Communication action buttons are right-aligned', strpos($commShowView, 'flex items-center justify-end gap-3 border-t border-gray-100 pt-4') !== false);
+    $standardShowView = file_get_contents(__DIR__ . '/../resources/views/plenary/first-reading/show.php');
+    check('8.29 Standard First Reading action buttons are right-aligned', strpos($standardShowView, 'flex items-center justify-end gap-3 pt-2') !== false);
 }
 
 section('Group 9 — View: referred-to-committee/index.php has adopt-cases modal');
@@ -684,6 +703,21 @@ if (!file_exists($frIndexPath)) {
     check('10.1 "Petitions" tab label present', strpos($frHtml, "'petitions'") !== false);
     check('10.2 frIsCases() function defined', strpos($frHtml, 'frIsCases') !== false);
     check('10.3 cases-first-reading/show route used for cases docs', strpos($frHtml, 'cases-first-reading/show') !== false);
+    check('10.4 All tab is present in the category tabs', strpos($frHtml, "'all'                   => ['label' => 'All'") !== false);
+    check('10.5 All tab is present in the mobile category options', strpos($frHtml, '<option value="all"') !== false);
+    check('10.5a All tab uses the aggregate count', strpos($frHtml, "'all'                   => ['label' => 'All', 'count' => \$tabCounts['all']") !== false);
+    check('10.6 Aggregate tab=all requests remain available', strpos($frHtml, "\$tab !== 'all'") !== false);
+    check('10.7 Pagination bar is always rendered', strpos($frHtml, 'aria-label="First Reading pagination"') !== false && strpos($frHtml, '<?php if ($totalPages > 1): ?>') === false);
+    check('10.8 Pagination links preserve tab and filters', strpos($frHtml, 'frPageUrl($tab, $page - 1, $search, $sessionType)') !== false && strpos($frHtml, 'function frPageUrl(string $tab, int $pageNum, string $search, string $sessionType = \'\')') !== false);
+    check('10.9 Session type filter appears on desktop and mobile', substr_count($frHtml, 'name="session_type"') >= 3);
+    check('10.10 Session type filter is carried across category tabs', strpos($frHtml, 'frTabUrl($tabKey, $search, $sessionType)') !== false);
+    $controllerPath = __DIR__ . '/../app/controllers/Plenary/PlenaryReadingController.php';
+    $controllerHtml = file_get_contents($controllerPath);
+    check('10.11 Session type is validated and applied to First Reading results', strpos($controllerHtml, "\$validSessionTypes = ['REGULAR', 'REGULAR_ONLINE', 'SPECIAL', 'SPECIAL_ONLINE'];") !== false && strpos($controllerHtml, 'pdd_filter.session_type = ?') !== false);
+    check('10.12 Process actions retain their labels without oversized fixed widths', substr_count($frHtml, '<span>Process</span>') >= 2 && strpos($frHtml, 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5') !== false && strpos($frHtml, 'inline-flex shrink-0 items-center justify-center gap-1.5') !== false);
+    check('10.13 Comm Referred statistic card removed', strpos($frHtml, 'Comm Referred (awaiting return)') === false && strpos($controllerHtml, 'fetchReferredCommCount') === false);
+    check('10.14 Statistics cards use a responsive four-card grid', strpos($frHtml, 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4') !== false);
+    check('10.15 Petitions and legislative queue cards use tab counts', strpos($frHtml, 'Petitions in Queue') !== false && strpos($frHtml, "\$tabCounts['cases']") !== false && strpos($frHtml, 'Ordinances &amp; Resolutions') !== false && strpos($frHtml, '$legislativeQueueCount') !== false);
 }
 
 section('Group 11 — View: status-list/index.php has Petitions tab');

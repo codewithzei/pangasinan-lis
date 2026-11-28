@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="<?= BASE_URL ?>/public/assets/css/output.css">
 </head>
 
-<body class="font-poppins bg-gray-100">
+<body class="font-inter bg-gray-100">
 
     <div class="min-h-screen flex items-center justify-center px-6">
 

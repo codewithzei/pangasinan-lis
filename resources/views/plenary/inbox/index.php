@@ -304,7 +304,7 @@ $isOutcomeView = isset($outcomeTabs[$currentView]);
                             <th class="px-6 py-3 font-bold">Accepted By</th>
                             <th class="px-6 py-3 font-bold">Accepted At</th>
                         <?php endif; ?>
-                        <th class="px-6 py-3 text-right font-bold">Action</th>
+                        <th class="w-36 px-3 py-3 text-right font-bold">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -415,20 +415,22 @@ $isOutcomeView = isset($outcomeTabs[$currentView]);
                                         <?php endif; ?>
                                     </td>
                                 <?php endif; ?>
-                                <td class="px-6 py-4 text-right">
+                                <td class="w-36 px-3 py-4 text-right">
+                                    <div class="flex w-full justify-end">
                                     <a href="<?= BASE_URL ?>/plenary/inbox/show?id=<?= (int) $row['document_id'] ?>"
-                                       class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200
-                                              bg-white text-gray-500 hover:border-primary hover:bg-primary hover:text-white transition"
+                                       class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary hover:bg-blue-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                                        title="<?= $currentView === 'inbox' ? 'Process document' : 'View document' ?>"
                                        aria-label="<?= $currentView === 'inbox' ? 'Process document' : 'View document' ?>">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7
                                                      -1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
+                                        <span><?= $currentView === 'inbox' ? 'Process' : 'View' ?></span>
                                     </a>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -463,15 +465,6 @@ $isOutcomeView = isset($outcomeTabs[$currentView]);
                                     · <?= htmlspecialchars(date('g:i A', strtotime($row['time_received']))) ?>
                                 </p>
                             </div>
-                            <a href="<?= BASE_URL ?>/plenary/inbox/show?id=<?= (int) $row['document_id'] ?>"
-                               class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:border-primary hover:bg-primary hover:text-white"
-                               title="<?= $currentView === 'inbox' ? 'Process document' : 'View document' ?>"
-                               aria-label="<?= $currentView === 'inbox' ? 'Process document' : 'View document' ?>">
-                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                                </svg>
-                            </a>
                         </div>
                         <p class="mt-3 break-words text-sm font-medium text-gray-900"><?= htmlspecialchars($row['subject_matter']) ?></p>
                         <span class="mt-1.5 inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
@@ -502,6 +495,18 @@ $isOutcomeView = isset($outcomeTabs[$currentView]);
                                     <p class="mt-1 text-sm text-gray-700"><?= !empty($row['accepted_at']) ? htmlspecialchars(date('M j, Y g:i A', strtotime($row['accepted_at']))) : '—' ?></p>
                                 </div>
                             <?php endif; ?>
+                        </div>
+                        <div class="mt-4 flex justify-end border-t border-gray-100 pt-3">
+                            <a href="<?= BASE_URL ?>/plenary/inbox/show?id=<?= (int) $row['document_id'] ?>"
+                               class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary hover:bg-blue-50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                               title="<?= $currentView === 'inbox' ? 'Process document' : 'View document' ?>"
+                               aria-label="<?= $currentView === 'inbox' ? 'Process document' : 'View document' ?>">
+                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                                <span><?= $currentView === 'inbox' ? 'Process' : 'View' ?></span>
+                            </a>
                         </div>
                     </article>
                 <?php endforeach; ?>

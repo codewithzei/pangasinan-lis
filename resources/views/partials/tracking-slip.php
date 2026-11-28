@@ -121,7 +121,7 @@ $receiptAutoCheckRouting = $receiptAutoCheckRouting ?? true;
             break-inside: avoid;
             page-break-inside: avoid;
             color: #20242a;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: Inter, sans-serif;
         }
 
         .tracking-slip,
@@ -358,7 +358,7 @@ $receiptAutoCheckRouting = $receiptAutoCheckRouting ?? true;
         .tracking-slip-signature small {
             grid-column: 2;
             text-align: center;
-            font-family: cursive;
+            font-family: Inter, sans-serif;
             font-size: 5.5pt;
         }
 

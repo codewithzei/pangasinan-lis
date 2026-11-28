@@ -576,7 +576,7 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                         </p>
                     </div>
                 </div>
-                <form method="POST" action="<?= BASE_URL ?>/plenary/inbox/process" class="space-y-4">
+                <form id="sendPetitionsToFirstReadingForm" method="POST" action="<?= BASE_URL ?>/plenary/inbox/process" class="space-y-4">
                     <input type="hidden" name="document_id" value="<?= $documentId ?>">
                     <input type="hidden" name="action"      value="save_processing">
                     <div class="flex flex-col items-stretch gap-3 pt-1 sm:flex-row sm:items-center">
@@ -592,6 +592,82 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                         </button>
                     </div>
                 </form>
+                <div id="confirmSendPetitionsDialog"
+                     class="fixed inset-0 z-[9999] hidden items-center justify-center p-4"
+                     role="dialog" aria-modal="true" aria-labelledby="confirmSendPetitionsTitle">
+                    <button type="button" id="confirmSendPetitionsBackdrop"
+                            class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+                            aria-label="Close confirmation"></button>
+                    <div class="relative z-10 max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl
+                                border border-gray-100 bg-white shadow-2xl">
+                        <div class="p-6">
+                            <h3 id="confirmSendPetitionsTitle" class="text-lg font-semibold text-gray-900">
+                                Confirm Send to First Reading
+                            </h3>
+                            <p class="mt-2 text-sm leading-6 text-gray-600">
+                                This document will move directly to the <strong>First Reading → Petitions</strong> queue.
+                                No proposed number, authors, committees, or session type will be required at this stage.
+                            </p>
+                            <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                <button type="button" id="cancelSendPetitions"
+                                        class="inline-flex justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5
+                                               text-sm font-semibold text-gray-700 transition hover:bg-gray-50
+                                               focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2">
+                                    Cancel
+                                </button>
+                                <button type="button" id="confirmSendPetitions"
+                                        class="inline-flex justify-center rounded-xl bg-indigo-600 px-4 py-2.5
+                                               text-sm font-semibold text-white transition hover:bg-indigo-700
+                                               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                    Yes, Send to First Reading
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                    (function () {
+                        var form = document.getElementById('sendPetitionsToFirstReadingForm');
+                        var modal = document.getElementById('confirmSendPetitionsDialog');
+                        var cancelButton = document.getElementById('cancelSendPetitions');
+                        var confirmButton = document.getElementById('confirmSendPetitions');
+                        var backdrop = document.getElementById('confirmSendPetitionsBackdrop');
+
+                        if (!form || !modal || !cancelButton || !confirmButton || !backdrop) return;
+
+                        function closeModal() {
+                            modal.classList.add('hidden');
+                            modal.classList.remove('flex');
+                        }
+
+                        form.addEventListener('submit', function (event) {
+                            if (form.dataset.confirmed === 'true') return;
+                            event.preventDefault();
+                            modal.classList.remove('hidden');
+                            modal.classList.add('flex');
+                            confirmButton.focus();
+                        });
+
+                        cancelButton.addEventListener('click', function () {
+                            closeModal();
+                        });
+
+                        backdrop.addEventListener('click', closeModal);
+
+                        document.addEventListener('keydown', function (event) {
+                            if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                                closeModal();
+                            }
+                        });
+
+                        confirmButton.addEventListener('click', function () {
+                            form.dataset.confirmed = 'true';
+                            closeModal();
+                            form.requestSubmit();
+                            delete form.dataset.confirmed;
+                        });
+                    })();
+                </script>
             </section>
             <?php else: ?>
             <section class="rounded-2xl border border-violet-200 bg-white p-4 sm:p-6">

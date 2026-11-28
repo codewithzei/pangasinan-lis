@@ -6,7 +6,7 @@
 
 echo "<!DOCTYPE html>";
 echo "<html><head><title>Clear Cache</title>";
-echo "<style>body{font-family:Arial,sans-serif;max-width:600px;margin:50px auto;padding:20px;}.success{color:green;}.error{color:red;}.info{color:blue;}</style>";
+echo "<style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');body{font-family:Inter,sans-serif;max-width:600px;margin:50px auto;padding:20px;}.success{color:green;}.error{color:red;}.info{color:blue;}</style>";
 echo "</head><body>";
 echo "<h2>Cache Clearing Utility</h2>";
 

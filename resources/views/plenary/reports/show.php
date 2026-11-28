@@ -30,26 +30,30 @@ $disapprovedCount = count(array_filter($adoptions, static fn(array $item): bool 
 ob_start();
 ?>
 <div class="detail-page space-y-6">
-    <?php require __DIR__ . '/../../partials/source-information.php'; ?>
-    <a href="<?= BASE_URL ?>/plenary/reports"
-       class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary">
-        <span aria-hidden="true">←</span> Back to Plenary Reports
-    </a>
-
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-7 sm:px-8">
-            <p class="text-sm font-medium text-blue-100">PLENARY / LEGISLATIVE RECORDS / ADOPTED COMMITTEE REPORT</p>
-            <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                <?= htmlspecialchars($reportType) ?>
-                <?= !empty($report['report_number']) ? '#' . htmlspecialchars($report['report_number']) : ' #' . (int) $report['id'] ?>
-            </h1>
-            <p class="mt-2 text-sm text-blue-100">
-                <?= count($adoptions) ?> legislative document<?= count($adoptions) === 1 ? '' : 's' ?>
-                · <?= $approvedCount ?> proceeded to Second Reading
-                · <?= $disapprovedCount ?> adopted as report copy only
-            </p>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-56 w-56 rounded-full bg-white/10"></div>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex items-center gap-3 px-5 py-6 sm:px-8 sm:py-7">
+            <a href="<?= BASE_URL ?>/plenary/reports"
+               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+               aria-label="Back to Plenary Reports">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">ADOPTED COMMITTEE REPORT</p>
+                <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                    <?= htmlspecialchars($reportType) ?>
+                    <?= !empty($report['report_number']) ? '#' . htmlspecialchars($report['report_number']) : ' #' . (int) $report['id'] ?>
+                </h1>
+                <p class="mt-2 text-sm leading-6 text-blue-100">
+                    <?= count($adoptions) ?> legislative document<?= count($adoptions) === 1 ? '' : 's' ?>
+                    · <?= $approvedCount ?> proceeded to Second Reading
+                    · <?= $disapprovedCount ?> adopted as report copy only
+                </p>
+            </div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -85,13 +89,24 @@ ob_start();
                             <dd class="text-right text-gray-900"><?= htmlspecialchars($report['returned_by_name'] ?? '—') ?></dd>
                         </div>
                     <?php endif; ?>
-                    <?php if ($reportCommittees !== []): ?>
-                        <div class="border-t border-gray-100 pt-3">
-                            <dt class="text-gray-500">Reporting Committee<?= count($reportCommittees) === 1 ? '' : 's' ?></dt>
-                            <dd class="mt-1 font-medium text-gray-900"><?= htmlspecialchars(implode(', ', $reportCommittees)) ?></dd>
-                        </div>
-                    <?php endif; ?>
                 </dl>
+            </section>
+
+            <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Reporting Committee<?= count($reportCommittees) === 1 ? '' : 's' ?></h2>
+                <?php if ($reportCommittees !== []): ?>
+                    <ul class="mt-3 divide-y divide-gray-100">
+                        <?php foreach ($reportCommittees as $committeeName): ?>
+                            <li class="py-3 first:pt-0 last:pb-0">
+                                <p class="break-words text-sm font-medium text-gray-900"><?= htmlspecialchars($committeeName, ENT_QUOTES, 'UTF-8') ?></p>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <div class="mt-3 border-t border-gray-100 pt-3">
+                        <p class="text-sm text-gray-500">No reporting committees are listed for this report.</p>
+                    </div>
+                <?php endif; ?>
             </section>
 
             <section class="rounded-2xl border border-emerald-200 bg-white p-5">

@@ -819,14 +819,14 @@ class PlenaryReadingController
         if ($userId === null) { flash_set('error', 'You must be logged in.'); redirect('login'); }
 
         $tab    = trim($_GET['tab'] ?? 'in_committee');
-        if (!in_array($tab, ['in_committee', 'returned'], true)) {
+        $validTabs = ['in_committee', 'returned', 'remanded', 'withdrawn', 'noted'];
+        if (!in_array($tab, $validTabs, true)) {
             $tab = 'in_committee';
         }
         $search  = trim($_GET['search'] ?? '');
         $documentTypeId = max(0, (int) ($_GET['doc_type'] ?? 0));
         $page    = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 20;
-        $offset  = ($page - 1) * $perPage;
 
         $documentTypesStmt = $this->pdo->query("
             SELECT id, name
@@ -840,6 +840,11 @@ class PlenaryReadingController
         $returnedStatusId  = $this->requireStatusId('Returned to Plenary');
         $awaitingSecondId  = $this->requireStatusId('Awaiting Second Reading');
         $commReferredId    = $this->requireStatusId('Plenary Comm: Referred to Committee');
+        $outcomeStatusIds = [
+            'remanded'  => $this->requireStatusId('Remanded'),
+            'withdrawn' => $this->requireStatusId('Withdrawn'),
+            'noted'     => $this->requireStatusId('Noted'),
+        ];
 
         // Base: referred at Legislative First Reading (plenary_readings) OR
         //       at Comm First Reading (plenary_comm_first_reading) OR
@@ -882,11 +887,19 @@ class PlenaryReadingController
         if ($tab === 'returned') {
             $tabWhere  = " AND d.current_status_id = ? ";
             $tabParams = [$returnedStatusId];
+        } elseif (isset($outcomeStatusIds[$tab])) {
+            $tabWhere  = " AND d.current_status_id = ? ";
+            $tabParams = [$outcomeStatusIds[$tab]];
         } else {
-            // Still with the committee: not returned, not yet advanced to 2nd reading,
-            // and not in the comm-referred status (which means it's still with committee).
-            $tabWhere  = " AND d.current_status_id NOT IN (?, ?) ";
-            $tabParams = [$returnedStatusId, $awaitingSecondId];
+            // Keep documents with a recorded committee disposition in their own tabs.
+            $tabWhere  = " AND d.current_status_id NOT IN (?, ?, ?, ?, ?) ";
+            $tabParams = [
+                $returnedStatusId,
+                $awaitingSecondId,
+                $outcomeStatusIds['remanded'],
+                $outcomeStatusIds['withdrawn'],
+                $outcomeStatusIds['noted'],
+            ];
         }
 
         $whereExtra  = '';
@@ -910,6 +923,7 @@ class PlenaryReadingController
         $total      = (int) $countStmt->fetchColumn();
         $totalPages = $total > 0 ? (int) ceil($total / $perPage) : 1;
         $page       = min($page, $totalPages);
+        $offset     = ($page - 1) * $perPage;
 
         // ── List rows for the active tab ─────────────────────────────────────
         $listStmt = $this->pdo->prepare("
@@ -958,13 +972,13 @@ class PlenaryReadingController
                 (SELECT ab.username
                  FROM document_assignments da2
                  INNER JOIN user_accounts ab ON ab.id = da2.accepted_by
-                 WHERE da2.document_id = d.id AND da2.phase = 'PLENARY'
+                 WHERE da2.document_id = d.id AND da2.phase = d.current_phase
                    AND da2.decision = 'ACCEPTED' AND da2.completed_at IS NULL
                  ORDER BY da2.id DESC LIMIT 1) AS accepted_by_username,
                 (SELECT CONCAT_WS(' ', NULLIF(ui.first_name,''), NULLIF(ui.last_name,''))
                  FROM document_assignments da3
                  INNER JOIN user_info ui ON ui.user_account_id = da3.accepted_by
-                 WHERE da3.document_id = d.id AND da3.phase = 'PLENARY'
+                 WHERE da3.document_id = d.id AND da3.phase = d.current_phase
                    AND da3.decision = 'ACCEPTED' AND da3.completed_at IS NULL
                  ORDER BY da3.id DESC LIMIT 1) AS accepted_by_name
             FROM documents d
@@ -979,13 +993,19 @@ class PlenaryReadingController
         $listStmt->execute([...$tabParams, ...$whereParams, $perPage, $offset]);
         $documents = $listStmt->fetchAll();
 
-        // ── Tab counts (both tabs, ignoring search, for the nav badges) ───────
+        // ── Tab counts (ignoring search, for the nav badges) ─────────────────
         $countIn = $this->pdo->prepare("
             SELECT COUNT(*) FROM documents d
             WHERE {$baseWhere}
-              AND d.current_status_id NOT IN (?, ?)
+              AND d.current_status_id NOT IN (?, ?, ?, ?, ?)
         ");
-        $countIn->execute([$returnedStatusId, $awaitingSecondId]);
+        $countIn->execute([
+            $returnedStatusId,
+            $awaitingSecondId,
+            $outcomeStatusIds['remanded'],
+            $outcomeStatusIds['withdrawn'],
+            $outcomeStatusIds['noted'],
+        ]);
         $inCommitteeCount = (int) $countIn->fetchColumn();
 
         $countRet = $this->pdo->prepare("
@@ -995,6 +1015,25 @@ class PlenaryReadingController
         ");
         $countRet->execute([$returnedStatusId]);
         $returnedCount = (int) $countRet->fetchColumn();
+
+        $outcomeCounts = [];
+        $countOutcome = $this->pdo->prepare("
+            SELECT d.current_status_id, COUNT(*) AS total
+            FROM documents d
+            WHERE {$baseWhere}
+              AND d.current_status_id IN (?, ?, ?)
+            GROUP BY d.current_status_id
+        ");
+        $countOutcome->execute(array_values($outcomeStatusIds));
+        foreach ($countOutcome->fetchAll(PDO::FETCH_ASSOC) as $outcomeCount) {
+            $statusKey = array_search((int) $outcomeCount['current_status_id'], $outcomeStatusIds, true);
+            if ($statusKey !== false) {
+                $outcomeCounts[$statusKey] = (int) $outcomeCount['total'];
+            }
+        }
+        foreach ($outcomeStatusIds as $outcomeTab => $_statusId) {
+            $outcomeCounts[$outcomeTab] = $outcomeCounts[$outcomeTab] ?? 0;
+        }
 
         // Per-row flag: the "Proceed to 2nd Reading" OR "Adopt Committee Report" button
         // is available only after the committee workflow has actually returned the document.
@@ -1052,9 +1091,17 @@ class PlenaryReadingController
             $filter = 'pending';
         }
         $search  = trim($_GET['search'] ?? '');
+        $documentTypeId = max(0, (int) ($_GET['doc_type'] ?? 0));
         $page    = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 20;
-        $offset  = ($page - 1) * $perPage;
+
+        $documentTypesStmt = $this->pdo->query("
+            SELECT id, name
+            FROM document_types
+            WHERE is_active = 1 AND is_deleted = 0
+            ORDER BY name ASC
+        ");
+        $documentTypes = $documentTypesStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Map filter to status name(s)
         $statusMap = [
@@ -1087,6 +1134,10 @@ class PlenaryReadingController
                 $whereParams[] = "%{$search}%";
                 $whereParams[] = "%{$search}%";
             }
+            if ($documentTypeId > 0) {
+                $whereExtra .= " AND d.document_type_id = ?";
+                $whereParams[] = $documentTypeId;
+            }
 
             $countStmt = $this->pdo->prepare("
                 SELECT COUNT(*) FROM documents d
@@ -1096,6 +1147,7 @@ class PlenaryReadingController
             $total      = (int) $countStmt->fetchColumn();
             $totalPages = $total > 0 ? (int) ceil($total / $perPage) : 1;
             $page       = min($page, $totalPages);
+            $offset     = ($page - 1) * $perPage;
 
             $listStmt = $this->pdo->prepare("
                 SELECT
@@ -1178,6 +1230,8 @@ class PlenaryReadingController
         $events         = $this->fetchEvents($documentId);
         $firstReading   = $this->fetchReading($documentId, 1);
         $secondReading  = $this->fetchReading($documentId, 2);
+        $assignments    = $this->fetchAllAssignments($documentId);
+        $documentAttachments = $this->fetchDocumentAttachments($documentId);
         $secondReadingDetails = $secondReading
             ? $this->fetchSecondReadingDetails((int) $secondReading['id'])
             : null;
@@ -1466,7 +1520,6 @@ class PlenaryReadingController
         $search  = trim($_GET['search'] ?? '');
         $page    = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 20;
-        $offset  = ($page - 1) * $perPage;
 
         $approvedStatusId   = $this->requireStatusId('Second Reading Approved');
         $commFinalStatusId  = $this->requireStatusId('Plenary Comm: Finalized');
@@ -2962,9 +3015,13 @@ class PlenaryReadingController
         if (!in_array($tab, $validTabs, true)) { $tab = 'all'; }
 
         $search  = trim($_GET['search'] ?? '');
+        $sessionType = trim((string) ($_GET['session_type'] ?? ''));
+        $validSessionTypes = ['REGULAR', 'REGULAR_ONLINE', 'SPECIAL', 'SPECIAL_ONLINE'];
+        if (!in_array($sessionType, $validSessionTypes, true)) {
+            $sessionType = '';
+        }
         $page    = max(1, (int) ($_GET['page'] ?? 1));
         $perPage = 20;
-        $offset  = ($page - 1) * $perPage;
 
         // The queue status used for both legislative and communication documents
         $awaitingStatusId = $this->requireStatusId('Awaiting First Reading');
@@ -3003,8 +3060,22 @@ class PlenaryReadingController
             $searchParams[] = "%{$search}%";
         }
 
-        $whereParams = [...$baseParams, ...$typeParams, ...$searchParams];
-        $whereSql    = $baseWhere . $typeWhere . $searchWhere;
+        $sessionTypeWhere = '';
+        $sessionTypeParams = [];
+        if ($sessionType !== '') {
+            $sessionTypeWhere = "
+                AND EXISTS (
+                    SELECT 1
+                    FROM plenary_document_details pdd_filter
+                    WHERE pdd_filter.document_id = d.id
+                      AND pdd_filter.session_type = ?
+                )
+            ";
+            $sessionTypeParams[] = $sessionType;
+        }
+
+        $whereParams = [...$baseParams, ...$typeParams, ...$sessionTypeParams, ...$searchParams];
+        $whereSql    = $baseWhere . $typeWhere . $sessionTypeWhere . $searchWhere;
 
         $countStmt = $this->pdo->prepare("
             SELECT COUNT(*) AS cnt
@@ -3016,6 +3087,7 @@ class PlenaryReadingController
         $total      = (int) $countStmt->fetchColumn();
         $totalPages = $total > 0 ? (int) ceil($total / $perPage) : 1;
         $page       = min($page, $totalPages);
+        $offset     = ($page - 1) * $perPage;
 
         $listStmt = $this->pdo->prepare("
             SELECT
@@ -3044,9 +3116,6 @@ class PlenaryReadingController
 
         // Tab counts — no search filter applied
         $tabCounts = $this->fetchFirstReadingTabCounts($awaitingStatusId);
-
-        // Count for referred (in committee, awaiting return for comm flow)
-        $referredCommCount = $this->fetchReferredCommCount();
 
         // Count for petitions referred (in committee, awaiting return)
         $referredPetitionsCount = $this->fetchReferredPetitionsCount();
@@ -3077,8 +3146,8 @@ class PlenaryReadingController
         $plenaryDetails = $this->fetchPlenaryDetails($documentId);
         $committees     = $this->fetchCommittees($documentId);
         $docCommittees  = $this->fetchDocumentCommittees($documentId);
-        $categories     = $this->fetchCommunicationCategories();
         $events         = $this->fetchEvents($documentId);
+        $assignments    = $this->fetchAllAssignments($documentId);
         $documentAttachments = $this->fetchDocumentAttachments($documentId);
 
         $existingReading = $this->fetchCommFirstReading($documentId);
@@ -3104,6 +3173,8 @@ class PlenaryReadingController
         }
         $resubmissionReference = $this->docService->getResubmissionReference($documentId);
         $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'plenary/inbox';
+        $mfrDetailRoute = 'plenary/inbox';
 
         $pageTitle = 'Communication First Reading — ' . htmlspecialchars($document['tracking_number']);
         $old     = old_get();
@@ -3139,13 +3210,6 @@ class PlenaryReadingController
         }
 
         switch ($decision) {
-            case 'NOTED':
-                $categoryId = (int) ($_POST['communication_category_id'] ?? 0);
-                if ($categoryId <= 0) {
-                    $errors[] = 'A Communication Category is required for a Noted decision.';
-                }
-                break;
-
             case 'APPROVED':
                 $approvedSubjectMatter = trim($_POST['approved_subject_matter'] ?? '');
                 if ($approvedSubjectMatter === '') {
@@ -3241,17 +3305,7 @@ class PlenaryReadingController
             // Resolve decision-specific fields inside the transaction
             switch ($decision) {
                 case 'NOTED':
-                    $categoryId = (int) ($_POST['communication_category_id'] ?? 0);
-                    // Validate category exists
-                    $catRow = $this->pdo->prepare(
-                        "SELECT id FROM communication_categories
-                         WHERE id = ? AND is_active = 1 AND is_deleted = 0 LIMIT 1"
-                    );
-                    $catRow->execute([$categoryId]);
-                    if (!$catRow->fetch()) {
-                        throw new RuntimeException('Invalid Communication Category selected.');
-                    }
-                    $this->doCommFrNoted($documentId, $userId, $readingDate, $remarks, $categoryId);
+                    $this->doCommFrNoted($documentId, $userId, $readingDate, $remarks);
                     break;
 
                 case 'APPROVED':
@@ -3289,22 +3343,21 @@ class PlenaryReadingController
     // =========================================================================
 
     /**
-     * NOTED decision: set category, update status to "Plenary Comm: Noted",
+     * NOTED decision: update status to "Plenary Comm: Noted",
      * insert plenary_comm_first_reading record.
      */
     private function doCommFrNoted(
-        int $documentId, int $userId, string $readingDate, string $remarks, int $categoryId
+        int $documentId, int $userId, string $readingDate, string $remarks
     ): void {
         $notedStatusId = $this->requireStatusId('Plenary Comm: Noted');
 
         // Insert first reading record
         $this->pdo->prepare("
             INSERT INTO plenary_comm_first_reading
-                (document_id, decision, reading_date, remarks, communication_category_id,
-                 performed_by, finalized_at, finalized_by)
-            VALUES (?, 'NOTED', ?, ?, ?, ?, NOW(), ?)
+                (document_id, decision, reading_date, remarks, performed_by, finalized_at, finalized_by)
+            VALUES (?, 'NOTED', ?, ?, ?, NOW(), ?)
         ")->execute([
-            $documentId, $readingDate, $remarks ?: null, $categoryId, $userId, $userId,
+            $documentId, $readingDate, $remarks ?: null, $userId, $userId,
         ]);
 
         // Update document status
@@ -3322,7 +3375,6 @@ class PlenaryReadingController
             $documentId, 'PLENARY_COMM_FIRST_READING_NOTED',
             $userId, $notedStatusId, $remarks, [
             'decision'    => 'NOTED',
-            'category_id' => $categoryId,
             'reading_date' => $readingDate,
         ]);
 
@@ -3330,7 +3382,6 @@ class PlenaryReadingController
             'action'        => 'plenary_comm_fr_noted',
             'decision'      => 'NOTED',
             'reading_date'  => $readingDate,
-            'category_id'   => $categoryId,
         ], "Plenary Comm First Reading (NOTED) recorded for document ID {$documentId}");
     }
 
@@ -3806,19 +3857,6 @@ class PlenaryReadingController
     }
 
     /**
-     * Fetch active communication_categories for select dropdowns.
-     */
-    private function fetchCommunicationCategories(): array
-    {
-        return $this->pdo->query("
-            SELECT id, name
-            FROM communication_categories
-            WHERE is_active = 1 AND is_deleted = 0
-            ORDER BY sort_order ASC, name ASC
-        ")->fetchAll();
-    }
-
-    /**
      * Build the tab WHERE condition and parameters for the First Reading list.
      * Returns [whereClause, params].
      */
@@ -3910,27 +3948,6 @@ class PlenaryReadingController
         $counts['all'] = array_sum($counts);
 
         return $counts;
-    }
-
-    /**
-     * Count Communication documents referred to Committee at Plenary FR
-     * that have not yet been finalized or adopted.
-     */
-    private function fetchReferredCommCount(): int
-    {
-        $returnedStatusId = $this->requireStatusId('Returned to Plenary');
-        $referredStatusId = $this->requireStatusId('Plenary Comm: Referred to Committee');
-
-        $stmt = $this->pdo->prepare("
-            SELECT COUNT(*) FROM documents d
-            INNER JOIN plenary_comm_first_reading pcfr
-                ON pcfr.document_id = d.id AND pcfr.decision = 'REFER_TO_COMMITTEE'
-            LEFT JOIN plenary_comm_adoptions pca ON pca.document_id = d.id
-            WHERE pca.id IS NULL
-              AND d.current_status_id IN (?, ?)
-        ");
-        $stmt->execute([$referredStatusId, $returnedStatusId]);
-        return (int) $stmt->fetchColumn();
     }
 
     /**
@@ -4422,6 +4439,7 @@ class PlenaryReadingController
         $committees      = $this->fetchCommittees($documentId);
         $docCommittees   = $this->fetchDocumentCommittees($documentId);
         $events          = $this->fetchEvents($documentId);
+        $assignments     = $this->fetchAllAssignments($documentId);
         $documentAttachments = $this->fetchDocumentAttachments($documentId);
         $existingReading = $this->fetchCasesFirstReading($documentId);
 
@@ -4447,6 +4465,8 @@ class PlenaryReadingController
         }
         $resubmissionReference = $this->docService->getResubmissionReference($documentId);
         $relatedResubmissions = $this->docService->getRelatedResubmissions($documentId);
+        $resubmissionDetailRoute = 'plenary/inbox';
+        $mfrDetailRoute = 'plenary/inbox';
 
         $pageTitle = 'Petitions First Reading — ' . htmlspecialchars($document['tracking_number']);
         $old     = old_get();

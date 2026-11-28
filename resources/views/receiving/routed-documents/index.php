@@ -133,6 +133,19 @@ function formatPhaseName(string $phase): string
         $responsiveInboxLabels = ['Tracking Number', 'Subject Matter / Document Type', 'Status', 'Division', 'Action'];
         require __DIR__ . '/../../partials/responsive-inbox-table.php';
         ?>
+        <style>
+            @media (max-width: 1279px) {
+                #receiving-routed-list .inbox-responsive-table tbody > tr:not(.inbox-empty-row) > td:last-child {
+                    position: static;
+                    display: flex;
+                    width: 100%;
+                    margin-top: 0.25rem;
+                    padding: 0.75rem 0 0;
+                    justify-content: flex-end;
+                    border-top: 1px solid #f3f4f6;
+                }
+            }
+        </style>
         <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <div>
                 <h2 class="font-semibold text-gray-900">Documents List</h2>
@@ -296,12 +309,13 @@ function formatPhaseName(string $phase): string
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <a href="<?= BASE_URL ?>/receiving/routed-documents/show?id=<?= $doc['id'] ?>"
-                                       class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:border-primary hover:bg-primary hover:text-white"
+                                       class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary hover:bg-blue-50 hover:text-primary"
                                        title="View Details" aria-label="View routed document details">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                         </svg>
+                                        <span>View</span>
                                     </a>
                                 </td>
                             </tr>

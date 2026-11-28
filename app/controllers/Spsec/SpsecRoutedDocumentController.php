@@ -296,8 +296,7 @@ class SpsecRoutedDocumentController
                 cc.name            AS communication_category_name,
                 creator.username   AS created_by_username,
                 updater.username   AS updated_by_username,
-                owner.username     AS current_owner_username,
-                comm.name          AS committee_name
+                owner.username     AS current_owner_username
             FROM documents d
             LEFT JOIN document_types          dt      ON d.document_type_id          = dt.id
             LEFT JOIN document_statuses       ds      ON d.current_status_id         = ds.id
@@ -309,8 +308,6 @@ class SpsecRoutedDocumentController
             LEFT JOIN user_accounts           creator ON d.created_by                = creator.id
             LEFT JOIN user_accounts           updater ON d.updated_by                = updater.id
             LEFT JOIN user_accounts           owner   ON d.current_owner_user_id      = owner.id
-            LEFT JOIN document_committees     dc      ON dc.document_id              = d.id
-            LEFT JOIN committees              comm    ON comm.id                     = dc.committee_id
             WHERE d.id = ?
             LIMIT 1
         ");
@@ -321,6 +318,39 @@ class SpsecRoutedDocumentController
             flash_set('error', 'Document not found.');
             redirect('spsec/routed');
         }
+
+        $authorsStmt = $this->pdo->prepare("
+            SELECT
+                da.sp_member_id,
+                da.author_role,
+                da.sort_order,
+                pdd.authors_all,
+                pdd.co_authors_all,
+                sm.position AS member_position,
+                TRIM(CONCAT_WS(' ',
+                    sm.first_name,
+                    COALESCE(NULLIF(TRIM(sm.middle_name), ''), NULL),
+                    sm.last_name,
+                    COALESCE(NULLIF(TRIM(sm.suffix), ''), NULL)
+                )) AS full_name
+            FROM document_authors da
+            INNER JOIN sp_members sm ON sm.sp_member_id = da.sp_member_id
+            LEFT JOIN plenary_document_details pdd ON pdd.document_id = da.document_id
+            WHERE da.document_id = ?
+            ORDER BY da.author_role ASC, da.sort_order ASC
+        ");
+        $authorsStmt->execute([$documentId]);
+        $authors = $this->markAllSelectedAuthorGroups($authorsStmt->fetchAll());
+
+        $committeesStmt = $this->pdo->prepare("
+            SELECT dc.committee_id, c.name AS committee_name
+            FROM document_committees dc
+            LEFT JOIN committees c ON c.id = dc.committee_id
+            WHERE dc.document_id = ?
+            ORDER BY c.name ASC, dc.id ASC
+        ");
+        $committeesStmt->execute([$documentId]);
+        $committees = $committeesStmt->fetchAll();
 
         // Route history
         $routeStmt = $this->pdo->prepare("
@@ -410,6 +440,40 @@ class SpsecRoutedDocumentController
         $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
 
         require __DIR__ . '/../../../resources/views/spsec/routed/show.php';
+    }
+
+    private function markAllSelectedAuthorGroups(array $authors): array
+    {
+        if ($authors === []) {
+            return [];
+        }
+
+        $activeSpMemberIds = array_map(
+            'intval',
+            $this->pdo->query("
+                SELECT sp_member_id
+                FROM sp_members
+                WHERE is_active = 1 AND is_deleted = 0
+            ")->fetchAll(PDO::FETCH_COLUMN)
+        );
+        $selectedByRole = [];
+
+        foreach ($authors as $author) {
+            $selectedByRole[$author['author_role']][] = (int) $author['sp_member_id'];
+        }
+
+        foreach ($authors as &$author) {
+            $allFlag = $author['author_role'] === 'AUTHOR' ? 'authors_all' : 'co_authors_all';
+            $selectedMemberIds = $selectedByRole[$author['author_role']] ?? [];
+            $author['is_all_selected'] = !empty($author[$allFlag])
+                || (
+                    !empty($activeSpMemberIds)
+                    && array_diff($activeSpMemberIds, $selectedMemberIds) === []
+                );
+        }
+        unset($author);
+
+        return $authors;
     }
 
     // =========================================================================

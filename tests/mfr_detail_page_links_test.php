@@ -135,8 +135,8 @@ $applicableViews = [
     'committee/communications/show.php'     => 'committee/communications',
     'plenary/inbox/show.php'                => 'plenary/inbox',
     'plenary/petitions/show.php'            => 'plenary/petitions',
-    'plenary/cases-first-reading/show.php'  => 'plenary/cases-first-reading',
-    'plenary/comm-first-reading/show.php'   => 'plenary/comm-first-reading',
+    'plenary/cases-first-reading/show.php'  => 'plenary/inbox',
+    'plenary/comm-first-reading/show.php'   => 'plenary/inbox',
     'plenary/status-list/show.php'          => 'plenary/status-list',
 ];
 
@@ -229,7 +229,19 @@ foreach ($applicableViews as $viewRelPath => $expectedRoute) {
     // Check $mfrDetailRoute is set before the require
     // Allow for either the exact expected route or any route string
     $hasDetailRoute = str_contains($src, '$mfrDetailRoute');
+    if ($viewRelPath === 'plenary/cases-first-reading/show.php') {
+        $controller = file_get_contents($root . '/app/controllers/Plenary/PlenaryReadingController.php');
+        $hasDetailRoute = $controller !== false
+            && str_contains($controller, "\$mfrDetailRoute = '{$expectedRoute}';");
+    }
     ok("1c: sets \$mfrDetailRoute — {$viewRelPath}", $hasDetailRoute);
+    if ($viewRelPath === 'plenary/comm-first-reading/show.php') {
+        ok(
+            '1c: Communication First Reading links related documents to full Plenary details',
+            str_contains($src, "\$mfrDetailRoute = '{$expectedRoute}';")
+                && str_contains($src, "\$resubmissionDetailRoute = '{$expectedRoute}';")
+        );
+    }
 
     $partialPosition = strpos($src, 'mfr-relationship.php');
     $pageTitleEnd = strpos($src, '</h1>');

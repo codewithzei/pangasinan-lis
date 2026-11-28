@@ -2,6 +2,8 @@
 ob_start();
 
 $document    = $document    ?? [];
+$authors     = $authors     ?? [];
+$committees  = $committees  ?? [];
 $attachments    = $attachments    ?? [];
 $routes         = $routes         ?? [];
 $assignments    = $assignments    ?? [];
@@ -57,39 +59,30 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
 
     <!-- ── Header ────────────────────────────────────────────────────────────── -->
-    <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
-            <div class="relative z-10">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="flex min-w-0 items-center gap-3">
-                        <a href="<?= BASE_URL ?>/spsec/routed"
-                           aria-label="Back to Routed Documents"
-                           class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition">
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                            </svg>
-                        </a>
-                        <div class="min-w-0">
-                            <p class="text-sm font-medium text-blue-100">DOCUMENT DETAILS</p>
-                            <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                                <?= htmlspecialchars($document['tracking_number'] ?? '') ?>
-                            </h1>
-                            <p class="mt-1 text-sm text-blue-100">
-                                <?= htmlspecialchars($pageSubtitle) ?>
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3 shrink-0">
-                        <!-- Current phase badge -->
-                        <span class="inline-flex items-center rounded-xl bg-white/10 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
-                            <?= htmlspecialchars(spsec_formatPhaseName($document['current_phase'] ?? '')) ?>
-                        </span>
-                    </div>
+    <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
+        <div class="relative z-10 flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-center sm:px-8 sm:py-7">
+            <div class="flex min-w-0 flex-1 items-center gap-3">
+                <a href="<?= BASE_URL ?>/spsec/routed"
+                   aria-label="Back to Routed Documents"
+                   class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white
+                          transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">DOCUMENT DETAILS</p>
+                    <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                        <?= htmlspecialchars($document['tracking_number'] ?? '') ?>
+                    </h1>
+                    <p class="mt-1 text-sm text-blue-100">
+                        <?= htmlspecialchars($pageSubtitle) ?>
+                    </p>
                 </div>
             </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
 
     <?php
@@ -160,20 +153,6 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                             <?= htmlspecialchars(spsec_formatPhaseName($document['current_phase'] ?? '')) ?>
                         </span>
                     </div>
-
-                    <?php if (!empty($document['committee_name'])): ?>
-                    <div>
-                        <p class="text-xs font-medium text-gray-500">Assigned Committee</p>
-                        <span class="mt-1 inline-flex items-center gap-1 rounded-lg border border-amber-200
-                                     bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 100-8 4 4 0 000 8z"/>
-                            </svg>
-                            <?= htmlspecialchars($document['committee_name']) ?>
-                        </span>
-                    </div>
-                    <?php endif; ?>
 
                     <?php if (!empty($document['communication_category_name'])): ?>
                     <div>
@@ -265,6 +244,87 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                     </div>
                     <?php endif; ?>
                 </div>
+            </section>
+
+            <!-- Authors -->
+            <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Authors &amp; Sponsors</h2>
+                <?php if (!empty($authors)): ?>
+                    <div class="mt-5 space-y-5">
+                        <?php foreach ([
+                            ['AUTHOR', 'Authors / Sponsors', 'Author'],
+                            ['CO_AUTHOR', 'Co-authors / Co-sponsors', 'Co-Author'],
+                        ] as [$role, $groupLabel, $roleLabel]): ?>
+                            <?php
+                            $roleAuthors = array_values(array_filter(
+                                $authors,
+                                static fn(array $author): bool => $author['author_role'] === $role
+                            ));
+                            ?>
+                            <?php if (!empty($roleAuthors)): ?>
+                                <div>
+                                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                        <?= htmlspecialchars($groupLabel) ?>
+                                    </p>
+                                    <div class="space-y-2">
+                                        <?php if (!empty($roleAuthors[0]['is_all_selected'])): ?>
+                                            <div class="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                                                <div class="min-w-0">
+                                                    <p class="text-sm font-semibold text-gray-900">All</p>
+                                                </div>
+                                                <span class="ml-auto inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold <?= $role === 'CO_AUTHOR' ? 'bg-purple-50 text-purple-700' : 'bg-blue-50 text-blue-700' ?>">
+                                                    <?= htmlspecialchars($roleLabel) ?>
+                                                </span>
+                                            </div>
+                                        <?php else: ?>
+                                            <?php foreach ($roleAuthors as $rank => $author): ?>
+                                                <div class="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                                                    <span class="shrink-0 pt-0.5 text-xs font-semibold text-gray-500"><?= $rank + 1 ?>.</span>
+                                                    <div class="min-w-0">
+                                                        <p class="truncate text-sm font-semibold text-gray-900">
+                                                            <?= htmlspecialchars($author['full_name']) ?>
+                                                        </p>
+                                                        <?php if (!empty($author['member_position'])): ?>
+                                                            <p class="text-xs text-gray-500"><?= htmlspecialchars($author['member_position']) ?></p>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/50 p-4">
+                        <svg class="h-5 w-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        <p class="text-sm text-gray-400 italic">No authors have been assigned to this document.</p>
+                    </div>
+                <?php endif; ?>
+            </section>
+
+            <!-- Committees -->
+            <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
+                <h2 class="text-lg font-semibold text-gray-900">Committees</h2>
+                <?php if (!empty($committees)): ?>
+                    <ul class="mt-3 divide-y divide-gray-100">
+                        <?php foreach ($committees as $committee): ?>
+                            <li class="py-3 first:pt-0 last:pb-0">
+                                <p class="break-words text-sm font-medium text-gray-900">
+                                    <?= htmlspecialchars($committee['committee_name'] ?? '—') ?>
+                                </p>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <div class="mt-3 border-t border-gray-100 pt-3">
+                        <p class="text-sm text-gray-500">No committees have been assigned to this document.</p>
+                    </div>
+                <?php endif; ?>
             </section>
 
             <!-- Assignments History ───────────────────────────────────────────── -->

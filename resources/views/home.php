@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
-<body class="font-poppins bg-gray-50 text-gray-800 flex flex-col min-h-screen">
+<body class="font-inter bg-gray-50 text-gray-800 flex flex-col min-h-screen">
 
     <!-- Navigation Header -->
     <header class="bg-white border-b border-gray-200 sticky top-0 z-50">

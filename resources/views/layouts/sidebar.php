@@ -13,6 +13,8 @@ if ($currentRoute === 'admin/inbox/show' && ($_GET['from'] ?? '') === 'noted') {
     $currentRoute = 'admin/noted-documents';
 } elseif ($currentRoute === 'spsec/inbox/show' && ($_GET['from'] ?? '') === 'noted') {
     $currentRoute = 'spsec/noted-documents';
+} elseif (in_array($currentRoute, ['plenary/cases-first-reading/show', 'plenary/comm-first-reading/show'], true)) {
+    $currentRoute = 'plenary/first-reading';
 }
 
 function isActiveNav(string $prefix, string $current): string

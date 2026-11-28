@@ -27,7 +27,7 @@ $pageTitle = $pageTitle ?? APP_SHORT_NAME;
 
 </head>
 
-<body class="font-poppins bg-gray-50 text-gray-800">
+<body class="font-inter bg-gray-50 text-gray-800">
 
     <?php require __DIR__ . '/sidebar.php'; ?>
 
