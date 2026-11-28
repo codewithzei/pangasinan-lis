@@ -72,7 +72,6 @@ $displayStatusBadgeColor = $document['status_badge_color'] ?? '#6B7280';
 $canEditPreDecision   = $canProcess && !$isTerminalOutcome;
 $canSaveProcessing    = $canProcess && $isOnProcess && !$isTerminalOutcome;
 $canSubmitCompliance  = $canProcess && $isDeferred && !$isTerminalOutcome;
-$canReturnToAdmin     = $canProcess && !$isTerminalOutcome;
 
 // Session type labels
 $sessionTypeLabels = [
@@ -147,7 +146,7 @@ ob_start();
 <div class="detail-page flex min-w-0 flex-col space-y-5 sm:space-y-6">
     <!-- Back + Page header --------------------------------------------------->
     <section class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative z-10 flex items-center gap-3 px-5 py-6 sm:px-8 sm:py-7">
+        <div class="relative z-10 flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-center sm:px-8 sm:py-7">
             <a href="<?= BASE_URL ?>/plenary/inbox"
                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white
                       transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
@@ -156,7 +155,7 @@ ob_start();
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
             </a>
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">DOCUMENT DETAILS</p>
                 <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl"><?= htmlspecialchars($trackingNumber) ?></h1>
             </div>
@@ -199,7 +198,7 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
 
     <section class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6">
         <h2 class="mb-4 text-base font-semibold text-gray-900">Document Information</h2>
-        <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+        <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
                 <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Tracking Number</dt>
                 <dd class="mt-1 font-mono text-sm font-medium text-gray-900">
@@ -253,7 +252,7 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                     <?= htmlspecialchars($document['source_type_name'] ?? '—') ?>
                 </dd>
             </div>
-            <div class="sm:col-span-2 lg:col-span-3">
+            <div class="sm:col-span-2">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Subject Matter</dt>
                 <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap leading-6"><?= escape_trimmed_text($document['subject_matter'] ?? '—') ?></dd>
             </div>
@@ -264,7 +263,7 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                 </div>
             <?php endif; ?>
             <?php if (!empty($document['remarks'])): ?>
-                <div class="sm:col-span-2 lg:col-span-3">
+                <div class="sm:col-span-2">
                     <dt class="text-xs font-semibold uppercase tracking-wide text-gray-400">Remarks</dt>
                     <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap leading-6"><?= escape_trimmed_text($document['remarks']) ?></dd>
                 </div>
@@ -1269,42 +1268,6 @@ require __DIR__ . '/../../partials/mfr-relationship.php';
                 </section>
             <?php endif; ?>
         <?php endif; ?>
-
-        <!-- ─────────────────────────────────────────────────────────────────── -->
-        <!-- Section 5: Return to Admin                                         -->
-        <!-- ─────────────────────────────────────────────────────────────────── -->
-        <section class="rounded-2xl border border-red-100 bg-red-50 p-4 sm:p-6">
-            <h2 class="mb-3 text-base font-semibold text-red-900">Return to Admin</h2>
-            <p class="mb-4 text-sm text-red-700">
-                This will return the document to the Admin inbox. A reason is required.
-                All processing data entered above will be preserved.
-            </p>
-            <form method="POST" action="<?= BASE_URL ?>/plenary/inbox/process" class="space-y-3">
-                <input type="hidden" name="document_id" value="<?= $documentId ?>">
-                <input type="hidden" name="action"      value="return_to_admin">
-                <div>
-                    <label for="return_remarks" class="block text-sm font-medium text-red-800 mb-1">
-                        Reason <span class="text-red-500">*</span>
-                    </label>
-                    <textarea id="return_remarks" name="remarks" rows="2" required
-                              class="w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-sm
-                                     text-gray-800 placeholder-gray-400 focus:border-red-400 focus:outline-none
-                                     focus:ring-2 focus:ring-red-400/20"
-                              placeholder="Reason for returning to Admin…"></textarea>
-                </div>
-                <button type="submit"
-                        onclick="return confirm('Return this document to Admin? This action cannot be undone.')"
-                        class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-300 bg-white
-                               px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 transition
-                               focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 sm:w-auto">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
-                    </svg>
-                    Return to Admin
-                </button>
-            </form>
-        </section>
 
     <?php endif; /* end $canEditPreDecision ($canProcess && !terminal) */ ?>
 

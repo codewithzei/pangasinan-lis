@@ -50,6 +50,7 @@ $mfrLink        = $mfrLink        ?? null;
 $relatedMotions = $relatedMotions ?? [];
 $mfrDetailRoute = rtrim($mfrDetailRoute ?? 'admin/inbox', '/');
 $mfrDetailAction = $mfrDetailAction ?? 'show';
+$mfrDetailQuery = (string) ($mfrDetailQuery ?? '');
 $mfrRelationshipTopMargin = $mfrRelationshipTopMargin ?? 'mt-6';
 
 // ── Nothing to show? Exit immediately ─────────────────────────────────────────
@@ -100,7 +101,7 @@ if (empty($mfrLink) && empty($relatedMotions)) {
 
         <div>
             <p class="text-xs font-medium text-gray-500">Tracking Number</p>
-            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($mfrLink['ref_id'] ?? $mfrLink['referenced_document_id'] ?? 0) ?>"
+            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($mfrLink['ref_id'] ?? $mfrLink['referenced_document_id'] ?? 0) ?><?= htmlspecialchars($mfrDetailQuery) ?>"
                class="mt-1 text-sm font-semibold text-primary hover:underline">
                 <?= htmlspecialchars($mfrLink['ref_tracking_number'] ?? '—') ?>
             </a>
@@ -171,7 +172,7 @@ if (empty($mfrLink) && empty($relatedMotions)) {
     </div><!-- /grid -->
 
     <div class="mt-4">
-        <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($mfrLink['ref_id'] ?? $mfrLink['referenced_document_id'] ?? 0) ?>"
+        <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($mfrLink['ref_id'] ?? $mfrLink['referenced_document_id'] ?? 0) ?><?= htmlspecialchars($mfrDetailQuery) ?>"
            class="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-50 transition">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -208,7 +209,7 @@ if (empty($mfrLink) && empty($relatedMotions)) {
         <div class="rounded-xl border border-purple-200 bg-white p-4">
             <div class="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                    <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($motion['mfr_document_id'] ?? 0) ?>"
+                    <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($motion['mfr_document_id'] ?? 0) ?><?= htmlspecialchars($mfrDetailQuery) ?>"
                        class="text-sm font-semibold text-primary hover:underline">
                         <?= htmlspecialchars($motion['mfr_tracking_number'] ?? '—') ?>
                     </a>
@@ -247,7 +248,7 @@ if (empty($mfrLink) && empty($relatedMotions)) {
                 <?php endif; ?>
             </div>
 
-            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($motion['mfr_document_id'] ?? 0) ?>"
+            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($mfrDetailRoute) ?>/<?= htmlspecialchars($mfrDetailAction) ?>?id=<?= (int) ($motion['mfr_document_id'] ?? 0) ?><?= htmlspecialchars($mfrDetailQuery) ?>"
                class="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium">
                 View Motion
                 <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

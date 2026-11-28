@@ -117,6 +117,7 @@ function normalizeTimeForInput(?string $time): string {
         </div>
     <?php endif; ?>
 
+<?php if (!$isAccepted): ?>
     <!-- Accept action -->
     <section class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
         <div class="flex items-start gap-4">
@@ -148,6 +149,7 @@ function normalizeTimeForInput(?string $time): string {
             </div>
         </div>
     </section>
+<?php endif; ?>
 
     <!-- Document Info Card -->
     <?php

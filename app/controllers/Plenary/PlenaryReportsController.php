@@ -116,7 +116,9 @@ class PlenaryReportsController
                    d.id AS document_id, d.tracking_number, d.subject_matter,
                    d.date_received, d.current_phase,
                    dt.name AS document_type_name,
+                   dt.badge_color AS document_type_badge_color,
                    ds.name AS document_status,
+                   ds.badge_color AS document_status_badge_color,
                    pdd.proposed_number, pdd.session_type, pdd.target_first_reading_date,
                    (SELECT pr.reading_date
                     FROM plenary_readings pr
@@ -194,13 +196,16 @@ class PlenaryReportsController
             return;
         }
 
+        $lineageDocumentIds = (new DocumentService($this->pdo))->getResubmissionLineageDocumentIds($documentId);
+        $lineagePlaceholders = implode(',', array_fill(0, count($lineageDocumentIds), '?'));
         $membershipStmt = $this->pdo->prepare("
             SELECT 1
             FROM plenary_committee_report_adoptions
-            WHERE committee_report_id = ? AND document_id = ?
+            WHERE committee_report_id = ?
+              AND document_id IN ({$lineagePlaceholders})
             LIMIT 1
         ");
-        $membershipStmt->execute([$reportId, $documentId]);
+        $membershipStmt->execute(array_merge([$reportId], $lineageDocumentIds));
         if (!$membershipStmt->fetchColumn()) {
             flash_set('error', 'This document is not part of the selected adopted Committee Report.');
             redirect('plenary/reports/show?id=' . $reportId);
@@ -328,6 +333,26 @@ class PlenaryReportsController
         $routesStmt->execute([$documentId]);
         $routes = $routesStmt->fetchAll(PDO::FETCH_ASSOC);
 
+        $assignmentsStmt = $this->pdo->prepare("
+            SELECT
+                da.*,
+                r.name AS role_name,
+                assigned.username AS assigned_to_username,
+                assigner.username AS assigned_by_username,
+                accepted.username AS accepted_by_username,
+                CONCAT(COALESCE(accepted_info.first_name, ''), ' ', COALESCE(accepted_info.last_name, '')) AS accepted_by_fullname
+            FROM document_assignments da
+            LEFT JOIN roles r ON r.id = da.assigned_to_role_id
+            LEFT JOIN user_accounts assigned ON assigned.id = da.assigned_to_user_id
+            LEFT JOIN user_accounts assigner ON assigner.id = da.assigned_by
+            LEFT JOIN user_accounts accepted ON accepted.id = da.accepted_by
+            LEFT JOIN user_info accepted_info ON accepted_info.user_account_id = accepted.id
+            WHERE da.document_id = ?
+            ORDER BY da.created_at ASC, da.id ASC
+        ");
+        $assignmentsStmt->execute([$documentId]);
+        $assignments = $assignmentsStmt->fetchAll(PDO::FETCH_ASSOC);
+
         $checklistStmt = $this->pdo->prepare("
             SELECT dci.id, dci.is_completed, dci.completed_at,
                    c.name AS checklist_name,
@@ -346,7 +371,12 @@ class PlenaryReportsController
         $documentEvents = $docService->getDocumentEvents($documentId);
         $resubmissionReference = $docService->getResubmissionReference($documentId);
         $relatedResubmissions = $docService->getRelatedResubmissions($documentId);
-        $resubmissionDetailRoute = 'plenary/inbox';
+        $resubmissionDetailRoute = 'plenary/reports';
+        $resubmissionDetailAction = 'document-show';
+        $resubmissionDetailQuery = '&report_id=' . $reportId;
+        $mfrDetailRoute = 'plenary/reports';
+        $mfrDetailAction = 'document-show';
+        $mfrDetailQuery = '&report_id=' . $reportId;
         $mfrLink = null;
         $relatedMotions = [];
         $showMfrRelationship = false;

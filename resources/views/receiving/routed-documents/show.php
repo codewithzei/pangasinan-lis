@@ -4,6 +4,7 @@ ob_start();
 $document = $document ?? [];
 $authors = $authors ?? [];
 $committees = $committees ?? [];
+$assignments = $assignments ?? [];
 $showAssignmentDetails = $showAssignmentDetails ?? false;
 $attachments = $attachments ?? [];
 $routes = $routes ?? [];
@@ -48,27 +49,25 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
 
     <?php if (!$renderAsPartial): ?>
     <section class="overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-indigo-700 shadow-md">
-        <div class="relative px-6 py-8 sm:px-8">
+        <div class="relative z-10 flex flex-col gap-5 px-5 py-6 sm:flex-row sm:items-center sm:px-8 sm:py-7">
             <div class="relative z-10">
-                <div class="flex items-center gap-3">
-                        <a href="<?= htmlspecialchars($detailBackUrl) ?>"
-                              aria-label="<?= htmlspecialchars($detailBackLabel) ?>"
-                       class="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white/20 transition">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                    </a>
-                    <div>
-                        <p class="text-sm font-medium text-blue-100">DOCUMENT DETAILS</p>
-                        <h1 class="mt-1 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                            <?= htmlspecialchars($pageSubtitle) ?>
-                        </h1>
-                    </div>
-                </div>
+                <a href="<?= htmlspecialchars($detailBackUrl) ?>"
+                   aria-label="<?= htmlspecialchars($detailBackLabel) ?>"
+                   class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
             </div>
-            <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
-            <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">DOCUMENT DETAILS</p>
+                <h1 class="mt-1 break-words text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                    <?= htmlspecialchars($pageSubtitle) ?>
+                </h1>
+            </div>
         </div>
+        <div class="pointer-events-none absolute -right-10 -top-20 h-64 w-64 rounded-full bg-white/10"></div>
+        <div class="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-white/5"></div>
     </section>
     <?php endif; ?>
 
@@ -95,56 +94,49 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
             <section class="rounded-2xl border border-gray-200 bg-white p-6">
                 <h2 class="text-lg font-semibold text-gray-900">Document Information</h2>
                 
-                <div class="mt-4 space-y-4">
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <p class="text-xs font-medium text-gray-500">Tracking Number</p>
-                            <p class="mt-1 text-sm font-semibold text-gray-900"><?= htmlspecialchars($document['tracking_number']) ?></p>
-                        </div>
-                        <div>
-                            <p class="text-xs font-medium text-gray-500">Date & Time Received</p>
-                            <p class="mt-1 text-sm text-gray-900">
-                                <?= htmlspecialchars(date('F j, Y', strtotime($document['date_received']))) ?> at 
-                                <?= htmlspecialchars(date('g:i A', strtotime($document['time_received']))) ?>
-                            </p>
-                        </div>
-                    </div>
-
+                <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                        <p class="text-xs font-medium text-gray-500">Subject Matter</p>
-                        <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap"><?= escape_trimmed_text($document['subject_matter']) ?></p>
+                        <p class="text-xs font-medium text-gray-500">Tracking Number</p>
+                        <p class="mt-1 text-sm font-semibold text-gray-900"><?= htmlspecialchars($document['tracking_number']) ?></p>
                     </div>
-
+                    <div>
+                        <p class="text-xs font-medium text-gray-500">Date & Time Received</p>
+                        <p class="mt-1 text-sm text-gray-900">
+                            <?= htmlspecialchars(date('F j, Y', strtotime($document['date_received']))) ?> at
+                            <?= htmlspecialchars(date('g:i A', strtotime($document['time_received']))) ?>
+                        </p>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <p class="text-xs font-medium text-gray-500">Subject Matter</p>
+                        <p class="mt-1 whitespace-pre-wrap text-sm text-gray-900"><?= escape_trimmed_text($document['subject_matter']) ?></p>
+                    </div>
                     <div>
                         <p class="text-xs font-medium text-gray-500">Document Type</p>
                         <span class="mt-1 inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
                               style="background-color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>1a;
                                      color: <?= htmlspecialchars($document['document_type_badge_color'] ?? '#2563EB') ?>;">
-                            <?= htmlspecialchars($document['document_type_name']) ?>
+                            <?= htmlspecialchars($document['document_type_name'] ?? '—') ?>
                         </span>
                     </div>
-
                     <div>
                         <p class="text-xs font-medium text-gray-500">Current Status</p>
                         <span class="mt-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
                               style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>1a; color: <?= htmlspecialchars($statusBadgeColor) ?>;">
                             <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($statusBadgeColor) ?>;"></span>
-                            <?= htmlspecialchars($document['status']) ?>
+                            <?= htmlspecialchars($document['status'] ?? '—') ?>
                         </span>
                     </div>
-
                     <div>
                         <p class="text-xs font-medium text-gray-500">Current Division / Phase</p>
-                        <span class="mt-1 inline-flex items-center rounded-lg bg-gray-50 border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700">
-                            <?= htmlspecialchars(formatPhaseName($document['current_phase'])) ?>
+                        <span class="mt-1 inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">
+                            <?= htmlspecialchars(formatPhaseName((string) ($document['current_phase'] ?? ''))) ?>
                         </span>
                     </div>
-
                     <?php if (!empty($document['remarks'])): ?>
-                    <div>
-                        <p class="text-xs font-medium text-gray-500">Remarks / Notes</p>
-                        <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap"><?= escape_trimmed_text($document['remarks']) ?></p>
-                    </div>
+                        <div class="sm:col-span-2">
+                            <p class="text-xs font-medium text-gray-500">Remarks / Notes</p>
+                            <p class="mt-1 whitespace-pre-wrap text-sm text-gray-900"><?= escape_trimmed_text($document['remarks']) ?></p>
+                        </div>
                     <?php endif; ?>
                 </div>
             </section>
@@ -383,16 +375,16 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                                 preg_replace('#^(?:public/)+#i', '', ltrim((string) ($attachment['stored_path'] ?? ''), '/\\')) ?? ''
                             );
                         ?>
-                            <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                <div class="flex items-center gap-3 min-w-0 flex-1">
+                            <div class="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 xl:flex-row xl:items-center xl:justify-between">
+                                <div class="flex min-w-0 items-start gap-3">
                                     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-primary">
                                         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                         </svg>
                                     </div>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-sm font-medium text-gray-900 truncate"><?= htmlspecialchars($attachmentName) ?></p>
-                                        <p class="text-xs text-gray-500">
+                                        <p class="break-words text-sm font-medium text-gray-900"><?= htmlspecialchars($attachmentName) ?></p>
+                                        <p class="mt-1 break-words text-xs leading-relaxed text-gray-500">
                                             <?= formatFileSize($attachment['file_size']) ?> •
                                             <?= htmlspecialchars(formatPhaseName($attachment['phase'])) ?>
                                             <?php if (!empty($attachment['attachment_type'])): ?>
@@ -403,18 +395,18 @@ $statusBadgeColor = !empty($document['status_badge_color']) ? $document['status_
                                         </p>
                                     </div>
                                 </div>
-                                <div class="ml-3 flex shrink-0 items-center gap-2">
+                                <div class="grid w-full grid-cols-2 gap-2 xl:w-auto xl:shrink-0">
                                     <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
                                        data-attachment-preview
                                        data-preview-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
                                        data-preview-name="<?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?>"
                                        data-download-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
-                                       class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-hover transition">
+                                       class="inline-flex justify-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-hover xl:py-1.5">
                                         Preview
                                     </a>
                                     <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
                                        download
-                                       class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition">
+                                       class="inline-flex justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 xl:py-1.5">
                                         Download
                                     </a>
                                 </div>

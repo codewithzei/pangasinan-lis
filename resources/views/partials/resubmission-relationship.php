@@ -5,6 +5,8 @@ $resubmissionDetailRoute = rtrim(
     $resubmissionDetailRoute ?? $mfrDetailRoute ?? 'admin/inbox',
     '/'
 );
+$resubmissionDetailAction = $resubmissionDetailAction ?? 'show';
+$resubmissionDetailQuery = (string) ($resubmissionDetailQuery ?? '');
 $resubmissionTopMargin = $resubmissionTopMargin ?? 'mt-6';
 
 if (empty($resubmissionReference) && empty($relatedResubmissions)) {
@@ -30,7 +32,7 @@ if (empty($resubmissionReference) && empty($relatedResubmissions)) {
     <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
             <p class="text-xs font-medium text-gray-500">Linked Document</p>
-            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($resubmissionDetailRoute) ?>/show?id=<?= (int) ($resubmissionReference['ref_id'] ?? $resubmissionReference['referenced_document_id'] ?? 0) ?>"
+            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($resubmissionDetailRoute) ?>/<?= htmlspecialchars($resubmissionDetailAction) ?>?id=<?= (int) ($resubmissionReference['ref_id'] ?? $resubmissionReference['referenced_document_id'] ?? 0) ?><?= htmlspecialchars($resubmissionDetailQuery) ?>"
                class="mt-1 inline-block text-sm font-semibold text-primary hover:underline">
                 <?= htmlspecialchars($resubmissionReference['ref_tracking_number'] ?? '—') ?>
             </a>
@@ -83,7 +85,7 @@ if (empty($resubmissionReference) && empty($relatedResubmissions)) {
         <?php foreach ($relatedResubmissions as $resubmission): ?>
         <li class="flex flex-wrap items-center justify-between gap-3 p-4">
             <div>
-                <a href="<?= BASE_URL ?>/<?= htmlspecialchars($resubmissionDetailRoute) ?>/show?id=<?= (int) ($resubmission['resubmitted_document_id'] ?? 0) ?>"
+                <a href="<?= BASE_URL ?>/<?= htmlspecialchars($resubmissionDetailRoute) ?>/<?= htmlspecialchars($resubmissionDetailAction) ?>?id=<?= (int) ($resubmission['resubmitted_document_id'] ?? 0) ?><?= htmlspecialchars($resubmissionDetailQuery) ?>"
                    class="text-sm font-semibold text-primary hover:underline">
                     <?= htmlspecialchars($resubmission['resubmitted_tracking_number'] ?? '—') ?>
                 </a>

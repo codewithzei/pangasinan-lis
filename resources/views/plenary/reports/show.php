@@ -18,6 +18,19 @@ $decisionClasses = [
     'DISAPPROVED' => 'bg-amber-100 text-amber-800',
     'ADOPTED' => 'bg-blue-100 text-blue-800',
 ];
+$hearingOutcomeColors = [
+    'APPROVED' => '#059669',
+    'DEFERRED' => '#d97706',
+    'REMANDED' => '#dc2626',
+    'WITHDRAWN' => '#6b7280',
+    'NOTED' => '#0891b2',
+    'COMPLETED_TERMINATED' => '#475569',
+    'RESET' => '#2563eb',
+];
+$hearingOutcomeLabels = [
+    'COMPLETED_TERMINATED' => 'Completed/Terminated',
+    'RESET' => 'Reset',
+];
 $sessionLabels = [
     'REGULAR' => 'Regular',
     'REGULAR_ONLINE' => 'Regular (Online)',
@@ -109,33 +122,61 @@ ob_start();
                 <?php endif; ?>
             </section>
 
-            <section class="rounded-2xl border border-emerald-200 bg-white p-5">
-                <div class="flex items-start justify-between gap-3">
+            <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+                <div class="mb-4 flex items-center justify-between gap-3">
                     <div>
-                        <h2 class="text-sm font-semibold text-gray-900">Official Committee Report Copy</h2>
-                        <p class="mt-1 text-xs text-gray-500"><?= count($reportAttachments) ?> file<?= count($reportAttachments) === 1 ? '' : 's' ?> transmitted</p>
+                        <h2 class="text-base font-semibold text-gray-900">Official Committee Report Copy</h2>
+                        <p class="mt-1 text-xs text-gray-500">Transmitted report attachments</p>
                     </div>
+                    <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                        <?= count($reportAttachments) ?> file<?= count($reportAttachments) === 1 ? '' : 's' ?>
+                    </span>
                 </div>
                 <?php if ($reportAttachments === []): ?>
-                    <p class="mt-4 rounded-lg bg-gray-50 px-3 py-3 text-sm italic text-gray-500">No report copy is attached to this record.</p>
+                    <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
+                        <p class="text-sm font-medium text-gray-700">No report copy attached</p>
+                        <p class="mt-1 text-xs text-gray-500">Transmitted report files will appear here.</p>
+                    </div>
                 <?php else: ?>
-                    <ul class="mt-4 space-y-2">
+                    <ul class="space-y-2">
                         <?php foreach ($reportAttachments as $attachment): ?>
-                            <?php $attachmentUrl = BASE_URL . '/public/' . ltrim((string) $attachment['stored_path'], '/\\'); ?>
-                            <li class="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
-                                <div class="flex items-start justify-between gap-3">
+                            <?php
+                            $attachmentName = (string) ($attachment['file_name'] ?? 'Committee report copy');
+                            $attachmentUrl = BASE_URL . '/public/' . ltrim((string) ($attachment['stored_path'] ?? ''), '/\\');
+                            ?>
+                            <li class="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="flex min-w-0 items-start gap-3 sm:items-center">
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-primary">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                        </svg>
+                                    </div>
                                     <div class="min-w-0">
-                                        <p class="break-words text-sm font-medium text-gray-800"><?= htmlspecialchars($attachment['file_name']) ?></p>
-                                        <p class="mt-1 text-xs text-gray-500">
-                                            <?= number_format((int) $attachment['file_size'] / 1024, 1) ?> KB
-                                            · <?= !empty($attachment['created_at']) ? htmlspecialchars(date('M j, Y', strtotime($attachment['created_at']))) : 'Date unavailable' ?>
+                                        <p class="break-words text-sm font-medium text-gray-800 sm:truncate">
+                                            <?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?>
+                                        </p>
+                                        <p class="mt-0.5 break-words text-xs leading-relaxed text-gray-500">
+                                            <?= number_format((int) ($attachment['file_size'] ?? 0) / 1024, 1) ?> KB
+                                            <?php if (!empty($attachment['created_at'])): ?>
+                                                &middot; <?= htmlspecialchars(date('M j, Y g:i A', strtotime($attachment['created_at'])), ENT_QUOTES, 'UTF-8') ?>
+                                            <?php endif; ?>
                                         </p>
                                     </div>
-                                    <a href="<?= htmlspecialchars($attachmentUrl) ?>" target="_blank" rel="noopener"
-                                       class="shrink-0 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
-                                        View Copy
-                                    </a>
                                 </div>
+                                <?php if (!empty($attachment['stored_path'])): ?>
+                                    <div class="grid grid-cols-2 gap-2 sm:ml-4 sm:flex sm:shrink-0 sm:items-center">
+                                        <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           target="_blank" rel="noopener"
+                                           data-attachment-preview
+                                           data-preview-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           data-preview-name="<?= htmlspecialchars($attachmentName, ENT_QUOTES, 'UTF-8') ?>"
+                                           data-download-url="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>"
+                                           class="inline-flex justify-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-hover sm:py-1.5">Preview</a>
+                                        <a href="<?= htmlspecialchars($attachmentUrl, ENT_QUOTES, 'UTF-8') ?>" download
+                                           class="inline-flex justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50 sm:py-1.5">Download</a>
+                                    </div>
+                                <?php endif; ?>
                             </li>
                         <?php endforeach; ?>
                     </ul>
@@ -169,18 +210,15 @@ ob_start();
                                 $decisionClass = $decisionClasses[$decision] ?? 'bg-gray-100 text-gray-700';
                                 $decisionLabel = $decisionLabels[$decision] ?? $decision;
                                 $hearingOutcome = (string) ($adoption['committee_hearing_outcome'] ?? '');
-                                $hearingClass = $hearingOutcome === 'APPROVED'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : ($hearingOutcome !== '' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600');
+                                $hearingColor = $hearingOutcomeColors[$hearingOutcome] ?? '#6B7280';
+                                $hearingLabel = $hearingOutcomeLabels[$hearingOutcome] ?? ucfirst(strtolower($hearingOutcome));
+                                $documentStatusColor = $adoption['document_status_badge_color'] ?? '#6B7280';
                             ?>
                             <article class="p-5">
                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                     <div class="min-w-0">
                                         <p class="font-mono text-sm font-bold text-primary"><?= htmlspecialchars($adoption['tracking_number']) ?></p>
                                         <h3 class="mt-1 text-base font-semibold leading-6 text-gray-900"><?= htmlspecialchars($adoption['subject_matter'] ?? '—') ?></h3>
-                                        <?php if (!empty($adoption['document_type_name'])): ?>
-                                            <p class="mt-1 text-xs text-gray-500"><?= htmlspecialchars($adoption['document_type_name']) ?></p>
-                                        <?php endif; ?>
                                     </div>
                                     <span class="inline-flex w-fit shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold <?= $decisionClass ?>">
                                         <?= htmlspecialchars($decisionLabel) ?>
@@ -189,12 +227,31 @@ ob_start();
 
                                 <dl class="mt-4 grid grid-cols-1 gap-3 rounded-xl bg-gray-50 p-4 text-sm sm:grid-cols-2">
                                     <div>
+                                        <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Document Type</dt>
+                                        <dd class="mt-1">
+                                            <?php if (!empty($adoption['document_type_name'])): ?>
+                                                <span class="inline-flex w-fit rounded-full px-2 py-0.5 text-xs font-medium"
+                                                      style="background-color: <?= htmlspecialchars($adoption['document_type_badge_color'] ?? '#2563EB') ?>14; color: <?= htmlspecialchars($adoption['document_type_badge_color'] ?? '#2563EB') ?>;">
+                                                    <?= htmlspecialchars($adoption['document_type_name']) ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="text-gray-500">—</span>
+                                            <?php endif; ?>
+                                        </dd>
+                                    </div>
+                                    <div>
                                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Proposed Number</dt>
                                         <dd class="mt-1 font-medium text-gray-800"><?= htmlspecialchars($adoption['proposed_number'] ?: 'Not assigned') ?></dd>
                                     </div>
                                     <div>
                                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Current Document Status</dt>
-                                        <dd class="mt-1 font-medium text-gray-800"><?= htmlspecialchars($adoption['document_status'] ?? '—') ?></dd>
+                                        <dd class="mt-1">
+                                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                                                  style="background-color: <?= htmlspecialchars($documentStatusColor) ?>14; color: <?= htmlspecialchars($documentStatusColor) ?>;">
+                                                <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($documentStatusColor) ?>;"></span>
+                                                <?= htmlspecialchars($adoption['document_status'] ?? '—') ?>
+                                            </span>
+                                        </dd>
                                     </div>
                                     <div>
                                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Received</dt>
@@ -218,7 +275,11 @@ ob_start();
                                         <dt class="text-xs font-medium uppercase tracking-wide text-gray-400">Committee Hearing</dt>
                                         <dd class="mt-1">
                                             <?php if ($hearingOutcome !== ''): ?>
-                                                <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold <?= $hearingClass ?>"><?= htmlspecialchars(ucfirst(strtolower($hearingOutcome))) ?></span>
+                                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                                                      style="background-color: <?= htmlspecialchars($hearingColor) ?>14; color: <?= htmlspecialchars($hearingColor) ?>;">
+                                                    <span class="h-1.5 w-1.5 rounded-full" style="background-color: <?= htmlspecialchars($hearingColor) ?>;"></span>
+                                                    <?= htmlspecialchars($hearingLabel) ?>
+                                                </span>
                                                 <?php if (!empty($adoption['committee_hearing_at'])): ?>
                                                     <span class="ml-1 text-xs text-gray-500"><?= htmlspecialchars(date('M j, Y', strtotime($adoption['committee_hearing_at']))) ?></span>
                                                 <?php endif; ?>
