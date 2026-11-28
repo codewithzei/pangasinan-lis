@@ -12,6 +12,11 @@ $checks = [
     'Controller maps REMANDED status and event' =>
         str_contains($controller, "'REMANDED'  => 'Remanded'") &&
         str_contains($controller, "'REMANDED'  => 'HEARING_REMANDED'"),
+    'Controller preserves a missing previous status as NULL for the event foreign key' =>
+        str_contains($controller, '$prevStatusId    = isset($case[\'current_status_id\'])') &&
+        !str_contains($controller, '$prevStatusId    = (int) $case[\'current_status_id\'];'),
+    'Controller includes a REMANDED success message' =>
+        str_contains($controller, "'REMANDED'  => 'Case outcome set to Remanded."),
     'Case detail offers and displays Remanded' =>
         str_contains($view, '<option value="REMANDED">Remand — Case sent to Remanded</option>') &&
         str_contains($view, "'REMANDED'  => ['label' => 'Remanded'"),

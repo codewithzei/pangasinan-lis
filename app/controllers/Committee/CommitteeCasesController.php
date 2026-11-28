@@ -1097,7 +1097,9 @@ class CommitteeCasesController
         }
 
         $eventType       = $eventMap[$outcome];
-        $prevStatusId    = (int) $case['current_status_id'];
+        $prevStatusId    = isset($case['current_status_id'])
+            ? (int) $case['current_status_id']
+            : null;
 
         // ── Resolve username ──────────────────────────────────────────────────
         $uStmt = $this->pdo->prepare("SELECT username FROM user_accounts WHERE id = ? LIMIT 1");
@@ -1175,6 +1177,7 @@ class CommitteeCasesController
         $successMessages = [
             'APPROVED'  => 'Case outcome set to Approved. The case is now available in Committee Hearings.',
             'DEFERRED'  => 'Case outcome set to Deferred. The case is now available in Committee Hearings.',
+            'REMANDED'  => 'Case outcome set to Remanded. The case is now available in Committee Hearings.',
             'WITHDRAWN' => 'Case outcome set to Withdrawn. The case is now available in Committee Hearings.',
             'NOTED'     => 'Case outcome set to Noted. The case is now available in Committee Hearings.',
         ];

@@ -1608,6 +1608,7 @@ ob_start();
     var trackingNumber = document.getElementById('reportAdoptionConfirmationTracking');
     var confirmButton = document.getElementById('confirmReportAdoptionConfirmation');
     var cancelButton = document.getElementById('cancelReportAdoptionConfirmation');
+    var confirmationIcon = document.getElementById('reportAdoptionConfirmationIcon');
     var activeButton = null;
     var submitted = false;
 
@@ -1637,6 +1638,10 @@ ob_start();
             confirmButton.classList.toggle('hover:bg-violet-700', decision === 'APPROVED');
             confirmButton.classList.toggle('bg-gray-700', decision !== 'APPROVED');
             confirmButton.classList.toggle('hover:bg-gray-800', decision !== 'APPROVED');
+            confirmationIcon.classList.toggle('bg-violet-100', decision === 'APPROVED');
+            confirmationIcon.classList.toggle('text-violet-600', decision === 'APPROVED');
+            confirmationIcon.classList.toggle('bg-gray-100', decision !== 'APPROVED');
+            confirmationIcon.classList.toggle('text-gray-600', decision !== 'APPROVED');
             confirmButton.disabled = false;
             modal.classList.remove('hidden');
             modal.classList.add('flex');

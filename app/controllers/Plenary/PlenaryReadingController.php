@@ -1555,6 +1555,7 @@ class PlenaryReadingController
             $total      = (int) $countStmt->fetchColumn();
             $totalPages = $total > 0 ? (int) ceil($total / $perPage) : 1;
             $page       = min($page, $totalPages);
+            $offset     = ($page - 1) * $perPage;
 
             $listStmt = $this->pdo->prepare("
                 SELECT
@@ -1648,6 +1649,7 @@ class PlenaryReadingController
             $total      = (int) $countStmt->fetchColumn();
             $totalPages = $total > 0 ? (int) ceil($total / $perPage) : 1;
             $page       = min($page, $totalPages);
+            $offset     = ($page - 1) * $perPage;
 
             $listStmt = $this->pdo->prepare("
                 SELECT
@@ -1708,6 +1710,7 @@ class PlenaryReadingController
             $total      = (int) $countStmt->fetchColumn();
             $totalPages = $total > 0 ? (int) ceil($total / $perPage) : 1;
             $page       = min($page, $totalPages);
+            $offset     = ($page - 1) * $perPage;
 
             $listStmt = $this->pdo->prepare("
                 SELECT
